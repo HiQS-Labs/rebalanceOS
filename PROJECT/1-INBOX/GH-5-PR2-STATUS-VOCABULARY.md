@@ -90,6 +90,14 @@ names (`badge-danger`) and in tests. Grep every literal before changing it — a
 "one line" if nothing downstream keys off the old value. The CSS rules in particular are named
 `.badge-{variant}` and must be renamed in lockstep.
 
+**Grep is not sufficient, and saying "may be persisted" while only prescribing grep is a gap.**
+Grep inspects code; it cannot see data at rest. This repo is SQLite-backed, so historical rows may
+already store `danger`/`warn`/`fail` literals — after a rename those rows render as unknown
+variants (and `badge_html` silently degrades an unknown variant to `neutral`, so the damage is
+*invisible*, not loud). **Query the database for stored instances of every old literal before
+renaming**, and if any exist, decide explicitly between a migration and a read-side compatibility
+map. Neither is free; picking neither is the failure mode.
+
 ### Phase 1b — Do NOT collapse `Check.status` into `Check.severity`
 
 **Reversed from this plan's first draft.** The draft called this "the single highest-value
