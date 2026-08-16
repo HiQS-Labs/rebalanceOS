@@ -1243,6 +1243,37 @@ def _check_auth_failures() -> list[Check]:
     return checks
 
 
+# GH-5 Phase 4 — the pulse_health → doctor severity boundary.
+#
+# `pulse_health.classify()` has its own 5-state vocabulary. That model is
+# independently useful and stays untouched; what was wrong was letting its raw
+# state word cross into doctor's user-facing `detail` text, where it read as a
+# fourth severity word alongside doctor's canonical notice/warning/error (#3).
+# The mapping lives here, at the consumption boundary, so exactly one caller's
+# presentation needs are served without collapsing the source model.
+_PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
+    # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
+    "ALIVE":     (OK,   NOTICE,  "collecting normally"),
+    "STALE":     (WARN, WARNING, "stale"),
+    "ALERT":     (WARN, ERROR,   "not collecting"),
+    "DEGRADED":  (WARN, ERROR,   "collecting with errors"),
+    "NO PUSHES": (WARN, ERROR,   "never collected"),
+}
+
+
+def _map_pulse_state(state: str) -> tuple[str, str, str]:
+    """Map a `pulse_health` state to doctor's canonical (status, severity, phrase).
+
+    `state` may carry a parenthetical qualifier appended by the caller (e.g.
+    ``"ALIVE (intermittent-device window 18h)"``); the leading word is what
+    classifies. An unrecognised state is treated as a warning rather than
+    assumed healthy — doctor must never report a state it does not understand
+    as fine.
+    """
+    head = (state or "").split(" (", 1)[0].strip()
+    return _PULSE_STATE_TO_CHECK.get(head, (WARN, WARNING, head.lower() or "unknown"))
+
+
 def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Check]:
     """Surface git-pulse per-device collector health (ALIVE/STALE/ALERT/DEGRADED).
 
@@ -1291,11 +1322,27 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
             healthy = True
             state = f"ALIVE (intermittent-device window {scope.stale_after_hours:g}h)"
 
-        detail = f"{state} — {age}"
+        # Map the raw pulse state to doctor's own vocabulary before it reaches
+        # any user-facing text (GH-5 Phase 4 / #3).
+        _status, severity, phrase = _map_pulse_state(state)
+        qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
+        detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
         if health.repo_scan_failures:
             detail += f", {health.repo_scan_failures} repo scan failures"
             if health.scan_failure_examples:
                 detail += f" ({health.scan_failure_examples})"
+
+        # `healthy` (not `health.healthy`) is the locally-adjusted verdict: an
+        # intermittent device inside its declared window is healthy here even
+        # though the fleet classifier called it stale. Severity must follow the
+        # same verdict as status.
+        #
+        # This line previously read `severity=WARNING if health.healthy else
+        # ERROR` — inverted, so a *healthy* collector was reported at WARNING
+        # severity, and the intermittent-device override never reached severity
+        # at all. Both fixed here.
+        if healthy:
+            severity = NOTICE
         checks.append(
             Check(
                 name,
@@ -1304,7 +1351,7 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
                 "" if healthy else
                 "check the collector machine / its launchd git-pulse job; "
                 "`python experimental/git-pulse/health-check.py` for the full view",
-                severity=WARNING if health.healthy else ERROR,
+                severity=severity,
             )
         )
     return checks
@@ -1648,6 +1695,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     launchctl_output = _launchctl_list()
     report.checks.extend(_check_scheduler_liveness(launchctl_output=launchctl_output))
     report.checks.extend(_check_launchd(launchctl_output))
+
 
     # Final section: a map of every diagnostics surface, so this one command
     # is the single entry point into the project's observability.
