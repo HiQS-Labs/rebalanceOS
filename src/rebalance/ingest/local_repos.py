@@ -25,7 +25,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from rebalance.lib.git_ops import _git
+from rebalance.lib.git_ops import _git, should_descend
 
 GITHUB_REMOTE_MARKERS = ("github.com:", "github.com/")
 
@@ -52,8 +52,15 @@ def parse_github_full_name(origin_url: str) -> str | None:
 
 
 def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
-    """Find git checkouts under *root* (same walk the git-pulse scanner uses:
-    stop descending at a ``.git`` dir, skip dot-dirs, bounded depth)."""
+    """Find git checkouts under *root*: stop descending at a ``.git`` dir,
+    prune the shared blacklist and dot-dirs, bounded depth.
+
+    GH-5 Phase 2 deliberately widened this walk. It previously skipped only
+    dot-directories, so a `node_modules/` or `Library/` tree was walked in
+    full looking for checkouts. It now shares ``git_ops.DEFAULT_PRUNE_DIRS``
+    with the ask_self/Focus5 walkers — an intended behavior change (more
+    directories skipped), not a pure code move.
+    """
     if not root.exists() or not root.is_dir():
         return []
 
@@ -69,7 +76,7 @@ def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
         try:
             children = sorted(
                 child for child in current.iterdir()
-                if child.is_dir() and not child.name.startswith(".")
+                if child.is_dir() and should_descend(child.name)
             )
         except OSError:
             continue

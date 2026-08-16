@@ -44,7 +44,8 @@ from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
 # Reuse the prune discipline and the (already tested) remote-URL → owner/repo
 # parser rather than duplicating them; both are low-churn and shared by intent.
-from rebalance.ingest.ask_self_scan import _PRUNE_DIRS, derive_repo_full_name
+from rebalance.ingest.ask_self_scan import derive_repo_full_name
+from rebalance.lib.git_ops import should_descend
 from rebalance.lib.git_ops import _git
 
 logger = logging.getLogger(__name__)
@@ -436,9 +437,8 @@ def rank_repos(
 # ---------------------------------------------------------------------------
 
 def _should_descend(name: str) -> bool:
-    if name in _PRUNE_DIRS:
-        return False
-    return not name.startswith(".")  # ".git" is matched by marker, never descended
+    # ".git" is matched by marker, never descended.
+    return should_descend(name)
 
 
 def iter_git_repos(
