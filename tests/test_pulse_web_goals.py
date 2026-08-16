@@ -99,7 +99,11 @@ class PulseWebGoalTests(unittest.TestCase):
         )
 
         self.assertIn("2 errors", html)
-        self.assertIn("Collector attention needed", html)
+        # GH-5 Phase 4b (#2): was "Collector attention needed". These problems are
+        # doctor Checks of every kind (gmail, sleuth, launchd, …), so the old
+        # summary was overbroad as well as ambiguous against the per-device
+        # collector items rendered directly below it.
+        self.assertIn("Attention needed", html)
         self.assertIn("github token", html)
         self.assertIn("vault", html)
         self.assertIn("+1 more", html)
@@ -119,7 +123,9 @@ class PulseWebGoalTests(unittest.TestCase):
         )
 
         self.assertIn("synced-warn", chip)
-        self.assertIn("Collector warnings", chip)
+        # GH-5 Phase 4b (#2): was "Collector warnings" — the chip renders the
+        # general-ingestion timestamp, not a per-device collector's scan age.
+        self.assertIn("Sync warnings", chip)
 
     def test_build_stream_rows_includes_email_and_figma(self) -> None:
         rows = pulse_web.build_stream_rows(
