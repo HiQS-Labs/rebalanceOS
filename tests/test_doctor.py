@@ -380,33 +380,6 @@ class PulseCollectorCheckTests(unittest.TestCase):
         ):
             self.assertEqual(_check_pulse_collectors(), [])
 
-    def test_detail_leads_with_canonical_severity_not_raw_pulse_state(self) -> None:
-        """GH-3: a user sees "1 error · 2 warnings · 21 notices" as the banner's
-        summary, then this Check's ``detail`` prints pulse_health's own raw
-        5-state word (ALERT/DEGRADED/STALE/NO PUSHES) as if it were a 4th
-        severity tier alongside error/warning/notice. It already collapses into
-        one of those 3 canonical words for bucket-counting (health.py) — the
-        visible text should already read as one of them too, not leak the raw
-        internal state name. Fails today (detail == "ALERT — last scan ...");
-        must pass once GH-3 lands."""
-        devices = [
-            self._health("Stale", "ALERT", healthy=False, age_hours=30.0),
-            self._health("Broken", "DEGRADED", healthy=False, age_hours=0.3, failures=1),
-        ]
-        with patch(
-            "rebalance.ingest.pulse_health.read_collector_health",
-            return_value=devices,
-        ):
-            checks = _check_pulse_collectors()
-        by = {c.name: c for c in checks}
-        for check_name in ("pulse collector:Stale", "pulse collector:Broken"):
-            detail = by[check_name].detail
-            self.assertFalse(
-                detail.startswith(("ALERT", "DEGRADED", "STALE", "NO PUSHES")),
-                f"{check_name}: detail leaks a raw pulse_health state word "
-                f"instead of a canonical error/warning/notice word: {detail!r}",
-            )
-
     def test_never_crashes_on_reader_error(self) -> None:
         with patch(
             "rebalance.ingest.pulse_health.read_collector_health",

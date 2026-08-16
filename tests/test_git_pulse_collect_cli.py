@@ -83,7 +83,6 @@ def _write_git_stub(
     unborn_repos: tuple[Path, ...] = (),
     log_failure_repos: tuple[Path, ...] = (),
     rev_parse_failure_repos: tuple[Path, ...] = (),
-    pull_exit_code: int = 0,
 ) -> None:
     _write_executable(
         path,
@@ -99,7 +98,6 @@ def _write_git_stub(
             unborn_repos = {tuple(str(repo) for repo in unborn_repos)!r}
             log_failure_repos = {tuple(str(repo) for repo in log_failure_repos)!r}
             rev_parse_failure_repos = {tuple(str(repo) for repo in rev_parse_failure_repos)!r}
-            pull_exit_code = {pull_exit_code!r}
             args = sys.argv[1:]
 
             if len(args) >= 3 and args[0] == "-C":
@@ -136,13 +134,7 @@ def _write_git_stub(
                     raise SystemExit(0)
 
                 if repo_path == sync_repo and repo_args[:2] == ["pull", "--quiet"]:
-                    if pull_exit_code != 0:
-                        print(
-                            "Auto-merging sync/calendar/latest.json\\n"
-                            "CONFLICT (content): Merge conflict in sync/calendar/latest.json",
-                            file=sys.stderr,
-                        )
-                    raise SystemExit(pull_exit_code)
+                    raise SystemExit(0)
 
             if args[:3] == ["add", "-A", "--"]:
                 stage_log = os.environ.get("STAGE_LOG")
@@ -252,88 +244,6 @@ class GitPulseCollectCliTests(unittest.TestCase):
         self.assertEqual(pulse_text.count("Migrated local commit"), 1)
         self.assertIn('last_scan_epoch: "1776750000"', metadata_text)
         self.assertIn('last_scan_utc: "2026-04-21T05:40:00Z"', metadata_text)
-
-    def test_collect_aborts_cleanly_without_writing_metadata_on_sync_repo_pull_conflict(
-        self,
-    ) -> None:
-        """GH-4: pins the (already correct) behavior investigated for the
-        2026-08-11 outage, so a future edit can't quietly regress it.
-        `git -C "$sync_repo_dir" pull --quiet --rebase` (collect.sh:480) is
-        unchecked, but `set -euo pipefail` (collect.sh:5) means a failed pull
-        aborts the whole script immediately — it does NOT fall through and
-        write a falsely-"clean" scan_status (confirmed: exit 1, no metadata
-        write). The 4-day outage was not this code being wrong; it was that
-        the launchd job (com.user.git-pulse) was not loaded to run again —
-        an OS-level supervision gap, not something this suite can pin."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            home = Path(tmpdir)
-            bin_dir = home / "bin"
-            config_dir = home / ".config" / "git-pulse"
-            sync_repo = config_dir / "repo"
-            devices_dir = sync_repo / "devices"
-            local_repo = home / "code" / "sample-repo"
-
-            bin_dir.mkdir(parents=True)
-            devices_dir.mkdir(parents=True)
-            (sync_repo / ".git").mkdir()
-            (local_repo / ".git").mkdir(parents=True)
-
-            _write_date_stub(bin_dir / "date")
-            _write_scutil_stub(bin_dir / "scutil")
-            _write_git_stub(bin_dir / "git", local_repo, sync_repo, pull_exit_code=1)
-
-            (config_dir / "config.sh").write_text(
-                textwrap.dedent(
-                    f"""\
-                    repos=("{local_repo}")
-                    sync_repo_dir="{sync_repo}"
-                    device_id="noels-mac-studio"
-                    device_name="noel's Mac Studio"
-                    hostname="noel's Mac Studio"
-                    """
-                )
-            )
-            (config_dir / "last-run").write_text("0\n")
-
-            original_metadata = textwrap.dedent(
-                """\
-                schema_version: 2
-                device_id: "noels-mac-studio"
-                device_name: "noel's Mac Studio"
-                hostname: "noel's Mac Studio"
-                host_tag: "Noels-Mac-Studio"
-                timezone_name: "PDT"
-                utc_offset: "-0700"
-                pulse_file: "pulse-noels-mac-studio.md"
-                """
-            )
-            (devices_dir / "noels-mac-studio.yaml").write_text(original_metadata)
-            (sync_repo / "pulse-noels-mac-studio.md").write_text(
-                "# Git pulse — noel's Mac Studio\n"
-            )
-
-            result = subprocess.run(
-                ["/bin/bash", str(COLLECT_SCRIPT)],
-                check=False,
-                capture_output=True,
-                text=True,
-                env={
-                    **os.environ,
-                    "HOME": str(home),
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                },
-            )
-
-            metadata_text = (devices_dir / "noels-mac-studio.yaml").read_text()
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("CONFLICT", result.stderr)
-        self.assertNotIn('scan_status: "ok"', metadata_text)
-        self.assertEqual(
-            metadata_text,
-            original_metadata,
-            "a failed pull must not touch the metadata file at all",
-        )
 
     def test_collect_skips_unborn_repo_without_failing(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

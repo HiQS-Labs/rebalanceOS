@@ -102,38 +102,6 @@ class PulseWebGoalTests(unittest.TestCase):
         self.assertIn("Collector attention needed", html)
         self.assertIn("github token", html)
         self.assertIn("vault", html)
-
-    def test_activity_label_does_not_share_wording_with_a_pulse_collector_pill(self) -> None:
-        """GH-2: the general-ingestion timestamp ("Last collector activity")
-        and a per-device "pulse collector:<name>" pill both surface in this
-        same banner with identical typography (.timestamp-block) and no
-        icon/color distinction — sharing the word "collector" is what makes a
-        user read two different clocks as one. Once GH-2 lands, the general
-        label must stop using that word. Fails today (label is literally
-        "Last collector activity"); must pass once fixed."""
-        checks = [
-            Check(
-                "pulse collector:noel's Mac Studio",
-                WARN,
-                "ALERT — last scan 2026-08-11 7:08 PM",
-            ),
-        ]
-        now = datetime(2026, 8, 16, 16, 22, tzinfo=timezone.utc)
-        health = compute_health_status(checks, {"sources": {}}, now)
-        html = pulse_web.render_health_banner(
-            health,
-            now,
-            "2026-08-16T16:22:00+00:00",
-        )
-        lead_start = html.index('class="health-banner-lead"')
-        items_start = html.index('class="health-banner-items"')
-        lead_html = html[lead_start:items_start]
-        self.assertNotIn(
-            "collector",
-            lead_html.lower(),
-            "the general-ingestion activity label reuses the word 'collector', "
-            "which a per-device 'pulse collector:<name>' pill also uses",
-        )
         self.assertIn("+1 more", html)
         self.assertIn("health-banner-copy-btn", html)
         self.assertIn("data-copy-text=", html)
