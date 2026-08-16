@@ -1,282 +1,162 @@
 ---
 gh_issue: 5
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/5
-title: "GH-5 subsystem consolidation — too many subsystems reinventing the same concept"
-status: "Working — plan adjudicated (agy Phase 0/1/2 research + 4-round Codex relay review), execution started 2026-08-16"
+title: "GH-5 subsystem consolidation — finish the campaign, don't restart it"
+status: "Working — rewritten 2026-08-16 after discovering this is the resumption of an unfinished campaign, not a new one"
 created: 2026-08-16
 updated: 2026-08-16
 owner: noel
 doc_type: refactor
-related: "#2 (timestamp conflation), #3 (severity vocabulary), #4 (git-pulse supervision gap)"
+related: "#2, #3, #4 · PR #6 (new repo) · old-repo PRs #302/#303/#304/#305 · GH-291 (repo consolidation)"
 goal: >
-  Consolidate the concepts this codebase independently reinvents per subsystem — LLM-JSON
-  parsing, repo-identity parsing, directory pruning, time handling, severity vocabulary,
-  text chunking, launchd supervision — into shared canonical implementations, while
-  preserving the deliberate isolation of the two standalone packages (HiQS, 3-Eyes) by
-  duplicating rather than coupling.
+  Finish the rebalance.lib consolidation campaign that began in the old repo and was cut in half
+  by the repo migration — recovering the work stranded in unmerged PRs before GH-291 archives it —
+  and collapse the remaining duplicated status vocabulary so an operator is never shown two words
+  for one condition.
 effort: 4
 complexity: 4
 risk: 3
-phases: 6
+phases: 5
 ratings_provisional: false
 roadmap_exempt: false
 ---
 
 # GH-5 — Subsystem Consolidation
 
-> **Plan provenance.** This doc is the local PDDA capture of the final adjudicated plan posted as
-> the last comment on [#5](https://github.com/HiQS-Suite/rebalanceOS/issues/5#issuecomment-5308674363).
-> That plan was produced by adjudicating agy's Phase 0/1/2 research (every file:line citation
-> independently re-verified — several were wrong, corrected there), then reviewed by Codex over
-> **4 relay-xyz rounds**: 6 Blockers + 8 Shoulds surfaced, all verified against source and folded
-> in, zero declined. The relay closed at `STATUS: Escalated` (round cap reached), which is the
-> honest terminal state — not an approval.
+> **This document was rewritten on 2026-08-16.** The previous version described GH-5 as a new
+> consolidation campaign. **It is not.** It is the second half of a campaign that started in the
+> old repo (GH-292, GH-293, GH-298), whose remaining phases are sitting in unmerged PRs on a repo
+> scheduled for archival. Everything below is re-planned around that fact. The prior version's
+> phase-by-phase detail survives in git history and in PR [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6)'s description.
 
 ## Status
 
 | What was just completed | What's next |
 |---|---|
-| Phases 1, 2, 3, 4, 4b and 6 shipped, one commit each, each with a regression gate proven red pre-change. Post-ship QA by agy + Codex through the `/ponytail` and `/debug-mantra` lenses: **Phase 5a reverted** (promoted a chunker with no caller — unanimous), the `unknown`-state boundary hardened, and this doc's claims narrowed to what the branch actually answers (see Post-ship QA below). | Open a PR. Next phase is the user-facing vocabulary **inventory** described below — not a further refactor. Phase 5b still deferred pending its own design pass. |
+| PR [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6) open (6 phases + post-ship QA: Phase 5a reverted, `unknown`-state hardened, claims narrowed). Root cause of the campaign's *repetition* found and fixed: the prior-art gate now lives in `ROUTER.md`, `HiQS/tests` is in CI, and a duplicated import-scanner was deleted in favour of the pre-existing one. | Merge PR #6, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. |
 
-## Post-ship QA — what this branch does and does NOT answer
+## The operator's goals — the bar this is measured against
 
-Reviewed after shipping by agy (Gemini lane) and Codex, adjudicated through the `/ponytail` and
-`/debug-mantra` lenses. The honest accounting, which supersedes any claim elsewhere in this doc
-that the branch is a coherent single answer to #5:
+Stated at the outset of the repo consolidation (GH-291) and restated for this refactor. Nothing
+below is scored against anything else.
 
-**The operator's complaint was:** too many subsystems, overlapping jargon, subsystems not talking.
+**From GH-291 (repo/folder consolidation):**
 
-| Phase | Observed symptom behind it? | Answers the complaint? |
+| # | Goal | State |
 |---|---|---|
-| 1 | **Yes** — a live incident, documented at `utils/3-eyes/three_eyes/classify.py:77-79`: a fenced model reply discarded a good ranked summary and the operator's "summary" became the raw fenced blob | No — helper dedup |
-| 2 | No — inferred smell | No — helper dedup |
-| 3 | No — inferred smell | No — helper dedup |
-| 4 | Yes — raw `ALERT` leaking into dashboard text | **Yes** (jargon) |
-| 4b | Yes — the operator's screenshot, two contradictory timestamps | **Yes** (jargon) |
-| 5a | No — and it had no caller | No — **reverted** |
-| 6 | Yes — `com.user.git-pulse` dead for days, unnoticed | **Yes** (not talking) |
+| G1 | **One repo folder on disk** | Not started — GH-291 cutover is pre-Phase-0 |
+| G2 | **Collectors and local scripts run without errors** | Partly — #4's supervision gap now surfaced by `doctor` (PR #6, Phase 6); the launchd reload is still an ops action |
+| G3 | **One single public repo** | Blocked by Phase R below — archiving today strands three PRs |
+| G4 | **Zero private-data leakage** | Unchanged from GH-291's plan |
+| G5 | **Verified and reversible** (7-day buffer) | Unchanged from GH-291's plan |
 
-**So: 4, 4b and 6 answer the complaint. 1, 2 and 3 are separately-justified maintenance and must
-not be represented as answering it.** Phase 1 is justified on its own incident record (Codex
-independently rejected agy's proposal to delete `json_ops` — doing so would leave
-`health_issue_reporter.py`'s two model-text parses strict and re-expose the same bug). Phases 2 and
-3 are safe and tested but were inferred from reading code, not from anything anyone could have
-noticed.
+**From this refactor:**
 
-### PR structure (operator decision, 2026-08-16)
+| # | Goal | Honest state after PR #6 | After the full plan |
+|---|---|---|---|
+| G6 | **Less complexity** | ❌ PR #6 adds a net module and more lines than it deletes | ⚠️ Modest. Real reduction needs the deferred `status`/`severity` collapse (Phase 4) |
+| G7 | **More maintainable code** | ✅ Fewer competing definitions | ✅ |
+| G8 | **Modules talk to each other** | ✅ One real link: `doctor` ← 3-Eyes | ✅ No further integration is scoped; say so rather than imply more |
+| G9 | **Improved UI — stop explaining similar-but-different concepts** | ⚠️ 2 of ~4 confusions fixed | ✅ Phase 3 closes this |
 
-#5 ships as **three sequenced PRs**, not one:
+> **G6 is the goal most at risk of being quietly missed.** This campaign's natural motion is
+> *adding* canonical modules. Every phase below states whether it moves net lines up or down, and
+> Phase 3 and Phase 4 are the only ones that move them down.
 
-| PR | Contents | Delivers |
-|---|---|---|
-| **PR1** — [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6) | Phases 1, 2, 3, 4, 4b, 6 | Phases 4/4b/6 answer the complaint; 1/2/3 ride along labelled as maintenance |
-| **PR2** — [plan](../1-INBOX/GH-5-PR2-STATUS-VOCABULARY.md) | One status vocabulary across user-facing surfaces | The remaining "similar but different concepts" problem; **deletion-forward**, net lines down |
-| **PR3** | Cleanup falling out of PR2 (dead shims, orphaned maps) | Kept separate so PR2's user-visible changes review on their own |
+## What we got wrong, and the fix that outlives it
 
-Phases 2 and 3 stay in PR1 rather than being re-cut: they are written, tested and green, and
-Codex graded them safe-but-unjustified rather than unsafe. Re-splitting them would be churn for
-no correctness gain — the honest fix is labelling, which PR1's description does.
+Two findings, both discovered *after* the code was written, both the same shape:
 
-**A cleanroom rewrite from `main` was considered and rejected.** A lens-applied replan converges on
-the same four substantive phases written the same way, and differs only by dropping 2 and 3 — so a
-rewrite would rebuild four correct phases in order to delete two safe ones, which is the largest
-possible diff to reach a destination two reverts away. The plan's failure mode was an unquestioned
-premise ("duplication is the problem"), not bad code; re-running the same process does not
-inoculate against that, but asking mantra 3 does.
+1. **`HiQS/tests/test_clean_room.py` already enforced the "duplicate, don't import" rule** —
+   mutually, generically, and framed in its own docstring as *"the extraction precondition, not a
+   style check."* PR #6 shipped a narrower, one-directional copy of it. **Inside the PR whose
+   purpose is removing duplicated concepts.**
+2. **`src/rebalance/lib/{git_ops,json_ops,time_ops}.py`, the `tz_utils` deprecation shim, and the
+   `now_iso()`/`now_utc()` API all pre-existed.** They came from the old repo's campaign
+   (GH-292/293/298). The modules looked like thin stubs because their adoption was stranded in
+   unmerged PRs. GH-5 read "thin stub" as "duplication to consolidate" and resumed the campaign
+   blind.
 
-### Next phase (adjudicated — Codex's framing, adopted over agy's)
+Neither was a coding error. Both were **prior-art discovery failures**, and PDDA Phase 0 already
+required the check that would have caught them.
 
-agy proposed collapsing every internal status enum into one unified taxonomy. **Declined.** Most of
-those enums never reach a human, so unifying them is machinery for its own sake — the same mistake
-Phase 5a made. The remaining problem is a *presentation* problem.
+**Root cause: nothing made existing work discoverable.** The clean-room gate existed but CI never
+ran it. The campaign existed but lived in another repo's PR queue. `GUIDING-PRINCIPLES.md` already
+stated the LOUD/SMALL invariants being re-derived by hand.
 
-**Next phase is an inventory, not a refactor:** enumerate the user-facing status vocabulary *per
-surface* (dashboard banner, sync chip, `/auth-log` badges, `doctor` output, 3-Eyes CLI) and
-determine whether an operator can still encounter two conflicting labels for one condition after
-4/4b/6. Only what fails that test gets a canonical presentation taxonomy. Internal enums with no
-user-facing path stay as they are.
+**Fixed as mechanism, not exhortation** (an exhortation demonstrably does not fire — `AGENTS.md`
+was read this session and both misses still happened):
 
-Known still-unreconciled at the presentation layer: `web.py`'s `_EVENT_BADGE`/`_SOURCE_BADGE`/
-`_KIND_BADGE` (ok/warn/danger/info/neutral) — **the seed example in #5's own body, never touched by
-this branch**.
-
-### Scope corrections found during execution
-
-Three things the 4-round-reviewed plan still had wrong, each verified against source before changing:
-
-1. **Phase 2 — `experimental/git-pulse/discover-repos.py` dropped from scope.** The plan had it
-   widening to the shared blacklist. It imports nothing from `rebalance` and sets up no `sys.path`,
-   so it cannot reach `rebalance.lib` at runtime — the *same* constraint Codex's round-4 finding
-   applied to `health-check.py` in Phase 3, which the plan never carried back to Phase 2. Left
-   script-local, consistent with the standing duplicate-don't-couple rule; a test pins it.
-2. **Phase 3 — `dashboard._ago` is not a drop-in for `time_ops.format_relative`.** The plan said
-   "retire `_ago`" without noting the two disagree on three display behaviors (`"—"` vs `""` for
-   empty, `"45s ago"` vs `"just now"`, and future timestamps as `"in 5m"` vs clamped). Swapping
-   blindly would have silently changed six dashboard call sites. The divergences became explicit
-   options on `format_relative`; a test holds `_ago`'s output byte-identical against the old
-   implementation kept verbatim as an oracle.
-3. **Phase 4b — #2's ready acceptance test was over-strict.** As posted on the issue it asserted no
-   "collector" anywhere in `.health-banner-lead`, but that div also carries the copy button's
-   `data-copy-text` payload, which embeds the problem list — where a check named
-   `pulse collector:…` *should* say collector. Assertion narrowed to the banner's visible chrome;
-   a companion test pins that the payload still names those checks.
-
-## Why
-
-Three independent, non-communicating status/severity vocabularies were found in one running
-system while diagnosing dashboard confusion (#2, #3). That was the seed, not the scope: a Phase 0
-sweep found the same "reinvent per subsystem" pattern across LLM-JSON parsing, repo-identity
-regexes, directory-prune blacklists, timezone helpers, text chunking, and launchd supervision.
-
-## The load-bearing design constraint
-
-`HiQS/` and `utils/3-eyes/` are **standalone packages by design** — HiQS is planned for extraction
-to `HiQS-Suite/HiQS`; 3-Eyes runs from its own launchd shim under a limited `PYTHONPATH` and is
-explicitly architected to degrade gracefully when the repo venv is absent. Two of agy's candidates
-proposed fixing them by importing from `rebalance.lib`, which contradicts the same research's own
-justification for keeping their config/DB isolated.
-
-**Adjudicated rule for this whole campaign: duplicate, don't import.** Where a helper also lives
-inside a standalone package, the standalone copy stays untouched and equivalence is proven by a
-shared golden-fixture test — never by a new cross-package import. This rule is applied in PR1,
-PR3, PR5a and PR6.
-
-## Existing issues folded into these phases
-
-| Issue | Phase | Note |
-|---|---|---|
-| [#3](https://github.com/HiQS-Suite/rebalanceOS/issues/3) severity vocabulary | Phase 4 | Direct fit — the seed case for this whole campaign |
-| [#2](https://github.com/HiQS-Suite/rebalanceOS/issues/2) two timestamps read as one | **Phase 4b** | **Correction made 2026-08-16:** the adjudicated plan claimed Phase 4 "addresses #2, #3", but Phase 4's actual scope (severity mapping at the `doctor.py` boundary) does **not** touch #2. #2 is a *presentation* defect in `scripts/pulse_web.py` — the topbar's `System: <clock>` render stamp sits directly above the banner's `Last collector activity <relative>`, two different sources adjacent with overlapping wording. Split into its own phase rather than left falsely covered. |
-| [#4](https://github.com/HiQS-Suite/rebalanceOS/issues/4) git-pulse dead since 2026-08-11 | Phase 6 | Partial by design. #4's own follow-up comment established the code was never the bug (`set -euo pipefail` + `self_heal_sync_repo()` already handle it) — the sole root cause was launchd unloading the job. Phase 6 addresses the *supervision* half (nothing watches loaded-state); the "reload the job on that machine" half is an ops action this repo's suite cannot perform. Phase 6 also picks up #4's ready **protective** regression test guarding the existing early-abort behavior. |
-| [#1](https://github.com/HiQS-Suite/rebalanceOS/issues/1) sustained-activity auto-promotion | **not folded in** | Unrelated feature work (watchlist promotion logic), not a reinvented-concept consolidation. Bundling it would violate this issue's own "do not bundle unrelated consolidations" rule. |
+- `ROUTER.md` now opens with four **runnable** prior-art checks, each citing the real duplicate it
+  would have caught. `AGENTS.md` / `ARCHITECTURE.md` / `ROADMAP.md` carry a one-line pointer —
+  deliberately *not* a fourth copy of the rule.
+- **`HiQS/tests` added to CI.** 162 tests and the extraction gate had never run here.
+- The duplicated import scanner is deleted; `test_clean_room.py` now covers 3-Eyes as a third
+  package.
 
 ## Phases
 
-Dependency graph (hard edges only): **PR2 → PR1**, **PR5a → PR5b**. Everything else is
-preference/merge-conflict avoidance, not a block.
+### Phase M — Merges (do first; unblocks everything)
 
-```mermaid
-flowchart TD
-    PR2["PR 2 — Directory pruning<br/>owns ALL of focus5_scan.py:47"]
-    PR1["PR 1 — Core library helpers<br/>json_ops + git_ops"]
-    PR3["PR 3 — Time operations"]
-    PR4["PR 4 — Severity vocabulary (#3)"]
-    PR4b["PR 4b — Timestamp disambiguation (#2)"]
-    PR5a["PR 5a — Chunking golden contract<br/>(REVERTED post-QA — no caller)"]
-    PR5b["PR 5b — Apply chunking to live indexing<br/>(DEFERRED — needs design pass)"]
-    PR6["PR 6 — Supervisor unification (#4)"]
+| Repo | PR | Disposition |
+|---|---|---|
+| new | **[#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6)** — GH-5 PR1 + recovery fixes | **Merge.** 2009 tests green; the 2 failures are pre-existing on `main` |
+| old | **#303** — GH-291 consolidation plan (docs only) | **Merge.** CI red is pre-existing on `main` (a missing `mcp` extra), unrelated to a markdown-only diff |
+| old | **#302, #304, #305** | **Do not merge into a repo being archived.** Port instead — see Phase R |
 
-    PR2 --> PR1
-    PR5a --> PR5b
-    PR3 -.soft.-> PR4
-    PR4 -.soft.-> PR6
-```
+### Phase R — Recover the stranded work ⏱ **deadline: before GH-291 Phase 4 archives the old repo**
 
-### Phase 2 (runs first) — Directory pruning
+GH-291's decisions cover transferring **issues**. They say nothing about **open PRs**, which is how
+this work came to be stranded. Port each into the new repo on its own branch:
 
-`rebalance.lib.git_ops` becomes sole owner of `DEFAULT_PRUNE_DIRS`, **moved** (not copied) from
-`ask_self_scan.py:47`. This PR owns the **entire** `focus5_scan.py:47` import rewrite — that one
-line supplies both `_PRUNE_DIRS` (this phase) and `derive_repo_full_name` (Phase 1), so splitting
-it guarantees a conflict and blocks Phase 1's stated goal.
+| Source | Contents | Evidence grade |
+|---|---|---|
+| **#305** (GH-293) | `diagnose.py`'s three PAT probes had **no retries** — one 429/5xx made `diagnose_repo` report a confident false *"PAT cannot see this repo."* Routes them through `GitHubClient` | **Observed user-facing false negative** — outranks anything in PR #6's phases 2/3 |
+| **#302** (GH-298) | ruff + CI lint job; 2 real bugs, incl. a `NameError` in the commit-backfill error path (the error handler itself crashed) | **Observed** |
+| **#304** (GH-292) | 92 raw clock sites → `now_iso()`/`now_utc()`. **140 such sites remain in the new repo** — measured, not assumed | Inferred (same class as PR #6's Phase 3, and its other half) |
 
-`ask_self_scan.py` / `focus5_scan.py` keep current behavior, repointed only.
-`local_repos.py` and `experimental/git-pulse/discover-repos.py` **intentionally widen** from
-dot-directory-only skipping to the full blacklist — a real, deliberate behavior change, called out
-rather than silently bundled.
+Port order: **#305, #302, #304** — observed-symptom fixes first. Each lands as its own PR.
+Net lines: up (#302 adds a lint gate) — accepted; this phase is about *recovering* value, not G6.
 
-### Phase 1 — Core library helpers
+**Gate:** the old repo has no open PR carrying unported work before GH-291 Phase 4 runs.
 
-- `json_ops.parse_llm_json` / `strip_code_fences` land in `src/rebalance/lib/json_ops.py`.
-  `utils/3-eyes/three_eyes/classify.py`'s own `_first_json_object`/`_parse_model_json`
-  **stay untouched** (standalone-isolation rule) — equivalence proven by golden fixture.
-  Only `scripts/health_issue_reporter.py` is rewired.
-- `health_issue_reporter.py`'s `_strip_code_fence` is **dead code** (defined, never called) —
-  delete, don't migrate. The real model-output parses are its two `json.loads()` calls on model
-  text; the one parsing the Gemini HTTP response *envelope* must stay untouched.
-- `git_ops.parse_github_remote_url` consolidates `local_repos.py:32`'s `_FULL_NAME_RE` and
-  `ask_self_scan.py:58`'s `_REMOTE_RE` **internals only**.
-- `querier.py` **excluded** — its defensive access is on already-parsed JSON, a different problem
-  shape that doesn't share the bug class being fixed.
+### Phase 3 — One status vocabulary (closes G9)
 
-### Phase 3 — Time operations
+Three words name the same top tier, all user-visible: `danger` (`web_components.py:98`), `fail`
+(`doctor.py:28`), `error` (`doctor.py:32`); plus `warn` vs `warning`, two enum values that look
+like a typo of each other and both reach the dashboard. Deletion-forward — visible dashboard
+changes accepted by operator decision. Full plan:
+[GH-5-PR2-STATUS-VOCABULARY.md](../1-INBOX/GH-5-PR2-STATUS-VOCABULARY.md). **Net lines: down.**
 
-Migrate the source files importing `rebalance.tz_utils` onto `rebalance.lib.time_ops`; retire
-`dashboard.py:_ago`. `tests/test_tz_utils.py` is **not** touched — its job is proving the
-deprecated re-export shim still works, which stays meaningful until a separately announced removal.
+### Phase 4 — The `status` / `severity` collapse (the real G6 lever)
 
-`experimental/git-pulse/health-check.py`'s `parse_utc` is **out of scope**: it is unreachable from
-`rebalance.lib` under its own `sys.path`, *and* it treats naive timestamps as host-local while
-`time_ops.parse_utc_iso` treats them as already-UTC — swapping would silently shift timestamps by
-the host's UTC offset. Stays script-local, per the duplicate-don't-couple rule.
+Deferred out of Phase 3 because it is not free: `health.py:100` renders an OK check when severity
+is `NOTICE` (the dashboard's "21 notices"), and `cli/__init__.py:156` makes `status == FAIL` drive
+the **process exit code** while severity does not. Two genuine axes. A single 4-value tier
+(`ok`/`notice`/`warning`/`error`) *is* expressible, but requires an explicit decision about which
+tiers exit non-zero. **Net lines: down. This is the phase that actually delivers G6** — without it,
+G6 is met only marginally, and the plan should not pretend otherwise.
 
-### Phase 4 — Severity vocabulary alignment (#2, #3)
+### Phase 5b — Chunking into live indexing (still deferred, unchanged)
 
-At `doctor.py`'s `_check_pulse_collectors()` **only**: map `pulse_health` state → canonical
-`Check.severity` before it reaches user-facing `detail` text, and fix the confirmed inversion
-where a **healthy** (`ALIVE`) collector currently reports `severity=WARNING`.
+`note_ingester` inserts one `chunks` row per parser chunk and `semantic_index` keys each document
+1:1 off that row's id. Splitting without a stable child-key scheme and a stale-child deletion policy
+breaks document identity on re-index. Needs its own design pass. Phase 5a — which promoted the
+chunker *without* its caller — was reverted; the next attempt promotes it **with** one.
 
-`pulse_health.py` itself stays untouched — its 5-state model has other consumers and its own tests.
-`index_ops._derive_signal_health()` is **excluded**: its `ok`/`warn`/`degraded` values are a
-separate, already-tested, already-consumed contract, unrelated to the #2/#3 confusion.
+## Out of scope (with reasons, so they stop resurfacing)
 
-### Phase 4b — Timestamp disambiguation (#2)
+- **`_SOURCE_BADGE` / `_KIND_BADGE`** — verified *categorical* (github/gmail/client/channel), not
+  severity, despite #5's own body, agy's research, and earlier summaries all claiming otherwise.
+- **Internal enums with no user-facing path** (`index_ops._derive_signal_health`, `pulse_health`'s
+  5-state model). agy proposed collapsing every internal enum; declined — enums no operator sees are
+  not this problem, and unifying them repeats Phase 5a's mistake.
+- **HiQS / 3-Eyes internals** — standalone packages; the clean-room gate is now enforced in CI.
+- **A cleanroom rewrite from `main`** — a lens-applied replan converges on the same substantive
+  phases and differs only by dropping two safe ones: the largest possible diff to reach a
+  destination two reverts away.
 
-Separate from Phase 4 (see the issue-mapping table above — the adjudicated plan wrongly folded
-this into Phase 4's severity work). Scope is `scripts/pulse_web.py` only: the health banner's lead
-row must stop using the word "collector" for what is actually *general ingestion* activity, so it
-no longer reads as a second, contradictory reading of the same thing the per-device pulse-collector
-checks report. Ready acceptance test already posted on #2.
-
-No `doctor.py` changes, no severity changes — those are Phase 4's.
-
-### Phase 5a — Chunking golden contract
-
-Promote `HiQS/hiqs/chunking.py:split_oversized` (with `_pack()`, 600-char cap) to
-`rebalance.lib.text_ops`, with a golden test proving byte-identical output. **No wiring into any
-write path.** HiQS keeps its own copy.
-
-### Phase 5b — Apply chunking to live indexing (DEFERRED, not executed here)
-
-Wiring `split_oversized` into `note_ingester.py`/`semantic_index.py` breaks an existing identity
-contract: one `chunks` row per `md_parser` chunk, with each semantic document keyed 1:1 off that
-row's id. Splitting a chunk with no stable child-key scheme breaks that mapping, and no stale-child
-deletion behavior is defined for re-indexing. Needs its own design pass
-(`{row_id}#{part_index}` keys, stale-child deletion, keyword/link-semantics regression) before any
-code lands.
-
-### Phase 6 — Supervisor unification (#4)
-
-`doctor.py` consumes 3-Eyes's `health.scan()` read model by **reusing the existing adapter**
-`web.py:_three_eyes_health_scan()` (already tested via `tests/test_focus5_three_eyes.py`) rather
-than designing a new consumption path.
-
-Two corrections that are easy to get wrong:
-1. That adapter has **no exception handling of its own** — the try/except lives in a *different*
-   caller. Doctor must define and test its `Check` for three cases: inactive sentinel (omit),
-   import/scan exception (`WARN`, never silently healthy), structured probe-unavailable
-   (`WARN`, surfacing `probe_error`).
-2. `launchd_crash_state.json` and doctor's crash-loop detection are **retained**. 3-Eyes's
-   `scan()` is a single-snapshot read with no persisted multi-poll history — deprecating doctor's
-   state file would silently delete a diagnostic capability 3-Eyes does not replace.
-
-3-Eyes's package-relative `ROOT.parent.parent` resolver stays as-is — no `rebalance.paths` import.
-
-## QA gate (per #5's standing policy)
+## QA gate
 
 Every phase ships a regression test that **fails pre-change and passes post-change** — not generic
-coverage.
-
-| Phase | Gate |
-|---|---|
-| 2 | Pruned non-hidden dir (`node_modules/`) and a valid nested checkout survive the walk, at each consuming call site; explicit test that the widened pruning is intended, not accidental |
-| 1 | `tests/test_json_ops.py` (new): fenced JSON, trailing prose, non-object JSON, malformed JSON, plus golden-fixture equivalence against `classify.py`'s untouched copy |
-| 3 | Consolidated time behavior covered; `tests/test_tz_utils.py` left green and untouched |
-| 4 | Reuse the ready acceptance test posted on #3 (`test_detail_leads_with_canonical_severity_not_raw_pulse_state`) |
-| 4b | Reuse the ready acceptance test posted on #2 (`test_activity_label_does_not_share_wording_with_a_pulse_collector_pill`) |
-| 5a | Golden-file test: promoted `split_oversized` byte-identical to HiQS's original |
-| 6 | Four distinct doctor `Check` outcomes (inactive / import-exception / scan-exception / structured-probe-unavailable) + proof crash-loop detection still works unchanged |
-
-## Explicitly out of scope
-
-Repo consolidation / HiQS extraction timing, the Swift client, and 3-Eyes's Ollama egress
-isolation — all unchanged from agy's Phase 2 scoping.
+coverage. Full suite is now `pytest tests/ utils/3-eyes/tests HiQS/tests`.

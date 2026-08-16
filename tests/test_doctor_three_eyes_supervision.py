@@ -225,27 +225,11 @@ class DependencyDirectionTests(unittest.TestCase):
     In particular it keeps its own package-relative root resolver rather than
     adopting rebalance.paths — the coupling Codex's round-1 finding rejected."""
 
-    def test_three_eyes_does_not_import_rebalance_anywhere(self) -> None:
-        """Asserts on *imports*, not on the string "rebalance" — 3-Eyes mentions
-        the repo by name in paths and prose (`REPO_ROOT`, its state dir) and
-        always has. What must never appear is a runtime dependency."""
-        import ast
-        from pathlib import Path
-
-        pkg = Path(__file__).resolve().parents[1] / "utils" / "3-eyes" / "three_eyes"
-        offenders: list[str] = []
-        for path in sorted(pkg.rglob("*.py")):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    names = [a.name for a in node.names]
-                elif isinstance(node, ast.ImportFrom):
-                    names = [node.module or ""]
-                else:
-                    continue
-                if any(n == "rebalance" or n.startswith("rebalance.") for n in names):
-                    offenders.append(f"{path.name}:{node.lineno}")
-        self.assertEqual([], offenders, "3-Eyes gained a runtime dependency on rebalance")
+    # NOTE: the AST import scan that used to live here was DELETED (GH-5 post-QA).
+    # `HiQS/tests/test_clean_room.py` already implemented exactly this gate — and
+    # predated it — so this file was shipping a narrower duplicate of an existing
+    # concept inside the very PR whose purpose is removing duplicated concepts.
+    # 3-Eyes is now asserted there, alongside HiQS, by the same scanner.
 
     def test_three_eyes_keeps_its_own_root_resolver(self) -> None:
         """Codex round-1 finding: replacing this with `rebalance.paths` would break

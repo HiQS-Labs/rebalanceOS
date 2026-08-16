@@ -49,6 +49,17 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ utils/3-eyes/tests -q
 
+      # HiQS runs as its OWN pytest process, not appended to the line above.
+      # It is a standalone package with its own pyproject, destined for
+      # extraction to HiQS-Suite/HiQS — running it in the incumbent's process is
+      # the very coupling its clean-room gate exists to prevent, and it is not
+      # hypothetical: sharing a process makes
+      # test_github_failure_continues_logs_error_and_keeps_watermark fail on
+      # state leaked from tests/ (reproduced on pristine main; tracked separately).
+      # This step is how HiQS will run after extraction, and it is green today.
+      - name: HiQS suite (isolated — standalone package)
+        run: python -m pytest HiQS/tests -q
+
       - name: 3-Eyes dashboard is in sync with the registry (GH-195)
         run: python -m three_eyes.dashboard --check
         working-directory: utils/3-eyes

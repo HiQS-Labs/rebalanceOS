@@ -57,6 +57,26 @@ def test_hiqs_and_the_incumbent_are_mutually_clean_rooms():
     assert _forbidden_imports(INCUMBENT_ROOT, "hiqs") == []
 
 
+def test_three_eyes_is_a_clean_room_too():
+    """3-Eyes is the *second* standalone package under the same rule (GH-5).
+
+    It runs from its own launchd shim under a limited ``PYTHONPATH`` and is built
+    to degrade when the repo venv is absent — a hard ``rebalance`` import would
+    break it precisely in the conditions it exists to survive. Same mechanism as
+    the HiQS gate above, so it lives here rather than in a second AST scanner
+    somewhere else: GH-5 originally shipped exactly that duplicate before noticing
+    this file already existed.
+
+    Only one direction is asserted. ``rebalance`` *may* reach into 3-Eyes — it
+    does, via ``rebalance.three_eyes_bridge`` — and that is the sanctioned
+    dependency direction, so the reverse check that HiQS gets is deliberately not
+    applied here.
+    """
+    three_eyes_root = REPO_ROOT / "utils" / "3-eyes" / "three_eyes"
+    assert _python_files(three_eyes_root), f"scanned no 3-Eyes sources under {three_eyes_root}"
+    assert _forbidden_imports(three_eyes_root, "rebalance") == []
+
+
 def test_scan_skips_vendored_dependencies_but_still_sees_first_party_code(tmp_path):
     (tmp_path / ".venv" / "site-packages").mkdir(parents=True)
     (tmp_path / ".venv" / "site-packages" / "vendored.py").write_text(

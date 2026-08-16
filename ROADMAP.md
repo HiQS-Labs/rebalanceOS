@@ -19,6 +19,9 @@ goal: >
 
 # Project Roadmap
 
+> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](./ROUTER.md) — canonical there, deliberately not restated here.
+
+
 > **Pointer/ledger only — not a plan body.** Execution detail lives in the linked `PROJECT/**` docs.
 
 ## Status
