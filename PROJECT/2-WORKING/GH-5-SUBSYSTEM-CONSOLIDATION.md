@@ -36,7 +36,28 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan adjudicated and frozen (see provenance above). Every citation in the plan re-verified a second time against **this** repo's tree before execution began — the relay reviewed the retiring `Hypercart-Dev-Tools/rebalance-OS` checkout, so the line references needed re-confirming here. All confirmed identical (`focus5_scan.py:47`, `ask_self_scan.py:47`/`:106`, `local_repos.py:32`). | Execute PR1–PR6 on `feat/gh-5-subsystem-consolidation`, one commit per phase. PR 5b is deliberately **not** executed — it needs its own design pass (see Phase 5b). |
+| All executable phases implemented on `feat/gh-5-subsystem-consolidation`, one commit each, each with a regression gate proven red pre-change. Citations were re-verified against **this** repo's tree first (the relay reviewed the retiring `Hypercart-Dev-Tools/rebalance-OS` checkout) — all matched. | Review the branch and open a PR. Phase 5b remains deliberately unexecuted pending its own design pass. |
+
+### Scope corrections found during execution
+
+Three things the 4-round-reviewed plan still had wrong, each verified against source before changing:
+
+1. **Phase 2 — `experimental/git-pulse/discover-repos.py` dropped from scope.** The plan had it
+   widening to the shared blacklist. It imports nothing from `rebalance` and sets up no `sys.path`,
+   so it cannot reach `rebalance.lib` at runtime — the *same* constraint Codex's round-4 finding
+   applied to `health-check.py` in Phase 3, which the plan never carried back to Phase 2. Left
+   script-local, consistent with the standing duplicate-don't-couple rule; a test pins it.
+2. **Phase 3 — `dashboard._ago` is not a drop-in for `time_ops.format_relative`.** The plan said
+   "retire `_ago`" without noting the two disagree on three display behaviors (`"—"` vs `""` for
+   empty, `"45s ago"` vs `"just now"`, and future timestamps as `"in 5m"` vs clamped). Swapping
+   blindly would have silently changed six dashboard call sites. The divergences became explicit
+   options on `format_relative`; a test holds `_ago`'s output byte-identical against the old
+   implementation kept verbatim as an oracle.
+3. **Phase 4b — #2's ready acceptance test was over-strict.** As posted on the issue it asserted no
+   "collector" anywhere in `.health-banner-lead`, but that div also carries the copy button's
+   `data-copy-text` payload, which embeds the problem list — where a check named
+   `pulse collector:…` *should* say collector. Assertion narrowed to the banner's visible chrome;
+   a companion test pins that the payload still names those checks.
 
 ## Why
 
