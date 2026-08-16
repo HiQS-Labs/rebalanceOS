@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rebalance-os.daily-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{REBALANCE_DIR}}/scripts/daily_sync.sh</string>
+    </array>
+
+    <!-- Run at 6:30 AM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- Also run on load (boot/login) if the scheduled time was missed -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{REBALANCE_DIR}}/temp/logs/launchd_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{REBALANCE_DIR}}/temp/logs/launchd_stderr.log</string>
+
+    <!-- Don't restart on failure — just run next scheduled time -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- Batch job: yield to interactive work (GH-175 remediation 3). This is
+         responsiveness hygiene, NOT a GH-172 mitigation — that panic came from
+         kernel_task compression starving watchdogd, which Nice does not affect.
+         The GH-172 fix is the job guard inside the embedding leaves. -->
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -1,0 +1,33 @@
+{
+  "calendar_id": "primary",
+  "exclude_titles": [
+    "Lunch",
+    "Break",
+    "Check Slack",
+    "Post Daily Timesheet"
+  ],
+  "aggregator_skip_words": [
+    "wrap",
+    "setup",
+    "test"
+  ],
+  "timezone": "America/New_York",
+  "hours_format": "decimal",
+  "projects": [
+    {
+      "name": "CreditRegistry",
+      "aliases": [
+        "CR",
+        "Credit Registry",
+        "CR CC"
+      ]
+    },
+    {
+      "name": "NeoNook",
+      "aliases": [
+        "NN",
+        "Neo Nook"
+      ]
+    }
+  ]
+}
