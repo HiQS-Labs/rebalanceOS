@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Literal
 
+from rebalance import three_eyes_bridge
 from rebalance.lib.time_ops import format_timestamp, local_tz, parse_utc_iso
 
 OK = "ok"
@@ -1357,6 +1358,108 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
     return checks
 
 
+def _check_three_eyes_supervision() -> list[Check]:
+    """Surface 3-Eyes' supervision verdict inside ``rebalance doctor`` (GH-5 Phase 6, #4).
+
+    #4's root cause was that ``com.user.git-pulse`` silently stopped being loaded
+    and nothing noticed for days. 3-Eyes already tracks loaded-state across the
+    catalogued fleet; doctor was simply never told. This is the wiring.
+
+    The failure contract is explicit, because the interesting failures here do
+    not raise:
+
+    ==============================  ==================================
+    condition                       emitted Check
+    ==============================  ==================================
+    3-Eyes inactive on this host    none (list is empty)
+    import or scan raised           WARN / warning — never silently ok
+    ran, but launchctl unreadable   WARN / warning, surfacing probe_error
+    jobs not loaded                 WARN / error
+    jobs failing                    WARN / error
+    fleet clean                     OK / notice
+    ==============================  ==================================
+
+    The middle case is the one worth spelling out: ``scan()`` reports an
+    unreadable ``launchctl`` as a structured result with every row "unknown",
+    not an exception. Reading ``failing == 0`` off that report and calling the
+    fleet healthy would be the same misread 3-Eyes' own "unknown" state exists
+    to prevent.
+
+    Deliberately does **not** replace doctor's own ``launchd_crash_state.json``
+    crash-loop detection. That check persists relaunch history across polls;
+    ``scan()`` is a single snapshot and cannot distinguish a one-off crash from
+    a KeepAlive job launchd is respawning in a loop. Retiring it here would
+    delete a diagnostic capability 3-Eyes does not replace.
+    """
+    name = "3-eyes supervision"
+    try:
+        report = three_eyes_bridge.health_scan()
+    except three_eyes_bridge.ThreeEyesUnavailable as exc:
+        return [
+            Check(
+                name,
+                WARN,
+                f"3-Eyes is installed but could not be read: {exc}",
+                "run `python utils/3-eyes/three_eyes_cli.py health` to see the failure directly",
+                severity=WARNING,
+            )
+        ]
+
+    if report is None:
+        return []  # not active on this machine — nothing to report, no noise
+
+    probe_error = three_eyes_bridge.probe_unavailable_reason(report)
+    if probe_error:
+        return [
+            Check(
+                name,
+                WARN,
+                f"could not read launchd, so fleet state is unknown: {probe_error}",
+                "3-Eyes could not run `launchctl list`; the fleet is unobserved, not healthy",
+                severity=WARNING,
+            )
+        ]
+
+    ok = int(report.get("ok") or 0)
+    failing = int(report.get("failing") or 0)
+    not_loaded = int(report.get("not_loaded") or 0)
+    unknown = int(report.get("unknown") or 0)
+    total = ok + failing + not_loaded + unknown
+
+    if failing or not_loaded:
+        problems = []
+        for row in report.get("rows") or []:
+            health = str(row.get("health") or "")
+            if health == "ok":
+                continue
+            problems.append(f"{row.get('label')} ({health})")
+        detail = f"{failing} failing, {not_loaded} not loaded of {total} supervised"
+        if problems:
+            detail += " — " + ", ".join(problems[:4])
+            if len(problems) > 4:
+                detail += f", +{len(problems) - 4} more"
+        return [
+            Check(
+                name,
+                WARN,
+                detail,
+                "a job that is not loaded will never run again on its own — "
+                "`launchctl bootstrap` it, or `three_eyes install` to re-manage it",
+                severity=ERROR,
+            )
+        ]
+
+    return [
+        Check(
+            name,
+            OK,
+            f"{ok} of {total} supervised jobs loaded and healthy",
+            "",
+            severity=NOTICE,
+        )
+    ]
+
+
 def _diagnostics_index() -> list[Check]:
     """Map every observability surface so ``rebalance doctor`` is the single
     place that points at all of them.
@@ -1696,6 +1799,9 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.extend(_check_scheduler_liveness(launchctl_output=launchctl_output))
     report.checks.extend(_check_launchd(launchctl_output))
 
+    # 3-Eyes' own supervision verdict over the catalogued fleet. Complements —
+    # never replaces — _check_launchd's persisted crash-loop detection above.
+    report.checks.extend(_check_three_eyes_supervision())
 
     # Final section: a map of every diagnostics surface, so this one command
     # is the single entry point into the project's observability.

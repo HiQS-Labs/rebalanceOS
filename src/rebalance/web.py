@@ -38,6 +38,7 @@ from rebalance.ingest.auth_log import read_log, _log_path
 from rebalance.ingest import zapier_calendar, zapier_email
 from rebalance.ingest.sleuth_grouping import grouped_reminders_from_db
 from rebalance.lib.time_ops import format_relative, parse_utc_iso
+from rebalance import three_eyes_bridge
 from rebalance.paths import resolve_db, resolve_secret_path
 from rebalance.web_components import badge_html, button_link, render_shell
 logger = logging.getLogger(__name__)
@@ -841,19 +842,12 @@ _te_health_cache: dict[str, Any] = {"at": -1e9, "card": None}
 def _three_eyes_health_scan() -> dict | None:
     """Return ``three_eyes.health.scan()`` when 3-Eyes is ACTIVE here, else None.
 
-    Isolated so the import + activation gate + subprocess all live behind the one
-    try/except in the caller: a problem here must never break /focus-5.json.
+    GH-5 Phase 6: the adapter body moved to ``rebalance.three_eyes_bridge`` so
+    ``doctor.py`` can reuse it without importing this module (and FastAPI with
+    it). Kept as a thin delegate — ``_three_eyes_health_card`` below still owns
+    the try/except that must never let a problem here break /focus-5.json.
     """
-    import sys
-
-    d = str(_THREE_EYES_DIR)
-    if d not in sys.path:
-        sys.path.insert(0, d)
-    from three_eyes import config as te_config, health as te_health
-
-    if not te_config.three_eyes_active():
-        return None
-    return te_health.scan()
+    return three_eyes_bridge.health_scan()
 
 
 def _build_three_eyes_card(report: dict) -> dict:
