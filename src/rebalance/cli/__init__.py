@@ -111,7 +111,15 @@ def dashboard_cmd() -> None:
 
 
 @app.command("doctor")
-def doctor_cmd(database: Path | None = DBOption()) -> None:
+def doctor_cmd(
+    database: Path | None = DBOption(),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the reconciled verdict and every check's disposition "
+        "(problem / notice / suppressed / ok) as JSON on stdout.",
+    ),
+) -> None:
     """Health check — database, token, schema, projects, GitHub data, scheduled jobs.
 
     Read-only. Surfaces the class of problem a test suite cannot: which database
@@ -121,13 +129,60 @@ def doctor_cmd(database: Path | None = DBOption()) -> None:
     log) and a diagnostics index pointing at every other observability surface —
     making this the single entry point into the project's diagnostics.
     """
-    from rich.console import Console
+    from datetime import timezone
 
     from rebalance.doctor import FAIL, OK, WARN, run_doctor
     from rebalance.ingest.index_ops import get_index_status
 
-    console = Console()
     report = run_doctor(database)
+    try:
+        status = get_index_status(resolve_database_path(database))
+    except DatabaseNotFoundError:
+        status = {}
+
+    degraded = {
+        name: health.get("reason", "degraded")
+        for name, health in status.get("freshness", {}).get("signal_health", {}).items()
+        if health.get("status") == "degraded"
+    }
+
+    if json_output:
+        # Same snapshot and clock as the dashboard (pulse_web) — the reconciled
+        # verdict must be the one every other surface renders, or --json becomes
+        # yet another parallel health opinion.
+        from rebalance.health import check_dispositions, compute_health_status
+
+        now = datetime.now(timezone.utc)
+        health_status = compute_health_status(report.checks, status, now)
+        payload = {
+            "generated_at": now.isoformat(timespec="seconds"),
+            "verdict": health_status.verdict,
+            "summary": health_status.bucket_text or "healthy",
+            "checks": [
+                {
+                    "name": c.name,
+                    "status": c.status,
+                    "severity": c.severity,
+                    "disposition": disposition,
+                    "detail": c.detail,
+                    "hint": c.hint,
+                }
+                for c, disposition in check_dispositions(report.checks, health_status)
+            ],
+            "signal_health_degraded": degraded,
+            # Pre-collapse exit-code inputs (raw, unreconciled). The process
+            # still exits on these until Phase 4.3 reroutes it; keeping them in
+            # the payload is what makes any verdict/exit divergence visible.
+            "legacy": {"failed": report.failed, "warned": report.warned},
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if report.failed:
+            raise typer.Exit(1)
+        return
+
+    from rich.console import Console
+
+    console = Console()
     label = {
         OK: "[green] OK [/green]",
         WARN: "[yellow]WARN[/yellow]",
@@ -139,16 +194,6 @@ def doctor_cmd(database: Path | None = DBOption()) -> None:
         if c.hint and c.status != OK:
             console.print(f"         [dim]{c.hint}[/dim]")
 
-    try:
-        status = get_index_status(resolve_database_path(database))
-    except DatabaseNotFoundError:
-        status = {}
-
-    degraded = {
-        name: health.get("reason", "degraded")
-        for name, health in status.get("freshness", {}).get("signal_health", {}).items()
-        if health.get("status") == "degraded"
-    }
     if degraded:
         detail = "; ".join(f"{name}: {reason}" for name, reason in degraded.items())
         console.print(f"  {label[WARN]}  [bold]signal health[/bold] — {detail}")

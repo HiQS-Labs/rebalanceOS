@@ -91,13 +91,19 @@ def _is_suppressed(name: str, status: dict[str, Any], now: datetime) -> bool:
     return False
 
 
+def _is_attention(check: Check) -> bool:
+    """A check the reconciler even considers: FAIL/WARN status, or an explicit
+    notice (an OK check the operator still wants rendered, muted)."""
+    return check.status in {FAIL, WARN} or check.severity == NOTICE
+
+
 def visible_problem_checks(
     checks: list[Check], status: dict[str, Any], now: datetime
 ) -> list[Check]:
     """Attention checks plus explicit notices, minus recovered WARNs."""
     visible: list[Check] = []
     for check in checks:
-        if check.status not in {FAIL, WARN} and check.severity != NOTICE:
+        if not _is_attention(check):
             continue
         recovered_auth = check.name.startswith("auth:")
         if (
@@ -229,3 +235,38 @@ def compute_health_status(
     else:
         verdict = OK
     return HealthStatus(verdict=verdict, problems=problems, notices=notices)
+
+
+def check_dispositions(
+    checks: list[Check], health: HealthStatus
+) -> list[tuple[Check, str]]:
+    """Classify every raw check against a computed ``HealthStatus``.
+
+    This is what makes a binary verdict diagnosable: raw checks alone cannot
+    say *why* something was hidden or demoted, because that decision lives in
+    the reconciler. Dispositions:
+
+    * ``problem`` — visible; drives the verdict.
+    * ``notice`` — visible but muted; never escalates the verdict.
+    * ``suppressed`` — a recovered WARN the reconciler hid (that source synced
+      successfully within its stale window).
+    * ``ok`` — nothing to reconcile.
+
+    *health* must have been computed from this same ``checks`` list —
+    membership is by object identity, since ``Check`` is an unfrozen dataclass
+    and two distinct checks may compare equal.
+    """
+    problem_ids = {id(c) for c in health.problems}
+    notice_ids = {id(c) for c in health.notices}
+    out: list[tuple[Check, str]] = []
+    for check in checks:
+        if id(check) in problem_ids:
+            disposition = "problem"
+        elif id(check) in notice_ids:
+            disposition = "notice"
+        elif _is_attention(check):
+            disposition = "suppressed"
+        else:
+            disposition = "ok"
+        out.append((check, disposition))
+    return out
