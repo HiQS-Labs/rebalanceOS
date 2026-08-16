@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from rebalance.tz_utils import parse_utc_iso
+from rebalance.lib.time_ops import parse_utc_iso
 
 HTTP_TIMEOUT_SECONDS = 30
 USER_AGENT = "rebalance-os/0.1"

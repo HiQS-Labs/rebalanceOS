@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from rebalance.tz_utils import local_tz
+from rebalance.lib.time_ops import local_tz
 
 logger = logging.getLogger(__name__)
 

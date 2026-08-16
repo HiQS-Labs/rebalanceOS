@@ -53,7 +53,7 @@ from rebalance.ingest.config import (  # noqa: E402
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID  # noqa: E402
 from rebalance.ingest.calendar_helpers import upcoming_calendar_rows  # noqa: E402
 from rebalance.ingest.db import db_connection  # noqa: E402
-from rebalance.lib.time_ops import local_tz, parse_utc_iso  # noqa: E402
+from rebalance.lib.time_ops import format_relative, local_tz, parse_utc_iso  # noqa: E402
 from rebalance.ingest.index_ops import (  # noqa: E402
     get_index_status,
     get_watched_repos,
@@ -272,30 +272,16 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def _ago(value: str | datetime | None, now: datetime | None = None) -> str:
-    if value is None:
-        return "—"
-    dt = _parse_iso(value) if isinstance(value, str) else value
-    if dt is None:
-        return "—"
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    n = now or datetime.now(timezone.utc)
-    delta = n - dt
-    secs = int(delta.total_seconds())
-    if secs < 0:
-        secs = -secs
-        future = True
-    else:
-        future = False
-    if secs < 60:
-        s = f"{secs}s"
-    elif secs < 3600:
-        s = f"{secs // 60}m"
-    elif secs < 86400:
-        s = f"{secs // 3600}h"
-    else:
-        s = f"{secs // 86400}d"
-    return f"in {s}" if future else f"{s} ago"
+    """Compact relative age for the TUI's narrow columns.
+
+    GH-5 Phase 3: the duplicated delta arithmetic moved into
+    ``time_ops.format_relative``. The dashboard's three display divergences
+    from the web default — "—" for empty, "in 5m" for future timestamps, and
+    second-granularity under a minute — are now explicit options rather than a
+    second implementation. Output is unchanged; pinned by
+    tests/test_time_ops_relative_options.py.
+    """
+    return format_relative(value, now=now, empty="—", allow_future=True, sub_minute=True)
 
 
 # ---------------------------------------------------------------------------

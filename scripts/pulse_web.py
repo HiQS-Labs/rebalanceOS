@@ -37,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ACTIVE_JSON_PATH = PROJECT_ROOT / "temp" / "apple-reminders" / "active.json"
 import _bootstrap  # noqa: E402, F401  — puts src/ and scripts/ on sys.path
 
-from rebalance.tz_utils import format_timestamp, parse_utc_iso  # noqa: E402
+from rebalance.lib.time_ops import format_timestamp, parse_utc_iso  # noqa: E402
 
 # Reuse the TUI's data layer so both views move in lockstep.
 from dashboard import (  # type: ignore  # noqa: E402
