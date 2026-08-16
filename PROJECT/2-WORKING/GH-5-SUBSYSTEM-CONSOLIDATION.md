@@ -63,6 +63,27 @@ independently rejected agy's proposal to delete `json_ops` — doing so would le
 3 are safe and tested but were inferred from reading code, not from anything anyone could have
 noticed.
 
+### PR structure (operator decision, 2026-08-16)
+
+#5 ships as **three sequenced PRs**, not one:
+
+| PR | Contents | Delivers |
+|---|---|---|
+| **PR1** — [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6) | Phases 1, 2, 3, 4, 4b, 6 | Phases 4/4b/6 answer the complaint; 1/2/3 ride along labelled as maintenance |
+| **PR2** — [plan](../1-INBOX/GH-5-PR2-STATUS-VOCABULARY.md) | One status vocabulary across user-facing surfaces | The remaining "similar but different concepts" problem; **deletion-forward**, net lines down |
+| **PR3** | Cleanup falling out of PR2 (dead shims, orphaned maps) | Kept separate so PR2's user-visible changes review on their own |
+
+Phases 2 and 3 stay in PR1 rather than being re-cut: they are written, tested and green, and
+Codex graded them safe-but-unjustified rather than unsafe. Re-splitting them would be churn for
+no correctness gain — the honest fix is labelling, which PR1's description does.
+
+**A cleanroom rewrite from `main` was considered and rejected.** A lens-applied replan converges on
+the same four substantive phases written the same way, and differs only by dropping 2 and 3 — so a
+rewrite would rebuild four correct phases in order to delete two safe ones, which is the largest
+possible diff to reach a destination two reverts away. The plan's failure mode was an unquestioned
+premise ("duplication is the problem"), not bad code; re-running the same process does not
+inoculate against that, but asking mantra 3 does.
+
 ### Next phase (adjudicated — Codex's framing, adopted over agy's)
 
 agy proposed collapsing every internal status enum into one unified taxonomy. **Declined.** Most of
