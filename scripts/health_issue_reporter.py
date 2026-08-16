@@ -73,6 +73,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  — puts src/ on sys.path for rebalance.* imports
 
+from rebalance.lib.json_ops import parse_llm_json  # noqa: E402 — needs _bootstrap first
+
 DEVICE_NAME: str = socket.gethostname()
 
 REPO = "Hypercart-Dev-Tools/rebalance-OS"
@@ -466,19 +468,6 @@ Hint:        {hint}
 _FALLBACK = ("file", "triage unavailable — filing by default")
 
 
-def _strip_code_fence(text: str) -> str:
-    """Remove leading ```json / ``` fences that some models wrap around JSON."""
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        # Drop the opening fence line and the closing ``` (if present).
-        inner = lines[1:]
-        if inner and inner[-1].strip() == "```":
-            inner = inner[:-1]
-        text = "\n".join(inner).strip()
-    return text
-
-
 def _triage_gemini(user_msg: str, model: str, api_key: str | None) -> dict:
     import json as _json
     import urllib.request
@@ -518,13 +507,14 @@ def _triage_gemini(user_msg: str, model: str, api_key: str | None) -> dict:
     if not parts:
         return {}
         
+    # Model-generated text — tolerate fences and trailing prose. (The
+    # _json.loads above parses the Gemini HTTP *envelope*, a different problem,
+    # and deliberately stays a strict parse.)
     raw = parts[0].get("text", "").strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise json.JSONDecodeError(
-            f"{exc.msg} — raw model response: {raw!r}", exc.doc, exc.pos
-        ) from exc
+    parsed = parse_llm_json(raw)
+    if parsed is None:
+        raise ValueError(f"model response was not a JSON object — raw: {raw!r}")
+    return parsed
 
 
 def _triage_openai_compat(user_msg: str, base_url: str, model: str, api_key: str) -> dict:
@@ -541,7 +531,12 @@ def _triage_openai_compat(user_msg: str, base_url: str, model: str, api_key: str
             {"role": "user", "content": user_msg},
         ],
     )
-    return json.loads(resp.choices[0].message.content.strip())
+    # Model-generated text — same tolerance as the Gemini path above.
+    raw = resp.choices[0].message.content.strip()
+    parsed = parse_llm_json(raw)
+    if parsed is None:
+        raise ValueError(f"model response was not a JSON object — raw: {raw!r}")
+    return parsed
 
 
 def llm_triage(

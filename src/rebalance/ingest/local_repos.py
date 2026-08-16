@@ -21,17 +21,12 @@ module runs ``git`` queries only, never mutates repos or registry state.
 
 from __future__ import annotations
 
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from rebalance.lib.git_ops import _git, should_descend
+from rebalance.lib.git_ops import _git, parse_github_remote_url, should_descend
 
 GITHUB_REMOTE_MARKERS = ("github.com:", "github.com/")
-
-_FULL_NAME_RE = re.compile(
-    r"github\.com[:/](?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
-)
 
 
 @dataclass(frozen=True)
@@ -46,9 +41,12 @@ class LocalRepo:
 
 
 def parse_github_full_name(origin_url: str) -> str | None:
-    """``owner/repo`` from an SSH or HTTPS GitHub remote URL, else None."""
-    match = _FULL_NAME_RE.search(origin_url or "")
-    return f"{match.group('owner')}/{match.group('repo')}" if match else None
+    """``owner/repo`` from an SSH or HTTPS GitHub remote URL, else None.
+
+    Public name kept — this is an existing call-site contract. Only the parsing
+    internals moved to ``rebalance.lib.git_ops`` (GH-5 Phase 1).
+    """
+    return parse_github_remote_url(origin_url)
 
 
 def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
