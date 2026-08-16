@@ -421,6 +421,7 @@ def _check_collector_freshness(
     max_invalid_fraction: float = 0.5,
     volume_ts_col: str | None = None,
     quiet_filter: Callable[[], str] | None = None,
+    configured: Callable[[], bool] | None = None,
 ) -> Check:
     """Generic data-freshness check for any collector table.
 
@@ -432,12 +433,31 @@ def _check_collector_freshness(
     """
     from rebalance.ingest.db import db_connection
 
+    def _opted_in() -> bool:
+        # Onboarding policy (GH-5 Phase 4, decided 2026-08-16): an unconfigured
+        # optional source is a clean skip, not an error — `_check_figma`'s
+        # "posture, not nagging" pattern extended to the ingest collectors.
+        # Only a *configured* source with no data is a real failure. A broken
+        # configured-probe must never hide a real error: fail toward surfacing.
+        if configured is None:
+            return True
+        try:
+            return configured()
+        except Exception:  # noqa: BLE001
+            return True
+
     try:
         with db_connection(db_path) as conn:
             has_table = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
             ).fetchone()
             if not has_table:
+                # Some collector tables (e.g. sleuth_reminders) are created by
+                # the first sync, not by migrations — a missing table on an
+                # unconfigured source is the canonical fresh-install state,
+                # indistinguishable from empty for onboarding purposes.
+                if not _opted_in():
+                    return Check(name, OK, "not configured (optional integration)")
                 return Check(
                     name, WARN, f"{table} table not present", severity=ERROR
                 )
@@ -467,6 +487,8 @@ def _check_collector_freshness(
         return Check(name, FAIL, f"could not read {table}: {exc}")
 
     if count == 0:
+        if not _opted_in():
+            return Check(name, OK, "not configured (optional integration)")
         return Check(
             name, WARN, f"no {name} ingested", empty_hint, severity=ERROR
         )
@@ -1607,9 +1629,61 @@ def _active_gmail_filter() -> str:
     return describe_gmail_query_filter()
 
 
+# Per-source "has the operator opted in?" probes for the onboarding gate.
+# Each one calls the SAME resolver its credential check already uses — never a
+# second hand-rolled "is X configured?" predicate (that duplication is this
+# campaign's own failure mode). Only reachable from the count == 0 branch, so
+# the common path pays nothing.
+
+
+def _github_source_configured() -> bool:
+    from rebalance.ingest.config import get_github_token
+
+    return bool(get_github_token())
+
+
+def _sleuth_source_configured() -> bool:
+    from rebalance.ingest.config import get_sleuth_credentials
+
+    try:
+        get_sleuth_credentials()
+    except (FileNotFoundError, ValueError):
+        # The exact "not configured" signals _check_sleuth already interprets.
+        return False
+    return True
+
+
+def _calendar_source_configured() -> bool:
+    from rebalance.ingest.config import get_calendar_oauth_token_json
+
+    return (
+        _google_oauth_source("calendar", bool(get_calendar_oauth_token_json()))
+        is not None
+    )
+
+
+def _email_source_configured() -> bool:
+    from rebalance.ingest.config import (
+        get_gmail_ingest_method,
+        get_gmail_oauth_token_json,
+    )
+
+    if get_gmail_ingest_method() == "mcp":
+        # Pinned reading (4.2): selecting mcp mode IS "configured". The
+        # connector credential lives in the agent and is invisible locally, so
+        # mode selection is the only local opt-in signal — and it is always an
+        # explicit act, because get_gmail_ingest_method() defaults to "oauth"
+        # unless the operator set the config key. "Selected mcp but never
+        # connected" therefore reads as configured-and-empty: an error, which
+        # is the honest reading of a deliberate opt-in that produced no data.
+        return True
+    return _google_oauth_source("gmail", bool(get_gmail_oauth_token_json())) is not None
+
+
 _COLLECTOR_FRESHNESS: list[dict] = [
     dict(
         name="github data",
+        configured=_github_source_configured,
         table="github_activity",
         ts_col="scan_date",
         warn_days=2,
@@ -1624,6 +1698,7 @@ _COLLECTOR_FRESHNESS: list[dict] = [
     ),
     dict(
         name="sleuth data",
+        configured=_sleuth_source_configured,
         table="sleuth_reminders",
         ts_col="last_synced_at",
         warn_days=2,
@@ -1632,6 +1707,7 @@ _COLLECTOR_FRESHNESS: list[dict] = [
     ),
     dict(
         name="calendar data",
+        configured=_calendar_source_configured,
         table="calendar_events",
         ts_col="fetched_at",
         warn_days=3,
@@ -1640,6 +1716,7 @@ _COLLECTOR_FRESHNESS: list[dict] = [
     ),
     dict(
         name="email data",
+        configured=_email_source_configured,
         table="email_messages",
         ts_col="synced_at",
         warn_days=7,

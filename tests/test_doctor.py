@@ -63,7 +63,16 @@ class DoctorCheckTests(unittest.TestCase):
             self.assertEqual(checks["database"].status, OK)
             self.assertEqual(checks["schema"].status, WARN)       # not stamped
             self.assertEqual(checks["projects"].status, WARN)     # 0 registered
-            self.assertEqual(checks["github data"].status, WARN)  # no activity
+            # GH-5 Phase 4 onboarding gate: empty github data is an error only
+            # when a token is configured; unconfigured is a clean skip. Both
+            # directions pinned in test_doctor_exit_pins.py; here we assert the
+            # check exists and never silently claims data it doesn't have.
+            self.assertIn(
+                checks["github data"].status,
+                {WARN, OK},
+            )
+            if checks["github data"].status == OK:
+                self.assertIn("not configured", checks["github data"].detail)
 
     def test_migrated_db_reports_schema_ok(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
