@@ -267,25 +267,50 @@ first run.
 > **The reroute is still correct** — for the single-verdict-path, G6 and G8 reasons above — but it
 > must be argued on those, not on a safety property it does not have.
 
-#### Onboarding policy — an explicit decision, not an assumption
+#### Onboarding policy — DECIDED 2026-08-16
 
-Because the hazard is real, Phase 4 must **choose and implement** a policy before deleting
-`Check.status`:
+**Decision: gate the empty-source check on whether that source is configured.** An unconfigured
+optional integration is a clean skip, not an error. Only a *configured* source with no data is an
+error.
 
-- **Recommended:** make the empty-source check's severity conditional on whether that source has
-  *ever* ingested. No data on a fresh install is expected (→ `NOTICE`); no data on an established
-  install is a real error (→ `ERROR`). Config already tracks onboarding state
-  (`config.py:411` `get_onboarding_skipped_stages`, `mcp/tools/onboarding.py:15`
-  `onboarding_status`), so the signal exists and does not need inventing.
-- **Alternative:** accept exit 1 on a fresh install and document it as expected.
+**This is not a new pattern — it is already the house pattern**, and extending it is cheaper than
+inventing an "ever ingested" signal (the alternative previously recommended here).
+`_check_figma` (`doctor.py:1080-1101`) states it outright:
 
-Whichever is chosen, **4.2 must include a black-box fresh-install test asserting the chosen exit
-code**, and it must land before `Check.status` is deleted.
+> *"Posture, not nagging: optional+unconfigured is a clean skip (OK), while a half-configured state
+> … is a real misconfiguration and warns."*
 
-#### Operator decision, recorded
+`_check_figma` returns `Check("figma", OK, "not configured (optional integration)")`. Phase 4
+extends that posture to the four `_COLLECTOR_FRESHNESS` sources, which today check emptiness
+unconditionally regardless of whether the operator ever opted in.
 
-Binary pass/fail is accepted: **`error` exits 1, everything else exits 0**, evaluated against the
-*reconciled* verdict, not raw check status.
+**Precondition verified** — a per-source configured-signal exists for all four, and each already
+has a credential check in `doctor.py` whose resolver can be reused rather than duplicated:
+
+| Source | Signal | Existing check |
+|---|---|---|
+| github data | `config.get_github_token()` | `doctor.py:208` ("no GitHub token configured") |
+| sleuth data | Sleuth Web API credentials | `doctor.py:921` |
+| calendar data | `config.get_calendar_oauth_token_json()` / `_google_oauth_source` | `doctor.py:1063` |
+| email data | `config.get_gmail_ingest_method()` + OAuth resolution | `doctor.py:1005` |
+
+**Resulting behaviour:**
+
+| Situation | Verdict |
+|---|---|
+| Fresh install, nothing configured | skip → **exit 0** |
+| Gmail never connected, ever | skip → **exit 0** (permanently, correctly) |
+| GitHub token configured, no data ingested | **ERROR → exit 1** |
+| GitHub was ingesting, now empty | **ERROR → exit 1** |
+
+**Known wrinkle to handle explicitly in 4.2:** Gmail's `mcp` ingest mode keeps credentials in the
+agent's connector, not locally (`doctor.py:1009-1011`), so "configured" there means only *"the
+operator selected mcp mode"* — it cannot distinguish "selected mcp and connected" from "selected
+mcp and never connected". Pick and pin one reading; do not leave it implicit.
+
+**Reuse, do not re-derive.** Each of the four resolvers above is already called by an existing
+check. Phase 4 must call the same resolver, not write a second "is github configured?" predicate —
+that would be this campaign's own failure mode, committed inside its own fix.
 
 #### Sequencing within Phase 4 — the order is the safety property
 
