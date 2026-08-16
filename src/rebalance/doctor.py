@@ -1426,14 +1426,24 @@ def _check_three_eyes_supervision() -> list[Check]:
     unknown = int(report.get("unknown") or 0)
     total = ok + failing + not_loaded + unknown
 
-    if failing or not_loaded:
+    if failing or not_loaded or unknown:
         problems = []
         for row in report.get("rows") or []:
             health = str(row.get("health") or "")
             if health == "ok":
                 continue
             problems.append(f"{row.get('label')} ({health})")
-        detail = f"{failing} failing, {not_loaded} not loaded of {total} supervised"
+        counts = [f"{failing} failing", f"{not_loaded} not loaded"]
+        if unknown:
+            # Defensive, not a live path: today `unknown > 0` only happens when
+            # launchctl_available is False, which the probe_error branch above
+            # already caught. But reading `unknown` solely to compute `total`
+            # and then reporting OK would contradict this module's own rule —
+            # _map_pulse_state refuses to treat a state it does not understand
+            # as healthy, and so must this. A synthetic or future report with
+            # unknown rows and launchctl_available True must not read as clean.
+            counts.append(f"{unknown} unknown")
+        detail = f"{', '.join(counts)} of {total} supervised"
         if problems:
             detail += " — " + ", ".join(problems[:4])
             if len(problems) > 4:

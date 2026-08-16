@@ -17,7 +17,7 @@ goal: >
 effort: 4
 complexity: 4
 risk: 3
-phases: 7
+phases: 6
 ratings_provisional: false
 roadmap_exempt: false
 ---
@@ -36,7 +36,48 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| All executable phases implemented on `feat/gh-5-subsystem-consolidation`, one commit each, each with a regression gate proven red pre-change. Citations were re-verified against **this** repo's tree first (the relay reviewed the retiring `Hypercart-Dev-Tools/rebalance-OS` checkout) — all matched. | Review the branch and open a PR. Phase 5b remains deliberately unexecuted pending its own design pass. |
+| Phases 1, 2, 3, 4, 4b and 6 shipped, one commit each, each with a regression gate proven red pre-change. Post-ship QA by agy + Codex through the `/ponytail` and `/debug-mantra` lenses: **Phase 5a reverted** (promoted a chunker with no caller — unanimous), the `unknown`-state boundary hardened, and this doc's claims narrowed to what the branch actually answers (see Post-ship QA below). | Open a PR. Next phase is the user-facing vocabulary **inventory** described below — not a further refactor. Phase 5b still deferred pending its own design pass. |
+
+## Post-ship QA — what this branch does and does NOT answer
+
+Reviewed after shipping by agy (Gemini lane) and Codex, adjudicated through the `/ponytail` and
+`/debug-mantra` lenses. The honest accounting, which supersedes any claim elsewhere in this doc
+that the branch is a coherent single answer to #5:
+
+**The operator's complaint was:** too many subsystems, overlapping jargon, subsystems not talking.
+
+| Phase | Observed symptom behind it? | Answers the complaint? |
+|---|---|---|
+| 1 | **Yes** — a live incident, documented at `utils/3-eyes/three_eyes/classify.py:77-79`: a fenced model reply discarded a good ranked summary and the operator's "summary" became the raw fenced blob | No — helper dedup |
+| 2 | No — inferred smell | No — helper dedup |
+| 3 | No — inferred smell | No — helper dedup |
+| 4 | Yes — raw `ALERT` leaking into dashboard text | **Yes** (jargon) |
+| 4b | Yes — the operator's screenshot, two contradictory timestamps | **Yes** (jargon) |
+| 5a | No — and it had no caller | No — **reverted** |
+| 6 | Yes — `com.user.git-pulse` dead for days, unnoticed | **Yes** (not talking) |
+
+**So: 4, 4b and 6 answer the complaint. 1, 2 and 3 are separately-justified maintenance and must
+not be represented as answering it.** Phase 1 is justified on its own incident record (Codex
+independently rejected agy's proposal to delete `json_ops` — doing so would leave
+`health_issue_reporter.py`'s two model-text parses strict and re-expose the same bug). Phases 2 and
+3 are safe and tested but were inferred from reading code, not from anything anyone could have
+noticed.
+
+### Next phase (adjudicated — Codex's framing, adopted over agy's)
+
+agy proposed collapsing every internal status enum into one unified taxonomy. **Declined.** Most of
+those enums never reach a human, so unifying them is machinery for its own sake — the same mistake
+Phase 5a made. The remaining problem is a *presentation* problem.
+
+**Next phase is an inventory, not a refactor:** enumerate the user-facing status vocabulary *per
+surface* (dashboard banner, sync chip, `/auth-log` badges, `doctor` output, 3-Eyes CLI) and
+determine whether an operator can still encounter two conflicting labels for one condition after
+4/4b/6. Only what fails that test gets a canonical presentation taxonomy. Internal enums with no
+user-facing path stay as they are.
+
+Known still-unreconciled at the presentation layer: `web.py`'s `_EVENT_BADGE`/`_SOURCE_BADGE`/
+`_KIND_BADGE` (ok/warn/danger/info/neutral) — **the seed example in #5's own body, never touched by
+this branch**.
 
 ### Scope corrections found during execution
 
@@ -100,7 +141,7 @@ flowchart TD
     PR3["PR 3 — Time operations"]
     PR4["PR 4 — Severity vocabulary (#3)"]
     PR4b["PR 4b — Timestamp disambiguation (#2)"]
-    PR5a["PR 5a — Chunking golden contract"]
+    PR5a["PR 5a — Chunking golden contract<br/>(REVERTED post-QA — no caller)"]
     PR5b["PR 5b — Apply chunking to live indexing<br/>(DEFERRED — needs design pass)"]
     PR6["PR 6 — Supervisor unification (#4)"]
 

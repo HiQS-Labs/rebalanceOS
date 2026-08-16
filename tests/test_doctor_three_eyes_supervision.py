@@ -159,6 +159,35 @@ class FleetStateTests(unittest.TestCase):
         self.assertEqual(ERROR, checks[0].severity)
         self.assertIn("com.rebalance-os.c", checks[0].detail)
 
+    def test_unknown_rows_never_read_as_a_clean_fleet(self) -> None:
+        """Forward-compatibility, not a live bug.
+
+        Today `unknown > 0` only occurs when launchctl_available is False, which
+        the probe_error branch catches first — so this fall-through is
+        unreachable through the real scan(). Codex confirmed agy's Blocker was
+        overstated on exactly that ground. But the code read `unknown` only to
+        build `total` and would then report OK, contradicting _map_pulse_state's
+        own refusal to treat an unrecognised state as healthy. A synthetic or
+        future report must not read as clean.
+        """
+        report = _report(
+            ok=2,
+            unknown=1,
+            launchctl_available=True,  # deliberately inconsistent — the synthetic case
+            probe_error="",
+            rows=[
+                {"label": "com.rebalance-os.a", "health": "ok"},
+                {"label": "com.rebalance-os.b", "health": "ok"},
+                {"label": "com.user.git-pulse", "health": "unknown"},
+            ],
+        )
+        checks = _checks(scan_result=report)
+        self.assertEqual(1, len(checks))
+        self.assertNotEqual(OK, checks[0].status)
+        self.assertNotEqual(NOTICE, checks[0].severity)
+        self.assertIn("unknown", checks[0].detail)
+        self.assertIn("com.user.git-pulse", checks[0].detail)
+
     def test_long_problem_lists_are_truncated_with_a_count(self) -> None:
         rows = [{"label": f"com.x.{i}", "health": "not-loaded"} for i in range(9)]
         checks = _checks(scan_result=_report(ok=0, not_loaded=9, rows=rows))
