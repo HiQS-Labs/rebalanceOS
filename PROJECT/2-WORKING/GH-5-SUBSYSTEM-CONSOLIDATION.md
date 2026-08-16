@@ -229,8 +229,12 @@ this campaign that removes a *system* rather than a *symbol*.
 
 #### The blast radius, measured
 
-Five checks are `WARN` status + `ERROR` severity today — shown as errors on the dashboard while the
-CLI exits 0. Under a binary verdict they begin failing the CLI:
+Checks that are `WARN` status + `ERROR` severity are shown as errors on the dashboard while the CLI
+exits 0 today; under a binary verdict they begin failing it. A local grep found five, listed below —
+but **a hand-counted list is not a control.** Codex correctly graded the bare assertion
+"five … measured" as unverifiable. **4.2 replaces it with a parameterized test enumerating every
+`WARN`+`ERROR` constructor in `doctor.py`**, so the blast radius is derived from source at test time
+and a sixth site added later cannot slip in silently.
 
 | Site | Check |
 |---|---|
@@ -240,10 +244,43 @@ CLI exits 0. Under a binary verdict they begin failing the CLI:
 | `doctor.py:1238` | auth failure events |
 | `doctor.py:1458` | 3-Eyes: a job is unloaded or failing (#4's incident shape) |
 
-`:471` fires on **every brand-new install**, so a naive collapse makes `rebalance doctor` exit 1 on
-first run. Routing through the reconciler fixes this for free — suppression and demotion already
-handle onboarding. **This is the argument for doing the reroute instead of the rename:** the rename
-introduces the hazard, the reroute removes it.
+`:471` fires on **every brand-new install**, so the collapse makes `rebalance doctor` exit 1 on
+first run.
+
+> ### ⚠️ Corrected — the reroute does NOT fix this
+>
+> An earlier version of this plan claimed routing through the reconciler "fixes this for free
+> because suppression already handles onboarding", and used that as the argument for reroute over
+> rename. **Codex graded it a Blocker and it is false.** Verified by executing the real code:
+>
+> ```
+> Check("vault", WARN, "no vault ingested", severity=ERROR)
+> + a status dict showing the source synced just now
+> → compute_health_status(...).verdict == "fail"     # CLI would exit 1
+> → in problems: ['vault'] · in notices: []
+> ```
+>
+> Suppression applies only to `severity == WARNING` (or `auth:*`), and notice-demotion also
+> excludes ERROR — both by design (`health.py:201`: *"Error severity is never demoted"*). A
+> WARN+ERROR check is unsuppressable by construction.
+>
+> **The reroute is still correct** — for the single-verdict-path, G6 and G8 reasons above — but it
+> must be argued on those, not on a safety property it does not have.
+
+#### Onboarding policy — an explicit decision, not an assumption
+
+Because the hazard is real, Phase 4 must **choose and implement** a policy before deleting
+`Check.status`:
+
+- **Recommended:** make the empty-source check's severity conditional on whether that source has
+  *ever* ingested. No data on a fresh install is expected (→ `NOTICE`); no data on an established
+  install is a real error (→ `ERROR`). Config already tracks onboarding state
+  (`config.py:411` `get_onboarding_skipped_stages`, `mcp/tools/onboarding.py:15`
+  `onboarding_status`), so the signal exists and does not need inventing.
+- **Alternative:** accept exit 1 on a fresh install and document it as expected.
+
+Whichever is chosen, **4.2 must include a black-box fresh-install test asserting the chosen exit
+code**, and it must land before `Check.status` is deleted.
 
 #### Operator decision, recorded
 
@@ -254,13 +291,19 @@ Binary pass/fail is accepted: **`error` exits 1, everything else exits 0**, eval
 
 **4.1 → 4.2 must precede 4.3.** At no point may a binary exit code exist that cannot be diagnosed.
 
-- **4.1 — `rebalance doctor --json`.** Purely additive flag emitting name/status/severity/detail/
-  hint per check. **Prerequisite for the collapse**, not a follow-up: a binary exit code is only
-  actionable if the failure list is machine-readable. Net lines: up (~20). Risk: near-zero.
-- **4.2 — Exit-code pin test.** Asserts exactly which conditions exit non-zero, so the blast radius
-  above is visible in the diff and cannot drift silently later. Risk: zero.
+- **4.1 — `rebalance doctor --json`.** Purely additive flag. **Must emit the reconciled verdict and
+  each check's disposition (problem / notice / suppressed), not merely the raw check list** — Codex's
+  Q4 finding: raw checks cannot explain *why* something was suppressed or demoted, so a JSON of raw
+  checks leaves a binary exit code still undiagnosable in exactly the cases the reconciler acts on.
+  **Prerequisite for the collapse**, not a follow-up. Risk: near-zero.
+- **4.2 — Exit-code pin tests.** Three, not one: (a) a parameterized enumeration of every
+  `WARN`+`ERROR` constructor in `doctor.py`; (b) a black-box fresh-install test asserting the chosen
+  onboarding exit code; (c) the status-unavailable path. Risk: zero.
 - **4.3 — Reroute the CLI exit through `compute_health_status()`**, then delete `Check.status` and
-  `__post_init__`'s reconciliation hack once it has no consumer. **Net lines: down.**
+  `__post_init__`'s reconciliation hack once it has no consumer. **The CLI must pass the same status
+  snapshot and clock the dashboard uses** — one shared provider. Codex's Q4: ordering alone is not
+  sufficient, because a different `now` or a missing status dict makes recovery/suppression evaluate
+  differently and the two surfaces disagree again through a new door. **Net lines: down.**
 
 ## Phase O — Observability, so a binary verdict stays diagnosable
 
@@ -275,19 +318,25 @@ deduped GitHub issue per failing check. That is a real alerting pipeline and it 
 **Gaps, in priority order:**
 
 - **O1 — no machine-readable output.** Delivered by 4.1; listed here so the dependency is explicit.
-- **O2 — no history.** Nothing persists a `DoctorReport`, so *"is this new?"* and *"how long?"*
-  cannot be answered — which is precisely how #4's collector stayed dead for days without anyone
-  noticing. Append each run to a bounded `doctor_history.jsonl` (same shape as the existing auth
-  log; BOUNDED per `GUIDING-PRINCIPLES.md`). Risk: low, additive write.
-- **O3 — suppression windows are coupled by comment, not by code.** `health.py:20` states
+- **O2 — no history. ~~Build `doctor_history.jsonl`.~~ CUT.** Codex's Q5, accepted: it names no
+  reader, no retention query, and no operational trigger — *"repeats the callerless-infrastructure
+  risk"*. That is Phase 5a's exact mistake, proposed again three phases later by the same author, in
+  the plan that documents Phase 5a as the cautionary example. The laziest thing that answers *"is
+  this new / how long"* is **4.1's JSON plus the per-source timestamps and activity records that
+  already exist**. Revisit only when a concrete incident cannot be answered from those — and cite
+  the incident.
+- **O3 — suppression windows are coupled by comment, not by code. KEEP.** `health.py:20` states
   *"Suppression windows MUST track `doctor.py` `warn_days * 24` for each source"* — a MUST enforced
-  by a docstring. This is the same exhortation-instead-of-mechanism pattern this campaign has
-  already been bitten by twice. Replace with a test that fails when the two drift. Risk: zero.
+  by a docstring, the same exhortation-instead-of-mechanism pattern this campaign has been bitten by
+  twice. **Derive the window from one shared policy value, or test that the two agree — do not
+  introduce a second hand-maintained copy** (Codex Q5). Risk: zero.
 
 **Explicitly NOT a quick win — do not attempt as one:** normalising check names to
-`subsystem:instance`. `health_issue_reporter` dedupes filed GitHub issues **on the check name**, so
-renaming re-files duplicates of every currently-open health issue. It is worth doing, but it needs
-a name-migration map and its own slice.
+`subsystem:instance`. Verified: `scripts/health_issue_reporter.py:686` is
+`check_id = check["name"]  # stable, registry-level id`, and that id is the GitHub issue key
+(`title = f"{ISSUE_TITLE_PREFIX} {check_id}"`, matched against `open_issues` / `recently_closed`).
+Renaming therefore re-files a duplicate of every currently-open health issue. It is worth doing, but
+it needs a name-migration/alias map and a test proving no re-file, in its own slice.
 
 ### Phase 5b — Chunking into live indexing (still deferred, unchanged)
 
