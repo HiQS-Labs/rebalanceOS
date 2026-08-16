@@ -11,7 +11,7 @@ import typer
 
 from rebalance.cli._core import app
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
-from rebalance.tz_utils import format_local, local_tz
+from rebalance.lib.time_ops import format_local, local_tz
 
 
 def _normalize_semantic_sources_option(values: list[str]) -> list[str]:

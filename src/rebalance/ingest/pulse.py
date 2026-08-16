@@ -38,7 +38,7 @@ from rebalance.ingest.calendar_helpers import calendar_dt_utc, normalize_aware_u
 from rebalance.ingest.config import get_github_token, get_pulse_config
 from rebalance.ingest.db import db_connection
 from rebalance.ingest.slack_users import compact_sleuth_reminder
-from rebalance.tz_utils import format_local, local_tz, parse_utc_iso
+from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
 
 

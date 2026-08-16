@@ -21,17 +21,12 @@ module runs ``git`` queries only, never mutates repos or registry state.
 
 from __future__ import annotations
 
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from rebalance.lib.git_ops import _git
+from rebalance.lib.git_ops import _git, parse_github_remote_url, should_descend
 
 GITHUB_REMOTE_MARKERS = ("github.com:", "github.com/")
-
-_FULL_NAME_RE = re.compile(
-    r"github\.com[:/](?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
-)
 
 
 @dataclass(frozen=True)
@@ -46,14 +41,24 @@ class LocalRepo:
 
 
 def parse_github_full_name(origin_url: str) -> str | None:
-    """``owner/repo`` from an SSH or HTTPS GitHub remote URL, else None."""
-    match = _FULL_NAME_RE.search(origin_url or "")
-    return f"{match.group('owner')}/{match.group('repo')}" if match else None
+    """``owner/repo`` from an SSH or HTTPS GitHub remote URL, else None.
+
+    Public name kept — this is an existing call-site contract. Only the parsing
+    internals moved to ``rebalance.lib.git_ops`` (GH-5 Phase 1).
+    """
+    return parse_github_remote_url(origin_url)
 
 
 def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
-    """Find git checkouts under *root* (same walk the git-pulse scanner uses:
-    stop descending at a ``.git`` dir, skip dot-dirs, bounded depth)."""
+    """Find git checkouts under *root*: stop descending at a ``.git`` dir,
+    prune the shared blacklist and dot-dirs, bounded depth.
+
+    GH-5 Phase 2 deliberately widened this walk. It previously skipped only
+    dot-directories, so a `node_modules/` or `Library/` tree was walked in
+    full looking for checkouts. It now shares ``git_ops.DEFAULT_PRUNE_DIRS``
+    with the ask_self/Focus5 walkers — an intended behavior change (more
+    directories skipped), not a pure code move.
+    """
     if not root.exists() or not root.is_dir():
         return []
 
@@ -69,7 +74,7 @@ def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
         try:
             children = sorted(
                 child for child in current.iterdir()
-                if child.is_dir() and not child.name.startswith(".")
+                if child.is_dir() and should_descend(child.name)
             )
         except OSError:
             continue

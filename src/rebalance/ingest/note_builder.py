@@ -19,7 +19,7 @@ from rebalance.ingest.calendar_config import (
 from rebalance.ingest.calendar_helpers import event_duration_minutes
 from rebalance.ingest.config import get_gemini_api_key
 from rebalance.ingest.db import db_connection, ensure_calendar_schema
-from rebalance.tz_utils import format_local, local_tz
+from rebalance.lib.time_ops import format_local, local_tz
 from rebalance.ingest.project_priority import apply_project_priorities
 from rebalance.ingest.project_classifier import annotate_events_with_projects, load_project_matchers
 from rebalance.ingest.registry import get_projects

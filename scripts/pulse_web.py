@@ -37,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ACTIVE_JSON_PATH = PROJECT_ROOT / "temp" / "apple-reminders" / "active.json"
 import _bootstrap  # noqa: E402, F401  — puts src/ and scripts/ on sys.path
 
-from rebalance.tz_utils import format_timestamp, parse_utc_iso  # noqa: E402
+from rebalance.lib.time_ops import format_timestamp, parse_utc_iso  # noqa: E402
 
 # Reuse the TUI's data layer so both views move in lockstep.
 from dashboard import (  # type: ignore  # noqa: E402
@@ -351,9 +351,9 @@ def _health_banner_copy_text(
     activity_text: str,
 ) -> str:
     lines = [
-        f"Collector attention needed",
+        f"Attention needed",
         f"Status: {status_text}",
-        f"Last collector activity: {activity_text}",
+        f"Last data ingest: {activity_text}",
     ]
     for check in problems:
         lines.append(f"{check.name}: {_compact_whitespace(check.detail)}")
@@ -373,7 +373,17 @@ def _clipboard_icon_svg() -> str:
     )
 
 
-def _latest_collector_activity(status: dict[str, Any]) -> str | None:
+def _latest_ingest_activity(status: dict[str, Any]) -> str | None:
+    """Newest timestamp across the general ingestion sources.
+
+    GH-5 Phase 4b (#2): this is deliberately NOT about the git-pulse per-device
+    collectors, whose own scan ages appear in the banner's problem items. Both
+    were previously labelled "collector activity" in the same banner, so the two
+    unrelated timestamps read as one contradictory reading of the same thing —
+    the operator saw "script ran at 9:22 AM" next to "collector 7:08 PM" and had
+    no way to know they measure different subsystems. Renamed to match what it
+    actually measures.
+    """
     sources = status.get("sources") or {}
     semantic = status.get("semantic_index") or {}
     candidates = [
@@ -400,7 +410,7 @@ def _latest_collector_activity(status: dict[str, Any]) -> str | None:
 def render_health_banner(
     health: HealthStatus,
     now: datetime,
-    last_activity: str | None,
+    last_ingest: str | None,
 ) -> str:
     problems = health.problems
     if not problems:
@@ -408,8 +418,8 @@ def render_health_banner(
 
     tone = "danger" if health.failures else "warn"
     status_text = health.status_text
-    activity_text = format_timestamp(last_activity, relative=True, tz=TZ) or "never"
-    activity_html = _timestamp_html(last_activity, tz=TZ, relative=True, fallback="never")
+    activity_text = format_timestamp(last_ingest, relative=True, tz=TZ) or "never"
+    activity_html = _timestamp_html(last_ingest, tz=TZ, relative=True, fallback="never")
     copy_text = _health_banner_copy_text(
         problems,
         status_text=status_text,
@@ -439,15 +449,15 @@ def render_health_banner(
     <section class="health-banner health-banner-{tone}" aria-live="polite">
       <div class="health-banner-lead">
         <span class="health-banner-badge">{_esc(status_text)}</span>
-        <span class="health-banner-summary">Collector attention needed</span>
-        <span class="health-banner-activity">Last collector activity {activity_html}</span>
+        <span class="health-banner-summary">Attention needed</span>
+        <span class="health-banner-activity">Last data ingest {activity_html}</span>
         <button
           type="button"
           class="health-banner-copy-btn"
           data-copy-text="{_esc(copy_text)}"
-          aria-label="Copy collector warning text"
-          title="Copy collector warning text"
-        >{_clipboard_icon_svg()}<span class="visually-hidden">Copy collector warning text</span></button>
+          aria-label="Copy health summary"
+          title="Copy health summary"
+        >{_clipboard_icon_svg()}<span class="visually-hidden">Copy health summary</span></button>
       </div>
       <div class="health-banner-items">{''.join(items)}</div>
     </section>
@@ -456,19 +466,19 @@ def render_health_banner(
 
 def render_sync_chip(
     health: HealthStatus,
-    last_activity: str | None,
+    last_ingest: str | None,
     now: datetime,
 ) -> str:
-    activity_text = format_timestamp(last_activity, relative=True, tz=TZ) or "—"
+    activity_text = format_timestamp(last_ingest, relative=True, tz=TZ) or "—"
     if health.verdict == FAIL:
         tone = "danger"
-        label = f"Collector degraded · {activity_text}"
+        label = f"Sync degraded · {activity_text}"
     elif health.verdict == WARN:
         tone = "warn"
-        label = f"Collector warnings · {activity_text}"
+        label = f"Sync warnings · {activity_text}"
     else:
         tone = "ok"
-        label = f"Collector active {activity_text}"
+        label = f"Last ingest {activity_text}"
     return (
         f'<span class="synced synced-{tone}">'
         f'<span class="ok-dot"></span>{_esc(label)}'
@@ -3077,7 +3087,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
     freshness = status.get("freshness") or {}
     drift_total = sum(int(v) for v in freshness.values() if isinstance(v, int))
 
-    last_activity = _latest_collector_activity(status)
+    last_ingest = _latest_ingest_activity(status)
     last_vault = vault_rows[0] if vault_rows else None
     health_filed_30d = fetch_health_filed_count(days=1)
     # One reconciled verdict drives every health pill, so they can't contradict.
@@ -3125,7 +3135,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
               <span class="{system_now_class}" title="{_esc(system_now_title)}">System: {_esc(system_now_str)} <span class="tz-key">{_esc(system_now_tz)} · {_esc(TZ.key)}</span></span>
             </div>
             <div class="topbar-row">
-              {render_sync_chip(health_status, last_activity, now)}
+              {render_sync_chip(health_status, last_ingest, now)}
               <a href="{_esc(HEALTH_ISSUES_URL)}" target="_blank" rel="noopener noreferrer"
                  class="health-pill metric{' has-issues' if health_filed_30d else ''}"
                  title="GitHub issues the health reporter auto-filed in the last day — click to view on GitHub">
@@ -3136,7 +3146,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
             </div>
           </div>
         </div>
-        {render_health_banner(health_status, now, last_activity)}
+        {render_health_banner(health_status, now, last_ingest)}
         {render_hero(goals, pulled_from, local_now, obsidian_url, recent_completions, secondary_todos=secondary_todos, apple_reminders=apple_reminders)}
         <div class="full-row">
           {render_work_next(work_next_rows, now, computed_at=work_next_computed_at, blended=work_next_blended, model_used=work_next_model)}

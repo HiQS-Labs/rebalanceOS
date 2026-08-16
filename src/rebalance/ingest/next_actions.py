@@ -61,7 +61,7 @@ from rebalance.ingest.config import get_pulse_config, get_vault_path
 from rebalance.lib.time_ops import parse_date, parse_iso
 from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.pulse import _query_day_activity, collect_pulse_snapshot
-from rebalance.tz_utils import format_local, local_tz
+from rebalance.lib.time_ops import format_local, local_tz
 
 logger = logging.getLogger(__name__)
 

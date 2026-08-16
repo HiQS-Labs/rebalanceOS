@@ -199,26 +199,61 @@ def format_local(value: str | datetime | None, fmt: str, *, tz: ZoneInfo | None 
     return to_local(parsed, tz).strftime(fmt)
 
 
-def format_relative(value: str | datetime | None, *, now: datetime | None = None) -> str:
+def format_relative(
+    value: str | datetime | None,
+    *,
+    now: datetime | None = None,
+    empty: str = "",
+    allow_future: bool = False,
+    sub_minute: bool = False,
+) -> str:
     """Render `value` as a compact relative age: 'just now' / '5m ago' /
-    '3h ago' / '2d ago'. Returns "" on None/unparseable input.
+    '3h ago' / '2d ago'. Returns *empty* on None/unparseable input.
 
     No timezone conversion needed — a delta between two instants is
     tz-agnostic — so this only depends on `parse_utc_iso`/naive-as-UTC.
+
+    The three keyword options exist to absorb the TUI dashboard's own age
+    renderer (GH-5 Phase 3) without changing what either surface displays.
+    Defaults reproduce the web behavior exactly; the dashboard passes all
+    three. They are display policy, not new time semantics:
+
+    - *empty* — placeholder for absent/unparseable input. The web surfaces
+      render nothing; the TUI uses "—" as its universal empty-cell marker.
+    - *allow_future* — render a timestamp ahead of *now* as "in 5m" rather
+      than clamping it to zero. Scheduled/should-post-on columns are
+      legitimately in the future; a web "age" never is.
+    - *sub_minute* — render "45s ago" instead of collapsing under a minute to
+      "just now". The TUI's narrow columns show seconds; the web does not.
     """
     if value is None:
-        return ""
+        return empty
     parsed = value if isinstance(value, datetime) else parse_utc_iso(value)
     if parsed is None:
-        return ""
+        return empty
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     reference = now or _current_time(timezone.utc)
-    secs = max(0, int((reference - parsed).total_seconds()))
+    secs = int((reference - parsed).total_seconds())
+
+    future = False
+    if secs < 0:
+        if allow_future:
+            future = True
+            secs = -secs
+        else:
+            secs = 0
+
     for label, unit in (("d", 86400), ("h", 3600), ("m", 60)):
         if secs >= unit:
-            return f"{secs // unit}{label} ago"
-    return "just now"
+            rendered = f"{secs // unit}{label}"
+            break
+    else:
+        if not sub_minute:
+            return "just now"
+        rendered = f"{secs}s"
+
+    return f"in {rendered}" if future else f"{rendered} ago"
 
 
 def format_timestamp(

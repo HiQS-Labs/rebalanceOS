@@ -30,7 +30,7 @@ from rebalance.ingest.project_classifier import (
     annotate_events_with_projects,
     load_project_matchers,
 )
-from rebalance.tz_utils import format_local
+from rebalance.lib.time_ops import format_local
 
 DEFAULT_AGGREGATOR_SKIP_WORDS = frozenset(
     {

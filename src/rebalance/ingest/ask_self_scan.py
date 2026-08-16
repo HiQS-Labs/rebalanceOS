@@ -28,7 +28,6 @@ Design notes
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -37,28 +36,10 @@ from typing import Any, Iterator
 
 from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
+from rebalance.lib.git_ops import parse_github_remote_url, should_descend
 
 HARNESS_RELPATH = ("ask_self", "ask_self_harness.json")
 DEFAULT_MAX_DEPTH = 6
-
-# Directories never worth descending into when hunting for harness files.
-# Keeps a full-tree walk cheap; ask_self/ itself is never hidden so pruning
-# hidden dirs is safe for discovery.
-_PRUNE_DIRS = frozenset({
-    "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache",
-    ".mypy_cache", ".ruff_cache", "build", "dist", ".next", ".cache",
-    "Library", ".Trash", ".npm", ".cargo", "site-packages", ".tox",
-    ".gradle", "target", "vendor", ".terraform", "DerivedData", ".git",
-})
-
-# remote_url forms we map to owner/repo:
-#   https://github.com/Owner/Repo.git
-#   git@github.com:Owner/Repo.git
-#   ssh://git@github.com/Owner/Repo
-_REMOTE_RE = re.compile(
-    r"""(?:github\.com[:/])(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$""",
-    re.IGNORECASE,
-)
 
 
 @dataclass(frozen=True)
@@ -104,13 +85,12 @@ class AskSelfSyncResult:
 # ---------------------------------------------------------------------------
 
 def derive_repo_full_name(remote_url: str | None) -> str | None:
-    """Parse a git remote URL into ``owner/repo`` (original casing), or None."""
-    if not remote_url:
-        return None
-    m = _REMOTE_RE.search(remote_url.strip())
-    if not m:
-        return None
-    return f"{m.group('owner')}/{m.group('repo')}"
+    """Parse a git remote URL into ``owner/repo`` (original casing), or None.
+
+    Public name and location kept — Focus5 imports this symbol from here. Only
+    the parsing internals moved to ``rebalance.lib.git_ops`` (GH-5 Phase 1).
+    """
+    return parse_github_remote_url(remote_url)
 
 
 def _git_remote_full_name(repo_root: Path) -> str | None:
@@ -183,10 +163,9 @@ def read_index_metadata(index_db_path: Path) -> dict[str, Any] | None:
 
 
 def _should_descend(name: str) -> bool:
-    if name in _PRUNE_DIRS:
-        return False
-    # Prune hidden dirs (".git", ".cache", …); ask_self/ is not hidden.
-    return not name.startswith(".")
+    # Prunes the shared blacklist, then hidden dirs (".git", ".cache", …);
+    # ask_self/ is not hidden, so this stays safe for discovery.
+    return should_descend(name)
 
 
 def iter_repo_harnesses(

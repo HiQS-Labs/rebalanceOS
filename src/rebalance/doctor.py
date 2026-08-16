@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Literal
 
+from rebalance import three_eyes_bridge
 from rebalance.lib.time_ops import format_timestamp, local_tz, parse_utc_iso
 
 OK = "ok"
@@ -1243,6 +1244,37 @@ def _check_auth_failures() -> list[Check]:
     return checks
 
 
+# GH-5 Phase 4 — the pulse_health → doctor severity boundary.
+#
+# `pulse_health.classify()` has its own 5-state vocabulary. That model is
+# independently useful and stays untouched; what was wrong was letting its raw
+# state word cross into doctor's user-facing `detail` text, where it read as a
+# fourth severity word alongside doctor's canonical notice/warning/error (#3).
+# The mapping lives here, at the consumption boundary, so exactly one caller's
+# presentation needs are served without collapsing the source model.
+_PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
+    # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
+    "ALIVE":     (OK,   NOTICE,  "collecting normally"),
+    "STALE":     (WARN, WARNING, "stale"),
+    "ALERT":     (WARN, ERROR,   "not collecting"),
+    "DEGRADED":  (WARN, ERROR,   "collecting with errors"),
+    "NO PUSHES": (WARN, ERROR,   "never collected"),
+}
+
+
+def _map_pulse_state(state: str) -> tuple[str, str, str]:
+    """Map a `pulse_health` state to doctor's canonical (status, severity, phrase).
+
+    `state` may carry a parenthetical qualifier appended by the caller (e.g.
+    ``"ALIVE (intermittent-device window 18h)"``); the leading word is what
+    classifies. An unrecognised state is treated as a warning rather than
+    assumed healthy — doctor must never report a state it does not understand
+    as fine.
+    """
+    head = (state or "").split(" (", 1)[0].strip()
+    return _PULSE_STATE_TO_CHECK.get(head, (WARN, WARNING, head.lower() or "unknown"))
+
+
 def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Check]:
     """Surface git-pulse per-device collector health (ALIVE/STALE/ALERT/DEGRADED).
 
@@ -1291,11 +1323,27 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
             healthy = True
             state = f"ALIVE (intermittent-device window {scope.stale_after_hours:g}h)"
 
-        detail = f"{state} — {age}"
+        # Map the raw pulse state to doctor's own vocabulary before it reaches
+        # any user-facing text (GH-5 Phase 4 / #3).
+        _status, severity, phrase = _map_pulse_state(state)
+        qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
+        detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
         if health.repo_scan_failures:
             detail += f", {health.repo_scan_failures} repo scan failures"
             if health.scan_failure_examples:
                 detail += f" ({health.scan_failure_examples})"
+
+        # `healthy` (not `health.healthy`) is the locally-adjusted verdict: an
+        # intermittent device inside its declared window is healthy here even
+        # though the fleet classifier called it stale. Severity must follow the
+        # same verdict as status.
+        #
+        # This line previously read `severity=WARNING if health.healthy else
+        # ERROR` — inverted, so a *healthy* collector was reported at WARNING
+        # severity, and the intermittent-device override never reached severity
+        # at all. Both fixed here.
+        if healthy:
+            severity = NOTICE
         checks.append(
             Check(
                 name,
@@ -1304,10 +1352,122 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
                 "" if healthy else
                 "check the collector machine / its launchd git-pulse job; "
                 "`python experimental/git-pulse/health-check.py` for the full view",
-                severity=WARNING if health.healthy else ERROR,
+                severity=severity,
             )
         )
     return checks
+
+
+def _check_three_eyes_supervision() -> list[Check]:
+    """Surface 3-Eyes' supervision verdict inside ``rebalance doctor`` (GH-5 Phase 6, #4).
+
+    #4's root cause was that ``com.user.git-pulse`` silently stopped being loaded
+    and nothing noticed for days. 3-Eyes already tracks loaded-state across the
+    catalogued fleet; doctor was simply never told. This is the wiring.
+
+    The failure contract is explicit, because the interesting failures here do
+    not raise:
+
+    ==============================  ==================================
+    condition                       emitted Check
+    ==============================  ==================================
+    3-Eyes inactive on this host    none (list is empty)
+    import or scan raised           WARN / warning — never silently ok
+    ran, but launchctl unreadable   WARN / warning, surfacing probe_error
+    jobs not loaded                 WARN / error
+    jobs failing                    WARN / error
+    fleet clean                     OK / notice
+    ==============================  ==================================
+
+    The middle case is the one worth spelling out: ``scan()`` reports an
+    unreadable ``launchctl`` as a structured result with every row "unknown",
+    not an exception. Reading ``failing == 0`` off that report and calling the
+    fleet healthy would be the same misread 3-Eyes' own "unknown" state exists
+    to prevent.
+
+    Deliberately does **not** replace doctor's own ``launchd_crash_state.json``
+    crash-loop detection. That check persists relaunch history across polls;
+    ``scan()`` is a single snapshot and cannot distinguish a one-off crash from
+    a KeepAlive job launchd is respawning in a loop. Retiring it here would
+    delete a diagnostic capability 3-Eyes does not replace.
+    """
+    name = "3-eyes supervision"
+    try:
+        report = three_eyes_bridge.health_scan()
+    except three_eyes_bridge.ThreeEyesUnavailable as exc:
+        return [
+            Check(
+                name,
+                WARN,
+                f"3-Eyes is installed but could not be read: {exc}",
+                "run `python utils/3-eyes/three_eyes_cli.py health` to see the failure directly",
+                severity=WARNING,
+            )
+        ]
+
+    if report is None:
+        return []  # not active on this machine — nothing to report, no noise
+
+    probe_error = three_eyes_bridge.probe_unavailable_reason(report)
+    if probe_error:
+        return [
+            Check(
+                name,
+                WARN,
+                f"could not read launchd, so fleet state is unknown: {probe_error}",
+                "3-Eyes could not run `launchctl list`; the fleet is unobserved, not healthy",
+                severity=WARNING,
+            )
+        ]
+
+    ok = int(report.get("ok") or 0)
+    failing = int(report.get("failing") or 0)
+    not_loaded = int(report.get("not_loaded") or 0)
+    unknown = int(report.get("unknown") or 0)
+    total = ok + failing + not_loaded + unknown
+
+    if failing or not_loaded or unknown:
+        problems = []
+        for row in report.get("rows") or []:
+            health = str(row.get("health") or "")
+            if health == "ok":
+                continue
+            problems.append(f"{row.get('label')} ({health})")
+        counts = [f"{failing} failing", f"{not_loaded} not loaded"]
+        if unknown:
+            # Defensive, not a live path: today `unknown > 0` only happens when
+            # launchctl_available is False, which the probe_error branch above
+            # already caught. But reading `unknown` solely to compute `total`
+            # and then reporting OK would contradict this module's own rule —
+            # _map_pulse_state refuses to treat a state it does not understand
+            # as healthy, and so must this. A synthetic or future report with
+            # unknown rows and launchctl_available True must not read as clean.
+            counts.append(f"{unknown} unknown")
+        detail = f"{', '.join(counts)} of {total} supervised"
+        if problems:
+            detail += " — " + ", ".join(problems[:4])
+            if len(problems) > 4:
+                detail += f", +{len(problems) - 4} more"
+        return [
+            Check(
+                name,
+                WARN,
+                detail,
+                "a job that is not loaded will never run again on its own — "
+                "`launchctl bootstrap` it, or `three_eyes install` to re-manage it",
+                severity=ERROR,
+            )
+        ]
+
+    return [
+        Check(
+            name,
+            OK,
+            f"{ok} of {total} supervised jobs loaded and healthy",
+            "",
+            severity=NOTICE,
+        )
+    ]
 
 
 def _diagnostics_index() -> list[Check]:
@@ -1648,6 +1808,10 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     launchctl_output = _launchctl_list()
     report.checks.extend(_check_scheduler_liveness(launchctl_output=launchctl_output))
     report.checks.extend(_check_launchd(launchctl_output))
+
+    # 3-Eyes' own supervision verdict over the catalogued fleet. Complements —
+    # never replaces — _check_launchd's persisted crash-loop detection above.
+    report.checks.extend(_check_three_eyes_supervision())
 
     # Final section: a map of every diagnostics surface, so this one command
     # is the single entry point into the project's observability.

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import html
 
-from rebalance.tz_utils import format_timestamp
+from rebalance.lib.time_ops import format_timestamp
 
 # The one design-token set every web page shares — the single source of truth for
 # the palette. Lifted verbatim from the pulse dashboard (the only fully-tokenized
@@ -172,7 +172,7 @@ def data_row(
 
     Caller-supplied ``*_html`` fragments are inserted verbatim and must already
     be escaped/sanitised. When ``timestamp`` is provided this helper formats it
-    through :func:`rebalance.tz_utils.format_timestamp`, so every adopting row
+    through :func:`rebalance.lib.time_ops.format_timestamp`, so every adopting row
     shares one timestamp contract.
     """
 

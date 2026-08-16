@@ -1,5 +1,28 @@
 # ROUTER.md
 
+> ## 🛑 Before you build anything: check whether it already exists.
+>
+> This repo's most expensive recurring defect is **re-inventing a subsystem that is already
+> here** — not writing bad code. It has happened repeatedly, to humans and agents alike, and
+> reading this sentence is not enough to prevent it. **Run these four checks; they take under a
+> minute and each one has caught a real duplicate:**
+>
+> 1. `gh pr list -R HiQS-Suite/rebalanceOS` **and** `gh pr list -R Hypercart-Dev-Tools/rebalance-OS`
+>    — work in flight is invisible to a code search. An entire `rebalance/lib/*_ops` consolidation
+>    campaign was resumed from scratch in 2026-08 because its remaining phases were sitting in
+>    unmerged PRs on the *other* repo.
+> 2. **`ROADMAP.md` → "In progress"** — the ledger of campaigns already under way.
+> 3. **`grep -rn "<the concept>" --include="*.py" .` across `src/`, `utils/`, `HiQS/`** — a helper
+>    you are about to write may exist in a package you were not looking at. A clean-room import
+>    gate (`HiQS/tests/test_clean_room.py`) was duplicated in 2026-08 by someone who never looked
+>    in `HiQS/`.
+> 4. **Run the full suite, including the parts CI skips** — `pytest tests/ utils/3-eyes/tests
+>    HiQS/tests`. A test that exists but never runs will not tell you it already covers your idea.
+>
+> If a thing exists and is inadequate, PDDA Phase 0 requires you to state **why extending it does
+> not work** before replacing it. "I did not know it was there" is the failure this block exists
+> to stop, and it is not a reason.
+
 This file is the first entry point for an AI agent working in this repo: it tells you what to read, what to run, and which files are canonical. **This repo is an MCP server** — reach for the MCP tools before scanning code or writing ad-hoc shell pipelines.
 
 ## Role split
