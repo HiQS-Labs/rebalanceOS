@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.7] - 2026-08-16
+
+### Changed
+- The health system's warning-suppression windows are now derived from the same
+  per-source staleness policy the doctor uses, instead of being a hand-maintained
+  copy that a docstring asked maintainers to keep in sync. Behavior is unchanged;
+  a new drift test pins today's values so any future policy change is a visible,
+  deliberate decision rather than a silent divergence between the two systems.
+
 ## [0.69.6] - 2026-08-16
 
 ### Changed

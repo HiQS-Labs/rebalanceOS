@@ -1757,6 +1757,22 @@ _COLLECTOR_FRESHNESS: list[dict] = [
 ]
 
 
+def freshness_warn_hours(check_name: str) -> int:
+    """Staleness policy for one freshness check, in hours (``warn_days * 24``).
+
+    The single accessor `health.py` derives its suppression windows from, so
+    the registry above stays the only place a source's staleness threshold is
+    written down (GH-5 Phase O3 — the old "MUST update both together" docstring
+    was policy enforced by exhortation, and this campaign has been bitten by
+    that pattern before). Unknown names raise: a silent default here would
+    reintroduce the drift this exists to prevent.
+    """
+    for entry in _COLLECTOR_FRESHNESS:
+        if entry["name"] == check_name:
+            return entry["warn_days"] * 24
+    raise KeyError(f"no collector-freshness registry entry named {check_name!r}")
+
+
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
