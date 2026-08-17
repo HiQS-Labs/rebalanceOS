@@ -12,15 +12,31 @@ from hiqs.sources import github
 
 
 def _insert_item(
-    connection, repo: str, item_type: str, number: int, title: str, body: str, state: str,
-    activity_at: str, *, updated_at: str = "2026-08-03T12:00:00Z",
+    connection,
+    repo: str,
+    item_type: str,
+    number: int,
+    title: str,
+    body: str,
+    state: str,
+    activity_at: str,
+    *,
+    updated_at: str = "2026-08-03T12:00:00Z",
 ):
     connection.execute(
         "INSERT INTO github_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            repo, item_type, number, title, body, state,
-            f"https://github.com/{repo}/issues/{number}", "octocat", "",
-            updated_at, activity_at,
+            repo,
+            item_type,
+            number,
+            title,
+            body,
+            state,
+            f"https://github.com/{repo}/issues/{number}",
+            "octocat",
+            "",
+            updated_at,
+            activity_at,
         ),
     )
 
@@ -37,17 +53,32 @@ def test_github_docs_index_closed_items_with_vault_and_are_idempotent(tmp_path, 
     try:
         monkeypatch.setattr("hiqs.search.log_event", lambda *_args: None)
         _insert_item(
-            connection, "acme/widgets", "issue", 7, "Closed retrieval decision",
-            "Archaeology says this retrieval work is finished.", "closed", "2026-08-01T09:00:00Z",
+            connection,
+            "acme/widgets",
+            "issue",
+            7,
+            "Closed retrieval decision",
+            "Archaeology says this retrieval work is finished.",
+            "closed",
+            "2026-08-01T09:00:00Z",
             updated_at="2026-08-03T12:00:00Z",
         )
         _insert_item(
-            connection, "acme/widgets", "pull_request", 8, "Open indexing PR",
-            "Makes GitHub items searchable.", "open", "2026-08-02T09:00:00Z",
+            connection,
+            "acme/widgets",
+            "pull_request",
+            8,
+            "Open indexing PR",
+            "Makes GitHub items searchable.",
+            "open",
+            "2026-08-02T09:00:00Z",
         )
         vault_doc = Doc(
-            source="vault", id="vault:retrieval", title="Vault retrieval context",
-            body="Retrieval notes from the vault.", unit="retrieval.md",
+            source="vault",
+            id="vault:retrieval",
+            title="Vault retrieval context",
+            body="Retrieval notes from the vault.",
+            unit="retrieval.md",
         )
         vault = Source(name="vault", fetch=lambda *_args: SyncReport(counts={}), docs=lambda _conn: [vault_doc])
         embedder = _embedder()
@@ -55,10 +86,15 @@ def test_github_docs_index_closed_items_with_vault_and_are_idempotent(tmp_path, 
         github_docs = list(github.docs(connection))
         closed = next(doc for doc in github_docs if doc.id == "github:acme/widgets#7")
         assert closed == Doc(
-            source="github", id="github:acme/widgets#7", title="Closed retrieval decision",
+            source="github",
+            id="github:acme/widgets#7",
+            title="Closed retrieval decision",
             body="Archaeology says this retrieval work is finished.",
-            url="https://github.com/acme/widgets/issues/7", ts="2026-08-01T09:00:00Z",
-            project="acme/widgets", author="octocat", unit="acme/widgets",
+            url="https://github.com/acme/widgets/issues/7",
+            ts="2026-08-01T09:00:00Z",
+            project="acme/widgets",
+            author="octocat",
+            unit="acme/widgets",
         )
 
         reports = {
@@ -103,8 +139,6 @@ def test_github_reconciliation_only_prunes_attested_repositories(tmp_path):
         )
 
         assert result.counts["pruned"] == 1
-        assert connection.execute("SELECT id FROM docs ORDER BY id").fetchall() == [
-            ("github:acme/failed#2",)
-        ]
+        assert connection.execute("SELECT id FROM docs ORDER BY id").fetchall() == [("github:acme/failed#2",)]
     finally:
         connection.close()

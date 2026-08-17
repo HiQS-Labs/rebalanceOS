@@ -156,10 +156,7 @@ def _source_statuses(connection: sqlite3.Connection) -> dict[str, dict[str, Any]
 
 def _row_counts(connection: sqlite3.Connection) -> dict[str, int]:
     """Count the canonical schema tables without dynamically interpolating names."""
-    return {
-        table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-        for table in _COUNTED_TABLES
-    }
+    return {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in _COUNTED_TABLES}
 
 
 def _last_errors(connection: sqlite3.Connection) -> list[dict[str, Any]]:

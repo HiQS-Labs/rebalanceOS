@@ -49,21 +49,24 @@ DEFAULT_OUT_DIR = os.path.join(REPO_ROOT, "temp", "cc-cloud-jobs")  # temp/ is g
 
 # ---------------------------------------------------------------- auth
 
+
 def get_token():
     """Return the subscription OAuth access token (keychain first, then creds file)."""
     for blob in (_keychain_blob(), _file_blob()):
         if blob.get("accessToken"):
             _warn_if_expired(blob)
             return blob["accessToken"]
-    sys.exit("ERROR: no subscription OAuth token found (keychain or ~/.claude/.credentials.json). "
-             "Run any `claude` command to log in / refresh.")
+    sys.exit(
+        "ERROR: no subscription OAuth token found (keychain or ~/.claude/.credentials.json). "
+        "Run any `claude` command to log in / refresh."
+    )
 
 
 def _keychain_blob():
     try:
         raw = subprocess.check_output(
-            ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"],
-            stderr=subprocess.DEVNULL, text=True).strip()
+            ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"], stderr=subprocess.DEVNULL, text=True
+        ).strip()
         return json.loads(raw).get("claudeAiOauth", {})
     except Exception:
         return {}
@@ -79,11 +82,11 @@ def _file_blob():
 def _warn_if_expired(blob):
     exp = blob.get("expiresAt")
     if exp and exp / 1000 < dt.datetime.now(dt.timezone.utc).timestamp():
-        print("WARN: subscription token appears expired; run a `claude` command to refresh.",
-              file=sys.stderr)
+        print("WARN: subscription token appears expired; run a `claude` command to refresh.", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- fetch
+
 
 def fetch_sessions(token, hard_cap=500):
     """Page through /v1/code/sessions (newest first) up to hard_cap records."""
@@ -102,7 +105,8 @@ def fetch_sessions(token, hard_cap=500):
         except urllib.error.HTTPError as e:
             raise SystemExit(
                 f"HTTP {e.code} on GET /v1/code/sessions\n{e.read().decode()[:300]}\n"
-                "401 -> token expired/invalid (refresh via any `claude` command).")
+                "401 -> token expired/invalid (refresh via any `claude` command)."
+            )
         out.extend(body.get("data", []))
         cursor = body.get("next_cursor")
         if not cursor:
@@ -111,6 +115,7 @@ def fetch_sessions(token, hard_cap=500):
 
 
 # ---------------------------------------------------------------- normalize
+
 
 def parse_ts(ts):
     if not ts:
@@ -167,13 +172,14 @@ def norm(s):
         "needs_action": (pts.get("needs_action") or "").strip() or None,
         # PR fields filled in by enrich_pr_status() (best-effort, needs `gh`)
         "pr_number": None,
-        "pr_state": None,       # OPEN | MERGED | CLOSED | None (no PR) | "?" (lookup failed)
+        "pr_state": None,  # OPEN | MERGED | CLOSED | None (no PR) | "?" (lookup failed)
         "pr_url": None,
         "pr_merged_at": None,
     }
 
 
 # ---------------------------------------------------------------- PR status
+
 
 def enrich_pr_status(rows):
     """Best-effort: fill pr_* fields from the head branch's PR via `gh`.
@@ -183,6 +189,7 @@ def enrich_pr_status(rows):
     One `gh` call per (repo, branch); results memoized so duplicate branches cost once.
     """
     import shutil
+
     if not shutil.which("gh"):
         print("NOTE: `gh` not found — PR merge status omitted from the signal.", file=sys.stderr)
         return rows
@@ -199,7 +206,7 @@ def enrich_pr_status(rows):
             r["pr_state"] = "?"
         elif pr:
             r["pr_number"] = pr.get("number")
-            r["pr_state"] = pr.get("state")          # OPEN | MERGED | CLOSED
+            r["pr_state"] = pr.get("state")  # OPEN | MERGED | CLOSED
             r["pr_url"] = pr.get("url")
             r["pr_merged_at"] = pr.get("mergedAt")
         # pr is None -> no PR for this branch; leave pr_state None
@@ -210,9 +217,25 @@ def _gh_pr_for_branch(repo, branch):
     """Return the newest PR dict for repo/head-branch, None if none, 'ERROR' on failure."""
     try:
         out = subprocess.check_output(
-            ["gh", "pr", "list", "--repo", repo, "--head", branch, "--state", "all",
-             "--json", "number,state,isDraft,mergedAt,url,title", "--limit", "5"],
-            stderr=subprocess.DEVNULL, text=True, timeout=25).strip()
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--json",
+                "number,state,isDraft,mergedAt,url,title",
+                "--limit",
+                "5",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=25,
+        ).strip()
         prs = json.loads(out) if out else []
         if not prs:
             return None
@@ -224,6 +247,7 @@ def _gh_pr_for_branch(repo, branch):
 
 
 # ---------------------------------------------------------------- window
+
 
 def in_window(r, since_date, until_date):
     d = parse_ts(r["created_at"])
@@ -238,6 +262,7 @@ def in_window(r, since_date, until_date):
 
 
 # ---------------------------------------------------------------- synthesis
+
 
 def hhmm(ts):
     d = parse_ts(ts)
@@ -283,8 +308,10 @@ def synthesize(rows, label):
     buckets = {}
     for r in rows:
         buckets[r["status_bucket"]] = buckets.get(r["status_bucket"], 0) + 1
-    L.append(f"\n{len(rows)} session(s).  buckets: " +
-             "  ".join(f"{k}={v}" for k, v in sorted(buckets.items(), key=lambda x: str(x[0]))))
+    L.append(
+        f"\n{len(rows)} session(s).  buckets: "
+        + "  ".join(f"{k}={v}" for k, v in sorted(buckets.items(), key=lambda x: str(x[0])))
+    )
 
     L.append("")
     L.append(f"  {'START':<7}{'DUR':<8}{'STATUS':<22}{'PR':<14}TITLE")
@@ -292,15 +319,19 @@ def synthesize(rows, label):
     for r in sorted(rows, key=lambda x: x["created_at"] or ""):
         st = BUCKET.get(r["status_bucket"], r["status_bucket"] or "?")
         worker = "" if r["worker_status"] in ("idle", None) else f" ({r['worker_status']})"
-        L.append(f"  {hhmm(r['created_at']):<7}{dur(r):<8}{(st + worker)[:21]:<22}"
-                 f"{pr_label(r):<14}{(r['title'] or '(untitled)')[:34]}")
+        L.append(
+            f"  {hhmm(r['created_at']):<7}{dur(r):<8}{(st + worker)[:21]:<22}"
+            f"{pr_label(r):<14}{(r['title'] or '(untitled)')[:34]}"
+        )
 
     L.append("\nDETAIL:")
     for r in sorted(rows, key=lambda x: x["created_at"] or ""):
         L.append(f"\n  • {r['title'] or '(untitled)'}   [{r['id']}]")
-        L.append(f"      {hhmm(r['created_at'])}–{hhmm(r['last_event_at'])} ({dur(r)})  "
-                 f"bucket={r['status_bucket']}  worker={r['worker_status']}  "
-                 f"effort={r['effort_level']}  origin={r['origin']}  model={r['model']}")
+        L.append(
+            f"      {hhmm(r['created_at'])}–{hhmm(r['last_event_at'])} ({dur(r)})  "
+            f"bucket={r['status_bucket']}  worker={r['worker_status']}  "
+            f"effort={r['effort_level']}  origin={r['origin']}  model={r['model']}"
+        )
         if r["repo"]:
             L.append(f"      repo: {r['repo']}  branch: {r['branch']}")
         if r["pr_state"] and r["pr_state"] != "?":
@@ -325,13 +356,15 @@ def synthesize(rows, label):
     open_pr = sum(1 for r in rows if r["pr_state"] == "OPEN")
     no_pr = sum(1 for r in rows if r["pr_state"] is None and r["repo"])
     L.append("\n" + "=" * 70)
-    L.append(f"BOTTOM LINE: {len(rows)} web session(s) — {done} done/review-ready, "
-             f"{running} still running, {failed} failed.")
+    L.append(
+        f"BOTTOM LINE: {len(rows)} web session(s) — {done} done/review-ready, {running} still running, {failed} failed."
+    )
     L.append(f"PR status: {merged} merged, {open_pr} open, {no_pr} no-PR.")
     return "\n".join(L)
 
 
 # ---------------------------------------------------------------- main
+
 
 def main():
     ap = argparse.ArgumentParser(description="Read Claude Code Cloud web sessions + status.")
@@ -362,7 +395,7 @@ def main():
         enrich_pr_status(rows)  # only the in-window rows -> bounded gh calls
 
     os.makedirs(args.out_dir, exist_ok=True)
-    stamp = (args.day or args.since or dt.date.today().isoformat())
+    stamp = args.day or args.since or dt.date.today().isoformat()
     raw_path = os.path.join(args.out_dir, f"cc_cloud_jobs_{stamp}.json")
     with open(raw_path, "w") as fh:
         json.dump(rows, fh, indent=2)

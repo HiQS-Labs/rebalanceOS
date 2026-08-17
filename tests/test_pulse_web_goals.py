@@ -61,10 +61,7 @@ class PulseWebGoalTests(unittest.TestCase):
         self.assertEqual(goals[0]["description"], "details")
 
     def test_render_hero_shows_secondary_todo_column(self) -> None:
-        all_goals = [
-            {"done": False, "title": f"Open item {i}", "description": ""}
-            for i in range(1, 10)
-        ]
+        all_goals = [{"done": False, "title": f"Open item {i}", "description": ""} for i in range(1, 10)]
 
         html = pulse_web.render_hero(
             all_goals[:3],
@@ -109,13 +106,11 @@ class PulseWebGoalTests(unittest.TestCase):
         self.assertIn("+1 more", html)
         self.assertIn("health-banner-copy-btn", html)
         self.assertIn("data-copy-text=", html)
-        self.assertNotIn("launchd:github-sync</span><span class=\"health-banner-detail\"", html)
+        self.assertNotIn('launchd:github-sync</span><span class="health-banner-detail"', html)
 
     def test_render_sync_chip_uses_warning_state(self) -> None:
         now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
-        health = compute_health_status(
-            [Check("gmail", WARN, "scope missing")], {"sources": {}}, now
-        )
+        health = compute_health_status([Check("gmail", WARN, "scope missing")], {"sources": {}}, now)
         chip = pulse_web.render_sync_chip(
             health,
             "2026-05-28T17:55:00+00:00",
@@ -169,9 +164,9 @@ class PulseWebGoalTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(">Email</span><span class=\"badge\">2</span>", html)
-        self.assertIn(">Figma</span><span class=\"badge\">0</span>", html)
-        self.assertNotIn(">Sleuth</span><span class=\"badge\">", html)
+        self.assertIn('>Email</span><span class="badge">2</span>', html)
+        self.assertIn('>Figma</span><span class="badge">0</span>', html)
+        self.assertNotIn('>Sleuth</span><span class="badge">', html)
 
     def test_render_recent_figma_shows_comments_and_add_form(self) -> None:
         html = pulse_web.render_recent_figma(

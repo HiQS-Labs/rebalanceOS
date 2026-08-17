@@ -27,9 +27,7 @@ _GITHUB_URL_RE = re.compile(
     r"https?://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/(?:issues/(?P<issue>\d+)|pull/(?P<pull>\d+))(?=$|[/?#\s<>)\],.?!;:])",
     re.IGNORECASE,
 )
-_GITHUB_SHORTHAND_RE = re.compile(
-    r"(?<![\w./-])(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>\d+)\b"
-)
+_GITHUB_SHORTHAND_RE = re.compile(r"(?<![\w./-])(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>\d+)\b")
 _BARE_GITHUB_REF_RE = re.compile(r"(?<![\w/#])#(?P<number>\d+)\b")
 _NEWSLETTER_ISSUE_RE = re.compile(r"^\s+of\s+(?:the\s+)?newsletter\b", re.IGNORECASE)
 
@@ -59,9 +57,7 @@ def _literal_github_references(body: str, repo_context: str) -> set[tuple[str, s
     return references
 
 
-def _resolved_github_references(
-    connection: sqlite3.Connection, doc: Doc
-) -> set[tuple[str, str, int]]:
+def _resolved_github_references(connection: sqlite3.Connection, doc: Doc) -> set[tuple[str, str, int]]:
     """Resolve only literal references to existing GitHub rows; never create placeholders."""
     resolved: set[tuple[str, str, int]] = set()
     for repo, explicit_type, number in _literal_github_references(doc.body, doc.project):
@@ -182,9 +178,7 @@ def project_docs(
 
     This function is the SOLE writer to the `docs` table (§5 rule 1).
     """
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS doc_units (doc_id TEXT PRIMARY KEY, unit TEXT NOT NULL)"
-    )
+    connection.execute("CREATE TABLE IF NOT EXISTS doc_units (doc_id TEXT PRIMARY KEY, unit TEXT NOT NULL)")
 
     if sources is None:
         sources = discover_sources()
@@ -244,10 +238,7 @@ def project_docs(
         existing_doc_units = {r[0]: r[1] for r in existing_units_rows}
 
         existing_vec_ids = {
-            r[0]
-            for r in connection.execute(
-                "SELECT doc_id FROM docs_vec WHERE model = ?", (model_name,)
-            ).fetchall()
+            r[0] for r in connection.execute("SELECT doc_id FROM docs_vec WHERE model = ?", (model_name,)).fetchall()
         }
 
         report = reports.get(source.name) if reports else None
@@ -269,9 +260,7 @@ def project_docs(
                         f"Duplicate doc ID '{doc.id}' found across sources '{prev_source}' and '{source.name}'"
                     )
                 else:
-                    raise ValueError(
-                        f"Duplicate doc ID '{doc.id}' found multiple times in source '{source.name}'"
-                    )
+                    raise ValueError(f"Duplicate doc ID '{doc.id}' found multiple times in source '{source.name}'")
             seen_in_batch[doc.id] = source.name
 
             if doc.id in existing_global_docs and source.name not in existing_global_docs[doc.id]:
@@ -285,16 +274,12 @@ def project_docs(
             if unit:
                 scanned_doc_ids_by_unit.setdefault(unit, set()).add(doc.id)
             doc_units_to_upsert.append((doc.id, unit))
-            desired_refs_by_doc[(source.name, doc.id)] = _resolved_github_references(
-                connection, doc
-            )
+            desired_refs_by_doc[(source.name, doc.id)] = _resolved_github_references(connection, doc)
 
             new_tuple = (doc.title, doc.body, doc.url, doc.ts, doc.project, doc.author)
 
             if doc.id not in existing_map:
-                inserts.append(
-                    (source.name, doc.id, doc.title, doc.body, doc.url, doc.ts, doc.project, doc.author)
-                )
+                inserts.append((source.name, doc.id, doc.title, doc.body, doc.url, doc.ts, doc.project, doc.author))
                 counts["inserted"] += 1
                 docs_to_embed.append(doc)
             else:
@@ -302,9 +287,7 @@ def project_docs(
                 old_title, old_body = old_tuple[0], old_tuple[1]
 
                 if new_tuple != old_tuple:
-                    updates.append(
-                        (doc.title, doc.body, doc.url, doc.ts, doc.project, doc.author, source.name, doc.id)
-                    )
+                    updates.append((doc.title, doc.body, doc.url, doc.ts, doc.project, doc.author, source.name, doc.id))
                     counts["updated"] += 1
                     # Delta embedding keyed by content hash
                     new_hash = compute_content_hash(doc.title, doc.body)
@@ -350,9 +333,7 @@ def project_docs(
             raise ValueError("Encoder result is not a valid sequence")
 
         if len(raw_vectors) != len(docs_to_embed):
-            raise ValueError(
-                f"Encoder returned {len(raw_vectors)} vectors, expected {len(docs_to_embed)}"
-            )
+            raise ValueError(f"Encoder returned {len(raw_vectors)} vectors, expected {len(docs_to_embed)}")
 
         for doc, vec in zip(docs_to_embed, raw_vectors):
             dim, blob = serialize_vector(vec)
@@ -450,9 +431,7 @@ def get_doc_vector(
     return dim, deserialize_vector(blob)
 
 
-def get_linked_github_items(
-    connection: sqlite3.Connection, doc_id: str
-) -> list[tuple[str, str, int, str, str]]:
+def get_linked_github_items(connection: sqlite3.Connection, doc_id: str) -> list[tuple[str, str, int, str, str]]:
     """Return GitHub items literally linked from one projected document, without ranking them."""
     return connection.execute(
         """

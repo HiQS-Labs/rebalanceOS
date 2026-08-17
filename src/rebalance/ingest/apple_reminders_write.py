@@ -220,14 +220,8 @@ def ensure_apple_reminders_write_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_arw_audit_reminder "
-        "ON apple_reminders_write_audit(reminder_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_arw_audit_state "
-        "ON apple_reminders_write_audit(state)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_arw_audit_reminder ON apple_reminders_write_audit(reminder_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_arw_audit_state ON apple_reminders_write_audit(state)")
     conn.commit()
 
 
@@ -244,9 +238,7 @@ def build_request(
         raise AppleRemindersWriteError(f"invalid mode: {mode!r} (expected plan|apply)")
     for op in operations:
         if op.op not in _VALID_OPS:
-            raise AppleRemindersWriteError(
-                f"invalid op: {op.op!r} (expected one of {sorted(_VALID_OPS)})"
-            )
+            raise AppleRemindersWriteError(f"invalid op: {op.op!r} (expected one of {sorted(_VALID_OPS)})")
     return {
         "schema_version": WRITE_SCHEMA_VERSION,
         "request_id": request_id or _new_request_id(),
@@ -278,25 +270,19 @@ def _check_confirmation(request: dict[str, Any]) -> None:
         return
     if request.get("confirm_destructive"):
         return
-    destructive = [
-        op["op"] for op in request["operations"] if op["op"] in _DESTRUCTIVE_OPS
-    ]
+    destructive = [op["op"] for op in request["operations"] if op["op"] in _DESTRUCTIVE_OPS]
     if destructive:
         raise AppleRemindersConfirmationError(
-            f"apply contains destructive op(s) {destructive} but "
-            f"confirm_destructive is not set"
+            f"apply contains destructive op(s) {destructive} but confirm_destructive is not set"
         )
 
 
-def _prior_result(
-    conn: sqlite3.Connection, request_id: str
-) -> WriteResult | None:
+def _prior_result(conn: sqlite3.Connection, request_id: str) -> WriteResult | None:
     """Idempotency: if this request_id already reached applied/reconciled, return
     the recorded result instead of re-invoking the helper. Guards the
     'Python timed out after a successful apply, then retried' duplicate path."""
     rows = conn.execute(
-        "SELECT state, response_json FROM apple_reminders_write_audit "
-        "WHERE request_id = ? ORDER BY op_index",
+        "SELECT state, response_json FROM apple_reminders_write_audit WHERE request_id = ? ORDER BY op_index",
         (request_id,),
     ).fetchall()
     if not rows:
@@ -330,9 +316,7 @@ def _record_audit(
             results_by_token[r.get("client_token")] = r
             results_by_id[r.get("reminder_id")] = r
     for i, op in enumerate(request["operations"]):
-        res = results_by_token.get(op.get("client_token")) or results_by_id.get(
-            op.get("reminder_id")
-        )
+        res = results_by_token.get(op.get("client_token")) or results_by_id.get(op.get("reminder_id"))
         reminder_id = op.get("reminder_id")
         op_status = None
         readback = None
@@ -360,9 +344,21 @@ def _record_audit(
                 updated_at=excluded.updated_at
             """,
             (
-                request["request_id"], i, op["op"], op.get("client_token"),
-                reminder_id, request["mode"], state, op_status, readback,
-                helper_identity, request_json, response_json, detail, now, now,
+                request["request_id"],
+                i,
+                op["op"],
+                op.get("client_token"),
+                reminder_id,
+                request["mode"],
+                state,
+                op_status,
+                readback,
+                helper_identity,
+                request_json,
+                response_json,
+                detail,
+                now,
+                now,
             ),
         )
     conn.commit()
@@ -371,8 +367,7 @@ def _record_audit(
 def _parse_response(response: dict[str, Any], request_id: str) -> WriteResult:
     if response.get("schema_version") != WRITE_SCHEMA_VERSION:
         raise AppleRemindersHelperError(
-            f"helper response schema_version "
-            f"{response.get('schema_version')!r} != {WRITE_SCHEMA_VERSION}"
+            f"helper response schema_version {response.get('schema_version')!r} != {WRITE_SCHEMA_VERSION}"
         )
     if response.get("request_id") != request_id:
         raise AppleRemindersHelperError(
@@ -418,11 +413,11 @@ def apply_reminder_writes(
 
     if request.get("schema_version") != WRITE_SCHEMA_VERSION:
         raise AppleRemindersWriteError(
-            f"request schema_version {request.get('schema_version')!r} "
-            f"!= {WRITE_SCHEMA_VERSION}"
+            f"request schema_version {request.get('schema_version')!r} != {WRITE_SCHEMA_VERSION}"
         )
     if list_name is None:
         from rebalance.ingest.config import get_apple_reminders_list_name
+
         list_name = get_apple_reminders_list_name()
 
     _validate_scope(request, list_name)
@@ -442,15 +437,13 @@ def apply_reminder_writes(
             )
             return prior
 
-        _record_audit(conn, request, state=STATE_ACCEPTED, response=None,
-                      helper_identity=None)
+        _record_audit(conn, request, state=STATE_ACCEPTED, response=None, helper_identity=None)
 
         call = invoker if invoker is not None else _open_bundle_invoker
         try:
             response = call(request)
         except AppleRemindersHelperError:
-            _record_audit(conn, request, state=STATE_FAILED, response=None,
-                          helper_identity=None)
+            _record_audit(conn, request, state=STATE_FAILED, response=None, helper_identity=None)
             raise
 
         result = _parse_response(response, request_id)
@@ -459,8 +452,7 @@ def apply_reminder_writes(
         # plan never mutates; record and return without reconcile.
         if mode == "plan":
             result.state = STATE_SKIPPED
-            _record_audit(conn, request, state=STATE_SKIPPED, response=response,
-                          helper_identity=helper_identity)
+            _record_audit(conn, request, state=STATE_SKIPPED, response=response, helper_identity=helper_identity)
             result.finished_at = _now_iso()
             return result
 
@@ -469,31 +461,32 @@ def apply_reminder_writes(
             # Nothing applied (e.g. auth denied, all ops errored) — record the
             # honest terminal state, no reconcile.
             result.state = STATE_FAILED
-            _record_audit(conn, request, state=STATE_FAILED, response=response,
-                          helper_identity=helper_identity)
+            _record_audit(conn, request, state=STATE_FAILED, response=response, helper_identity=helper_identity)
             result.finished_at = _now_iso()
             return result
 
         result.state = STATE_APPLIED
-        _record_audit(conn, request, state=STATE_APPLIED, response=response,
-                      helper_identity=helper_identity)
+        _record_audit(conn, request, state=STATE_APPLIED, response=response, helper_identity=helper_identity)
 
         if reconcile:
             fn = reconcile_fn
             if fn is None:
-                def fn() -> Any:  # type: ignore[misc]
+
+                def fn() -> Any:
                     from rebalance.ingest.apple_reminders import sync_apple_reminders
+
                     return sync_apple_reminders(database_path, list_name=list_name)
+
             try:
                 fn()
                 result.reconciled = True
                 result.state = STATE_RECONCILED
-                _record_audit(conn, request, state=STATE_RECONCILED,
-                              response=response, helper_identity=helper_identity)
+                _record_audit(conn, request, state=STATE_RECONCILED, response=response, helper_identity=helper_identity)
             except Exception as exc:  # reconcile is best-effort; write already done
                 logger.warning(
-                    "apple_reminders write: apply succeeded but reconcile failed "
-                    "for request %s: %s", request_id, exc,
+                    "apple_reminders write: apply succeeded but reconcile failed for request %s: %s",
+                    request_id,
+                    exc,
                 )
 
     result.finished_at = _now_iso()
@@ -505,6 +498,7 @@ def apply_reminder_writes(
 # identity verification. Not exercised by the headless test suite (which injects
 # a fake invoker); guarded so import never requires macOS.
 # ---------------------------------------------------------------------------
+
 
 def _helper_bundle_path(repo_root: Path | None = None) -> Path:
     root = repo_root or _repo_root()
@@ -521,32 +515,27 @@ def _verify_helper_identity(bundle: Path, expected_bundle_id: str) -> str:
     and declare the expected bundle id. Returns the verified identity string."""
     if not bundle.exists():
         raise AppleRemindersHelperError(
-            f"helper bundle not found at {bundle}. Build it with "
-            f"scripts/build_apple_reminders_helper_app.sh"
+            f"helper bundle not found at {bundle}. Build it with scripts/build_apple_reminders_helper_app.sh"
         )
     if not shutil.which("codesign"):
         raise AppleRemindersHelperError("codesign not available to verify helper")
     verify = subprocess.run(
         ["codesign", "--verify", "--deep", "--strict", str(bundle)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if verify.returncode != 0:
-        raise AppleRemindersHelperError(
-            f"helper signature failed verification: {verify.stderr.strip()}"
-        )
+        raise AppleRemindersHelperError(f"helper signature failed verification: {verify.stderr.strip()}")
     info = subprocess.run(
         ["codesign", "-d", "--verbose=2", str(bundle)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     blob = (info.stderr or "") + (info.stdout or "")
-    ident_line = next(
-        (ln for ln in blob.splitlines() if ln.startswith("Identifier=")), ""
-    )
+    ident_line = next((ln for ln in blob.splitlines() if ln.startswith("Identifier=")), "")
     identity = ident_line.partition("=")[2].strip()
     if identity != expected_bundle_id:
-        raise AppleRemindersHelperError(
-            f"helper bundle id {identity!r} != expected {expected_bundle_id!r}"
-        )
+        raise AppleRemindersHelperError(f"helper bundle id {identity!r} != expected {expected_bundle_id!r}")
     return identity
 
 
@@ -586,12 +575,11 @@ def _open_bundle_invoker(
 
     launch = subprocess.run(
         ["open", "-a", str(bundle), "--args", "--request", str(req_path)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if launch.returncode != 0:
-        raise AppleRemindersHelperError(
-            f"failed to launch helper via `open`: {launch.stderr.strip()}"
-        )
+        raise AppleRemindersHelperError(f"failed to launch helper via `open`: {launch.stderr.strip()}")
 
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:

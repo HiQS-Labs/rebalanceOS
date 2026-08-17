@@ -16,6 +16,7 @@ are structurally incapable of showing a different ranking for the same DB. If a
 future edit makes ``ask()`` recompute, or makes the route target a different DB
 or drop ``blend_team``, the assertions below fail.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -59,14 +60,14 @@ class CrossSurfaceParityTests(unittest.TestCase):
         to the test DB and ``persist_ranked_next_actions`` to a no-op so nothing
         touches the network or rewrites the cache.
         """
-        with patch(
-            "rebalance.paths.resolve_database_path", return_value=self._db
-        ), patch(
-            "rebalance.ingest.next_actions.persist_ranked_next_actions"
-        ) as mock_persist, patch(
-            "rebalance.ingest.next_actions.rank_next_actions",
-            return_value=RankedNextActions(),
-        ) as mock_rank:
+        with (
+            patch("rebalance.paths.resolve_database_path", return_value=self._db),
+            patch("rebalance.ingest.next_actions.persist_ranked_next_actions") as mock_persist,
+            patch(
+                "rebalance.ingest.next_actions.rank_next_actions",
+                return_value=RankedNextActions(),
+            ) as mock_rank,
+        ):
             whatsnext_page(refresh=True)
 
         mock_rank.assert_called_once()
@@ -85,12 +86,15 @@ class CrossSurfaceParityTests(unittest.TestCase):
         reader consumes exactly what the route wrote, so no drift is possible.
         """
         sentinel = RankedNextActions(note="persisted", blended=True)
-        with patch(
-            "rebalance.ingest.next_actions.load_ranked_next_actions",
-            return_value=sentinel,
-        ) as mock_load, patch(
-            "rebalance.ingest.next_actions.rank_next_actions",
-        ) as mock_rank:
+        with (
+            patch(
+                "rebalance.ingest.next_actions.load_ranked_next_actions",
+                return_value=sentinel,
+            ) as mock_load,
+            patch(
+                "rebalance.ingest.next_actions.rank_next_actions",
+            ) as mock_rank,
+        ):
             result = ask("status", self._db, skip_synthesis=True)
 
         mock_load.assert_called_once()

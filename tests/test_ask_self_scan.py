@@ -39,9 +39,7 @@ def _make_ask_self_repo(
     }
     if github_owner and github_repo:
         harness["github"] = {"owner": github_owner, "repo": github_repo}
-    (repo / "ask_self" / "ask_self_harness.json").write_text(
-        json.dumps(harness), encoding="utf-8"
-    )
+    (repo / "ask_self" / "ask_self_harness.json").write_text(json.dumps(harness), encoding="utf-8")
 
     if build_index:
         idx = repo / "ask_self" / "index" / "idx.sqlite"
@@ -61,10 +59,21 @@ def _make_ask_self_repo(
         conn.execute(
             "INSERT INTO repo_metadata VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                name.lower(), name, "python-repo", "main", head_sha,
-                "2026-06-01T00:00:00Z", remote_url, 100, 5000, 999,
-                "2026-06-01T03:00:00Z", "Qwen/Qwen3-Embedding-0.6B", 1024,
-                total_chunks, str(repo / "ask_self" / "ask_self_harness.json"),
+                name.lower(),
+                name,
+                "python-repo",
+                "main",
+                head_sha,
+                "2026-06-01T00:00:00Z",
+                remote_url,
+                100,
+                5000,
+                999,
+                "2026-06-01T03:00:00Z",
+                "Qwen/Qwen3-Embedding-0.6B",
+                1024,
+                total_chunks,
+                str(repo / "ask_self" / "ask_self_harness.json"),
             ),
         )
         conn.commit()
@@ -74,19 +83,13 @@ def _make_ask_self_repo(
 
 class DeriveRepoFullNameTests(unittest.TestCase):
     def test_https(self) -> None:
-        self.assertEqual(
-            derive_repo_full_name("https://github.com/Owner/Repo.git"), "Owner/Repo"
-        )
+        self.assertEqual(derive_repo_full_name("https://github.com/Owner/Repo.git"), "Owner/Repo")
 
     def test_https_no_suffix(self) -> None:
-        self.assertEqual(
-            derive_repo_full_name("https://github.com/Owner/Repo"), "Owner/Repo"
-        )
+        self.assertEqual(derive_repo_full_name("https://github.com/Owner/Repo"), "Owner/Repo")
 
     def test_ssh_scp_form(self) -> None:
-        self.assertEqual(
-            derive_repo_full_name("git@github.com:Owner/Repo.git"), "Owner/Repo"
-        )
+        self.assertEqual(derive_repo_full_name("git@github.com:Owner/Repo.git"), "Owner/Repo")
 
     def test_preserves_casing(self) -> None:
         self.assertEqual(
@@ -170,8 +173,11 @@ class SyncTests(unittest.TestCase):
             root = Path(tmp) / "repos"
             root.mkdir()
             _make_ask_self_repo(
-                root, "skeleton", build_index=False,
-                github_owner="Acme", github_repo="skeleton",
+                root,
+                "skeleton",
+                build_index=False,
+                github_owner="Acme",
+                github_repo="skeleton",
             )
             db = self._db(Path(tmp))
 
@@ -192,6 +198,7 @@ class SyncTests(unittest.TestCase):
             now = datetime.now(timezone.utc).isoformat()
             conn = sqlite3.connect(str(db))
             from rebalance.ingest.db import run_migrations
+
             run_migrations(conn)
             conn.execute(
                 "INSERT INTO github_pushed_repos "

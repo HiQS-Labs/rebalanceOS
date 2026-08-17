@@ -89,16 +89,12 @@ def test_crash_looping_daemon_is_flagged_despite_live_pid(tmp_path) -> None:
     # Poll 2: launchd respawned it under a new PID after another non-zero
     # exit. One crash-relaunch is now on record, but one alone is still not
     # a loop.
-    check2 = _check_launchd(
-        f"1050\t1\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=1)
-    )[0]
+    check2 = _check_launchd(f"1050\t1\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=1))[0]
     assert check2.status == OK
 
     # Poll 3: a second crash-relaunch inside the lookback window — this is a
     # genuine loop and must degrade despite the PID being live right now.
-    check3 = _check_launchd(
-        f"1103\t1\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=2)
-    )[0]
+    check3 = _check_launchd(f"1103\t1\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=2))[0]
     assert check3.status == WARN
     assert check3.severity == WARNING
     assert "crash-loop" in check3.detail.lower()
@@ -113,8 +109,6 @@ def test_repeated_sigterm_restarts_are_not_mistaken_for_a_crash_loop(tmp_path) -
     label = "com.rebalance-os.pulse-server"
 
     for minute, pid in enumerate((2000, 2050, 2103, 2140)):
-        check = _check_launchd(
-            f"{pid}\t-15\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=minute)
-        )[0]
+        check = _check_launchd(f"{pid}\t-15\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=minute))[0]
         assert check.status == OK, (pid, check)
         assert check.detail == "running"

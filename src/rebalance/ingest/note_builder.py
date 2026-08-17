@@ -78,14 +78,16 @@ def get_all_repo_activity_by_org(
     for row in rows:
         repo = row["repo_full_name"]
         org = repo.split("/")[0] if "/" in repo else repo
-        by_org.setdefault(org, []).append({
-            "repo_full_name": repo,
-            "commits": int(row["commits"] or 0),
-            "prs_opened": int(row["prs_opened"] or 0),
-            "prs_merged": int(row["prs_merged"] or 0),
-            "issues_opened": int(row["issues_opened"] or 0),
-            "last_active_at": row["last_active_at"],
-        })
+        by_org.setdefault(org, []).append(
+            {
+                "repo_full_name": repo,
+                "commits": int(row["commits"] or 0),
+                "prs_opened": int(row["prs_opened"] or 0),
+                "prs_merged": int(row["prs_merged"] or 0),
+                "issues_opened": int(row["issues_opened"] or 0),
+                "last_active_at": row["last_active_at"],
+            }
+        )
 
     for org_repos in by_org.values():
         org_repos.sort(key=lambda r: r["last_active_at"] or "", reverse=True)
@@ -318,8 +320,6 @@ def build_dashboard_payload(
         operator_summary=operator_summary,
         org_activity=org_activity,
     )
-
-
 
 
 def synthesize_dashboard_narrative(

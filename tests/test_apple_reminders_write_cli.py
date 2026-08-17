@@ -27,9 +27,14 @@ def _fake_result(request):
         host_runtime="com.test.helper",
         authorization_status="authorized",
         results=[
-            WriteOpResult(op=o["op"], status="ok", client_token=o.get("client_token"),
-                          reminder_id=o.get("reminder_id") or "RID-NEW", readback_ok=True,
-                          detail="ok")
+            WriteOpResult(
+                op=o["op"],
+                status="ok",
+                client_token=o.get("client_token"),
+                reminder_id=o.get("reminder_id") or "RID-NEW",
+                readback_ok=True,
+                detail="ok",
+            )
             for o in request["operations"]
         ],
         started_at="t0",
@@ -56,9 +61,7 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
             captured["request"] = request
             return _fake_result(request)
 
-        return mock.patch(
-            "rebalance.cli.apple_reminders.apply_reminder_writes", side_effect=fake
-        ), captured
+        return mock.patch("rebalance.cli.apple_reminders.apply_reminder_writes", side_effect=fake), captured
 
     def test_help_lists_subcommands(self):
         result = self.runner.invoke(app, ["apple-reminders", "--help"])
@@ -68,13 +71,16 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
 
     def test_create_defaults_to_plan(self):
         patcher, captured = self._patch()
-        with patcher, mock.patch(
-            "rebalance.ingest.config.get_apple_reminders_list_name",
-            return_value="Reminders",
+        with (
+            patcher,
+            mock.patch(
+                "rebalance.ingest.config.get_apple_reminders_list_name",
+                return_value="Reminders",
+            ),
         ):
             result = self.runner.invoke(
-                app, ["apple-reminders", "create", "--title", "buy milk",
-                      "--database", str(self.db)],
+                app,
+                ["apple-reminders", "create", "--title", "buy milk", "--database", str(self.db)],
             )
         self.assertEqual(result.exit_code, 0, result.output)
         req = captured["request"]
@@ -85,13 +91,16 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
 
     def test_create_apply_sets_apply_mode(self):
         patcher, captured = self._patch()
-        with patcher, mock.patch(
-            "rebalance.ingest.config.get_apple_reminders_list_name",
-            return_value="Reminders",
+        with (
+            patcher,
+            mock.patch(
+                "rebalance.ingest.config.get_apple_reminders_list_name",
+                return_value="Reminders",
+            ),
         ):
             result = self.runner.invoke(
-                app, ["apple-reminders", "create", "--title", "x", "--apply",
-                      "--database", str(self.db)],
+                app,
+                ["apple-reminders", "create", "--title", "x", "--apply", "--database", str(self.db)],
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(captured["request"]["mode"], "apply")
@@ -100,7 +109,8 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
         patcher, captured = self._patch()
         with patcher:
             result = self.runner.invoke(
-                app, ["apple-reminders", "complete", "RID-9", "--database", str(self.db)],
+                app,
+                ["apple-reminders", "complete", "RID-9", "--database", str(self.db)],
             )
         self.assertEqual(result.exit_code, 0, result.output)
         op = captured["request"]["operations"][0]
@@ -111,8 +121,8 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
         patcher, captured = self._patch()
         with patcher:
             result = self.runner.invoke(
-                app, ["apple-reminders", "delete", "RID-2", "--apply", "--yes",
-                      "--database", str(self.db)],
+                app,
+                ["apple-reminders", "delete", "RID-2", "--apply", "--yes", "--database", str(self.db)],
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertTrue(captured["request"]["confirm_destructive"])
@@ -121,8 +131,8 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
         patcher, captured = self._patch()
         with patcher:
             self.runner.invoke(
-                app, ["apple-reminders", "delete", "RID-2", "--apply",
-                      "--database", str(self.db)],
+                app,
+                ["apple-reminders", "delete", "RID-2", "--apply", "--database", str(self.db)],
             )
         # CLI builds the request; the real orchestrator would reject it, but here
         # we assert the CLI did NOT silently set confirm.
@@ -130,14 +140,16 @@ class AppleRemindersWriteCliTests(unittest.TestCase):
 
     def test_update_with_no_fields_errors(self):
         result = self.runner.invoke(
-            app, ["apple-reminders", "update", "RID-3", "--database", str(self.db)],
+            app,
+            ["apple-reminders", "update", "RID-3", "--database", str(self.db)],
         )
         self.assertEqual(result.exit_code, 2)
         self.assertIn("at least one", result.output)
 
     def test_audit_on_empty_db_returns_empty(self):
         result = self.runner.invoke(
-            app, ["apple-reminders", "audit", "--database", str(self.db)],
+            app,
+            ["apple-reminders", "audit", "--database", str(self.db)],
         )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertIn("[]", result.output)

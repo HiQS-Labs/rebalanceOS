@@ -52,7 +52,6 @@ def _plist(path: Path, program: str, *, create: bool = True) -> None:
     )
 
 
-
 def _template(templates: Path, label: str, args: list[str]) -> Path:
     """Write a real plist template, the way install_common.sh expects to find one.
 
@@ -75,10 +74,7 @@ def _template(templates: Path, label: str, args: list[str]) -> Path:
 
 def _rendered(agents: Path, label: str, repo: Path, args: list[str], *, create: bool = True) -> Path:
     """Write the plist a template would render to, substituting {{REBALANCE_DIR}}/{{PYTHON}}."""
-    real = [
-        a.replace("{{REBALANCE_DIR}}", str(repo)).replace("{{PYTHON}}", f"{repo}/.venv/bin/python")
-        for a in args
-    ]
+    real = [a.replace("{{REBALANCE_DIR}}", str(repo)).replace("{{PYTHON}}", f"{repo}/.venv/bin/python") for a in args]
     if create:
         for a in real:
             if a.startswith("/"):
@@ -117,9 +113,7 @@ def _run(sandbox, *args):
         "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
         "RB_UNINSTALL_AGENTS_DIR": str(agents),
     }
-    return subprocess.run(
-        ["bash", str(SCRIPT), *args], capture_output=True, text=True, env=environment
-    )
+    return subprocess.run(["bash", str(SCRIPT), *args], capture_output=True, text=True, env=environment)
 
 
 def test_a_dry_run_changes_nothing(sandbox):
@@ -590,8 +584,7 @@ def test_an_mcp_registration_is_reported_even_though_it_is_not_removed(sandbox):
     """
     repo, _templates, _agents = sandbox
     (repo / ".mcp.json").write_text(
-        '{"mcpServers": {"rebalance": {"command": ".venv/bin/python",'
-        ' "args": ["-m", "rebalance.mcp_server"]}}}',
+        '{"mcpServers": {"rebalance": {"command": ".venv/bin/python", "args": ["-m", "rebalance.mcp_server"]}}}',
         encoding="utf-8",
     )
 
@@ -636,8 +629,7 @@ def test_matching_processes_are_reported_without_claiming_the_checkout(sandbox, 
     """A command line cannot prove which clone a process belongs to, so it must not say so."""
     repo, templates, agents = sandbox
     (repo / ".mcp.json").write_text(
-        '{"mcpServers": {"rebalance": {"command": ".venv/bin/python",'
-        ' "args": ["-m", "rebalance.mcp_server"]}}}',
+        '{"mcpServers": {"rebalance": {"command": ".venv/bin/python", "args": ["-m", "rebalance.mcp_server"]}}}',
         encoding="utf-8",
     )
     fake_bin = tmp_path / "bin"
@@ -719,8 +711,7 @@ def test_inline_code_and_module_invocations_are_refused(sandbox):
 def test_a_genuine_interpreter_job_with_flags_is_still_removed(sandbox):
     """pulse-warning-watch passes flags after its script; those must not break ownership."""
     repo, templates, agents = sandbox
-    args = ["{{PYTHON}}", "{{REBALANCE_DIR}}/scripts/pulse_warning_watch.py",
-            "--url", "http://127.0.0.1:8767/"]
+    args = ["{{PYTHON}}", "{{REBALANCE_DIR}}/scripts/pulse_warning_watch.py", "--url", "http://127.0.0.1:8767/"]
     _template(templates, "com.rebalance-os.pulse-warning-watch", args)
     plist = _rendered(agents, "com.rebalance-os.pulse-warning-watch", repo, args)
 
@@ -755,7 +746,9 @@ def test_a_relative_script_operand_is_refused(sandbox):
     # Run from inside the checkout, the CWD that makes the relative path look owned.
     result = subprocess.run(
         ["bash", str(SCRIPT), "--apply"],
-        capture_output=True, text=True, cwd=str(repo),
+        capture_output=True,
+        text=True,
+        cwd=str(repo),
         env={
             **os.environ,
             "RB_UNINSTALL_REPO_DIR": str(repo),
@@ -821,8 +814,15 @@ def test_compact_inline_code_and_module_forms_are_refused(sandbox):
 def test_long_options_after_a_script_are_unaffected(sandbox):
     """--close/--llm-triage must keep working: they begin '--', not '-c'/'-m'."""
     repo, templates, agents = sandbox
-    args = ["{{PYTHON}}", "{{REBALANCE_DIR}}/scripts/health_issue_reporter.py",
-            "--warn", "--close", "--llm-triage", "--llm-max-per-run", "5"]
+    args = [
+        "{{PYTHON}}",
+        "{{REBALANCE_DIR}}/scripts/health_issue_reporter.py",
+        "--warn",
+        "--close",
+        "--llm-triage",
+        "--llm-max-per-run",
+        "5",
+    ]
     _template(templates, "com.rebalance-os.health-check-triage", args)
     plist = _rendered(agents, "com.rebalance-os.health-check-triage", repo, args)
 
@@ -964,8 +964,7 @@ def test_a_hand_edited_plist_is_refused_rather_than_assumed(sandbox):
     """A shape we did not write is not a shape we can claim. Refused loudly, not deleted."""
     repo, templates, agents = sandbox
     _template(templates, "com.rebalance-os.alpha", ["{{REBALANCE_DIR}}/scripts/alpha.sh"])
-    plist = _rendered(agents, "com.rebalance-os.alpha", repo,
-                      ["{{REBALANCE_DIR}}/scripts/alpha.sh", "--extra-flag"])
+    plist = _rendered(agents, "com.rebalance-os.alpha", repo, ["{{REBALANCE_DIR}}/scripts/alpha.sh", "--extra-flag"])
 
     result = _run(sandbox, "--apply")
 
@@ -1028,11 +1027,9 @@ def test_an_injected_PYTHONPATH_is_refused(sandbox):
     _template(templates, "com.rebalance-os.health-check", args)
     _touch_executable(f"{repo}/.venv/bin/python")
     _touch_executable(f"{repo}/scripts/health_issue_reporter.py")
-    real = [a.replace("{{REBALANCE_DIR}}", str(repo)).replace("{{PYTHON}}", f"{repo}/.venv/bin/python")
-            for a in args]
+    real = [a.replace("{{REBALANCE_DIR}}", str(repo)).replace("{{PYTHON}}", f"{repo}/.venv/bin/python") for a in args]
 
-    plist = _plist_with_env(agents, "com.rebalance-os.health-check", repo, real,
-                            {"PYTHONPATH": "/opt/attacker"})
+    plist = _plist_with_env(agents, "com.rebalance-os.health-check", repo, real, {"PYTHONPATH": "/opt/attacker"})
 
     result = _run(sandbox, "--apply")
 
@@ -1053,10 +1050,19 @@ def test_loader_hijack_variables_are_refused(sandbox):
     # dangerous ones was one list behind three rounds running (PYTHONUSERBASE, then BASH_ENV);
     # the set of ways an environment redirects a program does not close, so the rule is
     # "exactly what we rendered".
-    for name in ("DYLD_INSERT_LIBRARIES", "LD_PRELOAD", "PATH", "PYTHONUSERBASE",
-                 "BASH_ENV", "ENV", "PYTHONNEVERHEARDOFIT", "SOMETHING_NOBODY_LISTED"):
-        plist = _plist_with_env(agents, "com.rebalance-os.alpha", repo,
-                                [f"{repo}/scripts/alpha.sh"], {name: "/opt/attacker"})
+    for name in (
+        "DYLD_INSERT_LIBRARIES",
+        "LD_PRELOAD",
+        "PATH",
+        "PYTHONUSERBASE",
+        "BASH_ENV",
+        "ENV",
+        "PYTHONNEVERHEARDOFIT",
+        "SOMETHING_NOBODY_LISTED",
+    ):
+        plist = _plist_with_env(
+            agents, "com.rebalance-os.alpha", repo, [f"{repo}/scripts/alpha.sh"], {name: "/opt/attacker"}
+        )
         result = _run(sandbox, "--apply")
         assert plist.exists(), f"{name} must not be removable"
         assert result.returncode == 1
@@ -1076,8 +1082,9 @@ def test_an_environment_variable_we_did_not_render_is_refused_and_named(sandbox)
     _template(templates, "com.rebalance-os.alpha", args)
     _touch_executable(f"{repo}/scripts/alpha.sh")
 
-    plist = _plist_with_env(agents, "com.rebalance-os.alpha", repo,
-                            [f"{repo}/scripts/alpha.sh"], {"PULSE_PUSH": "false"})
+    plist = _plist_with_env(
+        agents, "com.rebalance-os.alpha", repo, [f"{repo}/scripts/alpha.sh"], {"PULSE_PUSH": "false"}
+    )
 
     result = _run(sandbox, "--apply")
 

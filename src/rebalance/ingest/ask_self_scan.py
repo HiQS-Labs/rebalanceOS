@@ -84,6 +84,7 @@ class AskSelfSyncResult:
 # Pure helpers
 # ---------------------------------------------------------------------------
 
+
 def derive_repo_full_name(remote_url: str | None) -> str | None:
     """Parse a git remote URL into ``owner/repo`` (original casing), or None.
 
@@ -101,10 +102,14 @@ def _git_remote_full_name(repo_root: Path) -> str | None:
     Best-effort: any git failure (no remote, not a repo) yields None.
     """
     import subprocess
+
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo_root), "remote", "get-url", "origin"],
-            capture_output=True, text=True, check=False, timeout=5,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
         )
     except Exception:  # noqa: BLE001 — git missing / hung / unreadable repo
         return None
@@ -115,6 +120,7 @@ def _git_remote_full_name(repo_root: Path) -> str | None:
 
 def _read_json(path: Path) -> dict[str, Any]:
     import json
+
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001 — a malformed harness shouldn't abort the sweep
@@ -224,11 +230,7 @@ def scan_ask_self_repos(
         if gh.get("owner") and gh.get("repo"):
             harness_full = f"{gh['owner']}/{gh['repo']}"
         remote_url = (meta or {}).get("remote_url")
-        repo_full_name = (
-            derive_repo_full_name(remote_url)
-            or _git_remote_full_name(repo_root)
-            or harness_full
-        )
+        repo_full_name = derive_repo_full_name(remote_url) or _git_remote_full_name(repo_root) or harness_full
 
         index_size = None
         if index_db and index_db.is_file():
@@ -237,26 +239,28 @@ def scan_ask_self_repos(
             except OSError:
                 index_size = None
 
-        out.append(AskSelfIndex(
-            device_id=dev,
-            local_path=str(repo_root),
-            repo_full_name=repo_full_name,
-            repo_label=(meta or {}).get("repo_label") or harness.get("repo_label"),
-            repo_kind=(meta or {}).get("repo_kind") or harness.get("repo_kind"),
-            harness_path=str(harness_path),
-            index_db_path=str(index_db) if index_db else None,
-            index_built=built,
-            branch=(meta or {}).get("branch"),
-            head_sha=(meta or {}).get("head_sha"),
-            last_commit_at=(meta or {}).get("last_commit_at"),
-            file_count=(meta or {}).get("file_count"),
-            total_chunks=(meta or {}).get("total_chunks"),
-            embed_model=(meta or {}).get("embed_model"),
-            embed_dim=(meta or {}).get("embed_dim"),
-            index_size_bytes=index_size,
-            ingested_at=(meta or {}).get("ingested_at"),
-            remote_url=remote_url,
-        ))
+        out.append(
+            AskSelfIndex(
+                device_id=dev,
+                local_path=str(repo_root),
+                repo_full_name=repo_full_name,
+                repo_label=(meta or {}).get("repo_label") or harness.get("repo_label"),
+                repo_kind=(meta or {}).get("repo_kind") or harness.get("repo_kind"),
+                harness_path=str(harness_path),
+                index_db_path=str(index_db) if index_db else None,
+                index_built=built,
+                branch=(meta or {}).get("branch"),
+                head_sha=(meta or {}).get("head_sha"),
+                last_commit_at=(meta or {}).get("last_commit_at"),
+                file_count=(meta or {}).get("file_count"),
+                total_chunks=(meta or {}).get("total_chunks"),
+                embed_model=(meta or {}).get("embed_model"),
+                embed_dim=(meta or {}).get("embed_dim"),
+                index_size_bytes=index_size,
+                ingested_at=(meta or {}).get("ingested_at"),
+                remote_url=remote_url,
+            )
+        )
     return out
 
 
@@ -265,10 +269,25 @@ def scan_ask_self_repos(
 # ---------------------------------------------------------------------------
 
 _COLUMNS = (
-    "device_id", "local_path", "repo_full_name", "repo_label", "repo_kind",
-    "harness_path", "index_db_path", "index_built", "branch", "head_sha",
-    "last_commit_at", "file_count", "total_chunks", "embed_model", "embed_dim",
-    "index_size_bytes", "ingested_at", "remote_url", "scanned_at",
+    "device_id",
+    "local_path",
+    "repo_full_name",
+    "repo_label",
+    "repo_kind",
+    "harness_path",
+    "index_db_path",
+    "index_built",
+    "branch",
+    "head_sha",
+    "last_commit_at",
+    "file_count",
+    "total_chunks",
+    "embed_model",
+    "embed_dim",
+    "index_size_bytes",
+    "ingested_at",
+    "remote_url",
+    "scanned_at",
 )
 
 # Fields whose change makes a row "updated" rather than "unchanged".
@@ -286,6 +305,7 @@ def sync_ask_self_indexes(
     dev = device_id or get_device_id()
     if roots is None:
         from rebalance.ingest.config import get_repo_scan_roots
+
         roots = get_repo_scan_roots()
     scanned_at = now_iso()
     found = scan_ask_self_repos(roots, max_depth=max_depth, device_id=dev)
@@ -319,8 +339,10 @@ def sync_ask_self_indexes(
                 inserted += 1
             else:
                 before = (
-                    existing["repo_full_name"], existing["head_sha"],
-                    existing["ingested_at"], existing["total_chunks"],
+                    existing["repo_full_name"],
+                    existing["head_sha"],
+                    existing["ingested_at"],
+                    existing["total_chunks"],
                     bool(existing["index_built"]),
                 )
                 after = tuple(getattr(item, f) for f in _SIGNATURE)
@@ -364,12 +386,14 @@ def summarize_ask_self_indexes(database_path: Path) -> dict[str, Any]:
 
     enriched: list[dict[str, Any]] = []
     for row in indexes:
-        full = (row.get("repo_full_name") or "")
-        enriched.append({
-            **row,
-            "index_built": bool(row.get("index_built")),
-            "watched": full.lower() in watched if full else False,
-        })
+        full = row.get("repo_full_name") or ""
+        enriched.append(
+            {
+                **row,
+                "index_built": bool(row.get("index_built")),
+                "watched": full.lower() in watched if full else False,
+            }
+        )
 
     devices = sorted({r["device_id"] for r in enriched})
     summary: dict[str, Any] = {
@@ -382,8 +406,5 @@ def summarize_ask_self_indexes(database_path: Path) -> dict[str, Any]:
         },
     }
     if not enriched:
-        summary["note"] = (
-            "No ask_self indexes recorded yet. Run "
-            "refresh_index(scope=['ask_self']) to scan this device."
-        )
+        summary["note"] = "No ask_self indexes recorded yet. Run refresh_index(scope=['ask_self']) to scan this device."
     return summary

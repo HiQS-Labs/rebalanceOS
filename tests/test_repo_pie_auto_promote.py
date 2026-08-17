@@ -25,7 +25,11 @@ class RepoPieAutoPromoteBadgeTests(unittest.TestCase):
         html = pulse_web.render_repo_pie(
             [{"repo_full_name": "Acme/widget", "events": 5}],
             days=7,
-            recent_promotion={"repo": "Acme/widget", "project_name": "widget", "promoted_at": "2026-07-10T00:00:00+00:00"},
+            recent_promotion={
+                "repo": "Acme/widget",
+                "project_name": "widget",
+                "promoted_at": "2026-07-10T00:00:00+00:00",
+            },
         )
         self.assertIn("repo-pie-new-badge", html)
         self.assertIn("New repo added: widget", html)
@@ -34,7 +38,11 @@ class RepoPieAutoPromoteBadgeTests(unittest.TestCase):
         html = pulse_web.render_repo_pie(
             [],
             days=7,
-            recent_promotion={"repo": "Acme/widget", "project_name": "widget", "promoted_at": "2026-07-10T00:00:00+00:00"},
+            recent_promotion={
+                "repo": "Acme/widget",
+                "project_name": "widget",
+                "promoted_at": "2026-07-10T00:00:00+00:00",
+            },
         )
         self.assertIn("New repo added: widget", html)
 

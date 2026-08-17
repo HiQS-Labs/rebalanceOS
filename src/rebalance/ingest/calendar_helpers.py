@@ -34,6 +34,7 @@ def parse_calendar_dt(raw: str) -> datetime:
     when possible; date-only strings (all-day events) return naive.
     """
     from rebalance.lib.time_ops import _parse_iso
+
     parsed = _parse_iso(raw, force_utc=False)  # raw-ok: canonical location
     if parsed is None:
         raise ValueError(f"Invalid isoformat string: '{raw}'")

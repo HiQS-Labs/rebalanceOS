@@ -35,9 +35,9 @@ OK = "ok"
 WARN = "warning"
 FAIL = "error"
 
-NOTICE = "notice"
-WARNING = "warning"
-ERROR = "error"
+NOTICE: Literal["notice", "warning", "error"] = "notice"
+WARNING: Literal["notice", "warning", "error"] = "warning"
+ERROR: Literal["notice", "warning", "error"] = "error"
 Severity = Literal["notice", "warning", "error"]
 
 
@@ -118,9 +118,7 @@ def _local_device_id() -> str:
     return get_device_id().removesuffix("-local")
 
 
-def _other_device_check(
-    name: str, scope: _DeviceScope | None, current_device_id: str
-) -> Check | None:
+def _other_device_check(name: str, scope: _DeviceScope | None, current_device_id: str) -> Check | None:
     """Return an informational check when a scoped check belongs elsewhere."""
     if scope is None or current_device_id in scope.device_ids:
         return None
@@ -228,6 +226,7 @@ def _check_token() -> Check:
     # keychain) needs a file fallback. Phase 2: the out-of-repo secret store is
     # that fallback (rbos.config is legacy and no longer written).
     from rebalance.ingest import secret_store
+
     in_secret_store = secret_store.read_secret_file("github_token") is not None
     in_config = bool(_read_config().get("github_token"))
     if source == "keyring" and not (in_secret_store or in_config):
@@ -249,6 +248,7 @@ def _check_token() -> Check:
     # short-lived PAT (dies every few days) vs a durable one.
     try:
         from rebalance.ingest import token_meta
+
         meta = token_meta.current_token_meta("github")
         if meta and meta.get("first_added_at"):
             age = token_meta.age_text(meta["first_added_at"])
@@ -273,18 +273,14 @@ def _secret_permission_check(paths_to_check: list[Path]) -> Check:
     checked = [p for p in paths_to_check if p.exists()]
     insecure = [p for p in checked if not secret_store.permission_ok(p)]
     if insecure:
-        labels = ", ".join(
-            f"{p.name}={_stat.S_IMODE(p.stat().st_mode):04o}" for p in insecure
-        )
+        labels = ", ".join(f"{p.name}={_stat.S_IMODE(p.stat().st_mode):04o}" for p in insecure)
         return Check(
             "secret permissions",
             WARN,
             f"{len(insecure)} of {len(checked)} secret path(s) broader than 0600/0700: {labels}",
             "chmod 600 files / 700 dirs; rebalance writers self-correct on the next write",
         )
-    return Check(
-        "secret permissions", OK, f"{len(checked)} secret file(s)/dir(s) at 0600/0700"
-    )
+    return Check("secret permissions", OK, f"{len(checked)} secret file(s)/dir(s) at 0600/0700")
 
 
 def _check_secret_permissions() -> Check:
@@ -331,12 +327,16 @@ def _check_vault() -> Check:
     vault = get_vault_path()
     if not vault:
         return Check(
-            "vault", WARN, "no vault path configured",
+            "vault",
+            WARN,
+            "no vault path configured",
             "run `rebalance config set-vault-path`",
         )
     if not Path(vault).expanduser().exists():
         return Check(
-            "vault", FAIL, f"configured vault path does not exist: {vault}",
+            "vault",
+            FAIL,
+            f"configured vault path does not exist: {vault}",
             "fix the path with `rebalance config set-vault-path`",
         )
     return Check("vault", OK, str(vault))
@@ -352,7 +352,8 @@ def _check_unpushed_work() -> Check:
     roots = get_local_repo_roots()
     if not roots:
         return Check(
-            "local repos", OK,
+            "local repos",
+            OK,
             "local scanning off (set local_repo_roots to enable unpushed-work checks)",
         )
     repos = scan_local_repos(roots)
@@ -367,7 +368,8 @@ def _check_unpushed_work() -> Check:
     if len(stale) > 5:
         detail += f"; +{len(stale) - 5} more"
     return Check(
-        "local repos", WARN,
+        "local repos",
+        WARN,
         f"{len(stale)}/{len(repos)} checkout(s) carry unpushed work — {detail}",
         "push the branches (or set their upstreams); discovery offers these repos for promotion",
     )
@@ -383,7 +385,9 @@ def _check_schema(db_path: Path) -> Check:
             ).fetchone()
             if not has_table:
                 return Check(
-                    "schema", WARN, "schema_version table not present",
+                    "schema",
+                    WARN,
+                    "schema_version table not present",
                     "run `rebalance refresh` once — migrations stamp the version",
                 )
             return Check("schema", OK, f"version {current_schema_version(conn)}")
@@ -397,8 +401,7 @@ def _check_projects(db_path: Path) -> Check:
     try:
         with db_connection(db_path) as conn:
             row = conn.execute(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
-                "AND name='project_registry'"
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_registry'"
             ).fetchone()
             if not row or not row[0]:
                 return Check("projects", WARN, "project_registry table not present")
@@ -408,11 +411,12 @@ def _check_projects(db_path: Path) -> Check:
 
     if count == 0:
         return Check(
-            "projects", WARN, "no projects registered",
+            "projects",
+            WARN,
+            "no projects registered",
             "run `rebalance onboard` to discover and register projects",
         )
     return Check("projects", OK, f"{count} registered")
-
 
 
 def _check_collector_freshness(
@@ -457,9 +461,7 @@ def _check_collector_freshness(
 
     try:
         with db_connection(db_path) as conn:
-            has_table = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ).fetchone()
+            has_table = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
             if not has_table:
                 # Some collector tables (e.g. sleuth_reminders) are created by
                 # the first sync, not by migrations — a missing table on an
@@ -467,9 +469,7 @@ def _check_collector_freshness(
                 # indistinguishable from empty for onboarding purposes.
                 if not _opted_in():
                     return Check(name, OK, "not configured (optional integration)")
-                return Check(
-                    name, WARN, f"{table} table not present", severity=ERROR
-                )
+                return Check(name, WARN, f"{table} table not present", severity=ERROR)
             count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # noqa: S608
             latest = conn.execute(
                 f"SELECT MAX({ts_col}) FROM {table}"  # noqa: S608
@@ -498,9 +498,7 @@ def _check_collector_freshness(
     if count == 0:
         if not _opted_in():
             return Check(name, OK, "not configured (optional integration)")
-        return Check(
-            name, WARN, f"no {name} ingested", empty_hint, severity=ERROR
-        )
+        return Check(name, WARN, f"no {name} ingested", empty_hint, severity=ERROR)
 
     if quality_count and invalid_count / quality_count > max_invalid_fraction:
         invalid_percent = round(invalid_count / quality_count * 100)
@@ -515,13 +513,11 @@ def _check_collector_freshness(
         try:
             latest_dt = parse_utc_iso(str(latest))
             if latest_dt:
-                age_days = (
-                    now_utc().date()
-                    - latest_dt.date()
-                ).days
+                age_days = (now_utc().date() - latest_dt.date()).days
                 if age_days > warn_days:
                     return Check(
-                        name, WARN,
+                        name,
+                        WARN,
                         f"{count} rows, last sync {age_days} days ago (stale > {warn_days}d)",
                         stale_hint,
                     )
@@ -537,9 +533,7 @@ def _check_collector_freshness(
 def _launchctl_list() -> str | None:
     """Return the live launchd listing, or ``None`` when unavailable."""
     try:
-        out = subprocess.run(
-            ["launchctl", "list"], capture_output=True, text=True, timeout=10
-        )
+        out = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=10)
     except (FileNotFoundError, subprocess.SubprocessError):
         return None
     if out.returncode != 0 or not out.stdout.strip():
@@ -711,9 +705,7 @@ def _latest_daily_sync_result(
     return result, log_path, modified_at
 
 
-def _daily_sync_launchd_check(
-    pid: str, status: str, log_dir: Path, now: datetime
-) -> Check:
+def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetime) -> Check:
     """Assess daily-sync from its recent structured result, not stale launchctl state."""
     result, log_path, modified_at = _latest_daily_sync_result(log_dir, now)
     if result is not None and log_path is not None and modified_at is not None:
@@ -755,16 +747,14 @@ def _daily_sync_launchd_check(
             return Check("launchd:daily-sync", OK, running)
 
     log_detail = (
-        f"; latest log {log_path.name} is outside the "
-        f"{_STRUCTURED_LAUNCHD_RUN_MAX_AGE_HOURS}h window"
+        f"; latest log {log_path.name} is outside the {_STRUCTURED_LAUNCHD_RUN_MAX_AGE_HOURS}h window"
         if log_path is not None and modified_at is not None
         else ""
     )
     return Check(
         "launchd:daily-sync",
         WARN,
-        f"launchctl status {status} is stale/unknown: no recent structured daily-sync run"
-        f"{log_detail}",
+        f"launchctl status {status} is stale/unknown: no recent structured daily-sync run{log_detail}",
         "inspect temp/logs/daily_sync_*.log or run `bash scripts/daily_sync.sh`",
     )
 
@@ -872,8 +862,7 @@ def _check_launchd(
         crash_events = [
             t
             for t in entry.get("crash_events", ())
-            if isinstance(t, (int, float))
-            and now.timestamp() - t <= _LAUNCHD_CRASH_LOOP_LOOKBACK_S
+            if isinstance(t, (int, float)) and now.timestamp() - t <= _LAUNCHD_CRASH_LOOP_LOOKBACK_S
         ]
 
         # A crash-relaunch happened between the last poll and this one when the
@@ -893,7 +882,8 @@ def _check_launchd(
         if is_crash_looping:
             checks.append(
                 Check(
-                    f"launchd:{short}", WARN,
+                    f"launchd:{short}",
+                    WARN,
                     f"crash-looping: {len(crash_events)} crash-relaunches in the "
                     f"last {_LAUNCHD_CRASH_LOOP_LOOKBACK_S // 60}m despite a live PID",
                     "inspect temp/logs/ for this job's error output — it is being "
@@ -902,13 +892,12 @@ def _check_launchd(
             )
         elif has_live_pid or is_ok_status:
             running = "running" if has_live_pid else "idle, last run ok"
-            checks.append(
-                Check(f"launchd:{short}", OK, running, severity=NOTICE)
-            )
+            checks.append(Check(f"launchd:{short}", OK, running, severity=NOTICE))
         else:
             checks.append(
                 Check(
-                    f"launchd:{short}", WARN,
+                    f"launchd:{short}",
+                    WARN,
                     f"last run exited with status {status_val}",
                     "inspect temp/logs/ for this job's error output",
                 )
@@ -948,7 +937,8 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
         get_sleuth_credentials()
     except FileNotFoundError:
         return Check(
-            "sleuth", WARN,
+            "sleuth",
+            WARN,
             "no Sleuth Web API credentials configured",
             "run `rebalance config set-sleuth` (keyring + launchd-reachable config), "
             "or create the sleuth-web-api env file — without it the Slack-reminders "
@@ -956,7 +946,9 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
         )
     except ValueError as exc:
         return Check(
-            "sleuth", WARN, str(exc),
+            "sleuth",
+            WARN,
+            str(exc),
             "set all of SLEUTH_WEB_API_BASE_URL / SLEUTH_WEB_API_TOKEN / SLEUTH_WORKSPACE_NAME",
         )
     except Exception as exc:  # noqa: BLE001 — doctor must never crash
@@ -968,7 +960,6 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
     # reread even when the upstream export is dead — against now.
     if db_path is not None:
         try:
-
             from rebalance.ingest.sleuth_reminders import get_export_generated_at
 
             beat = get_export_generated_at(db_path)
@@ -993,7 +984,8 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
                 # WARNING made this finding vanish on false evidence; the
                 # distinct name keeps it a visible warning.
                 return Check(
-                    "sleuth export", WARN,
+                    "sleuth export",
+                    WARN,
                     f"publisher export is stale — heartbeat {stamp} ({age_h:.1f}h ago; "
                     "the export publisher runs on another machine)",
                     "check sleuth-reminders-export.timer on the publisher box, and "
@@ -1022,9 +1014,10 @@ def _check_apple_reminders(db_path: Path | None = None) -> Check:
         return Check(name, OK, "not enabled (opt-in; never synced)")
     if status == "drift":
         return Check(
-            name, WARN,
+            name,
+            WARN,
             health.get("message", "schema drift"),
-            health.get("remediation"),
+            health.get("remediation") or "",
         )
     fp = health.get("schema_fingerprint") or {}
     macos = fp.get("macos") or "?"
@@ -1038,6 +1031,7 @@ def _google_oauth_source(service: str, in_keyring: bool) -> str | None:
         return "keyring"
     from rebalance.ingest import secret_store
     from rebalance.paths import resolve_oauth_token_path
+
     if secret_store.read_secret_file(f"google-{service}-oauth"):
         return "secret-store JSON"
     if resolve_oauth_token_path(service).exists():
@@ -1058,21 +1052,17 @@ def _check_gmail(db_path: Path | None) -> Check:
 
                 with db_connection(db_path) as conn:
                     has_table = conn.execute(
-                        "SELECT 1 FROM sqlite_master WHERE type='table' "
-                        "AND name='email_messages'"
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='email_messages'"
                     ).fetchone()
-                    count = (
-                        conn.execute("SELECT COUNT(*) FROM email_messages").fetchone()[0]
-                        if has_table
-                        else 0
-                    )
+                    count = conn.execute("SELECT COUNT(*) FROM email_messages").fetchone()[0] if has_table else 0
             except Exception as exc:  # noqa: BLE001
                 return Check("gmail", WARN, f"MCP mode — could not read email_messages: {exc}")
             if count == 0:
                 return Check(
-                    "gmail", WARN, "MCP mode — no email ingested yet",
-                    "have an agent fetch via the Gmail MCP connector and call "
-                    "`ingest_gmail_messages`",
+                    "gmail",
+                    WARN,
+                    "MCP mode — no email ingested yet",
+                    "have an agent fetch via the Gmail MCP connector and call `ingest_gmail_messages`",
                 )
             return Check("gmail", OK, f"MCP mode — {count} messages ingested")
         return Check("gmail", OK, "MCP mode — email ingested via the Gmail MCP connector")
@@ -1087,7 +1077,8 @@ def _check_gmail(db_path: Path | None) -> Check:
     source = _google_oauth_source("gmail", bool(get_gmail_oauth_token_json()))
     if source is None:
         return Check(
-            "gmail", WARN,
+            "gmail",
+            WARN,
             "no Gmail OAuth credentials (keyring + secret store empty, no token file)",
             "🔧 run the Gmail OAuth flow (scripts/setup_gmail_oauth.py) — or switch "
             "to MCP mode (`rebalance config set-gmail-method mcp`)",
@@ -1105,13 +1096,15 @@ def _check_calendar() -> Check:
     source = _google_oauth_source("calendar", bool(get_calendar_oauth_token_json()))
     if source is None:
         return Check(
-            "calendar", WARN,
+            "calendar",
+            WARN,
             "no Calendar OAuth credentials (keyring + secret store empty, no token file)",
             "🔧 run the Calendar OAuth flow (scripts/setup_calendar_oauth.py)",
         )
     detail = f"OAuth token present (via {source})"
     try:
         from rebalance.ingest import token_meta
+
         meta = token_meta.current_token_meta("calendar")
         if meta and meta.get("first_added_at"):
             detail += f" · authorized {token_meta.age_text(meta['first_added_at'])} ago"
@@ -1144,7 +1137,8 @@ def _check_figma() -> Check:
         return Check("figma", OK, "not configured (optional integration)")
     if not has_token:
         return Check(
-            "figma", WARN,
+            "figma",
+            WARN,
             f"{len(file_keys)} Figma file key(s) configured but no token",
             "store a Figma personal access token in the `figma_token` secret "
             "(keyring) — the figma sync fails every run without it",
@@ -1152,16 +1146,15 @@ def _check_figma() -> Check:
     where = source or "config"
     if not file_keys:
         return Check(
-            "figma", WARN,
+            "figma",
+            WARN,
             f"token present (via {where}) but no file keys to sync",
-            "add a Figma file via the pulse dashboard so the figma source has "
-            "something to ingest",
+            "add a Figma file via the pulse dashboard so the figma source has something to ingest",
         )
     return Check("figma", OK, f"token present (via {where}) · {len(file_keys)} file(s)")
 
 
-
-def _check_commit_coverage(db_path: Path) -> Check:
+def _check_commit_coverage(db_path: Path | None = None) -> Check:
     """Commit-corpus completeness vs the remote (GH-169 Phase 3).
 
     This check exists because #155 and #157 each fixed something real and each
@@ -1173,6 +1166,9 @@ def _check_commit_coverage(db_path: Path) -> Check:
     Reports the three quantities separately. A phantom row from a force-push
     and a real uncollected commit must never cancel each other out.
     """
+    if db_path is None:
+        return Check("commit coverage", WARN, "database not resolved")
+
     try:
         from rebalance.ingest.github_coverage import check_coverage, coverage_health
         from rebalance.ingest.index_ops import _resolve_repos_for_refresh
@@ -1180,7 +1176,7 @@ def _check_commit_coverage(db_path: Path) -> Check:
         return Check("commit coverage", WARN, f"coverage module unavailable: {exc}")
 
     try:
-        repos = _resolve_repos_for_refresh(db_path, None)
+        repos = _resolve_repos_for_refresh(db_path, [])
         if not repos:
             return Check("commit coverage", OK, "no watched repos to check")
         # check_remote=False: local git only, no network. Staleness is enforced
@@ -1221,7 +1217,8 @@ def _check_xyz_pin() -> Check:
     commit = pin.get("commit", "").strip()
     if not commit:
         return Check(
-            "xyz pin", WARN,
+            "xyz pin",
+            WARN,
             ".xyz-pin present but has no `commit=` — pin is unusable",
             "record the pinned xyz-3-agents-swarm commit in .xyz-pin (via PR)",
         )
@@ -1231,13 +1228,11 @@ def _check_xyz_pin() -> Check:
 
 
 _AUTH_FAIL_HINT = {
-    "github": "PAT revoked, expired, or lost a scope — run "
-              "`rebalance config set-github-token` with a fresh token",
-    "calendar": "re-run the Calendar OAuth flow "
-                "(scripts/setup_calendar_oauth.py)",
+    "github": "PAT revoked, expired, or lost a scope — run `rebalance config set-github-token` with a fresh token",
+    "calendar": "re-run the Calendar OAuth flow (scripts/setup_calendar_oauth.py)",
     "gmail": "re-run the Gmail OAuth flow (scripts/setup_gmail_oauth.py) — it "
-             "writes keyring + JSON in one pass — or switch to MCP mode "
-             "(`rebalance config set-gmail-method mcp`)",
+    "writes keyring + JSON in one pass — or switch to MCP mode "
+    "(`rebalance config set-gmail-method mcp`)",
 }
 
 
@@ -1297,11 +1292,11 @@ def _check_auth_failures() -> list[Check]:
 # presentation needs are served without collapsing the source model.
 _PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
     # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
-    "ALIVE":     (OK,   NOTICE,  "collecting normally"),
-    "STALE":     (WARN, WARNING, "stale"),
-    "ALERT":     (WARN, ERROR,   "not collecting"),
-    "DEGRADED":  (WARN, ERROR,   "collecting with errors"),
-    "NO PUSHES": (WARN, ERROR,   "never collected"),
+    "ALIVE": (OK, NOTICE, "collecting normally"),
+    "STALE": (WARN, WARNING, "stale"),
+    "ALERT": (WARN, ERROR, "not collecting"),
+    "DEGRADED": (WARN, ERROR, "collecting with errors"),
+    "NO PUSHES": (WARN, ERROR, "never collected"),
 }
 
 
@@ -1371,7 +1366,7 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
 
         # Map the raw pulse state to doctor's own vocabulary before it reaches
         # any user-facing text (GH-5 Phase 4 / #3).
-        _status, severity, phrase = _map_pulse_state(state)
+        _status, raw_severity, phrase = _map_pulse_state(state)
         qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
         detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
         if health.repo_scan_failures:
@@ -1390,19 +1385,22 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         # at all. Both fixed here.
         if healthy:
             severity = NOTICE
-        elif health.device_id != current_device_id and severity == ERROR:
-            # Device-first health (GH-5 Phase F): the local verdict is graded on
-            # local state. A dead collector on ANOTHER machine stays visible in
-            # problems but is capped at WARNING so it cannot fail this device's
-            # exit; the same state on the device running doctor keeps ERROR.
-            severity = WARNING
+        else:
+            severity = raw_severity  # type: ignore[assignment]
+            if health.device_id != current_device_id and severity == ERROR:
+                # Device-first health (GH-5 Phase F): the local verdict is graded on
+                # local state. A dead collector on ANOTHER machine stays visible in
+                # problems but is capped at WARNING so it cannot fail this device's
+                # exit; the same state on the device running doctor keeps ERROR.
+                severity = WARNING
         checks.append(
             Check(
                 name,
                 OK if healthy else WARN,
                 detail,
-                "" if healthy else
-                "check the collector machine / its launchd git-pulse job; "
+                ""
+                if healthy
+                else "check the collector machine / its launchd git-pulse job; "
                 "`python experimental/git-pulse/health-check.py` for the full view",
                 severity=severity,
             )
@@ -1543,28 +1541,39 @@ def _diagnostics_index() -> list[Check]:
         sources = sorted(auth_log.latest_event_by_source().keys())
         n = len(auth_log.read_log(limit=2000))
         where = f"{n} events across {', '.join(sources)}" if sources else "no events yet"
-        checks.append(Check(
-            "diagnostics: auth log", OK,
-            f"{where} · temp/logs/auth_activity.jsonl · web: `rebalance serve` → /auth-log",
-        ))
+        checks.append(
+            Check(
+                "diagnostics: auth log",
+                OK,
+                f"{where} · temp/logs/auth_activity.jsonl · web: `rebalance serve` → /auth-log",
+            )
+        )
     except Exception:  # noqa: BLE001 — doctor must never crash
         pass
 
-    checks.append(Check(
-        "diagnostics: git-pulse", OK,
-        "per-device collector health now shown inline above (`fleet:*`); "
-        "`python experimental/git-pulse/health-check.py` for the full cross-machine "
-        "table. Full module migration tracked in Phase 9.",
-    ))
-    checks.append(Check(
-        "diagnostics: repo probes", OK,
-        "live PAT/repo visibility & commit existence: the `diagnose_repo` MCP tool",
-    ))
-    checks.append(Check(
-        "diagnostics: health reporter", OK,
-        "launchd issue-filer (runs this doctor + git-pulse, opens GitHub issues): "
-        "temp/health-reporter.log.jsonl",
-    ))
+    checks.append(
+        Check(
+            "diagnostics: git-pulse",
+            OK,
+            "per-device collector health now shown inline above (`fleet:*`); "
+            "`python experimental/git-pulse/health-check.py` for the full cross-machine "
+            "table. Full module migration tracked in Phase 9.",
+        )
+    )
+    checks.append(
+        Check(
+            "diagnostics: repo probes",
+            OK,
+            "live PAT/repo visibility & commit existence: the `diagnose_repo` MCP tool",
+        )
+    )
+    checks.append(
+        Check(
+            "diagnostics: health reporter",
+            OK,
+            "launchd issue-filer (runs this doctor + git-pulse, opens GitHub issues): temp/health-reporter.log.jsonl",
+        )
+    )
     return checks
 
 
@@ -1580,8 +1589,7 @@ def _check_pulse() -> Check:
             "pulse",
             WARN,
             f"pulse config missing keys: {', '.join(missing)}",
-            "set the missing pulse config values in temp/rbos.config so hourly "
-            "pulse-sync can render and push",
+            "set the missing pulse config values in temp/rbos.config so hourly pulse-sync can render and push",
         )
     target = Path(str(cfg.get("pulse_target_path"))).expanduser()
     if not target.exists():
@@ -1614,10 +1622,7 @@ def _check_deep_work_stalls(db_path: Path) -> Check:
     except Exception as exc:  # noqa: BLE001 — doctor must never crash
         return Check("deep work", WARN, f"stall signal unavailable: {exc}")
 
-    flagged = [
-        signal for signal in signals.values()
-        if signal.get("possible_stall")
-    ]
+    flagged = [signal for signal in signals.values() if signal.get("possible_stall")]
     if not flagged:
         return Check("deep work", OK, "no possible-stall projects in the last 7 days")
 
@@ -1627,11 +1632,14 @@ def _check_deep_work_stalls(db_path: Path) -> Check:
         yesterday = evidence.get("yesterday_date") or "yesterday"
         yesterday_rows = ", ".join((evidence.get("yesterday_rows") or [])[:2]) or "activity recorded"
         open_items = evidence.get("open_items") or []
-        open_summary = ", ".join(
-            f"{'pr' if item.get('item_type') == 'pull_request' else item.get('item_type') or 'item'} "
-            f"#{item.get('number')} {item.get('title') or ''}".strip()
-            for item in open_items[:2]
-        ) or "open work item"
+        open_summary = (
+            ", ".join(
+                f"{'pr' if item.get('item_type') == 'pull_request' else item.get('item_type') or 'item'} "
+                f"#{item.get('number')} {item.get('title') or ''}".strip()
+                for item in open_items[:2]
+            )
+            or "open work item"
+        )
         parts.append(
             f"{signal.get('project')}: quiet {evidence.get('today_date')} after {yesterday} "
             f"({yesterday_rows}); still open: {open_summary}"
@@ -1686,10 +1694,7 @@ def _sleuth_source_configured() -> bool:
 def _calendar_source_configured() -> bool:
     from rebalance.ingest.config import get_calendar_oauth_token_json
 
-    return (
-        _google_oauth_source("calendar", bool(get_calendar_oauth_token_json()))
-        is not None
-    )
+    return _google_oauth_source("calendar", bool(get_calendar_oauth_token_json())) is not None
 
 
 def _email_source_configured() -> bool:
@@ -1718,8 +1723,7 @@ _COLLECTOR_FRESHNESS: list[dict] = [
         ts_col="scan_date",
         warn_days=2,
         empty_hint=(
-            "run `rebalance refresh` (scope github) — check that projects are "
-            "registered and the token is in config"
+            "run `rebalance refresh` (scope github) — check that projects are registered and the token is in config"
         ),
         stale_hint="run `rebalance refresh` (scope github)",
         quality_table="github_items",
@@ -1753,8 +1757,7 @@ _COLLECTOR_FRESHNESS: list[dict] = [
         empty_hint="ingest email via the Gmail MCP connector or the OAuth sync (scripts/setup_gmail_oauth.py)",
         stale_hint="no new email ingested in 7+ days — ask Claude to call `ingest_gmail_messages` (MCP mode), or check the Gmail OAuth token (`rebalance doctor`)",
         quality_predicate=(
-            "(from_address IS NOT NULL AND TRIM(from_address) != '') "
-            "OR (subject IS NOT NULL AND TRIM(subject) != '')"
+            "(from_address IS NOT NULL AND TRIM(from_address) != '') OR (subject IS NOT NULL AND TRIM(subject) != '')"
         ),
         quality_label="a sender or subject",
         volume_ts_col="received_at",
@@ -1789,7 +1792,8 @@ def _ro_connection(db_path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     try:
         import sqlite_vec
-        if sqlite_vec is not None and hasattr(conn, 'enable_load_extension'):
+
+        if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
             conn.enable_load_extension(True)
             sqlite_vec.load(conn)
             conn.enable_load_extension(False)
@@ -1807,13 +1811,27 @@ def _check_orphaned_vectors(db_path: Path) -> list[Check]:
         with _ro_connection(db_path) as conn:
             gh_count, gh_wasted = count_gh(conn)
             if gh_count > 0:
-                checks.append(Check("orphaned vectors:github", FAIL, f"{gh_count} orphaned vectors (est. {gh_wasted} bytes wasted)", "Run full re-embed or database cleanup"))
+                checks.append(
+                    Check(
+                        "orphaned vectors:github",
+                        FAIL,
+                        f"{gh_count} orphaned vectors (est. {gh_wasted} bytes wasted)",
+                        "Run full re-embed or database cleanup",
+                    )
+                )
             else:
                 checks.append(Check("orphaned vectors:github", OK, "0 orphaned vectors", severity=NOTICE))
 
             sem_count, sem_wasted = count_sem(conn)
             if sem_count > 0:
-                checks.append(Check("orphaned vectors:semantic", FAIL, f"{sem_count} orphaned vectors (est. {sem_wasted} bytes wasted)", "Run full re-embed or database cleanup"))
+                checks.append(
+                    Check(
+                        "orphaned vectors:semantic",
+                        FAIL,
+                        f"{sem_count} orphaned vectors (est. {sem_wasted} bytes wasted)",
+                        "Run full re-embed or database cleanup",
+                    )
+                )
             else:
                 checks.append(Check("orphaned vectors:semantic", OK, "0 orphaned vectors", severity=NOTICE))
     except Exception as exc:
@@ -1837,8 +1855,8 @@ def _check_embedding_backlog(db_path: Path) -> Check:
             # compared unequal: the backlog read 47,914 when it was ~1,762.
             # A rough count is fine; a count that is wrong by 25x is not.
             from rebalance.ingest.embedder import DEFAULT_MODEL, EMBEDDING_DIM
-            model_version = f"{DEFAULT_MODEL}|{EMBEDDING_DIM}"
 
+            model_version = f"{DEFAULT_MODEL}|{EMBEDDING_DIM}"
 
             gh_unembedded = count_gh(conn, min_chars=10)
             sem_unembedded = count_sem(conn, source_types=None, min_chars=10, model_version=model_version)

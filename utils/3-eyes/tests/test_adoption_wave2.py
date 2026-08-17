@@ -14,11 +14,7 @@ ADOPTED = {
     },
     "pulse-web-sync": {
         "label": "com.rebalance-os.pulse-web-sync",
-        "calendar": [
-            {"Hour": hour, "Minute": minute}
-            for hour in HOURS
-            for minute in (8, 38)
-        ],
+        "calendar": [{"Hour": hour, "Minute": minute} for hour in HOURS for minute in (8, 38)],
     },
     "pulse-warning-watch": {
         "label": "com.rebalance-os.pulse-warning-watch",

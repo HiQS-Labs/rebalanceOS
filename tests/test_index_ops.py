@@ -83,11 +83,16 @@ class GithubAdapterRetryTests(unittest.TestCase):
                 raise sqlite3.OperationalError("database is locked")
             return {"scope": "github", "recovered": True}
 
-        with patch("rebalance.ingest.index_ops._refresh_github", side_effect=flaky_refresh), \
-             patch("rebalance.ingest.index_ops.time.sleep") as mock_sleep:
+        with (
+            patch("rebalance.ingest.index_ops._refresh_github", side_effect=flaky_refresh),
+            patch("rebalance.ingest.index_ops.time.sleep") as mock_sleep,
+        ):
             result = _github_adapter(
                 Path("/tmp/fake.db"),
-                token="t", since_days=7, repos=[], dry_run=False,
+                token="t",
+                since_days=7,
+                repos=[],
+                dry_run=False,
             )
 
         self.assertEqual(result, {"scope": "github", "recovered": True})
@@ -95,11 +100,16 @@ class GithubAdapterRetryTests(unittest.TestCase):
         mock_sleep.assert_called_once()
 
     def test_github_adapter_dry_run_never_touches_retry_sleep(self) -> None:
-        with patch("rebalance.ingest.index_ops._refresh_github", return_value={"scope": "github", "dry_run": True}), \
-             patch("rebalance.ingest.index_ops.time.sleep") as mock_sleep:
+        with (
+            patch("rebalance.ingest.index_ops._refresh_github", return_value={"scope": "github", "dry_run": True}),
+            patch("rebalance.ingest.index_ops.time.sleep") as mock_sleep,
+        ):
             result = _github_adapter(
                 Path("/tmp/fake.db"),
-                token="t", since_days=7, repos=[], dry_run=True,
+                token="t",
+                since_days=7,
+                repos=[],
+                dry_run=True,
             )
         self.assertEqual(result, {"scope": "github", "dry_run": True})
         mock_sleep.assert_not_called()
@@ -143,18 +153,14 @@ class IndexOpsTests(unittest.TestCase):
                     "rebalance.ingest.index_ops._resolve_repos_for_refresh",
                     return_value=[],
                 ),
-                patch(
-                    "rebalance.ingest.github_scan.sync_pushed_repos"
-                ) as mock_pushed,
+                patch("rebalance.ingest.github_scan.sync_pushed_repos") as mock_pushed,
                 patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
                 patch(
                     "rebalance.ingest.github_scan.filter_ignored_repo_activity",
                     return_value=[],
                 ),
                 patch("rebalance.ingest.github_scan.upsert_github_activity"),
-                patch(
-                    "rebalance.ingest.github_knowledge.embed_github_documents"
-                ) as mock_embed,
+                patch("rebalance.ingest.github_knowledge.embed_github_documents") as mock_embed,
                 patch(
                     "rebalance.ingest.watchlist_guard.snapshot_and_detect",
                     return_value={"ok": True},
@@ -178,9 +184,7 @@ class IndexOpsTests(unittest.TestCase):
                 mock_embed.return_value.skipped_unchanged = 0
                 mock_embed.return_value.elapsed_seconds = 0.0
 
-                result = _refresh_github(
-                    db_path, token="test-token", since_days=14, repos=[], dry_run=False
-                )
+                result = _refresh_github(db_path, token="test-token", since_days=14, repos=[], dry_run=False)
 
         mock_auto_promote.assert_called_once_with(db_path)
         self.assertEqual(result["auto_promote"]["promoted_count"], 1)
@@ -268,8 +272,14 @@ class IndexOpsTests(unittest.TestCase):
             # Verify keys are present for all sources
             sources = status.get("sources", {})
             expected_sources = [
-                "vault", "github", "calendar", "sleuth",
-                "apple_reminders", "email", "figma", "ask_self"
+                "vault",
+                "github",
+                "calendar",
+                "sleuth",
+                "apple_reminders",
+                "email",
+                "figma",
+                "ask_self",
             ]
             for src in expected_sources:
                 self.assertIn(src, sources)
@@ -479,13 +489,14 @@ class SignalHealthQuietFilterTests(unittest.TestCase):
             health = self._email_health(db_path, synced="-1 hour", received="-31 days")
 
         self.assertEqual(
-            health["status"], "ok",
-            "a successful sync that retained nothing is the configured outcome, "
-            "not silent data loss",
+            health["status"],
+            "ok",
+            "a successful sync that retained nothing is the configured outcome, not silent data loss",
         )
         self.assertIn("no rows matched", health["reason"])
         self.assertIn(
-            "Gmail filter:", health["reason"],
+            "Gmail filter:",
+            health["reason"],
             "the operator must be able to see WHY it is quiet, or 'ok' is just "
             "as unactionable as the false 'degraded' was",
         )
@@ -501,7 +512,8 @@ class SignalHealthQuietFilterTests(unittest.TestCase):
             health = self._email_health(db_path, synced="-40 days", received="-40 days")
 
         self.assertEqual(
-            health["status"], "degraded",
+            health["status"],
+            "degraded",
             "quiet_filter only excuses a zero-row window on a collector that "
             "demonstrably RAN; a stale freshness timestamp still degrades",
         )
@@ -584,7 +596,9 @@ class VaultIngestLagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"
             vault_source, health = self._vault_health_and_lag(
-                db_path, ingested_minutes_ago=15, modified_minutes_ago=5,
+                db_path,
+                ingested_minutes_ago=15,
+                modified_minutes_ago=5,
             )
 
         self.assertAlmostEqual(vault_source["ingest_lag_minutes"], 10.0, delta=1.0)
@@ -596,7 +610,9 @@ class VaultIngestLagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"
             vault_source, health = self._vault_health_and_lag(
-                db_path, ingested_minutes_ago=130, modified_minutes_ago=0,
+                db_path,
+                ingested_minutes_ago=130,
+                modified_minutes_ago=0,
             )
 
         self.assertGreater(vault_source["ingest_lag_minutes"], 120)
@@ -607,7 +623,9 @@ class VaultIngestLagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"
             vault_source, health = self._vault_health_and_lag(
-                db_path, ingested_minutes_ago=200, modified_minutes_ago=0,
+                db_path,
+                ingested_minutes_ago=200,
+                modified_minutes_ago=0,
             )
 
         self.assertGreater(vault_source["ingest_lag_minutes"], 180)
@@ -621,7 +639,9 @@ class VaultIngestLagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"
             vault_source, health = self._vault_health_and_lag(
-                db_path, ingested_minutes_ago=0, modified_minutes_ago=2880,
+                db_path,
+                ingested_minutes_ago=0,
+                modified_minutes_ago=2880,
             )
 
         self.assertEqual(vault_source["ingest_lag_minutes"], 0.0)
@@ -705,7 +725,8 @@ class SignalHealthAgreesWithDoctorTests(unittest.TestCase):
         from rebalance.ingest.config import describe_gmail_query_filter
 
         self.assertEqual(
-            _active_gmail_filter(), describe_gmail_query_filter(),
+            _active_gmail_filter(),
+            describe_gmail_query_filter(),
             "doctor's freshness check and signal health must describe the "
             "active filter identically — two formatters is how they drifted",
         )

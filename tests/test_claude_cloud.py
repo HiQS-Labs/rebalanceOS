@@ -4,13 +4,13 @@ Covers normalization, data-quality grading, and the dormant/enabled behavior of 
 HiQS candidates provider. No network: the session fetch is monkeypatched.
 """
 
-
 import pytest
 
 from rebalance.ingest import claude_cloud as cc
 
 
 # --- fixtures ---------------------------------------------------------------
+
 
 def _raw(title, bucket, repo, branch, summary, origin="web_claude_ai"):
     return {
@@ -22,7 +22,9 @@ def _raw(title, bucket, repo, branch, summary, origin="web_claude_ai"):
         "created_at": "2026-07-14T17:55:54.000000Z",
         "last_event_at": "2026-07-14T18:30:37.000000Z",
         "config": {
-            "model": "claude-opus-4-8", "effort_level": "high", "origin": origin,
+            "model": "claude-opus-4-8",
+            "effort_level": "high",
+            "origin": origin,
             "outcomes": [{"git_info": {"repo": repo, "branches": [branch]}}],
         },
         "external_metadata": {"post_turn_summary": {"status_detail": summary, "needs_action": ""}},
@@ -45,6 +47,7 @@ def rows():
 
 # --- normalize --------------------------------------------------------------
 
+
 def test_normalize_extracts_repo_branch_summary():
     n = cc.normalize(_raw("T", "review_ready", "owner/repo", "feature/x", "did a thing"))
     assert n["repo"] == "owner/repo"
@@ -66,6 +69,7 @@ def test_normalize_repo_falls_back_to_source_url():
 
 # --- grade ------------------------------------------------------------------
 
+
 def test_grade_empty():
     g = cc.grade([])
     assert g["n"] == 0 and g["overall"] is None and g["letter"] == "—"
@@ -74,12 +78,11 @@ def test_grade_empty():
 def test_grade_full_coverage_is_A(rows):
     g = cc.grade(rows)
     assert g["n"] == 4
-    assert g["dimensions"]["identified"] == 1.0   # all have repo+branch
-    assert g["dimensions"]["attested"] == 1.0     # all have summaries
+    assert g["dimensions"]["identified"] == 1.0  # all have repo+branch
+    assert g["dimensions"]["attested"] == 1.0  # all have summaries
     assert g["dimensions"]["outcome_known"] == 1.0
     assert g["letter"] == "A"
-    assert g["counts"] == {"merged": 1, "open": 1, "no_pr": 2, "pr_lookup_failed": 0,
-                           "running": 0, "failed": 1}
+    assert g["counts"] == {"merged": 1, "open": 1, "no_pr": 2, "pr_lookup_failed": 0, "running": 0, "failed": 1}
 
 
 def test_grade_flags_unattributed_and_summaryless():
@@ -92,6 +95,7 @@ def test_grade_flags_unattributed_and_summaryless():
 
 
 # --- candidates provider ----------------------------------------------------
+
 
 def test_candidates_dormant_by_default(rows, monkeypatch):
     monkeypatch.setattr(cc, "_signal_enabled", lambda: False)
@@ -118,7 +122,7 @@ def test_candidates_when_enabled(rows, monkeypatch):
     assert any(t.startswith("Triage cloud job") for t in titles)
     assert any(t.startswith("Cloud job FAILED") for t in titles)
     assert all(c["source"] == "claude_cloud" for c in cands)
-    assert all(c["evidence"] for c in cands)               # Attested: non-empty
+    assert all(c["evidence"] for c in cands)  # Attested: non-empty
     assert all(c["rank_key"][0] == cc._RANK_CLASS for c in cands)
 
 
@@ -133,4 +137,4 @@ def test_candidates_never_raises_on_fetch_failure(monkeypatch):
     class B:
         local_day = "2026-07-14"
 
-    assert cc.claude_cloud_candidates(B()) == []           # fail-soft, not an exception
+    assert cc.claude_cloud_candidates(B()) == []  # fail-soft, not an exception

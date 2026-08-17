@@ -89,8 +89,9 @@ class GitOpsTimeout(unittest.TestCase):
 
         from rebalance.lib.git_ops import _git
 
-        with patch("rebalance.lib.git_ops.subprocess.run",
-                   side_effect=subprocess.TimeoutExpired(cmd="git", timeout=30.0)):
+        with patch(
+            "rebalance.lib.git_ops.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="git", timeout=30.0)
+        ):
             self.assertIsNone(_git(__import__("pathlib").Path("/tmp"), "status"))
 
 

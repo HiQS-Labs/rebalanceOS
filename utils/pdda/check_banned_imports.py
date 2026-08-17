@@ -2,6 +2,7 @@ import os
 import ast
 from pathlib import Path
 
+
 def check_file(path: Path) -> list[str]:
     errors = []
     try:
@@ -20,6 +21,7 @@ def check_file(path: Path) -> list[str]:
                 errors.append(f"{path}:{node.lineno}: Banned import from '{node.module}'. Use rebalance.lib instead.")
     return errors
 
+
 def main():
     root_dir = Path("src/rebalance/ingest")
     for root, _, files in os.walk(root_dir):
@@ -29,6 +31,7 @@ def main():
                 errors = check_file(path)
                 for err in errors:
                     print(err)
+
 
 if __name__ == "__main__":
     main()

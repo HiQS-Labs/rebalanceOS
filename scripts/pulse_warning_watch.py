@@ -251,10 +251,7 @@ def call_openai_compatible(
         stderr = proc.stderr.strip() or f"curl exit {proc.returncode}"
         raise RuntimeError(stderr)
     response = json.loads(proc.stdout)
-    content = (
-        ((((response.get("choices") or [])[0] or {}).get("message") or {}).get("content"))
-        or ""
-    ).strip()
+    content = (((((response.get("choices") or [])[0] or {}).get("message") or {}).get("content")) or "").strip()
     return json.loads(content)
 
 

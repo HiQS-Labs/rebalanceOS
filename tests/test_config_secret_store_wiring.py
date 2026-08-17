@@ -111,6 +111,7 @@ def test_sleuth_clear_removes_from_secret_store(seams, monkeypatch):
 
 # --- rbos.config permission hardening (still secret-bearing until Phase 2) ---
 
+
 def test_write_config_hardens_to_0600(seams):
     config_module._write_config({"github_token": "ghp_x", "figma_file_keys": ["a"]})
     cfg = seams / "rbos.config"

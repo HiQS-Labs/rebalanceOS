@@ -11,18 +11,11 @@ import unittest
 from pathlib import Path
 
 
-RECAP_SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / "experimental"
-    / "git-pulse"
-    / "team-recap.py"
-)
+RECAP_SCRIPT = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse" / "team-recap.py"
 
 
 class TeamRecapCliTests(unittest.TestCase):
-    def _run_recap(
-        self, home: Path, *args: str
-    ) -> subprocess.CompletedProcess[str]:
+    def _run_recap(self, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         env = {**os.environ, "HOME": str(home)}
         return subprocess.run(
             [sys.executable, str(RECAP_SCRIPT), *args],

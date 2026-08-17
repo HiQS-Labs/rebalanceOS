@@ -140,6 +140,7 @@ def normalize_sources(source_types: Iterable[str] | None) -> tuple[str, ...]:
         # does not project them into the semantic index. Lazy/function-local
         # import avoids an import cycle (index_ops imports SemanticDoc here).
         from rebalance.ingest.index_ops import _all_semantic_sources
+
         legal = set(_all_semantic_sources())
         if item not in legal:
             raise ValueError(f"Unsupported source type: {value!r}")
@@ -226,9 +227,7 @@ def _delete_missing_docs(
     seen_source_pks: set[str],
     source_pk_prefix: str = "",
 ) -> int:
-    rows = sem.semantic_documents_for_source(
-        conn, source_type, source_pk_prefix=source_pk_prefix
-    )
+    rows = sem.semantic_documents_for_source(conn, source_type, source_pk_prefix=source_pk_prefix)
 
     to_delete = [int(row["id"]) for row in rows if row["source_pk"] not in seen_source_pks]
     if not to_delete:
@@ -293,9 +292,7 @@ def sync_github_documents(conn: Any, *, repo_full_name: str = "") -> dict[str, i
     if normalized_repo and normalized_repo in ignored_repos:
         return {"total": 0, "inserted": 0, "updated": 0, "unchanged": 0, "deleted": 0}
 
-    rows = sem.github_documents_for_semantic(
-        conn, normalized_repo=normalized_repo, ignored_repos=ignored_repos
-    )
+    rows = sem.github_documents_for_semantic(conn, normalized_repo=normalized_repo, ignored_repos=list(ignored_repos))
 
     inserted = updated = unchanged = skipped = 0
     seen_source_pks: set[str] = set()
@@ -331,8 +328,7 @@ def sync_github_documents(conn: Any, *, repo_full_name: str = "") -> dict[str, i
             # going so every other row still lands in the semantic index.
             skipped += 1
             logger.warning(
-                "sync_github_documents: skipping malformed row source_key=%r "
-                "repo=%r doc_type=%r: %s",
+                "sync_github_documents: skipping malformed row source_key=%r repo=%r doc_type=%r: %s",
                 source_pk,
                 row["repo_full_name"],
                 row["doc_type"],
@@ -542,6 +538,7 @@ def backfill_semantic_documents(
             total += result["total"]
         if "email" in selected_sources:
             from rebalance.ingest.db import ensure_email_schema
+
             ensure_email_schema(conn)
             result = sync_email_documents(conn)
             inserted += result["inserted"]
@@ -554,6 +551,7 @@ def backfill_semantic_documents(
                 root = repo_root
             else:
                 from rebalance.paths import resolve_project_root
+
                 root = resolve_project_root(Path(__file__))
             result = sync_code_documents(conn, root)
             inserted += result["inserted"]
@@ -566,6 +564,7 @@ def backfill_semantic_documents(
         # carry a ``semantic_docs`` provider are iterated here.
         if use_registry_providers:
             from rebalance.ingest.index_ops import COLLECTORS
+
             for source in selected_sources:
                 if source in _LADDER_SOURCES:
                     continue
@@ -650,6 +649,7 @@ def embed_pending(
     against each other, not merely against themselves.
     """
     from rebalance.ingest.embedder import instrument_embedding_pass
+
     instrument_embedding_pass("embed_pending")
     start = time.monotonic()
     embed_fn = embed_texts or _default_embed_texts
@@ -667,12 +667,8 @@ def embed_pending(
                 sem.reset_semantic_embedded_state(conn, selected_sources)
             conn.commit()
 
-        rows = sem.semantic_documents_pending_embed(
-            conn, selected_sources, min_chars, current_model_version
-        )
-        total_docs = sem.count_embeddable_semantic_documents(
-            conn, selected_sources, min_chars
-        )
+        rows = sem.semantic_documents_pending_embed(conn, selected_sources, min_chars, current_model_version)
+        total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
 
         if not rows:
             return SemanticEmbedResult(
@@ -686,16 +682,14 @@ def embed_pending(
 
         embedded = 0
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             texts = [row["body"][:4000] for row in batch]
             vectors = embed_fn(texts, model_name)
             now_iso = time_ops.now_iso()
             for row, vec in zip(batch, vectors):
                 sem.delete_semantic_embedding(conn, row["id"])
                 sem.insert_semantic_embedding(conn, row["id"], _vec_to_bytes(vec))
-                sem.mark_semantic_document_embedded(
-                    conn, row["id"], current_model_version, now_iso
-                )
+                sem.mark_semantic_document_embedded(conn, row["id"], current_model_version, now_iso)
                 embedded += 1
             conn.commit()
 
@@ -719,9 +713,7 @@ def embed_pending(
     )
 
 
-def _rrf_fuse(
-    result_lists: list[list[Any]], top_k: int, *, k: int = 60
-) -> list[Any]:
+def _rrf_fuse(result_lists: list[list[Any]], top_k: int, *, k: int = 60) -> list[Any]:
     """Reciprocal-rank fusion of ranked row lists, keyed on ``doc_id``.
 
     Rank-based, so the vector (distance) and lexical (bm25) scales never have to
@@ -771,15 +763,24 @@ def query(
 
     with db_connection(database_path, ensure_semantic_schema) as conn:
         vec_rows = sem.search_semantic_documents(
-            conn, query_vec, pool, selected_sources,
-            updated_after=updated_after, repo=repo,
+            conn,
+            query_vec,
+            pool,
+            selected_sources,
+            updated_after=updated_after,
+            repo=repo,
         )
         fts_rows = (
             sem.search_semantic_documents_fts(
-                conn, query_text, pool, selected_sources,
-                updated_after=updated_after, repo=repo,
+                conn,
+                query_text,
+                pool,
+                selected_sources,
+                updated_after=updated_after,
+                repo=repo,
             )
-            if hybrid else []
+            if hybrid
+            else []
         )
 
     rows = _rrf_fuse([vec_rows, fts_rows], top_k) if fts_rows else vec_rows[:top_k]

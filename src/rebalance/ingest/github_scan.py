@@ -42,6 +42,7 @@ BAND_C_DAYS = 30
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RepoActivity:
     repo_full_name: str
@@ -84,7 +85,7 @@ class RepoActivity:
 @dataclass
 class GitHubScanResult:
     login: str
-    scanned_at: str          # ISO 8601
+    scanned_at: str  # ISO 8601
     days_fetched: int
     total_events: int
     repo_activity: dict[str, RepoActivity] = field(default_factory=dict)
@@ -101,6 +102,7 @@ class GitHubApiError(Exception):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _client(token: str) -> GitHubClient:
     """Return a GitHubClient — wrapper kept so callers needn't import the type."""
@@ -170,8 +172,7 @@ def _get_login(token: str) -> str:
         # diagnosable from the log rather than re-derived from scratch.
         rate_limited = _is_rate_limit(status, headers)
         logger.warning(
-            "GitHub /user -> %s (rate_limit=%s) remaining=%s used=%s "
-            "retry_after=%s reset=%s resource=%s",
+            "GitHub /user -> %s (rate_limit=%s) remaining=%s used=%s retry_after=%s reset=%s resource=%s",
             status,
             rate_limited,
             headers.get("x-ratelimit-remaining", "?"),
@@ -198,6 +199,7 @@ def _get_login(token: str) -> str:
         # Authoritative deauth signal: the PAT was revoked, expired, or lost a
         # required scope. Log it to the unified auth trail before raising.
         from rebalance.ingest import auth_log
+
         auth_log.log_github_auth_failed(status, endpoint="/user")
     if status != 200 or not isinstance(data, dict):
         raise GitHubApiError(f"Failed to fetch /user: HTTP {status}", status)
@@ -229,9 +231,7 @@ def _fetch_events(login: str, token: str, days: int = 30) -> list[dict[str, Any]
             break
 
         if status == 403 or status == 429:
-            raise GitHubApiError(
-                f"Rate limited fetching events page {page}", status, is_rate_limit=True
-            )
+            raise GitHubApiError(f"Rate limited fetching events page {page}", status, is_rate_limit=True)
 
         if status != 200 or not isinstance(data, list):
             raise GitHubApiError(f"Failed to fetch events page {page}: HTTP {status}", status)
@@ -254,6 +254,7 @@ def _fetch_events(login: str, token: str, days: int = 30) -> list[dict[str, Any]
 # ---------------------------------------------------------------------------
 # Event aggregation
 # ---------------------------------------------------------------------------
+
 
 def _summarize_by_repo(
     events: list[dict[str, Any]],
@@ -335,6 +336,7 @@ def _summarize_by_repo(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def validate_github_token(token: str) -> dict[str, Any]:
     """
@@ -448,6 +450,7 @@ def scan_and_store_github_activity(
     """
     if ignored_repos is None:
         from rebalance.ingest.config import get_github_ignored_repos
+
         ignored_repos = get_github_ignored_repos()
     result = scan_github(token=token, days=since_days)
     skipped = filter_ignored_repo_activity(result, ignored_repos)
@@ -531,6 +534,7 @@ def upsert_github_activity(database_path: Path, result: GitHubScanResult) -> Non
 # pushes the operator wasn't the actor on, or that the events API dropped.
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PushedRepoRecord:
     repo_full_name: str
@@ -580,14 +584,16 @@ def fetch_pushed_repos(token: str, *, per_page: int = 30) -> list[PushedRepoReco
         pushed = r.get("pushed_at") or ""
         if not full or not pushed:
             continue
-        out.append(PushedRepoRecord(
-            repo_full_name=full,
-            pushed_at=pushed,
-            private=bool(r.get("private")),
-            fork=bool(r.get("fork")),
-            archived=bool(r.get("archived")),
-            disabled=bool(r.get("disabled")),
-        ))
+        out.append(
+            PushedRepoRecord(
+                repo_full_name=full,
+                pushed_at=pushed,
+                private=bool(r.get("private")),
+                fork=bool(r.get("fork")),
+                archived=bool(r.get("archived")),
+                disabled=bool(r.get("disabled")),
+            )
+        )
     return out
 
 
@@ -622,8 +628,7 @@ def sync_pushed_repos(
                 result.skipped_archived += 1
                 continue
             existing = conn.execute(
-                "SELECT pushed_at, private, fork FROM github_pushed_repos "
-                "WHERE repo_full_name = ?",
+                "SELECT pushed_at, private, fork FROM github_pushed_repos WHERE repo_full_name = ?",
                 (rec.repo_full_name,),
             ).fetchone()
             if existing is None:
@@ -635,10 +640,14 @@ def sync_pushed_repos(
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        rec.repo_full_name, rec.pushed_at,
-                        int(rec.private), int(rec.fork),
-                        int(rec.archived), int(rec.disabled),
-                        now, now,
+                        rec.repo_full_name,
+                        rec.pushed_at,
+                        int(rec.private),
+                        int(rec.fork),
+                        int(rec.archived),
+                        int(rec.disabled),
+                        now,
+                        now,
                     ),
                 )
                 result.inserted += 1
@@ -650,8 +659,7 @@ def sync_pushed_repos(
             )
             if same:
                 conn.execute(
-                    "UPDATE github_pushed_repos SET last_seen_at = ? "
-                    "WHERE repo_full_name = ?",
+                    "UPDATE github_pushed_repos SET last_seen_at = ? WHERE repo_full_name = ?",
                     (now, rec.repo_full_name),
                 )
                 result.unchanged += 1
@@ -664,9 +672,13 @@ def sync_pushed_repos(
                     WHERE repo_full_name = ?
                     """,
                     (
-                        rec.pushed_at, int(rec.private), int(rec.fork),
-                        int(rec.archived), int(rec.disabled),
-                        now, rec.repo_full_name,
+                        rec.pushed_at,
+                        int(rec.private),
+                        int(rec.fork),
+                        int(rec.archived),
+                        int(rec.disabled),
+                        now,
+                        rec.repo_full_name,
                     ),
                 )
                 result.updated += 1
@@ -698,6 +710,7 @@ def filter_ignored_repo_activity(result: GitHubScanResult, ignored_repos: list[s
 # ---------------------------------------------------------------------------
 # Balance query — used by MCP tool
 # ---------------------------------------------------------------------------
+
 
 def get_github_balance(
     database_path: Path,
@@ -743,9 +756,7 @@ def get_github_balance(
         ).fetchall()
 
     # Build lookup: repo_full_name → aggregated activity row
-    repo_stats: dict[str, dict[str, Any]] = {
-        row["repo_full_name"]: dict(row) for row in rows
-    }
+    repo_stats: dict[str, dict[str, Any]] = {row["repo_full_name"]: dict(row) for row in rows}
 
     results: list[dict[str, Any]] = []
     for project_name, repos in project_repos.items():
@@ -769,17 +780,19 @@ def get_github_balance(
             if la and (last_active is None or la > last_active):
                 last_active = la
 
-        results.append({
-            "project_name": project_name,
-            "repos_linked": repos,
-            "repos_touched": repos_touched,
-            "total_commits": total_commits,
-            "prs_opened": total_prs_opened,
-            "prs_merged": total_prs_merged,
-            "issues_opened": total_issues,
-            "last_active_at": last_active,
-            "is_idle": len(repos_touched) == 0,
-        })
+        results.append(
+            {
+                "project_name": project_name,
+                "repos_linked": repos,
+                "repos_touched": repos_touched,
+                "total_commits": total_commits,
+                "prs_opened": total_prs_opened,
+                "prs_merged": total_prs_merged,
+                "issues_opened": total_issues,
+                "last_active_at": last_active,
+                "is_idle": len(repos_touched) == 0,
+            }
+        )
 
     # Sort: active projects first, then by last_active_at descending
     results.sort(key=lambda x: (x["is_idle"], -(len(x["repos_touched"]))), reverse=False)
@@ -790,9 +803,11 @@ def get_github_balance(
 # Preflight discovery — GitHub repositories
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RepoCandidate:
     """A repository discovered from recent GitHub activity."""
+
     repo_full_name: str
     last_active_at: str | None
     activity_score: int  # Total events in scan window

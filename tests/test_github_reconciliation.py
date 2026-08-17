@@ -115,7 +115,9 @@ class GitHubReconciliationTests(unittest.TestCase):
                     """,
                     (repo, "2026-04-17T12:00:00Z", "2026-04-17T12:00:00Z", "2026-04-17T12:30:00Z"),
                 )
-                _insert_issue(conn, repo=repo, number=101, title="Fix mini-cart hydration bug", milestone_title="Silver")
+                _insert_issue(
+                    conn, repo=repo, number=101, title="Fix mini-cart hydration bug", milestone_title="Silver"
+                )
                 _insert_pr(
                     conn,
                     repo=repo,
@@ -169,7 +171,7 @@ class GitHubReconciliationTests(unittest.TestCase):
                     conn,
                     repo=repo,
                     number=766,
-                    title='Use variation.is_in_stock for sold out button state',
+                    title="Use variation.is_in_stock for sold out button state",
                     body="Production hotfix for sold out button state.",
                     head_ref="hotfix/761-Out-of-Stock-product-showing-disabled-Add-to-Cart",
                     base_ref="main",

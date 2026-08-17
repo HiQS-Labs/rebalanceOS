@@ -82,9 +82,10 @@ def test_widening_appends_attested_siblings_without_changing_direct_hits(tmp_pat
         assert isinstance(widened[1], AffinityDoc)
         assert widened[1].id == "south:1"
         assert widened[1].affinity_edge == "same_org"
-        assert append_affinity_hits(
-            connection, "orbit program release", direct, limit=5, enabled_edges=frozenset()
-        ) == direct
+        assert (
+            append_affinity_hits(connection, "orbit program release", direct, limit=5, enabled_edges=frozenset())
+            == direct
+        )
         assert append_affinity_hits(connection, "unrelated exact request", direct, limit=5) == direct
     finally:
         connection.close()

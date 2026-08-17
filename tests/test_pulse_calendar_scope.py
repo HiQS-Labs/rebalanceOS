@@ -22,8 +22,19 @@ _TABLE = """
 
 def _event(id_: str, cal: str, summary: str, person: str | None = None) -> tuple:
     # 14:00 UTC today — after `now` (09:00) so it counts as upcoming.
-    return (id_, summary, "2026-06-15T14:00:00+00:00", "2026-06-15T15:00:00+00:00",
-            None, None, cal, "confirmed", None, "2026-06-01T00:00:00Z", person)
+    return (
+        id_,
+        summary,
+        "2026-06-15T14:00:00+00:00",
+        "2026-06-15T15:00:00+00:00",
+        None,
+        None,
+        cal,
+        "confirmed",
+        None,
+        "2026-06-01T00:00:00Z",
+        person,
+    )
 
 
 class TestPulseUpcomingScope(unittest.TestCase):
@@ -33,16 +44,15 @@ class TestPulseUpcomingScope(unittest.TestCase):
         conn.execute(_TABLE)
         conn.executemany(
             "INSERT INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            [_event("p", "primary", "Mine"),
-             _event("t", "teammate@group.calendar.google.com", "Theirs")])
+            [_event("p", "primary", "Mine"), _event("t", "teammate@group.calendar.google.com", "Theirs")],
+        )
         conn.commit()
 
         now = datetime(2026, 6, 15, 9, 0, tzinfo=timezone.utc)
         today_start = datetime(2026, 6, 15, 0, 0, tzinfo=timezone.utc)
         tomorrow_start = today_start + timedelta(days=1)
 
-        out = _query_calendar_upcoming(
-            conn, today_start=today_start, tomorrow_start=tomorrow_start, now=now)
+        out = _query_calendar_upcoming(conn, today_start=today_start, tomorrow_start=tomorrow_start, now=now)
         summaries = [e["summary"] for e in out]
         conn.close()
 
@@ -58,17 +68,18 @@ class TestPulseUpcomingScope(unittest.TestCase):
         conn.execute(_TABLE)
         conn.executemany(
             "INSERT INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            [_event("p", "primary", "Mine", person="OPERATOR_LABEL"),
-             _event("t", "teammate@group.calendar.google.com", "Theirs",
-                    person="matthew")])
+            [
+                _event("p", "primary", "Mine", person="OPERATOR_LABEL"),
+                _event("t", "teammate@group.calendar.google.com", "Theirs", person="matthew"),
+            ],
+        )
         conn.commit()
 
         now = datetime(2026, 6, 15, 9, 0, tzinfo=timezone.utc)
         today_start = datetime(2026, 6, 15, 0, 0, tzinfo=timezone.utc)
         tomorrow_start = today_start + timedelta(days=1)
 
-        out = _query_calendar_upcoming(
-            conn, today_start=today_start, tomorrow_start=tomorrow_start, now=now)
+        out = _query_calendar_upcoming(conn, today_start=today_start, tomorrow_start=tomorrow_start, now=now)
         conn.close()
 
         for e in out:

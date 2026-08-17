@@ -72,15 +72,11 @@ class FigmaSourceModuleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"
 
-            sync_result = sync_figma_comments(
-                db_path, file_keys=["fileA"], token="injected", client=client
-            )
+            sync_result = sync_figma_comments(db_path, file_keys=["fileA"], token="injected", client=client)
             self.assertEqual(sync_result.comments_inserted, 2)
 
             # Registry-driven provider path (strangler flag). Empty body skipped.
-            backfill = backfill_semantic_documents(
-                db_path, source_types=["figma"], use_registry_providers=True
-            )
+            backfill = backfill_semantic_documents(db_path, source_types=["figma"], use_registry_providers=True)
             self.assertEqual(backfill.inserted_count, 1)
 
             with db_connection(db_path) as conn:
@@ -96,9 +92,7 @@ class FigmaSourceModuleTests(unittest.TestCase):
             self.assertEqual(rows[0]["source_table"], "figma_comments")
             self.assertEqual(rows[0]["source_pk"], "fileA:c1")
 
-            embed = embed_pending(
-                db_path, source_types=["figma"], embed_texts=_fake_embed_texts
-            )
+            embed = embed_pending(db_path, source_types=["figma"], embed_texts=_fake_embed_texts)
             self.assertEqual(embed.embedded_docs, 1)
 
             hits = query(

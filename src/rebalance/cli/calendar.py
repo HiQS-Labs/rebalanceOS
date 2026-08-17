@@ -57,9 +57,7 @@ def _load_calendar_credentials_from_env(env_data: dict[str, str]) -> object:
     """Load the pickled Google OAuth credentials referenced by the shared env file."""
     token_path_str = env_data.get("GOOGLE_CALENDAR_TOKEN_PATH", "").strip()
     if not token_path_str:
-        raise typer.BadParameter(
-            f"GOOGLE_CALENDAR_TOKEN_PATH is missing in {GOOGLE_CALENDAR_ENV_PATH}"
-        )
+        raise typer.BadParameter(f"GOOGLE_CALENDAR_TOKEN_PATH is missing in {GOOGLE_CALENDAR_ENV_PATH}")
 
     token_path = Path(token_path_str).expanduser()
     if not token_path.exists():
@@ -100,6 +98,9 @@ def _resolve_calendar_event_window(
     if date_str and (start_time or end_time):
         raise typer.BadParameter("Use either --date or --start/--end, not both.")
 
+    start_dt: datetime | None = None
+    end_dt: datetime | None = None
+
     if date_str:
         target_date = parse_date(date_str)
         if target_date is None:
@@ -118,6 +119,7 @@ def _resolve_calendar_event_window(
     end_dt = parse_iso(end_time, force_utc=False)
     if start_dt is None or end_dt is None:
         raise typer.BadParameter("Invalid datetime format for --start or --end.")
+    assert start_dt is not None and end_dt is not None
 
     if start_dt.tzinfo is None or end_dt.tzinfo is None:
         raise typer.BadParameter("--start and --end must include timezone offsets.")
@@ -286,8 +288,12 @@ def calendar_create_event_cmd(
     attendees: list[str] = typer.Option(None, "--attendee", help="Attendee email; repeat the flag to add more"),
     calendar_id: str = typer.Option("primary", "--calendar-id", help="Calendar ID (defaults to primary)"),
     timezone_name: str = typer.Option("America/Los_Angeles", "--timezone", help="IANA timezone for --date payloads"),
-    dedupe_key: str = typer.Option("", "--dedupe-key", help="Optional idempotency key checked against the local create-event log"),
-    skip_if_exists: bool = typer.Option(False, "--skip-if-exists", help="Return success instead of erroring when a matching event already exists"),
+    dedupe_key: str = typer.Option(
+        "", "--dedupe-key", help="Optional idempotency key checked against the local create-event log"
+    ),
+    skip_if_exists: bool = typer.Option(
+        False, "--skip-if-exists", help="Return success instead of erroring when a matching event already exists"
+    ),
     output_format: str = typer.Option("text", "--output", help="Output format: text or json"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the normalized payload without creating the event"),
 ) -> None:
@@ -369,7 +375,7 @@ def calendar_create_event_cmd(
         timezone_name=str(payload["timezone_name"]),
         description=str(payload["description"]),
         location=str(payload["location"]),
-        attendees=list(payload["attendees"]),
+        attendees=list(payload["attendees"]) if isinstance(payload["attendees"], list) else [],
     )
     emit_data = {
         **base_log_record,
@@ -491,6 +497,7 @@ def calendar_snap_edges_cmd(
 
     if normalized_output == "json":
         import dataclasses
+
         typer.echo(json.dumps(dataclasses.asdict(result), ensure_ascii=False, indent=2))
         return
 
@@ -509,8 +516,8 @@ def calendar_snap_edges_cmd(
 
         for pair in day.snapped:
             typer.echo(
-                f"    Suggested: \"{pair.event1_summary}\" end {pair.event1_original_end} -> {pair.event1_new_end}"
-                f"  (overlapped \"{pair.event2_summary}\" by {pair.overlap_minutes}m)"
+                f'    Suggested: "{pair.event1_summary}" end {pair.event1_original_end} -> {pair.event1_new_end}'
+                f'  (overlapped "{pair.event2_summary}" by {pair.overlap_minutes}m)'
             )
 
         for cluster in day.skipped_clusters:
@@ -564,9 +571,17 @@ def calendar_weekly_report_cmd(
     database: Path | None = DBOption(),
     date_str: str = typer.Option(None, "--date", help="Date in target week (YYYY-MM-DD, default: today)"),
     output: Path = typer.Option(None, "--output", "-o", help="Write report to a markdown file instead of stdout"),
-    vault: Path = typer.Option(None, "--vault", envvar="REBALANCE_VAULT", help="Obsidian vault path for weekly note write-back"),
-    write_week_note: bool = typer.Option(False, "--write-week-note", help="Write week-of-YYYY-MM-DD.md into the vault under Weekly Notes/"),
-    reingest_note: bool = typer.Option(True, "--reingest-note/--no-reingest-note", help="When writing a week note, re-ingest and embed it into the local knowledge store"),
+    vault: Path = typer.Option(
+        None, "--vault", envvar="REBALANCE_VAULT", help="Obsidian vault path for weekly note write-back"
+    ),
+    write_week_note: bool = typer.Option(
+        False, "--write-week-note", help="Write week-of-YYYY-MM-DD.md into the vault under Weekly Notes/"
+    ),
+    reingest_note: bool = typer.Option(
+        True,
+        "--reingest-note/--no-reingest-note",
+        help="When writing a week note, re-ingest and embed it into the local knowledge store",
+    ),
 ) -> None:
     """Generate weekly calendar report (Sun-Sat) with daily summaries and project aggregator."""
     from datetime import date

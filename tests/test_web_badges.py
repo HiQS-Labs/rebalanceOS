@@ -35,8 +35,10 @@ class SleuthGroupBadgeTests(unittest.TestCase):
             label="My Repo",
             reminders=[{"task_text": "do the thing"}],
         )
-        with patch.object(web, "grouped_reminders_from_db", return_value=[group]), \
-             patch.object(web, "resolve_db", return_value=":memory:"):
+        with (
+            patch.object(web, "grouped_reminders_from_db", return_value=[group]),
+            patch.object(web, "resolve_db", return_value=":memory:"),
+        ):
             return web._render_sleuth_groups()
 
     def test_group_header_badge_uses_variant_class_and_label_text(self):
@@ -51,8 +53,7 @@ class SleuthGroupBadgeTests(unittest.TestCase):
 
 class OneVocabularyPinTests(unittest.TestCase):
     def test_status_and_severity_constants_are_canonical(self):
-        for const in (doctor.OK, doctor.WARN, doctor.FAIL,
-                      doctor.NOTICE, doctor.WARNING, doctor.ERROR):
+        for const in (doctor.OK, doctor.WARN, doctor.FAIL, doctor.NOTICE, doctor.WARNING, doctor.ERROR):
             self.assertIn(const, CANONICAL)
 
     def test_status_axis_reuses_severity_words(self):
@@ -70,7 +71,8 @@ class OneVocabularyPinTests(unittest.TestCase):
             table = getattr(web, table_name)
             for key, (variant, _label) in table.items():
                 self.assertIn(
-                    variant, CANONICAL,
+                    variant,
+                    CANONICAL,
                     f"{table_name}[{key!r}] uses non-canonical variant {variant!r}",
                 )
                 self.assertNotIn(variant, RETIRED)
@@ -79,7 +81,7 @@ class OneVocabularyPinTests(unittest.TestCase):
         # Defense in depth: if an old literal survives somewhere, it degrades
         # to neutral (visible in review) instead of resolving to a live style.
         for word in RETIRED:
-            self.assertIn('badge-neutral', badge_html(word, "x"))
+            self.assertIn("badge-neutral", badge_html(word, "x"))
 
 
 if __name__ == "__main__":

@@ -67,9 +67,7 @@ class TestPersonAttribution(unittest.TestCase):
     def test_operator_person_is_null(self) -> None:
         self._run_sync("primary", None, [_fake_event("op1", "My Event")])
         conn = sqlite3.connect(self.db)
-        row = conn.execute(
-            "SELECT person FROM calendar_events WHERE id = 'op1'"
-        ).fetchone()
+        row = conn.execute("SELECT person FROM calendar_events WHERE id = 'op1'").fetchone()
         conn.close()
         self.assertIsNotNone(row)
         self.assertIsNone(row[0], "operator rows must have person IS NULL")
@@ -81,9 +79,7 @@ class TestPersonAttribution(unittest.TestCase):
             [_fake_event("tm1", "Team Meeting")],
         )
         conn = sqlite3.connect(self.db)
-        row = conn.execute(
-            "SELECT person, calendar_id FROM calendar_events WHERE id = 'tm1'"
-        ).fetchone()
+        row = conn.execute("SELECT person, calendar_id FROM calendar_events WHERE id = 'tm1'").fetchone()
         conn.close()
         self.assertIsNotNone(row)
         self.assertEqual(row[0], "matthew")
@@ -97,9 +93,7 @@ class TestPersonAttribution(unittest.TestCase):
             [_fake_event("shared-id", "Matthew View")],
         )
         conn = sqlite3.connect(self.db)
-        rows = conn.execute(
-            "SELECT id, calendar_id, person FROM calendar_events ORDER BY calendar_id"
-        ).fetchall()
+        rows = conn.execute("SELECT id, calendar_id, person FROM calendar_events ORDER BY calendar_id").fetchall()
         conn.close()
         self.assertEqual(len(rows), 2, "composite PK (id, calendar_id) should keep both rows")
         persons = {row[1]: row[2] for row in rows}

@@ -36,9 +36,7 @@ README/LICENSE, into utils/CLIO/.
 
 
 def _git(path: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(path), *args], capture_output=True, text=True
-    )
+    result = subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True)
     if result.returncode != 0:
         raise AssertionError(f"git {' '.join(args)} failed: {result.stderr}")
     return result.stdout.strip()
@@ -110,16 +108,13 @@ class GitCommitBackfillTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _run(self, **kw):
-        return backfill_commits(
-            self.db, REPO, clone_path=self.fx.path, fetch=False, **kw
-        )
+        return backfill_commits(self.db, REPO, clone_path=self.fx.path, fetch=False, **kw)
 
     def _rows(self):
         with db_connection(self.db, ensure_github_schema) as conn:
             return {
-                r["sha"]: r for r in conn.execute(
-                    "SELECT * FROM github_direct_commits WHERE repo_full_name = ?", (REPO,)
-                )
+                r["sha"]: r
+                for r in conn.execute("SELECT * FROM github_direct_commits WHERE repo_full_name = ?", (REPO,))
             }
 
     # -- QA gate: the gap closes, and cfeafe4-shaped commits carry their paths --
@@ -141,9 +136,9 @@ class GitCommitBackfillTests(unittest.TestCase):
 
         with db_connection(self.db, ensure_github_schema) as conn:
             paths = sorted(
-                r[0] for r in conn.execute(
-                    "SELECT path FROM github_direct_commit_files "
-                    "WHERE repo_full_name = ? AND sha = ?",
+                r[0]
+                for r in conn.execute(
+                    "SELECT path FROM github_direct_commit_files WHERE repo_full_name = ? AND sha = ?",
                     (REPO, self.fx.clio_sha),
                 )
             )
@@ -161,9 +156,9 @@ class GitCommitBackfillTests(unittest.TestCase):
         self.assertIn(self.fx.merge_sha, rows)
         with db_connection(self.db, ensure_github_schema) as conn:
             paths = [
-                r[0] for r in conn.execute(
-                    "SELECT path FROM github_direct_commit_files "
-                    "WHERE repo_full_name = ? AND sha = ?",
+                r[0]
+                for r in conn.execute(
+                    "SELECT path FROM github_direct_commit_files WHERE repo_full_name = ? AND sha = ?",
                     (REPO, self.fx.merge_sha),
                 )
             ]
@@ -207,9 +202,7 @@ class GitCommitBackfillTests(unittest.TestCase):
     # -- QA gate: no-clone repos REPORT, never silently skip --
 
     def test_missing_clone_is_reported_as_uncoverable_not_skipped(self):
-        result = backfill_commits(
-            self.db, "Some-Org/never-cloned", roots=[], fetch=False
-        )
+        result = backfill_commits(self.db, "Some-Org/never-cloned", roots=[], fetch=False)
         self.assertEqual(result.state, "uncoverable")
         self.assertIn("no local clone", result.reason)
 
@@ -245,9 +238,20 @@ class GitCommitBackfillTests(unittest.TestCase):
         with db_connection(self.db, ensure_github_schema) as conn:
             gh.upsert_direct_commit(
                 conn,
-                (REPO, self.fx.clio_sha, "push-999", "refs/heads/development",
-                 "noelsaw1", "Tester", "clobbered", "2026-07-18T00:00:00Z", "",
-                 "unavailable", "2026-07-19T00:00:00Z", "2026-07-19T00:00:00Z"),
+                (
+                    REPO,
+                    self.fx.clio_sha,
+                    "push-999",
+                    "refs/heads/development",
+                    "noelsaw1",
+                    "Tester",
+                    "clobbered",
+                    "2026-07-18T00:00:00Z",
+                    "",
+                    "unavailable",
+                    "2026-07-19T00:00:00Z",
+                    "2026-07-19T00:00:00Z",
+                ),
                 source="events",
             )
             conn.commit()
@@ -260,9 +264,20 @@ class GitCommitBackfillTests(unittest.TestCase):
         with db_connection(self.db, ensure_github_schema) as conn:
             gh.upsert_direct_commit(
                 conn,
-                (REPO, self.fx.clio_sha, "push-1", "refs/heads/development",
-                 "noelsaw1", "Tester", "stub", "2026-07-18T00:00:00Z", "",
-                 "unavailable", "2026-07-19T00:00:00Z", "2026-07-19T00:00:00Z"),
+                (
+                    REPO,
+                    self.fx.clio_sha,
+                    "push-1",
+                    "refs/heads/development",
+                    "noelsaw1",
+                    "Tester",
+                    "stub",
+                    "2026-07-18T00:00:00Z",
+                    "",
+                    "unavailable",
+                    "2026-07-19T00:00:00Z",
+                    "2026-07-19T00:00:00Z",
+                ),
                 source="events",
             )
             conn.commit()

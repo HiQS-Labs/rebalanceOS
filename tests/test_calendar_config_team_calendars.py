@@ -13,9 +13,7 @@ from rebalance.ingest.calendar_config import (
 
 class TestTeamCalendarsLoad(unittest.TestCase):
     def _config_with(self, team_calendars: list) -> CalendarConfig:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"team_calendars": team_calendars}, f)
             path = Path(f.name)
         try:
@@ -28,9 +26,7 @@ class TestTeamCalendarsLoad(unittest.TestCase):
         self.assertEqual(config.team_calendars, [])
 
     def test_single_entry_loaded(self) -> None:
-        config = self._config_with([
-            {"person": "matthew", "calendar_id": "matthew@group.calendar.google.com"}
-        ])
+        config = self._config_with([{"person": "matthew", "calendar_id": "matthew@group.calendar.google.com"}])
         self.assertEqual(len(config.team_calendars), 1)
         self.assertEqual(config.team_calendars[0].person, "matthew")
         self.assertEqual(
@@ -39,28 +35,34 @@ class TestTeamCalendarsLoad(unittest.TestCase):
         )
 
     def test_multiple_entries_loaded(self) -> None:
-        config = self._config_with([
-            {"person": "matthew", "calendar_id": "m@cal.google.com"},
-            {"person": "jose", "calendar_id": "j@cal.google.com"},
-        ])
+        config = self._config_with(
+            [
+                {"person": "matthew", "calendar_id": "m@cal.google.com"},
+                {"person": "jose", "calendar_id": "j@cal.google.com"},
+            ]
+        )
         self.assertEqual(len(config.team_calendars), 2)
         persons = [tc.person for tc in config.team_calendars]
         self.assertIn("matthew", persons)
         self.assertIn("jose", persons)
 
     def test_missing_person_skipped(self) -> None:
-        config = self._config_with([
-            {"calendar_id": "orphan@cal.google.com"},   # no person
-            {"person": "matthew", "calendar_id": "m@cal.google.com"},
-        ])
+        config = self._config_with(
+            [
+                {"calendar_id": "orphan@cal.google.com"},  # no person
+                {"person": "matthew", "calendar_id": "m@cal.google.com"},
+            ]
+        )
         self.assertEqual(len(config.team_calendars), 1)
         self.assertEqual(config.team_calendars[0].person, "matthew")
 
     def test_missing_calendar_id_skipped(self) -> None:
-        config = self._config_with([
-            {"person": "ghost"},                         # no calendar_id
-            {"person": "matthew", "calendar_id": "m@cal.google.com"},
-        ])
+        config = self._config_with(
+            [
+                {"person": "ghost"},  # no calendar_id
+                {"person": "matthew", "calendar_id": "m@cal.google.com"},
+            ]
+        )
         self.assertEqual(len(config.team_calendars), 1)
 
     def test_non_dict_entries_skipped(self) -> None:
@@ -68,9 +70,7 @@ class TestTeamCalendarsLoad(unittest.TestCase):
         self.assertEqual(config.team_calendars, [])
 
     def test_absent_key_gives_empty_list(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({}, f)
             path = Path(f.name)
         try:

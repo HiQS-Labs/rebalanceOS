@@ -468,9 +468,7 @@ def evaluate_setup(
 
     stages = [results[stage.id] for stage in SETUP_STAGES]
     now_ids = [s["id"] for s in stages if s["status"] == STATUS_NOW]
-    required_remaining = [
-        s["id"] for s in stages if not s["optional"] and not s["complete"]
-    ]
+    required_remaining = [s["id"] for s in stages if not s["optional"] and not s["complete"]]
     return {
         "contract_version": CONTRACT_VERSION,
         "stages": stages,

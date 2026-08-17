@@ -57,8 +57,15 @@ def _seed_email(
             " received_at, labels_json, synced_at) "
             "VALUES (?,?,?,?,?,?,?,?,?)",
             (
-                message_id, "t1", from_address, from_name, subject,
-                "please review the deploy checklist", received_at, "[]", IN_WINDOW,
+                message_id,
+                "t1",
+                from_address,
+                from_name,
+                subject,
+                "please review the deploy checklist",
+                received_at,
+                "[]",
+                IN_WINDOW,
             ),
         )
         conn.commit()
@@ -73,9 +80,20 @@ def _seed_figma(db: Path, *, resolved: bool, message: str = "tighten the header"
             " reactions_json, raw_json, synced_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                "c1", "FILEKEY", "cid1", None, message, "u1", "designer",
-                IN_WINDOW, (IN_WINDOW if resolved else None), 1.0, None, None,
-                "{}", IN_WINDOW,
+                "c1",
+                "FILEKEY",
+                "cid1",
+                None,
+                message,
+                "u1",
+                "designer",
+                IN_WINDOW,
+                (IN_WINDOW if resolved else None),
+                1.0,
+                None,
+                None,
+                "{}",
+                IN_WINDOW,
             ),
         )
         conn.commit()
@@ -92,9 +110,7 @@ class Phase1BundleTests(unittest.TestCase):
     def _rank(self):
         # blend_team=False + synthesize=False → the deterministic candidate floor,
         # no teammate calendar read, no LLM/network.
-        return rank_next_actions(
-            self._db, blend_team=False, synthesize=False, now=NOW
-        )
+        return rank_next_actions(self._db, blend_team=False, synthesize=False, now=NOW)
 
     def test_email_row_becomes_email_candidate(self) -> None:
         """Acceptance #2: an email_messages row in the window → source=='email'."""
@@ -116,13 +132,18 @@ class Phase1BundleTests(unittest.TestCase):
         from unknown sender". This pins the guard so that cannot happen silently.
         """
         _seed_email(
-            self._db, subject="", from_address="", from_name="", message_id="shell",
+            self._db,
+            subject="",
+            from_address="",
+            from_name="",
+            message_id="shell",
         )
         _seed_email(self._db, subject="Real mail", message_id="real")
         result = self._rank()
         email = [a for a in result.ranked if a.source == "email"]
         self.assertEqual(
-            [a.title for a in email], ["Real mail"],
+            [a.title for a in email],
+            ["Real mail"],
             msg=f"contentless shell must not be ranked; got {[a.as_dict() for a in email]}",
         )
 
@@ -183,13 +204,15 @@ class Phase3RegistryWalkTests(unittest.TestCase):
             # Ignores the bundle entirely — a truly external source whose data is
             # NOT one of the six built-in bundle fields. Proves the walk is
             # source-agnostic: any registered provider's rows are ranked.
-            return [{
-                "rank_key": (3, IN_WINDOW),
-                "title": "FAKE EXTERNAL SIGNAL",
-                "source": "faketest",
-                "evidence": ["fake://evidence/42"],
-                "why": "registered via candidates= provider, no ranker edit",
-            }]
+            return [
+                {
+                    "rank_key": (3, IN_WINDOW),
+                    "title": "FAKE EXTERNAL SIGNAL",
+                    "source": "faketest",
+                    "evidence": ["fake://evidence/42"],
+                    "why": "registered via candidates= provider, no ranker edit",
+                }
+            ]
 
         register_collector(
             Collector(
@@ -201,9 +224,7 @@ class Phase3RegistryWalkTests(unittest.TestCase):
         )
         self.addCleanup(lambda: COLLECTORS.pop("faketest", None))
 
-        result = rank_next_actions(
-            self._db, blend_team=False, synthesize=False, now=NOW
-        )
+        result = rank_next_actions(self._db, blend_team=False, synthesize=False, now=NOW)
         fake = [a for a in result.ranked if a.source == "faketest"]
         self.assertEqual(len(fake), 1, msg=f"ranked={[a.as_dict() for a in result.ranked]}")
         self.assertEqual(fake[0].title, "FAKE EXTERNAL SIGNAL")
@@ -217,17 +238,20 @@ class Phase3RegistryWalkTests(unittest.TestCase):
             Collector(
                 "faketest2",
                 refresh=lambda db_path, **opts: {"scope": "faketest2"},
-                candidates=lambda bundle: [{
-                    "rank_key": (3, IN_WINDOW), "title": "X", "source": "faketest2",
-                    "evidence": ["e"], "why": "w",
-                }],
+                candidates=lambda bundle: [
+                    {
+                        "rank_key": (3, IN_WINDOW),
+                        "title": "X",
+                        "source": "faketest2",
+                        "evidence": ["e"],
+                        "why": "w",
+                    }
+                ],
                 included_in_all=False,
             )
         )
         COLLECTORS.pop("faketest2", None)  # immediately unregister
-        result = rank_next_actions(
-            self._db, blend_team=False, synthesize=False, now=NOW
-        )
+        result = rank_next_actions(self._db, blend_team=False, synthesize=False, now=NOW)
         self.assertEqual([a for a in result.ranked if a.source == "faketest2"], [])
 
 

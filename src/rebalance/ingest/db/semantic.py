@@ -17,9 +17,7 @@ from typing import Sequence
 # ---------------------------------------------------------------------------
 
 
-def find_semantic_document(
-    conn: sqlite3.Connection, source_type: str, source_pk: str
-) -> sqlite3.Row | None:
+def find_semantic_document(conn: sqlite3.Connection, source_type: str, source_pk: str) -> sqlite3.Row | None:
     """Return the existing ``semantic_documents`` row for a source key, or None."""
     return conn.execute(
         """
@@ -143,9 +141,7 @@ def semantic_documents_for_source(
     ).fetchall()
 
 
-def delete_semantic_documents(
-    conn: sqlite3.Connection, doc_ids: list[int]
-) -> None:
+def delete_semantic_documents(conn: sqlite3.Connection, doc_ids: list[int]) -> None:
     """Delete ``semantic_embeddings`` + ``semantic_documents`` rows for *doc_ids*."""
     try:
         conn.executemany(
@@ -280,9 +276,7 @@ def clear_semantic_embeddings(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM semantic_embeddings")
 
 
-def reset_semantic_embedded_state(
-    conn: sqlite3.Connection, source_types: Sequence[str] | None = None
-) -> None:
+def reset_semantic_embedded_state(conn: sqlite3.Connection, source_types: Sequence[str] | None = None) -> None:
     """Null out the embedding bookkeeping columns on ``semantic_documents``.
 
     Pass *source_types* to restrict the reset; omit it to reset every row.
@@ -310,9 +304,7 @@ def reset_semantic_embedded_state(
     )
 
 
-def semantic_doc_ids_for_sources(
-    conn: sqlite3.Connection, source_types: Sequence[str]
-) -> list[int]:
+def semantic_doc_ids_for_sources(conn: sqlite3.Connection, source_types: Sequence[str]) -> list[int]:
     """Ids of ``semantic_documents`` rows for the given source types."""
     placeholders = ", ".join("?" for _ in source_types)
     return [
@@ -328,9 +320,7 @@ def semantic_doc_ids_for_sources(
     ]
 
 
-def delete_semantic_embeddings_for_docs(
-    conn: sqlite3.Connection, doc_ids: list[int]
-) -> None:
+def delete_semantic_embeddings_for_docs(conn: sqlite3.Connection, doc_ids: list[int]) -> None:
     """Delete ``semantic_embeddings`` rows for the given document ids."""
     conn.executemany(
         "DELETE FROM semantic_embeddings WHERE rowid = ?",
@@ -368,9 +358,7 @@ def semantic_documents_pending_embed(
     ).fetchall()
 
 
-def count_embeddable_semantic_documents(
-    conn: sqlite3.Connection, source_types: Sequence[str], min_chars: int
-) -> int:
+def count_embeddable_semantic_documents(conn: sqlite3.Connection, source_types: Sequence[str], min_chars: int) -> int:
     """Count documents of the given source types whose body is long enough."""
     placeholders = ", ".join("?" for _ in source_types)
     return conn.execute(
@@ -388,9 +376,7 @@ def delete_semantic_embedding(conn: sqlite3.Connection, doc_id: int) -> None:
     conn.execute("DELETE FROM semantic_embeddings WHERE rowid = ?", (doc_id,))
 
 
-def insert_semantic_embedding(
-    conn: sqlite3.Connection, doc_id: int, embedding: bytes
-) -> None:
+def insert_semantic_embedding(conn: sqlite3.Connection, doc_id: int, embedding: bytes) -> None:
     """Insert one ``semantic_embeddings`` vector row."""
     conn.execute(
         "INSERT INTO semantic_embeddings (rowid, embedding) VALUES (?, ?)",
@@ -414,9 +400,7 @@ def mark_semantic_document_embedded(
     )
 
 
-def set_semantic_embedding_meta(
-    conn: sqlite3.Connection, key: str, value: str
-) -> None:
+def set_semantic_embedding_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
     """Insert-or-replace one ``semantic_embedding_meta`` key/value row."""
     conn.execute(
         "INSERT OR REPLACE INTO semantic_embedding_meta (key, value) VALUES (?, ?)",
@@ -524,8 +508,7 @@ def search_semantic_documents(
         params.append(updated_after)
     if repo:
         extra_clauses.append(
-            "AND (sd.source_type != 'github' OR "
-            "LOWER(JSON_EXTRACT(sd.metadata_json, '$.repo_full_name')) = LOWER(?))"
+            "AND (sd.source_type != 'github' OR LOWER(JSON_EXTRACT(sd.metadata_json, '$.repo_full_name')) = LOWER(?))"
         )
         params.append(repo)
 
@@ -600,8 +583,7 @@ def search_semantic_documents_fts(
         params.append(updated_after)
     if repo:
         extra_clauses.append(
-            "AND (sd.source_type != 'github' OR "
-            "LOWER(JSON_EXTRACT(sd.metadata_json, '$.repo_full_name')) = LOWER(?))"
+            "AND (sd.source_type != 'github' OR LOWER(JSON_EXTRACT(sd.metadata_json, '$.repo_full_name')) = LOWER(?))"
         )
         params.append(repo)
     params.append(top_k)

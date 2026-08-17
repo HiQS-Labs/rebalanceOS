@@ -30,6 +30,7 @@ from three_eyes import breakers, config, routes, run
 # 1. Deferred is not failed
 # --------------------------------------------------------------------------- #
 
+
 def test_job_guard_separates_refusal_from_ceiling_trip():
     """The two causes must have DIFFERENT exit codes.
 
@@ -50,9 +51,9 @@ def test_job_guard_separates_refusal_from_ceiling_trip():
     "code, expected",
     [
         (0, "ok"),
-        (3, "deferred"),    # another instance holds the lock
-        (75, "deferred"),   # refused to start; machine starved
-        (4, "fail"),        # ceiling tripped MID-RUN — the job misbehaved
+        (3, "deferred"),  # another instance holds the lock
+        (75, "deferred"),  # refused to start; machine starved
+        (4, "fail"),  # ceiling tripped MID-RUN — the job misbehaved
         (1, "fail"),
         (2, "fail"),
     ],
@@ -68,8 +69,7 @@ def test_guard_refusals_never_open_the_breaker(activate, monkeypatch):
     must now leave the breaker closed and the failure count at zero.
     """
     activate()
-    monkeypatch.setattr(breakers, "run_job_command",
-                        lambda job: breakers.job_guard.EXIT_REFUSED_TO_START)
+    monkeypatch.setattr(breakers, "run_job_command", lambda job: breakers.job_guard.EXIT_REFUSED_TO_START)
     monkeypatch.setattr(routes, "route", lambda finding, rts, **k: [])
 
     for _ in range(5):
@@ -87,8 +87,7 @@ def test_guard_refusals_never_open_the_breaker(activate, monkeypatch):
 def test_instance_conflicts_never_open_the_breaker(activate, monkeypatch):
     """A job that overlaps its own previous run is contention, not breakage."""
     activate()
-    monkeypatch.setattr(breakers, "run_job_command",
-                        lambda job: breakers.job_guard.EXIT_INSTANCE_CONFLICT)
+    monkeypatch.setattr(breakers, "run_job_command", lambda job: breakers.job_guard.EXIT_INSTANCE_CONFLICT)
     monkeypatch.setattr(routes, "route", lambda finding, rts, **k: [])
 
     for _ in range(5):
@@ -104,11 +103,10 @@ def test_mid_run_ceiling_trip_DOES_open_the_breaker(activate, monkeypatch):
     footprint ceiling is never quarantined. Exit 4 is a real failure.
     """
     activate()
-    monkeypatch.setattr(breakers, "run_job_command",
-                        lambda job: breakers.job_guard.EXIT_CEILING_TRIPPED)
+    monkeypatch.setattr(breakers, "run_job_command", lambda job: breakers.job_guard.EXIT_CEILING_TRIPPED)
     monkeypatch.setattr(routes, "route", lambda finding, rts, **k: [])
 
-    for _ in range(3):        # selfcheck trips after 3
+    for _ in range(3):  # selfcheck trips after 3
         run.run_job("selfcheck")
 
     assert breakers.FailureBreaker().is_open("selfcheck") is True
@@ -128,19 +126,19 @@ def test_deferred_run_does_not_reset_an_existing_failure_count(activate, monkeyp
     run.run_job("selfcheck")
     assert breakers.FailureBreaker().status("selfcheck")["consecutive_failures"] == 2
 
-    monkeypatch.setattr(breakers, "run_job_command",
-                        lambda job: breakers.job_guard.EXIT_REFUSED_TO_START)
+    monkeypatch.setattr(breakers, "run_job_command", lambda job: breakers.job_guard.EXIT_REFUSED_TO_START)
     run.run_job("selfcheck")
     assert breakers.FailureBreaker().status("selfcheck")["consecutive_failures"] == 2
 
     monkeypatch.setattr(breakers, "run_job_command", lambda job: 1)
-    run.run_job("selfcheck")                        # third real failure -> opens
+    run.run_job("selfcheck")  # third real failure -> opens
     assert breakers.FailureBreaker().is_open("selfcheck") is True
 
 
 # --------------------------------------------------------------------------- #
 # 2. Half-open recovery
 # --------------------------------------------------------------------------- #
+
 
 def _open_breaker(job_id: str = "selfcheck") -> breakers.FailureBreaker:
     breaker = breakers.FailureBreaker()
@@ -223,7 +221,7 @@ def test_cooldown_doubles_on_each_failed_probe_then_saturates():
         breakers.DEFAULT_COOLDOWN_SECONDS * 8,
     ]
 
-    for _ in range(20):       # far more doublings than the cap allows
+    for _ in range(20):  # far more doublings than the cap allows
         cooldown = _fail_a_probe(breaker)
     assert cooldown == breakers.MAX_COOLDOWN_SECONDS
 
@@ -271,9 +269,7 @@ def test_pausing_an_ALREADY_TRIPPED_job_stops_its_probe():
     status = breaker.status("selfcheck")
     assert status["quarantined_at"] > 0, "precondition: the retry clock is live"
     due = status["quarantined_at"] + status["cooldown_seconds"] + 1
-    assert breaker.claim_probe("selfcheck", now=due) is False, (
-        "a paused job resumed itself despite a due probe"
-    )
+    assert breaker.claim_probe("selfcheck", now=due) is False, "a paused job resumed itself despite a due probe"
 
 
 def test_half_open_probe_actually_runs_the_job(activate, monkeypatch):
@@ -292,11 +288,10 @@ def test_half_open_probe_actually_runs_the_job(activate, monkeypatch):
 
     # Rewind the trip time so the cooldown has "elapsed" without sleeping.
     import json
+
     path = breakers._state_path()
     state = json.loads(path.read_text())
-    state["selfcheck"]["quarantined_at"] = (
-        status["quarantined_at"] - status["cooldown_seconds"] - 1
-    )
+    state["selfcheck"]["quarantined_at"] = status["quarantined_at"] - status["cooldown_seconds"] - 1
     path.write_text(json.dumps(state))
 
     run.run_job("selfcheck")
@@ -308,6 +303,7 @@ def test_half_open_probe_actually_runs_the_job(activate, monkeypatch):
 # 3. Quiet quarantine
 # --------------------------------------------------------------------------- #
 
+
 def test_quarantined_skips_are_throttled_to_one_notice_per_window(activate, monkeypatch):
     """The findings-log spam fix.
 
@@ -316,8 +312,7 @@ def test_quarantined_skips_are_throttled_to_one_notice_per_window(activate, monk
     """
     activate()
     breakers.FailureBreaker().quarantine("selfcheck")
-    monkeypatch.setattr(breakers, "run_job_command",
-                        lambda job: pytest.fail("ran a quarantined job"))
+    monkeypatch.setattr(breakers, "run_job_command", lambda job: pytest.fail("ran a quarantined job"))
     seen = []
     monkeypatch.setattr(routes, "route", lambda finding, rts, **k: seen.append(finding) or [])
 
@@ -334,8 +329,7 @@ def test_the_first_skip_still_records_once(activate, monkeypatch):
     breakers.FailureBreaker().quarantine("selfcheck")
     monkeypatch.setattr(breakers, "run_job_command", lambda job: 0)
     seen = []
-    monkeypatch.setattr(routes, "route",
-                        lambda finding, rts, **k: seen.append(list(rts)) or [])
+    monkeypatch.setattr(routes, "route", lambda finding, rts, **k: seen.append(list(rts)) or [])
     run.run_job("selfcheck")
     assert seen == [["log-only"]], "a quarantined skip must stay log-only, and must appear"
 
@@ -343,6 +337,7 @@ def test_the_first_skip_still_records_once(activate, monkeypatch):
 # --------------------------------------------------------------------------- #
 # 4. The shim's Python probe: transient vs. permanent
 # --------------------------------------------------------------------------- #
+
 
 def _run_shim(tmp_path, probe_exit: int) -> int:
     """Run the shim with a fake `python3.13` whose tomllib probe exits `probe_exit`.
@@ -367,7 +362,9 @@ def _run_shim(tmp_path, probe_exit: int) -> int:
     env = dict(os.environ, PATH=f"{fakebin}:/usr/bin:/bin")
     return subprocess.run(
         ["/bin/bash", str(shim), "selfcheck"],
-        env=env, capture_output=True, text=True,
+        env=env,
+        capture_output=True,
+        text=True,
     ).returncode
 
 
@@ -381,7 +378,7 @@ def test_shim_defers_when_python_cannot_be_EXECUTED(tmp_path):
     """
     assert _run_shim(tmp_path, probe_exit=126) == 75
     assert _run_shim(tmp_path, probe_exit=127) == 75
-    assert _run_shim(tmp_path, probe_exit=137) == 75    # SIGKILL
+    assert _run_shim(tmp_path, probe_exit=137) == 75  # SIGKILL
 
 
 def test_shim_still_reports_a_GENUINELY_too_old_python(tmp_path):
@@ -398,7 +395,8 @@ def test_shim_selects_the_repo_venv_when_it_works():
     """Unmodified shim, real interpreter: selfcheck runs and exits clean."""
     proc = subprocess.run(
         ["/bin/bash", str(config.ROOT / "shims" / "run-job.sh"), "selfcheck"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
 
@@ -406,6 +404,7 @@ def test_shim_selects_the_repo_venv_when_it_works():
 # --------------------------------------------------------------------------- #
 # 5. Defects found by the agy QA relay (2026-07-28) — regression locks
 # --------------------------------------------------------------------------- #
+
 
 def test_a_successful_run_does_not_lift_an_OPERATOR_pause():
     """QA finding 1b: a pause must outrank a success.
@@ -423,7 +422,7 @@ def test_a_successful_run_does_not_lift_an_OPERATOR_pause():
     assert breaker.is_open("selfcheck") is True, "a successful run lifted an operator pause"
     assert breaker.status("selfcheck")["paused"] is True
 
-    breaker.reset("selfcheck")                    # the ONLY sanctioned way out
+    breaker.reset("selfcheck")  # the ONLY sanctioned way out
     assert breaker.is_open("selfcheck") is False
 
 
@@ -456,11 +455,10 @@ def test_a_pre_P6_quarantine_is_rescued_not_stranded():
     the jobs P6 was written to rescue — skill-sync sat dead for a day in this state.
     """
     import json
+
     path = breakers._state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
-        "selfcheck": {"consecutive_failures": 3, "last": "fail", "quarantined": True}
-    }))
+    path.write_text(json.dumps({"selfcheck": {"consecutive_failures": 3, "last": "fail", "quarantined": True}}))
 
     breaker = breakers.FailureBreaker()
     assert breaker.is_open("selfcheck") is True
@@ -475,11 +473,10 @@ def test_a_pre_P6_quarantine_is_rescued_not_stranded():
 def test_a_pre_P6_state_that_is_PAUSED_is_still_not_rescued():
     """The rescue must not resurrect an operator pause that predates P6 either."""
     import json
+
     path = breakers._state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
-        "selfcheck": {"consecutive_failures": 0, "quarantined": True, "paused": True}
-    }))
+    path.write_text(json.dumps({"selfcheck": {"consecutive_failures": 0, "quarantined": True, "paused": True}}))
     assert breakers.FailureBreaker().claim_probe("selfcheck") is False
 
 

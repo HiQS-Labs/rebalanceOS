@@ -133,8 +133,7 @@ class SleuthRemindersTests(unittest.TestCase):
 
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
-                "SELECT state, is_active, github_urls_json "
-                "FROM sleuth_reminders WHERE reminder_id = 'R-001'"
+                "SELECT state, is_active, github_urls_json FROM sleuth_reminders WHERE reminder_id = 'R-001'"
             ).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row[0], "scheduled")
@@ -158,9 +157,7 @@ class SleuthRemindersTests(unittest.TestCase):
                 "SELECT first_seen_at FROM sleuth_reminders WHERE reminder_id = 'R-001'"
             ).fetchone()[0]
 
-        mutated = _success_payload(
-            reminders=[_fixture_reminder(state="overdue", isActive=True)]
-        )
+        mutated = _success_payload(reminders=[_fixture_reminder(state="overdue", isActive=True)])
         result = self._run_sync(mutated)
         self.assertEqual(result.inserted_count, 0)
         self.assertEqual(result.updated_count, 1)
@@ -190,9 +187,7 @@ class SleuthRemindersTests(unittest.TestCase):
         self.assertEqual(result.updated_count, 0)
 
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'"
-            ).fetchone()
+            row = conn.execute("SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'").fetchone()
         self.assertEqual(row[0], 0)
         self.assertEqual(row[1], "stale")
 
@@ -205,9 +200,7 @@ class SleuthRemindersTests(unittest.TestCase):
         self.assertEqual(result.retired_count, 0)
 
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'"
-            ).fetchone()
+            row = conn.execute("SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'").fetchone()
         self.assertEqual(row[0], 1)
         self.assertEqual(row[1], "scheduled")
 
@@ -230,16 +223,10 @@ class SleuthRemindersTests(unittest.TestCase):
                 ]
             )
         )
-        result = self._run_sync(
-            _success_payload(
-                reminders=[_fixture_reminder(reminderId="R-001", state="overdue")]
-            )
-        )
+        result = self._run_sync(_success_payload(reminders=[_fixture_reminder(reminderId="R-001", state="overdue")]))
         self.assertEqual(result.retired_count, 1)
         with sqlite3.connect(self.db_path) as conn:
-            kept = conn.execute(
-                "SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'"
-            ).fetchone()
+            kept = conn.execute("SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'").fetchone()
             retired = conn.execute(
                 "SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-002'"
             ).fetchone()
@@ -338,9 +325,7 @@ class SleuthFileSourceTests(unittest.TestCase):
         self.assertEqual(result.inserted_count, 1)
         self.assertEqual(result.workspace_name, "neochrome-dev")
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT is_active FROM sleuth_reminders WHERE reminder_id = 'R-001'"
-            ).fetchone()
+            row = conn.execute("SELECT is_active FROM sleuth_reminders WHERE reminder_id = 'R-001'").fetchone()
         self.assertEqual(row[0], 1)
 
     # --- contract validation: a bad payload must NOT reconcile/retire -----------

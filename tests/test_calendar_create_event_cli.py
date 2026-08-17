@@ -77,7 +77,10 @@ class CalendarCreateEventCliTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["calendar_id"], "primary")
-        self.assertEqual(payload["summary"], "Verify AcmeCorp BQ candidate + staging dataset auto-deletion (2026-04-13 clone+swap cleanup)")
+        self.assertEqual(
+            payload["summary"],
+            "Verify AcmeCorp BQ candidate + staging dataset auto-deletion (2026-04-13 clone+swap cleanup)",
+        )
         self.assertEqual(payload["start_time"], "2026-04-21T00:00:00-07:00")
         self.assertEqual(payload["end_time"], "2026-04-22T00:00:00-07:00")
         self.assertEqual(payload["timezone_name"], "America/Los_Angeles")
@@ -116,7 +119,10 @@ class CalendarCreateEventCliTests(unittest.TestCase):
             with (
                 patch("rebalance.cli.calendar.GOOGLE_CALENDAR_ENV_PATH", env_path),
                 patch("rebalance.cli.calendar.CALENDAR_EVENT_LOG_PATH", log_path),
-                patch("rebalance.cli.calendar._find_existing_calendar_event", return_value={"event_id": "evt-1", "html_link": "https://example.com/e/1"}),
+                patch(
+                    "rebalance.cli.calendar._find_existing_calendar_event",
+                    return_value={"event_id": "evt-1", "html_link": "https://example.com/e/1"},
+                ),
                 patch("rebalance.ingest.calendar.create_calendar_event") as mock_create,
             ):
                 result = self.runner.invoke(
@@ -144,7 +150,10 @@ class CalendarCreateEventCliTests(unittest.TestCase):
             with (
                 patch("rebalance.cli.calendar.GOOGLE_CALENDAR_ENV_PATH", env_path),
                 patch("rebalance.cli.calendar.CALENDAR_EVENT_LOG_PATH", log_path),
-                patch("rebalance.cli.calendar._find_existing_calendar_event", return_value={"event_id": "evt-2", "html_link": "https://example.com/e/2"}),
+                patch(
+                    "rebalance.cli.calendar._find_existing_calendar_event",
+                    return_value={"event_id": "evt-2", "html_link": "https://example.com/e/2"},
+                ),
                 patch("rebalance.ingest.calendar.create_calendar_event") as mock_create,
             ):
                 result = self.runner.invoke(
@@ -181,7 +190,8 @@ class CalendarCreateEventCliTests(unittest.TestCase):
                         "event_id": "evt-3",
                         "html_link": "https://example.com/e/3",
                     }
-                ) + "\n",
+                )
+                + "\n",
                 encoding="utf-8",
             )
 

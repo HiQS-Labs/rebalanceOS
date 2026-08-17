@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rebalance-os"
-version = "0.69.8"
+version = "0.69.9"
 description = "Local-first workday operating system with MCP tools and Obsidian ingest"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -38,6 +38,7 @@ gcp = [
   "google-cloud-secret-manager>=2.0.0",
 ]
 dev = [
+  "mypy>=1.11",
   "pytest>=8.0.0",
   "ruff>=0.6",
 ]
@@ -93,3 +94,18 @@ ignore = [
 "HiQS/tests/**" = ["B017"]
 # Legacy re-export shim: domain names stay importable from the old paths.
 "src/rebalance/cli/__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+no_implicit_optional = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+exclude = [
+  "macOS",
+  "vscode-extensions",
+  "temp",
+  "ask_self",
+  "experimental",
+  ".swe-diagram",
+]

@@ -183,13 +183,15 @@ def _parse_log(raw: str) -> list[dict]:
         if len(parts) < 5:
             continue
         sha, author_name, author_email, authored_at, message = parts[:5]
-        commits.append({
-            "sha": sha.strip(),
-            "author_name": author_name.strip(),
-            "author_email": author_email.strip(),
-            "committed_at": authored_at.strip(),
-            "message": message.strip(),
-        })
+        commits.append(
+            {
+                "sha": sha.strip(),
+                "author_name": author_name.strip(),
+                "author_email": author_email.strip(),
+                "committed_at": authored_at.strip(),
+                "message": message.strip(),
+            }
+        )
     return commits
 
 
@@ -200,9 +202,7 @@ def _changed_paths(repo_path: Path, sha: str) -> list[str]:
     actually brought in; without it git prints nothing for a merge, which is
     how merge commits ended up invisible in the first place.
     """
-    code, out, _ = _git(
-        repo_path, "show", "--pretty=format:", "--name-only", "-m", "--first-parent", sha
-    )
+    code, out, _ = _git(repo_path, "show", "--pretty=format:", "--name-only", "-m", "--first-parent", sha)
     if code != 0:
         return []
     seen: list[str] = []
@@ -229,8 +229,7 @@ def _record_coverage(conn, repo: str, result: BackfillResult, now: str) -> None:
             local_path=excluded.local_path, default_branch=excluded.default_branch,
             checked_at=excluded.checked_at
         """,
-        (repo, result.state, result.reason or None, result.local_path or None,
-         result.default_branch or None, now),
+        (repo, result.state, result.reason or None, result.local_path or None, result.default_branch or None, now),
     )
 
 
@@ -311,20 +310,17 @@ def backfill_commits(
     if len(commits) > cap:
         commits = commits[:cap]
         result.capped = True
-        result.warnings.append(
-            f"walk capped at {cap} commits; older history not enumerated this run"
-        )
+        result.warnings.append(f"walk capped at {cap} commits; older history not enumerated this run")
     result.commits_seen = len(commits)
 
     with db_connection(database_path, ensure_github_schema) as conn:
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         pr_shas = {
-            row[0] for row in conn.execute(
-                "SELECT sha FROM github_commits WHERE repo_full_name = ?", (repo_full_name,)
-            )
+            row[0] for row in conn.execute("SELECT sha FROM github_commits WHERE repo_full_name = ?", (repo_full_name,))
         }
         existing = {
-            row[0]: row[1] for row in conn.execute(
+            row[0]: row[1]
+            for row in conn.execute(
                 "SELECT sha, path_coverage FROM github_direct_commits WHERE repo_full_name = ?",
                 (repo_full_name,),
             )
@@ -351,19 +347,26 @@ def backfill_commits(
             gh.upsert_direct_commit(
                 conn,
                 (
-                    repo_full_name, sha, f"git-backfill:{result.default_branch}",
+                    repo_full_name,
+                    sha,
+                    f"git-backfill:{result.default_branch}",
                     f"refs/heads/{result.default_branch}",
                     "",  # author_login: git has no GitHub login; left to the API path
-                    commit["author_name"], commit["message"], commit["committed_at"],
+                    commit["author_name"],
+                    commit["message"],
+                    commit["committed_at"],
                     f"https://github.com/{repo_full_name}/commit/{sha}",
-                    "complete", now, now,
+                    "complete",
+                    now,
+                    now,
                 ),
                 source="git_backfill",
             )
             gh.replace_direct_commit_files(
-                conn, repo_full_name, sha,
-                [{"filename": p, "status": "", "additions": None,
-                  "deletions": None, "changes": None} for p in paths],
+                conn,
+                repo_full_name,
+                sha,
+                [{"filename": p, "status": "", "additions": None, "deletions": None, "changes": None} for p in paths],
             )
             result.files_written += len(paths)
             if is_new:
@@ -396,8 +399,13 @@ def backfill_repos(
     """Backfill several repos, never letting one repo's failure hide the rest."""
     return [
         backfill_commits(
-            database_path, repo, since=since, cap=cap, fetch=fetch,
-            roots=roots, branch=branch,
+            database_path,
+            repo,
+            since=since,
+            cap=cap,
+            fetch=fetch,
+            roots=roots,
+            branch=branch,
         )
         for repo in repos
     ]

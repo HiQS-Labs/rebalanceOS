@@ -9,17 +9,13 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT_DIR = (
-    Path(__file__).resolve().parents[1] / "experimental" / "git-pulse"
-)
+SCRIPT_DIR = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse"
 
 
 def _load():
     if str(SCRIPT_DIR) not in sys.path:
         sys.path.insert(0, str(SCRIPT_DIR))
-    spec = importlib.util.spec_from_file_location(
-        "scope", SCRIPT_DIR / "scope.py"
-    )
+    spec = importlib.util.spec_from_file_location("scope", SCRIPT_DIR / "scope.py")
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["scope"] = module

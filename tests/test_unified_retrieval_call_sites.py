@@ -97,17 +97,15 @@ class QueryCliRendersUnifiedResults(unittest.TestCase):
 
     def test_github_query_cmd_renders_github_result(self) -> None:
         with patch("rebalance.ingest.semantic_index.query", return_value=[_github_row()]):
-            result = self.runner.invoke(
-                app, ["github-query", "audit", "--database", str(self.db)]
-            )
+            result = self.runner.invoke(app, ["github-query", "audit", "--database", str(self.db)])
         self.assertIsNone(result.exception, f"github-query raised: {result.exception!r}")
         self.assertEqual(result.exit_code, 0)
         self.assertIn("AcmeOrg/rebalance-OS", result.stdout)
         self.assertIn("#266", result.stdout)
-        self.assertIn("architecture", result.stdout)          # labels
-        self.assertIn("open", result.stdout)                  # state
-        self.assertIn("0.69.0", result.stdout)                # milestone_title
-        self.assertIn("issues/266", result.stdout)            # html_url
+        self.assertIn("architecture", result.stdout)  # labels
+        self.assertIn("open", result.stdout)  # state
+        self.assertIn("0.69.0", result.stdout)  # milestone_title
+        self.assertIn("issues/266", result.stdout)  # html_url
         # The artifact kind must survive: source_type is now "github" for every
         # row, so the issue/pr distinction has to come from metadata.item_type.
         self.assertIn("issue", result.stdout)

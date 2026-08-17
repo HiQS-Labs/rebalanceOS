@@ -34,6 +34,7 @@ def _json_default(obj: Any) -> Any:
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
+
 DEFAULT_EXCLUDES = [".obsidian/*", ".trash/*", "node_modules/*", ".git/*", ".venv/*", "*/.venv/*"]
 
 # Top-100 English stopwords for TF-IDF filtering
@@ -59,16 +60,16 @@ _WORD_RE = re.compile(r"[a-zA-Z]{2,}")
 # ---------------------------------------------------------------------------
 
 _SECRET_PATTERNS = re.compile(
-    r'sk-ant-[A-Za-z0-9\-_]{20,}'   # Anthropic sk-ant-
-    r'|sk-[A-Za-z0-9]{20,}'          # OpenAI / generic sk-
-    r'|ghp_[A-Za-z0-9]{35,}'         # GitHub PAT (36 chars typical)
-    r'|gho_[A-Za-z0-9]{35,}'         # GitHub OAuth token
-    r'|github_pat_[A-Za-z0-9_]{20,}' # GitHub fine-grained PAT
-    r'|AIza[A-Za-z0-9\-_]{35,}'      # Google API key (39 chars total)
-    r'|AKIA[A-Za-z0-9]{16}'          # AWS access key ID (exactly 20 chars)
-    r'|xoxb-[0-9]+-[A-Za-z0-9\-]+'  # Slack bot token
-    r'|xoxp-[0-9]+-[A-Za-z0-9\-]+'  # Slack user token
-    r'|ya29\.[A-Za-z0-9\-_]{20,}'   # Google OAuth access token
+    r"sk-ant-[A-Za-z0-9\-_]{20,}"  # Anthropic sk-ant-
+    r"|sk-[A-Za-z0-9]{20,}"  # OpenAI / generic sk-
+    r"|ghp_[A-Za-z0-9]{35,}"  # GitHub PAT (36 chars typical)
+    r"|gho_[A-Za-z0-9]{35,}"  # GitHub OAuth token
+    r"|github_pat_[A-Za-z0-9_]{20,}"  # GitHub fine-grained PAT
+    r"|AIza[A-Za-z0-9\-_]{35,}"  # Google API key (39 chars total)
+    r"|AKIA[A-Za-z0-9]{16}"  # AWS access key ID (exactly 20 chars)
+    r"|xoxb-[0-9]+-[A-Za-z0-9\-]+"  # Slack bot token
+    r"|xoxp-[0-9]+-[A-Za-z0-9\-]+"  # Slack user token
+    r"|ya29\.[A-Za-z0-9\-_]{20,}"  # Google OAuth access token
 )
 
 
@@ -141,13 +142,8 @@ def ingest_vault(
         # signals "you touched this," and the dashboard should reflect that.
         existing: dict[str, tuple[str, str | None]] = {}
         try:
-            rows = conn.execute(
-                "SELECT rel_path, content_hash, last_modified FROM vault_files"
-            ).fetchall()
-            existing = {
-                row["rel_path"]: (row["content_hash"], row["last_modified"])
-                for row in rows
-            }
+            rows = conn.execute("SELECT rel_path, content_hash, last_modified FROM vault_files").fetchall()
+            existing = {row["rel_path"]: (row["content_hash"], row["last_modified"]) for row in rows}
         except Exception:
             pass
 
@@ -174,9 +170,7 @@ def ingest_vault(
                 # Content unchanged — but if on-disk mtime moved forward,
                 # refresh the stored last_modified so "vault edits" surfaces
                 # the touch. Cheap UPDATE; no chunk/embedding work.
-                disk_mtime_iso = datetime.fromtimestamp(
-                    file_path.stat().st_mtime, tz=timezone.utc
-                ).isoformat()
+                disk_mtime_iso = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat()
                 if not dry_run and disk_mtime_iso != (existing_mtime or ""):
                     conn.execute(
                         "UPDATE vault_files SET last_modified = ? WHERE rel_path = ?",
@@ -231,8 +225,15 @@ def ingest_vault(
                     """INSERT INTO chunks
                        (file_id, chunk_index, heading, heading_level, body, char_count, content_hash)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (file_id, chunk.chunk_index, chunk.heading, chunk.heading_level,
-                     safe_body, chunk.char_count, chunk_hash),
+                    (
+                        file_id,
+                        chunk.chunk_index,
+                        chunk.heading,
+                        chunk.heading_level,
+                        safe_body,
+                        chunk.char_count,
+                        chunk_hash,
+                    ),
                 )
                 total_chunks += 1
 
@@ -270,14 +271,14 @@ def ingest_vault(
             total_keywords = _compute_tfidf_keywords(conn)
 
         if not dry_run:
-            semantic_rows = conn.execute(
-                "SELECT COUNT(*) FROM semantic_documents WHERE source_type = 'vault'"
-            ).fetchone()[0] if conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='semantic_documents'"
-            ).fetchone() else 0
-            if new_count > 0 or updated_count > 0 or deleted_count > 0 or (
-                semantic_rows == 0 and existing
-            ):
+            semantic_rows = (
+                conn.execute("SELECT COUNT(*) FROM semantic_documents WHERE source_type = 'vault'").fetchone()[0]
+                if conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='semantic_documents'"
+                ).fetchone()
+                else 0
+            )
+            if new_count > 0 or updated_count > 0 or deleted_count > 0 or (semantic_rows == 0 and existing):
                 ensure_semantic_schema(conn)
                 sync_vault_documents(conn)
                 conn.commit()
@@ -305,11 +306,7 @@ def ingest_vault(
 
 def _tokenize(text: str) -> list[str]:
     """Lowercase word tokens, filtered by stopwords and minimum length."""
-    return [
-        w.lower()
-        for w in _WORD_RE.findall(text)
-        if w.lower() not in _STOPWORDS and len(w) >= 3
-    ]
+    return [w.lower() for w in _WORD_RE.findall(text) if w.lower() not in _STOPWORDS and len(w) >= 3]
 
 
 def _compute_tfidf_keywords(conn: Any, top_k: int = 10) -> int:

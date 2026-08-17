@@ -9,9 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-SCRIPT_DIR = (
-    Path(__file__).resolve().parents[1] / "experimental" / "git-pulse"
-)
+SCRIPT_DIR = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse"
 SCRIPT_PATH = SCRIPT_DIR / "team-collect.py"
 
 
@@ -45,10 +43,7 @@ class SanitizeTsvTests(unittest.TestCase):
 
 class ParseLinkNextTests(unittest.TestCase):
     def test_returns_next_url(self) -> None:
-        header = (
-            '<https://api.github.com/x?page=2>; rel="next", '
-            '<https://api.github.com/x?page=5>; rel="last"'
-        )
+        header = '<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last"'
         self.assertEqual(
             team_collect.parse_link_next(header),
             "https://api.github.com/x?page=2",
@@ -108,10 +103,7 @@ class ResolveTokenTests(unittest.TestCase):
     def test_errors_when_no_source_provided(self) -> None:
         import os
 
-        original = {
-            key: os.environ.pop(key, None)
-            for key in ("GITHUB_TOKEN", "GH_TOKEN")
-        }
+        original = {key: os.environ.pop(key, None) for key in ("GITHUB_TOKEN", "GH_TOKEN")}
         try:
             with self.assertRaises(SystemExit):
                 team_collect.resolve_token(None)

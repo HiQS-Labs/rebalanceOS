@@ -42,6 +42,7 @@ import health_issue_reporter as hr  # noqa: E402  (after path setup)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now_str() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -51,18 +52,22 @@ def _days_ago_str(days: int) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _make_check(name: str, status: str = "error", detail: str = "test detail",
-                hint: str = "fix it", source: str = "rebalance-doctor") -> dict:
-    return {"name": name, "status": status, "detail": detail,
-            "hint": hint, "source": source}
+def _make_check(
+    name: str,
+    status: str = "error",
+    detail: str = "test detail",
+    hint: str = "fix it",
+    source: str = "rebalance-doctor",
+) -> dict:
+    return {"name": name, "status": status, "detail": detail, "hint": hint, "source": source}
 
 
 # ===========================================================================
 # 1. Occurrence counter — pure unit tests, no I/O
 # ===========================================================================
 
-class TestOccurrenceCounter(unittest.TestCase):
 
+class TestOccurrenceCounter(unittest.TestCase):
     def test_parse_zero_on_empty_body(self) -> None:
         self.assertEqual(hr.parse_occurrence_count(""), 0)
 
@@ -97,8 +102,7 @@ class TestOccurrenceCounter(unittest.TestCase):
 
     def test_issue_body_starts_with_seen_1(self) -> None:
         body = hr._issue_body("my-check", "error", "detail text", "fix hint", "rebalance-doctor")
-        self.assertTrue(body.startswith("> **Seen:** 1×"),
-                        f"Body should start with seen marker, got: {body[:80]!r}")
+        self.assertTrue(body.startswith("> **Seen:** 1×"), f"Body should start with seen marker, got: {body[:80]!r}")
 
     def test_issue_body_contains_required_sections(self) -> None:
         body = hr._issue_body("db-check", "warning", "DB is stale", "run refresh", "rebalance-doctor")
@@ -114,8 +118,8 @@ class TestOccurrenceCounter(unittest.TestCase):
 #     not just the Seen counter.
 # ===========================================================================
 
-class TestDetailRefresh(unittest.TestCase):
 
+class TestDetailRefresh(unittest.TestCase):
     def test_set_detail_replaces_detail_block(self) -> None:
         body = hr._issue_body("db", "error", "original detail", "", "rebalance-doctor")
         updated = hr.set_detail(body, "new root-cause detail")
@@ -157,8 +161,8 @@ class TestDetailRefresh(unittest.TestCase):
 #     match its existing open issue instead of orphaning it.
 # ===========================================================================
 
-class TestStableCheckIdDedup(unittest.TestCase):
 
+class TestStableCheckIdDedup(unittest.TestCase):
     def test_issue_body_embeds_check_id_marker(self) -> None:
         body = hr._issue_body("sleuth", "error", "detail", "", "rebalance-doctor")
         self.assertEqual(hr.parse_check_id(body), "sleuth")
@@ -178,9 +182,7 @@ class TestStableCheckIdDedup(unittest.TestCase):
         have no marker; matching must still work off the title so this fix
         does not misbehave against them or file new duplicates."""
         issue = {"title": "health: pulse collector:noels-mbp-16-m1-pro", "body": ""}
-        self.assertEqual(
-            hr.dedup_key_for_issue(issue), "pulse collector:noels-mbp-16-m1-pro"
-        )
+        self.assertEqual(hr.dedup_key_for_issue(issue), "pulse collector:noels-mbp-16-m1-pro")
 
     def test_dedup_key_legacy_issue_with_no_body_at_all(self) -> None:
         issue = {"title": "health: vault", "body": None}
@@ -219,8 +221,11 @@ class TestStableCheckIdDedup(unittest.TestCase):
         found as 'already open' via the stable check id, not re-filed."""
         body = hr._issue_body("figma", "error", "token missing", "", "rebalance-doctor")
         open_issues = {
-            hr.dedup_key_for_issue({"title": "health: figma token (renamed)", "body": body}):
-                {"title": "health: figma token (renamed)", "number": 77, "body": body}
+            hr.dedup_key_for_issue({"title": "health: figma token (renamed)", "body": body}): {
+                "title": "health: figma token (renamed)",
+                "number": 77,
+                "body": body,
+            }
         }
 
         check = _make_check("figma")
@@ -239,8 +244,8 @@ class TestStableCheckIdDedup(unittest.TestCase):
 # 2. Quota management
 # ===========================================================================
 
-class TestQuotaManagement(unittest.TestCase):
 
+class TestQuotaManagement(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._quota_path = Path(self._tmp.name) / "quota.json"
@@ -288,6 +293,7 @@ class TestQuotaManagement(unittest.TestCase):
 # ===========================================================================
 # 3. Circuit breakers
 # ===========================================================================
+
 
 class TestCircuitBreakers(unittest.TestCase):
     """Verify each CB prevents or degrades LLM calls as intended."""
@@ -342,6 +348,7 @@ class TestCircuitBreakers(unittest.TestCase):
 
         def _bad_json(*_, **__):
             import json
+
             raise json.JSONDecodeError("nope", "", 0)
 
         with patch.object(hr, "_triage_gemini", side_effect=_bad_json):
@@ -353,8 +360,8 @@ class TestCircuitBreakers(unittest.TestCase):
 # 4. RunLog — JSONL accumulation and flush
 # ===========================================================================
 
-class TestRunLog(unittest.TestCase):
 
+class TestRunLog(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._log_path = Path(self._tmp.name) / "test.log.jsonl"
@@ -408,8 +415,8 @@ class TestRunLog(unittest.TestCase):
 # 5. Dashboard health counter (fetch_health_filed_count)
 # ===========================================================================
 
-class TestHealthFiledCount(unittest.TestCase):
 
+class TestHealthFiledCount(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._log_path = Path(self._tmp.name) / "health.log.jsonl"
@@ -418,6 +425,7 @@ class TestHealthFiledCount(unittest.TestCase):
         # Also patch the pulse_web module path if already imported.
         try:
             import pulse_web as pw  # noqa: F401
+
             self._pw = pw
             self._orig_pw_log = pw.HEALTH_LOG_PATH
             pw.HEALTH_LOG_PATH = self._log_path
@@ -430,8 +438,7 @@ class TestHealthFiledCount(unittest.TestCase):
             self._pw.HEALTH_LOG_PATH = self._orig_pw_log
         self._tmp.cleanup()
 
-    def _write_log_record(self, run_id: str, actions: list[dict],
-                          dry_run: bool = False) -> None:
+    def _write_log_record(self, run_id: str, actions: list[dict], dry_run: bool = False) -> None:
         record = {"run_id": run_id, "dry_run": dry_run, "actions": actions, "checks": []}
         with self._log_path.open("a") as f:
             f.write(json.dumps(record) + "\n")
@@ -439,6 +446,7 @@ class TestHealthFiledCount(unittest.TestCase):
     def _import_fetch(self):
         # Reimport pulse_web to pick up patched HEALTH_LOG_PATH.
         import pulse_web as pw
+
         importlib.reload(pw)
         pw.HEALTH_LOG_PATH = self._log_path
         return pw.fetch_health_filed_count
@@ -454,8 +462,7 @@ class TestHealthFiledCount(unittest.TestCase):
             self.skipTest("pulse_web not importable in this environment")
         self._write_log_record(
             _now_str(),
-            [{"action": "filed", "check": "sleuth"},
-             {"action": "filed", "check": "calendar"}],
+            [{"action": "filed", "check": "sleuth"}, {"action": "filed", "check": "calendar"}],
         )
         fn = self._import_fetch()
         self.assertEqual(fn(days=30), 2)
@@ -498,6 +505,7 @@ class TestHealthFiledCount(unittest.TestCase):
 # ===========================================================================
 # 6. GitHub API interaction (mocked _request)
 # ===========================================================================
+
 
 class TestGitHubInteraction(unittest.TestCase):
     """Mock _request to test filing, dedup, body update, and close logic."""
@@ -581,9 +589,7 @@ class TestGitHubInteraction(unittest.TestCase):
             patched_calls.append((method, path, payload))
             return {}
 
-        open_issues = {
-            "health: sleuth": self._open_issue("health: sleuth", 12, existing_body)
-        }
+        open_issues = {"health: sleuth": self._open_issue("health: sleuth", 12, existing_body)}
 
         with patch.object(hr, "_request", side_effect=_fake_request):
             issue = open_issues["health: sleuth"]
@@ -616,6 +622,7 @@ class TestGitHubInteraction(unittest.TestCase):
 # 7. Doctor DB fixtures — intentional errors in a temp SQLite database
 # ===========================================================================
 
+
 class TestDoctorFixtures(unittest.TestCase):
     """Drive run_doctor() against temp DBs with known bad states."""
 
@@ -625,6 +632,7 @@ class TestDoctorFixtures(unittest.TestCase):
     def _fresh_db(self, tmp: str):
         """Return a path to a freshly migrated empty DB."""
         from rebalance.ingest.db import db_connection, run_migrations  # noqa: PLC0415
+
         db = Path(tmp) / "rebalance.db"
         with db_connection(db) as conn:
             run_migrations(conn)
@@ -657,6 +665,7 @@ class TestDoctorFixtures(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = self._fresh_db(tmp)
             from rebalance.doctor import WARN, run_doctor  # noqa: PLC0415
+
             checks = self._by_name(run_doctor(db))
             self.assertEqual(checks["projects"].status, WARN)
 
@@ -666,6 +675,7 @@ class TestDoctorFixtures(unittest.TestCase):
             db = self._fresh_db(tmp)
             from rebalance.ingest.db import db_connection  # noqa: PLC0415
             from rebalance.doctor import WARN, run_doctor  # noqa: PLC0415
+
             with db_connection(db) as conn:
                 conn.execute(
                     "INSERT INTO github_activity "
@@ -682,6 +692,7 @@ class TestDoctorFixtures(unittest.TestCase):
             db = self._fresh_db(tmp)
             from rebalance.ingest.db import db_connection  # noqa: PLC0415
             from rebalance.doctor import OK, run_doctor  # noqa: PLC0415
+
             with db_connection(db) as conn:
                 conn.execute(
                     "INSERT INTO github_activity "
@@ -697,10 +708,9 @@ class TestDoctorFixtures(unittest.TestCase):
             db = self._fresh_db(tmp)
             from rebalance.ingest.db import db_connection  # noqa: PLC0415
             from rebalance.doctor import OK, run_doctor  # noqa: PLC0415
+
             with db_connection(db) as conn:
-                conn.execute(
-                    "INSERT INTO project_registry (name, status) VALUES ('proj', 'active')"
-                )
+                conn.execute("INSERT INTO project_registry (name, status) VALUES ('proj', 'active')")
                 conn.execute(
                     "INSERT INTO github_activity "
                     "(login, repo_full_name, scan_date, scanned_at) "
@@ -722,6 +732,7 @@ class TestDoctorFixtures(unittest.TestCase):
             db = Path(tmp) / "rebalance.db"
             from rebalance.ingest.db import db_connection, ensure_baseline_schema  # noqa: PLC0415
             from rebalance.doctor import _COLLECTOR_FRESHNESS, WARN, run_doctor  # noqa: PLC0415
+
             with db_connection(db, ensure_baseline_schema):
                 pass  # baseline tables only, no migrations
             entry = next(e for e in _COLLECTOR_FRESHNESS if e["name"] == "github data")
@@ -738,27 +749,24 @@ class TestDoctorFixtures(unittest.TestCase):
 # 8. LLM triage routing
 # ===========================================================================
 
-class TestLLMTriage(unittest.TestCase):
 
+class TestLLMTriage(unittest.TestCase):
     def _check(self) -> dict:
         return _make_check("test-check", "warning")
 
     def test_file_decision_passes_through(self) -> None:
-        with patch.object(hr, "_triage_gemini",
-                          return_value={"decision": "file", "reason": "real issue"}):
+        with patch.object(hr, "_triage_gemini", return_value={"decision": "file", "reason": "real issue"}):
             decision, reason = hr.llm_triage(self._check(), provider="gemini")
         self.assertEqual(decision, "file")
         self.assertEqual(reason, "real issue")
 
     def test_skip_decision_passes_through(self) -> None:
-        with patch.object(hr, "_triage_gemini",
-                          return_value={"decision": "skip", "reason": "noise"}):
+        with patch.object(hr, "_triage_gemini", return_value={"decision": "skip", "reason": "noise"}):
             decision, reason = hr.llm_triage(self._check(), provider="gemini")
         self.assertEqual(decision, "skip")
 
     def test_downgrade_decision_passes_through(self) -> None:
-        with patch.object(hr, "_triage_gemini",
-                          return_value={"decision": "downgrade", "reason": "low priority"}):
+        with patch.object(hr, "_triage_gemini", return_value={"decision": "downgrade", "reason": "low priority"}):
             decision, reason = hr.llm_triage(self._check(), provider="gemini")
         self.assertEqual(decision, "downgrade")
 
@@ -772,9 +780,7 @@ class TestLLMTriage(unittest.TestCase):
         env_backup = os.environ.pop("HEALTH_LLM_BASE_URL", None)
         env_backup2 = os.environ.pop("HEALTH_LLM_MODEL", None)
         try:
-            decision, reason = hr.llm_triage(
-                self._check(), provider="openai-compat", base_url="", model=""
-            )
+            decision, reason = hr.llm_triage(self._check(), provider="openai-compat", base_url="", model="")
         finally:
             if env_backup:
                 os.environ["HEALTH_LLM_BASE_URL"] = env_backup
@@ -790,6 +796,7 @@ class TestLLMTriage(unittest.TestCase):
         key and model are working end-to-end.
         """
         from rebalance.ingest.config import get_gemini_api_key
+
         if not get_gemini_api_key():
             self.skipTest("GEMINI_API_KEY not set — skipping live API test")
 
@@ -799,10 +806,8 @@ class TestLLMTriage(unittest.TestCase):
             detail="github_activity last scan 5 days ago (stale)",
             hint="run `rebalance refresh` (scope github)",
         )
-        decision, reason = hr.llm_triage(check, provider="gemini",
-                                          model="gemini-3.5-flash")
-        self.assertIn(decision, ("file", "skip", "downgrade"),
-                      f"Unexpected decision: {decision!r} — reason: {reason}")
+        decision, reason = hr.llm_triage(check, provider="gemini", model="gemini-3.5-flash")
+        self.assertIn(decision, ("file", "skip", "downgrade"), f"Unexpected decision: {decision!r} — reason: {reason}")
         self.assertIsInstance(reason, str)
         self.assertGreater(len(reason), 5)
 
@@ -824,6 +829,7 @@ class TestLLMTriage(unittest.TestCase):
 #       tests/test_health_issue_reporter.py::TestTriageScenarios -v -s
 # ===========================================================================
 
+
 class TestTriageScenarios(unittest.TestCase):
     """Live LLM scenario tests — skipped unless GEMINI_API_KEY is set."""
 
@@ -832,6 +838,7 @@ class TestTriageScenarios(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         from rebalance.ingest.config import get_gemini_api_key
+
         if not get_gemini_api_key():
             raise unittest.SkipTest("GEMINI_API_KEY not set — skipping live scenario tests")
 
@@ -841,8 +848,7 @@ class TestTriageScenarios(unittest.TestCase):
         return decision, reason
 
     def _assert_valid(self, decision: str, reason: str, check_name: str) -> None:
-        self.assertIn(decision, ("file", "skip", "downgrade"),
-                      f"{check_name}: unexpected decision {decision!r}")
+        self.assertIn(decision, ("file", "skip", "downgrade"), f"{check_name}: unexpected decision {decision!r}")
         self.assertIsInstance(reason, str)
         self.assertGreater(len(reason), 5, f"{check_name}: reason too short: {reason!r}")
 
@@ -853,7 +859,8 @@ class TestTriageScenarios(unittest.TestCase):
     def test_hard_db_not_found_should_not_skip(self) -> None:
         """A missing database on a configured machine is a regression — never skip."""
         check = _make_check(
-            "database", "error",
+            "database",
+            "error",
             detail=(
                 "no rebalance.db could be resolved — the database that was present "
                 "yesterday is now missing; sync has stopped completely"
@@ -862,13 +869,13 @@ class TestTriageScenarios(unittest.TestCase):
         )
         decision, reason = self._triage(check)
         self._assert_valid(decision, reason, "database")
-        self.assertNotEqual(decision, "skip",
-                            f"skip is wrong for a missing database. Reason: {reason}")
+        self.assertNotEqual(decision, "skip", f"skip is wrong for a missing database. Reason: {reason}")
 
     def test_hard_github_token_missing_should_not_skip(self) -> None:
         """Token was present, now gone — all GitHub sync is broken."""
         check = _make_check(
-            "github token", "error",
+            "github token",
+            "error",
             detail=(
                 "no GitHub token configured — previously stored token is no longer "
                 "present; all GitHub activity ingestion has stopped"
@@ -877,20 +884,19 @@ class TestTriageScenarios(unittest.TestCase):
         )
         decision, reason = self._triage(check)
         self._assert_valid(decision, reason, "github token")
-        self.assertNotEqual(decision, "skip",
-                            f"skip is wrong for a missing GitHub token. Reason: {reason}")
+        self.assertNotEqual(decision, "skip", f"skip is wrong for a missing GitHub token. Reason: {reason}")
 
     def test_hard_schema_corrupt_should_not_skip(self) -> None:
         """A corrupt/unreadable schema is a real error, not noise."""
         check = _make_check(
-            "schema", "error",
+            "schema",
+            "error",
             detail="could not read schema: database disk image is malformed",
             hint="restore from backup or run `rebalance refresh` to recreate",
         )
         decision, reason = self._triage(check)
         self._assert_valid(decision, reason, "schema-corrupt")
-        self.assertNotEqual(decision, "skip",
-                            f"skip is wrong for a corrupt schema. Reason: {reason}")
+        self.assertNotEqual(decision, "skip", f"skip is wrong for a corrupt schema. Reason: {reason}")
 
     # ------------------------------------------------------------------
     # SOFT assertions — WARNs where any decision may be reasonable.
@@ -900,7 +906,8 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_stale_github_data(self) -> None:
         """10-day-old GitHub activity — should be file or downgrade, rarely skip."""
         check = _make_check(
-            "github data", "warning",
+            "github data",
+            "warning",
             detail="42 activity rows, latest 2026-05-20 — last scan 10 days ago (stale)",
             hint="run `rebalance refresh` (scope github) — check projects are registered",
         )
@@ -912,11 +919,9 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_calendar_token_missing(self) -> None:
         """Calendar OAuth token absent — optional integration, may be skip/downgrade."""
         check = _make_check(
-            "calendar", "warning",
-            detail=(
-                "OAuth token not found at "
-                "/Users/user/.config/rebalance/calendar_token.json"
-            ),
+            "calendar",
+            "warning",
+            detail=("OAuth token not found at /Users/user/.config/rebalance/calendar_token.json"),
             hint="run the Calendar OAuth flow (scripts/setup_calendar_oauth.py)",
         )
         decision, reason = self._triage(check)
@@ -925,11 +930,9 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_sleuth_env_missing(self) -> None:
         """Sleuth env file absent — optional integration on machines without Sleuth."""
         check = _make_check(
-            "sleuth", "warning",
-            detail=(
-                "no Sleuth Web API env file "
-                "(/Users/user/.config/rebalance/sleuth-web-api-production.env)"
-            ),
+            "sleuth",
+            "warning",
+            detail=("no Sleuth Web API env file (/Users/user/.config/rebalance/sleuth-web-api-production.env)"),
             hint=(
                 "create it with SLEUTH_WEB_API_BASE_URL / SLEUTH_WEB_API_TOKEN / "
                 "SLEUTH_WORKSPACE_NAME — without it the Slack-reminders sync fails every run"
@@ -941,7 +944,8 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_launchd_single_nonzero_exit(self) -> None:
         """launchd job exited 1 once — may be transient; any decision is reasonable."""
         check = _make_check(
-            "launchd:daily-sync", "warning",
+            "launchd:daily-sync",
+            "warning",
             detail="last run exited with status 1",
             hint="inspect temp/logs/ for this job's error output",
         )
@@ -951,7 +955,8 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_database_location_split(self) -> None:
         """Active DB not at canonical path — housekeeping issue, medium priority."""
         check = _make_check(
-            "database location", "warning",
+            "database location",
+            "warning",
             detail=(
                 "active DB is not the canonical path\n"
                 "  canonical: /Users/user/Library/Application Support/rebalance-os/rebalance.db\n"
@@ -965,12 +970,10 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_gmail_mcp_no_messages(self) -> None:
         """Gmail in MCP mode with 0 messages ingested — may not need an issue."""
         check = _make_check(
-            "gmail", "warning",
+            "gmail",
+            "warning",
             detail="MCP mode — no email ingested yet",
-            hint=(
-                "have an agent fetch via the Gmail MCP connector "
-                "and call `ingest_gmail_messages`"
-            ),
+            hint=("have an agent fetch via the Gmail MCP connector and call `ingest_gmail_messages`"),
         )
         decision, reason = self._triage(check)
         self._assert_valid(decision, reason, "gmail-mcp-empty")
@@ -1012,7 +1015,8 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         """
         source = (SCRIPTS_DIR / "health_issue_reporter.py").read_text(encoding="utf-8")
         self.assertNotIn(
-            "health-check.py", source,
+            "health-check.py",
+            source,
             "The reporter must not invoke the git-pulse health check; doctor "
             "already surfaces collector health as `pulse collector:*`.",
         )
@@ -1026,7 +1030,8 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         """
         source = (SCRIPTS_DIR / "health_issue_reporter.py").read_text(encoding="utf-8")
         self.assertNotIn(
-            "pulse-collector:", source,
+            "pulse-collector:",
+            source,
             "'pulse-collector:' (hyphen) was the duplicate emitter's spelling. "
             "doctor's canonical name is 'pulse collector:' (space). Two spellings "
             "of one check defeat dedup-by-title and file twin issues per device.",
@@ -1056,7 +1061,8 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
 
         for check in checks:
             self.assertNotIn(
-                "pulse-collector:", check["name"],
+                "pulse-collector:",
+                check["name"],
                 "'pulse-collector:' (hyphen) was the duplicate emitter's spelling; "
                 "doctor's canonical name is 'pulse collector:' (space). Two "
                 "spellings of one check defeat dedup-by-title.",
@@ -1073,7 +1079,8 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         source = (SCRIPTS_DIR / "health_issue_reporter.py").read_text(encoding="utf-8")
 
         self.assertIn(
-            '"--also-pulse"', source,
+            '"--also-pulse"',
+            source,
             "The flag must remain accepted — launchd jobs still pass it.",
         )
 
@@ -1082,7 +1089,8 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         branch = after_flag.split("\n\n", 1)[0]
         for forbidden in ("checks.extend", "run_pulse", "health-check.py"):
             self.assertNotIn(
-                forbidden, branch,
+                forbidden,
+                branch,
                 f"--also-pulse must stay a no-op; found {forbidden!r} in its branch, "
                 "which re-creates the duplicate collector emitter (GH-139).",
             )

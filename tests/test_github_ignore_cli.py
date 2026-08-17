@@ -161,7 +161,20 @@ class GitHubIgnoreCliTests(unittest.TestCase):
             ensure_semantic_schema(conn)
             conn.execute(
                 "INSERT INTO github_activity (login, repo_full_name, scan_date, commits, pushes, prs_opened, prs_merged, issues_opened, issue_comments, reviews, last_active_at, scanned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                ("tester", "dlt-hub/dlt", "2026-04-28", 1, 1, 0, 0, 0, 0, 0, "2026-04-28T00:00:00Z", "2026-04-28T00:00:00Z"),
+                (
+                    "tester",
+                    "dlt-hub/dlt",
+                    "2026-04-28",
+                    1,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    "2026-04-28T00:00:00Z",
+                    "2026-04-28T00:00:00Z",
+                ),
             )
             conn.execute(
                 """

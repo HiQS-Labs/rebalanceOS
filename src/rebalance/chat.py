@@ -31,6 +31,7 @@ from rebalance.ingest.semantic_index import (  # noqa: E402
     WORK_SOURCES,  # noqa: F401
     scope_to_sources as _semantic_sources_for_scope,
 )
+
 _REPO_ROOT = resolve_project_root(Path(__file__))
 ASK_SELF_TIMEOUT_SECONDS = 60
 
@@ -49,10 +50,9 @@ def _citation_from_semantic(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _default_semantic_query(
-    database_path: Path, query: str, top_k: int, sources: list[str]
-) -> list[dict[str, Any]]:
+def _default_semantic_query(database_path: Path, query: str, top_k: int, sources: list[str]) -> list[dict[str, Any]]:
     from rebalance.ingest.semantic_index import query as _q
+
     return _q(database_path, query, top_k=top_k, source_filter=sources)
 
 
@@ -60,12 +60,16 @@ def _default_semantic_query(
 # ask_self federation (code/docs corpus)
 # ---------------------------------------------------------------------------
 
+
 def ask_self_available() -> bool:
     """True if ask_self federation can run: a configured install + the wrapper."""
     from rebalance.ingest.config import get_ask_self_path
+
     root = get_ask_self_path()
+    if root is None:
+        return False
     wrapper = _REPO_ROOT / "scripts" / "ask-self-query.sh"
-    return bool(root) and Path(root).is_dir() and wrapper.exists()
+    return Path(root).is_dir() and wrapper.exists()
 
 
 def _query_ask_self(query: str, top_k: int) -> list[dict[str, Any]]:
@@ -76,6 +80,7 @@ def _query_ask_self(query: str, top_k: int) -> list[dict[str, Any]]:
     so the rebalance venv is required for the local Qwen-MLX provider.
     """
     from rebalance.ingest.config import get_ask_self_path
+
     root = get_ask_self_path()
     wrapper = _REPO_ROOT / "scripts" / "ask-self-query.sh"
     if not root or not wrapper.exists():
@@ -84,8 +89,11 @@ def _query_ask_self(query: str, top_k: int) -> list[dict[str, Any]]:
     try:
         proc = subprocess.run(
             ["bash", str(wrapper), query, "--retrieval-only", "--json"],
-            capture_output=True, text=True, env=env,
-            timeout=ASK_SELF_TIMEOUT_SECONDS, cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=ASK_SELF_TIMEOUT_SECONDS,
+            cwd=str(_REPO_ROOT),
         )
         if proc.returncode != 0:
             return []
@@ -101,20 +109,23 @@ def _query_ask_self(query: str, top_k: int) -> list[dict[str, Any]]:
             continue
         dist = hit.get("distance")
         score = round(1.0 - dist, 4) if isinstance(dist, (int, float)) else hit.get("score")
-        cites.append({
-            "source": "code",
-            "title": hit.get("path") or "",
-            "path": hit.get("path") or "",
-            "preview": (hit.get("content") or "")[:280],
-            "score": score,
-            "kind": hit.get("source") or "code",
-        })
+        cites.append(
+            {
+                "source": "code",
+                "title": hit.get("path") or "",
+                "path": hit.get("path") or "",
+                "preview": (hit.get("content") or "")[:280],
+                "score": score,
+                "kind": hit.get("source") or "code",
+            }
+        )
     return cites
 
 
 def _rrf_merge(lists: list[list[dict[str, Any]]], top_k: int, k: int = 60) -> list[dict[str, Any]]:
     """Reciprocal-rank fusion — rank-based, so the two systems' score scales
     don't have to be comparable. Dedupe by (source, path|title)."""
+
     def key(c: dict[str, Any]) -> tuple[str, str]:
         return (c.get("source") or "", (c.get("path") or c.get("title") or "").lower())
 
@@ -158,8 +169,12 @@ def chat_with_data(
     text = (query or "").strip()
     if not text:
         return {
-            "query": text, "scope": scope, "citations": [],
-            "used_sources": [], "elapsed_ms": 0, "answer": None,
+            "query": text,
+            "scope": scope,
+            "citations": [],
+            "used_sources": [],
+            "elapsed_ms": 0,
+            "answer": None,
         }
 
     used: list[str] = []

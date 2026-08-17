@@ -24,9 +24,7 @@ def test_log_event_round_trips_through_status(event_database):
 
     connection = db_connection(event_database)
     try:
-        row = connection.execute(
-            "SELECT kind, source, status, payload_json FROM events"
-        ).fetchone()
+        row = connection.execute("SELECT kind, source, status, payload_json FROM events").fetchone()
         assert row[:3] == ("sync.completed", "vault", "ok")
         assert '"inserted":1' in row[3]
     finally:

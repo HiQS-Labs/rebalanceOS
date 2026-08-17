@@ -123,9 +123,7 @@ class ExternalWatchTests(unittest.TestCase):
             ensure_github_schema(conn)
             _seed_artifacts(conn)
 
-        summary = derive_watched_repo_activity(
-            self.db, REPO, "tok", since_days=90, api_get_json=_two_commits_fetcher()
-        )
+        summary = derive_watched_repo_activity(self.db, REPO, "tok", since_days=90, api_get_json=_two_commits_fetcher())
         self.assertEqual(summary["commits"], 2)
         self.assertEqual(summary["prs_opened"], 1)
         self.assertEqual(summary["prs_merged"], 1)
@@ -134,8 +132,7 @@ class ExternalWatchTests(unittest.TestCase):
 
         with db_connection(self.db) as conn:
             row = conn.execute(
-                "SELECT login, commits, prs_merged FROM github_activity "
-                "WHERE repo_full_name=?",
+                "SELECT login, commits, prs_merged FROM github_activity WHERE repo_full_name=?",
                 (REPO,),
             ).fetchone()
         self.assertEqual(row["login"], WATCHED_LOGIN)
@@ -191,9 +188,7 @@ class ExternalWatchTests(unittest.TestCase):
             )
             conn.commit()
 
-        result = reconcile_watched_repo(
-            self.db, REPO, "tok", since_days=14, api_get_json=_two_commits_fetcher()
-        )
+        result = reconcile_watched_repo(self.db, REPO, "tok", since_days=14, api_get_json=_two_commits_fetcher())
         self.assertEqual(result["mode"], "active")
         self.assertGreaterEqual(result["purged"], 1)
         with db_connection(self.db) as conn:
@@ -209,9 +204,7 @@ class ExternalWatchTests(unittest.TestCase):
             ensure_github_schema(conn)
             _seed_artifacts(conn)
 
-        result = reconcile_watched_repo(
-            self.db, REPO, "tok", since_days=90, api_get_json=_two_commits_fetcher()
-        )
+        result = reconcile_watched_repo(self.db, REPO, "tok", since_days=90, api_get_json=_two_commits_fetcher())
         self.assertEqual(result["mode"], "external")
         self.assertEqual(result["commits"], 2)
         with db_connection(self.db) as conn:

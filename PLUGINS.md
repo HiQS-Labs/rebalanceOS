@@ -33,13 +33,13 @@ parity-gated PR (see the roadmap doc).
 ```python
 # src/rebalance/ingest/index_ops.py
 @dataclass(frozen=True)
-class Collector:                     # alias: SourceModule = Collector
-    name: str                        # unique user-facing scope key (reserved: "all")
-    refresh: Callable[..., dict]     # (db_path, **opts) -> {"scope": name, ...}; ignore unknown opts
-    requires: tuple[str, ...] = ()   # preconditions: "vault_path" | "github_token" | "figma_token"
-    included_in_all: bool = True     # False = opt-in (network/secret-gated; runs only on explicit scope)
+class Collector:  # alias: SourceModule = Collector
+    name: str  # unique user-facing scope key (reserved: "all")
+    refresh: Callable[..., dict]  # (db_path, **opts) -> {"scope": name, ...}; ignore unknown opts
+    requires: tuple[str, ...] = ()  # preconditions: "vault_path" | "github_token" | "figma_token"
+    included_in_all: bool = True  # False = opt-in (network/secret-gated; runs only on explicit scope)
     semantic_docs: Callable[[Conn], Iterable[SemanticDoc]] | None = None  # vectorize provider
-    secrets: tuple[str, ...] = ()    # secret config keys this source consumes (metadata for tooling)
+    secrets: tuple[str, ...] = ()  # secret config keys this source consumes (metadata for tooling)
 ```
 
 A `Collector` that also exposes `semantic_docs` *is* a `SourceModule`.

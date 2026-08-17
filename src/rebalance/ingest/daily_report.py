@@ -77,6 +77,7 @@ DEFAULT_AGGREGATOR_SKIP_WORDS = frozenset(
 @dataclass
 class ProjectGroup:
     """Group of similar event names with combined stats."""
+
     keyword: str
     count: int
     total_minutes: int
@@ -89,11 +90,7 @@ class ProjectGroup:
 
 def _normalize_word_tokens(text: str) -> list[str]:
     """Split text into normalized word tokens for report grouping."""
-    return [
-        word
-        for word in re.findall(r"\b[a-z0-9]+\b", text.lower())
-        if len(word) > 1 and not word.isdigit()
-    ]
+    return [word for word in re.findall(r"\b[a-z0-9]+\b", text.lower()) if len(word) > 1 and not word.isdigit()]
 
 
 def _build_aggregator_skip_words(
@@ -119,11 +116,7 @@ def extract_keywords(
     skip_words: set[str] | None = None,
 ) -> list[str]:
     """Extract top N most common words from event name."""
-    words = [
-        word
-        for word in _normalize_word_tokens(text)
-        if word not in (skip_words or set())
-    ]
+    words = [word for word in _normalize_word_tokens(text) if word not in (skip_words or set())]
 
     counter = Counter(words)
     return [word for word, _ in counter.most_common(top_n)]
@@ -160,11 +153,7 @@ def group_similar_events(
                 group_key = keywords[0].title()
             else:
                 relaxed_keywords = extract_keywords(summary, skip_words=fallback_skip_words)
-                group_key = (
-                    relaxed_keywords[0].title()
-                    if relaxed_keywords
-                    else (summary.strip()[:20] or "(untagged)")
-                )
+                group_key = relaxed_keywords[0].title() if relaxed_keywords else (summary.strip()[:20] or "(untagged)")
 
         if group_key not in groups:
             groups[group_key] = ProjectGroup(
@@ -184,6 +173,7 @@ def group_similar_events(
 @dataclass
 class DayData:
     """Structured data for a single day (used by both daily and weekly reports)."""
+
     target_date: date
     filtered_events: list[dict[str, Any]]
     total_minutes: int
@@ -277,10 +267,7 @@ def get_day_data(
             if not event.get("project_name") and decision != "include":
                 needs_review.append(event)
 
-    total_minutes = sum(
-        event_duration_minutes(e.get("start_time", ""), e.get("end_time", ""))
-        for e in kept
-    )
+    total_minutes = sum(event_duration_minutes(e.get("start_time", ""), e.get("end_time", "")) for e in kept)
 
     groups = group_similar_events(
         kept,

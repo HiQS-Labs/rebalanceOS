@@ -32,19 +32,14 @@ def _scan_tree(root: Path) -> list[str]:
     for path in sorted(root.rglob("*.py")):
         if path in EXEMPT or "__pycache__" in path.parts:
             continue
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if RAW_CLOCK.search(line) and "# raw-ok" not in line:
                 hits.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
     return hits
 
 
 def test_product_trees_have_no_raw_clock_reads():
-    hits = _scan_tree(REPO_ROOT / "src" / "rebalance") + [
-        h
-        for h in _scan_tree(REPO_ROOT / "scripts")
-    ]
+    hits = _scan_tree(REPO_ROOT / "src" / "rebalance") + [h for h in _scan_tree(REPO_ROOT / "scripts")]
     assert hits == [], (
         "raw clock reads found — use rebalance.lib.time_ops.now_utc()/now_iso() "
         "(or mark a deliberate exception with `# raw-ok`):\n" + "\n".join(hits)
@@ -64,6 +59,5 @@ def test_time_ops_itself_is_exempt():
     # intent. Assert it still holds an actual datetime.now call at all.
     time_ops = REPO_ROOT / "src" / "rebalance" / "lib" / "time_ops.py"
     assert "datetime.now(" in time_ops.read_text(encoding="utf-8"), (
-        "time_ops.py no longer contains the real clock call — this guard's "
-        "exemption list is stale"
+        "time_ops.py no longer contains the real clock call — this guard's exemption list is stale"
     )

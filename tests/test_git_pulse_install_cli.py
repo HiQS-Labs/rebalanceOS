@@ -11,9 +11,7 @@ import unittest
 from pathlib import Path
 
 
-INSTALL_SCRIPT = (
-    Path(__file__).resolve().parents[1] / "experimental" / "git-pulse" / "install.sh"
-)
+INSTALL_SCRIPT = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse" / "install.sh"
 
 
 def _write_executable(path: Path, content: str) -> None:

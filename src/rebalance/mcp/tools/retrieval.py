@@ -17,8 +17,8 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         Requires: `rebalance ingest notes`.
         """
         from rebalance.ingest.note_ingester import search_by_keyword
-        return search_by_keyword(database_path=database_path, keyword=keyword, limit=limit)
 
+        return search_by_keyword(database_path=database_path, keyword=keyword, limit=limit)
 
     @mcp.tool()
     def github_release_readiness(repo_full_name: str, milestone_title: str = "") -> dict[str, Any]:
@@ -75,6 +75,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         dashboard's /whats-next view reads, so the two surfaces cannot drift.
         """
         from rebalance.ingest.querier import ask as querier_ask
+
         result = querier_ask(
             query=query,
             database_path=database_path,

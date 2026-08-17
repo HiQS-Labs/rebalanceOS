@@ -195,9 +195,7 @@ class AutoPromoteTests(unittest.TestCase):
         sync_commit_threshold_promotions(self.db_path)
 
         with db_connection(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT summary FROM project_registry WHERE name = 'Widget'"
-            ).fetchone()
+            row = conn.execute("SELECT summary FROM project_registry WHERE name = 'Widget'").fetchone()
         self.assertEqual(row["summary"], "hand-curated")
 
     def test_name_collision_disambiguates_instead_of_overwriting(self) -> None:
@@ -225,17 +223,13 @@ class AutoPromoteTests(unittest.TestCase):
         sync_commit_threshold_promotions(self.db_path)
 
         with db_connection(self.db_path) as conn:
-            count = conn.execute(
-                "SELECT COUNT(*) AS n FROM project_registry WHERE name = 'Widget'"
-            ).fetchone()["n"]
+            count = conn.execute("SELECT COUNT(*) AS n FROM project_registry WHERE name = 'Widget'").fetchone()["n"]
         self.assertEqual(count, 1)
 
     def test_disabled_is_a_no_op(self) -> None:
         repo = "Acme/widget"
         _insert_activity(self.db_path, repo=repo, commits=3)
-        config_module._write_config(
-            {**config_module._read_config(), "auto_promote_enabled": False}
-        )
+        config_module._write_config({**config_module._read_config(), "auto_promote_enabled": False})
 
         summary = sync_commit_threshold_promotions(self.db_path)
 
@@ -246,22 +240,16 @@ class AutoPromoteTests(unittest.TestCase):
         repo = "Acme/widget"
         _insert_activity(self.db_path, repo=repo, commits=3)
 
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_project_auto_promoted"
-        ) as mocked:
+        with mock.patch("rebalance.ingest.auth_log.log_project_auto_promoted") as mocked:
             sync_commit_threshold_promotions(self.db_path)
 
-        mocked.assert_called_once_with(
-            repo, project_name="Widget", commit_count=3, threshold=3
-        )
+        mocked.assert_called_once_with(repo, project_name="Widget", commit_count=3, threshold=3)
 
     def test_no_promotion_does_not_fire_auth_log_alert(self) -> None:
         repo = "Acme/widget"
         _insert_activity(self.db_path, repo=repo, commits=2)
 
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_project_auto_promoted"
-        ) as mocked:
+        with mock.patch("rebalance.ingest.auth_log.log_project_auto_promoted") as mocked:
             sync_commit_threshold_promotions(self.db_path)
 
         mocked.assert_not_called()
@@ -294,17 +282,13 @@ class AutoPromoteTests(unittest.TestCase):
         )
 
         with db_connection(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT name FROM project_registry WHERE name = 'Widget'"
-            ).fetchone()
+            row = conn.execute("SELECT name FROM project_registry WHERE name = 'Widget'").fetchone()
         self.assertIsNotNone(row, "auto-promoted row was deleted by activity inference cleanup")
 
     def test_no_github_login_configured_is_a_no_op(self) -> None:
         # set_pulse_config(github_login=None) is a no-op (None means "leave
         # unchanged"), so clear it directly at the raw-config layer instead.
-        config_module._write_config(
-            {**config_module._read_config(), "github_login": None}
-        )
+        config_module._write_config({**config_module._read_config(), "github_login": None})
         repo = "Acme/widget"
         _insert_activity(self.db_path, repo=repo, commits=3)
 

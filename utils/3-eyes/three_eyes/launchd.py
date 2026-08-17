@@ -67,6 +67,7 @@ def _fmt_interval(n: int) -> str:
 
 def _fmt_calendar(cal) -> str:
     """Compact a launchd StartCalendarInterval into a readable schedule string."""
+
     def one(entry: dict) -> str:
         h, m = entry.get("Hour"), entry.get("Minute", 0)
         return f"daily {h:02d}:{m:02d}" if h is not None else f"hourly :{m:02d}"
@@ -134,9 +135,7 @@ def launchctl_state(label: str) -> str:
     try:
         uid = subprocess.run(["id", "-u"], capture_output=True, text=True, timeout=5)
         gui = f"gui/{uid.stdout.strip()}/{label}"
-        proc = subprocess.run(
-            ["launchctl", "print", gui], capture_output=True, text=True, timeout=8
-        )
+        proc = subprocess.run(["launchctl", "print", gui], capture_output=True, text=True, timeout=8)
     except (OSError, subprocess.SubprocessError):
         return "unknown"
     return "loaded" if proc.returncode == 0 else "not-loaded"
@@ -154,16 +153,13 @@ def install(job) -> Path:
         )
     problems = registry.validate()
     if problems:  # S8: never install from an invalid registry
-        raise registry.RegistryError(
-            "refusing to install launchd agent — registry invalid: " + "; ".join(problems)
-        )
+        raise registry.RegistryError("refusing to install launchd agent — registry invalid: " + "; ".join(problems))
     if not job.enabled:  # S8: don't schedule a disabled job
         raise registry.RegistryError(f"job {job.id!r} is disabled; refusing to install")
     # Adoption REPLACES an emitter; it never adds a second one. Installing while the
     # incumbent is live is how #139's duplicate-issue defect comes back. Fail closed:
     # only a positive "not-loaded" clears the gate, so an unreadable probe blocks too.
-    blocking = [(lbl, st) for lbl in job.supersedes
-                if (st := launchctl_state(lbl)) != "not-loaded"]
+    blocking = [(lbl, st) for lbl in job.supersedes if (st := launchctl_state(lbl)) != "not-loaded"]
     if blocking:
         raise registry.RegistryError(
             f"refusing to install {job.id!r}: it supersedes "

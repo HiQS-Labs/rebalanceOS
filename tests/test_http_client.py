@@ -221,23 +221,22 @@ class RequestAttributionTests(unittest.TestCase):
         summary = client.request_summary()
         self.assertEqual(summary["logical_requests"], 1)
         self.assertEqual(summary["attempts"], 3)
-        self.assertEqual(
-            summary["endpoint_attempt_counts"]["/repos/{owner}/{repo}/pulls/{id}"], 3
-        )
+        self.assertEqual(summary["endpoint_attempt_counts"]["/repos/{owner}/{repo}/pulls/{id}"], 3)
 
     def test_pagination_is_captured(self) -> None:
         """paginate() goes through _request(), so every page must be counted."""
         client = self._client("paginate", retries=1)
         pages = [
             _ok_response([{"id": 1}] * 100),  # full page -> keep going
-            _ok_response([{"id": 2}]),        # short page -> stop
+            _ok_response([{"id": 2}]),  # short page -> stop
         ]
         with patch("urllib.request.urlopen", side_effect=pages):
             client.paginate("/repos/acme/widgets/issues")
 
         summary = client.request_summary()
         self.assertEqual(
-            summary["logical_requests"], 2,
+            summary["logical_requests"],
+            2,
             "both pages must appear; per-call-site instrumentation would see one call",
         )
 
@@ -281,7 +280,8 @@ class RequestAttributionTests(unittest.TestCase):
 
         self.assertEqual(a.request_summary()["logical_requests"], 2)
         self.assertEqual(
-            a.request_summary(), b.request_summary(),
+            a.request_summary(),
+            b.request_summary(),
             "both clients must observe the same job-level totals",
         )
 

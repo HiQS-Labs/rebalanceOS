@@ -17,9 +17,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
-def top_active_repos(
-    conn: sqlite3.Connection, top_n: int, since_days: int = 7
-) -> list[str]:
+def top_active_repos(conn: sqlite3.Connection, top_n: int, since_days: int = 7) -> list[str]:
     """Repo full-names ranked by recent activity score, highest first.
 
     Score sums ``commits + prs_opened + prs_merged + issues_opened +
@@ -43,9 +41,7 @@ def top_active_repos(
     return [r[0] for r in rows]
 
 
-def repo_last_active(
-    conn: sqlite3.Connection, repos: list[str] | None = None
-) -> dict[str, str]:
+def repo_last_active(conn: sqlite3.Connection, repos: list[str] | None = None) -> dict[str, str]:
     """Map of ``repo_full_name`` -> latest ``last_active_at`` (raw ISO string).
 
     Pass *repos* to restrict to a subset; omit it for every repo. Repos with
@@ -261,9 +257,7 @@ def insert_push_event(conn: sqlite3.Connection, values: tuple) -> bool:
     return cursor.rowcount == 1
 
 
-def pending_push_events(
-    conn: sqlite3.Connection, limit: int, max_attempts: int
-) -> list[sqlite3.Row]:
+def pending_push_events(conn: sqlite3.Connection, limit: int, max_attempts: int) -> list[sqlite3.Row]:
     """Oldest direct-push receipts still requiring bounded enrichment."""
     return conn.execute(
         """
@@ -315,9 +309,7 @@ def update_push_event(
     )
 
 
-def upsert_direct_commit(
-    conn: sqlite3.Connection, values: tuple, *, source: str = "events"
-) -> None:
+def upsert_direct_commit(conn: sqlite3.Connection, values: tuple, *, source: str = "events") -> None:
     """Insert-or-replace a direct commit while retaining its event provenance.
 
     ``path_coverage`` is RATCHETED, never assigned (GH-169): it may only move
@@ -371,9 +363,13 @@ def replace_direct_commit_files(
         """,
         [
             (
-                repo_full_name, sha, str(row.get("filename") or ""),
-                str(row.get("status") or ""), row.get("additions"),
-                row.get("deletions"), row.get("changes"),
+                repo_full_name,
+                sha,
+                str(row.get("filename") or ""),
+                str(row.get("status") or ""),
+                row.get("additions"),
+                row.get("deletions"),
+                row.get("changes"),
             )
             for row in files
             if row.get("filename")
@@ -398,9 +394,7 @@ def upsert_check_run(conn: sqlite3.Connection, values: tuple) -> None:
     )
 
 
-def delete_repo_table(
-    conn: sqlite3.Connection, table: str, repo_full_name: str
-) -> None:
+def delete_repo_table(conn: sqlite3.Connection, table: str, repo_full_name: str) -> None:
     """Delete every row of *table* for an exact ``repo_full_name`` match.
 
     Used to clear branches/labels/milestones/releases before a fresh sync.
@@ -510,10 +504,7 @@ def upsert_github_document(
     row = cursor.fetchone()
     if row is not None:
         return int(row[0])
-    return int(conn.execute(
-        "SELECT id FROM github_documents WHERE source_key = ?",
-        (source_key,)
-    ).fetchone()[0])
+    return int(conn.execute("SELECT id FROM github_documents WHERE source_key = ?", (source_key,)).fetchone()[0])
 
 
 def delete_item_children(
@@ -636,9 +627,7 @@ def reset_github_embedded_hashes(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE github_documents SET embedded_hash = NULL")
 
 
-def github_documents_pending_embed(
-    conn: sqlite3.Connection, min_chars: int
-) -> list[sqlite3.Row]:
+def github_documents_pending_embed(conn: sqlite3.Connection, min_chars: int) -> list[sqlite3.Row]:
     """Rows (id, body, content_hash) for documents needing (re-)embedding.
 
     A document qualifies when its body is at least *min_chars* long and its
@@ -656,9 +645,7 @@ def github_documents_pending_embed(
     ).fetchall()
 
 
-def count_embeddable_github_documents(
-    conn: sqlite3.Connection, min_chars: int
-) -> int:
+def count_embeddable_github_documents(conn: sqlite3.Connection, min_chars: int) -> int:
     """Count documents whose body is at least *min_chars* long."""
     return conn.execute(
         "SELECT COUNT(*) FROM github_documents WHERE LENGTH(body) >= ?",
@@ -666,9 +653,7 @@ def count_embeddable_github_documents(
     ).fetchone()[0]
 
 
-def upsert_github_embedding(
-    conn: sqlite3.Connection, doc_id: int, embedding: bytes
-) -> None:
+def upsert_github_embedding(conn: sqlite3.Connection, doc_id: int, embedding: bytes) -> None:
     """Insert-or-replace one ``github_embeddings`` vector row."""
     conn.execute("DELETE FROM github_embeddings WHERE doc_id = ?", (doc_id,))
     conn.execute(
@@ -685,9 +670,7 @@ def mark_github_document_embedded(conn: sqlite3.Connection, doc_id: int) -> None
     )
 
 
-def set_github_embedding_meta(
-    conn: sqlite3.Connection, key: str, value: str
-) -> None:
+def set_github_embedding_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
     """Insert-or-replace one ``github_embedding_meta`` key/value row."""
     conn.execute(
         "INSERT OR REPLACE INTO github_embedding_meta (key, value) VALUES (?, ?)",
@@ -736,9 +719,7 @@ def count_unembedded_documents(conn: sqlite3.Connection, min_chars: int) -> int:
 def table_byte_size(conn: sqlite3.Connection, table_name: str) -> int:
     """Return the total byte size of a table using dbstat."""
     try:
-        return conn.execute(
-            "SELECT SUM(pgsize) FROM dbstat WHERE name LIKE ?", (f"{table_name}%",)
-        ).fetchone()[0] or 0
+        return conn.execute("SELECT SUM(pgsize) FROM dbstat WHERE name LIKE ?", (f"{table_name}%",)).fetchone()[0] or 0
     except sqlite3.OperationalError:
         return 0
 
@@ -748,9 +729,7 @@ def table_byte_size(conn: sqlite3.Connection, table_name: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def count_repo_rows(
-    conn: sqlite3.Connection, table: str, repo_name_lower: str
-) -> int:
+def count_repo_rows(conn: sqlite3.Connection, table: str, repo_name_lower: str) -> int:
     """Count rows of *table* for a case-insensitive ``repo_full_name`` match.
 
     *table* must be a trusted constant — it is interpolated, not bound.
@@ -761,9 +740,7 @@ def count_repo_rows(
     ).fetchone()[0]
 
 
-def delete_repo_rows(
-    conn: sqlite3.Connection, table: str, repo_name_lower: str
-) -> None:
+def delete_repo_rows(conn: sqlite3.Connection, table: str, repo_name_lower: str) -> None:
     """Delete rows of *table* for a case-insensitive ``repo_full_name`` match.
 
     *table* must be a trusted constant — it is interpolated, not bound.
@@ -774,9 +751,7 @@ def delete_repo_rows(
     )
 
 
-def github_document_ids(
-    conn: sqlite3.Connection, repo_name_lower: str
-) -> list[int]:
+def github_document_ids(conn: sqlite3.Connection, repo_name_lower: str) -> list[int]:
     """Ids of ``github_documents`` for a case-insensitive repo match."""
     return [
         int(row["id"])
@@ -787,9 +762,7 @@ def github_document_ids(
     ]
 
 
-def semantic_doc_ids_for_github_repo(
-    conn: sqlite3.Connection, repo_name_lower: str
-) -> list[int]:
+def semantic_doc_ids_for_github_repo(conn: sqlite3.Connection, repo_name_lower: str) -> list[int]:
     """Ids of ``semantic_documents`` projected from one GitHub repo's docs."""
     return [
         int(row["id"])
@@ -806,9 +779,7 @@ def semantic_doc_ids_for_github_repo(
     ]
 
 
-def count_ids_in(
-    conn: sqlite3.Connection, table: str, id_column: str, ids: list[int]
-) -> int:
+def count_ids_in(conn: sqlite3.Connection, table: str, id_column: str, ids: list[int]) -> int:
     """Count rows of *table* whose *id_column* is in *ids* (0 for an empty list).
 
     *table* and *id_column* must be trusted constants — interpolated, not bound.
@@ -822,9 +793,7 @@ def count_ids_in(
     ).fetchone()[0]
 
 
-def delete_github_embeddings_for_docs(
-    conn: sqlite3.Connection, doc_ids: list[int]
-) -> None:
+def delete_github_embeddings_for_docs(conn: sqlite3.Connection, doc_ids: list[int]) -> None:
     """Delete ``github_embeddings`` rows for the given document ids."""
     conn.executemany(
         "DELETE FROM github_embeddings WHERE doc_id = ?",
@@ -838,7 +807,7 @@ def delete_github_documents(conn: sqlite3.Connection, doc_ids: list[int]) -> Non
         return
     delete_github_embeddings_for_docs(conn, doc_ids)
     for i in range(0, len(doc_ids), 900):
-        chunk = doc_ids[i:i + 900]
+        chunk = doc_ids[i : i + 900]
         conn.executemany(
             "DELETE FROM github_documents WHERE id = ?",
             [(doc_id,) for doc_id in chunk],

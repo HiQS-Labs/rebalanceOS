@@ -18,8 +18,8 @@ NOTES = {
 OBSERVE = [
     {"label": "com.x.managed", "schedule": "every 1h"},
     {"label": "com.x.adopt", "schedule": "every 2m"},
-    {"label": "com.google.foo", "schedule": "every 1h"},   # vendor → ignored
-    {"label": "com.x.NEW", "schedule": "daily 09:00"},      # unclassified
+    {"label": "com.google.foo", "schedule": "every 1h"},  # vendor → ignored
+    {"label": "com.x.NEW", "schedule": "daily 09:00"},  # unclassified
 ]
 
 
@@ -32,16 +32,16 @@ def fixture_env(monkeypatch, tmp_path):
 
 def test_drift_detects_new_and_ignores_vendor(fixture_env):
     d = catalog.drift()
-    assert d["new"] == ["com.x.NEW"]          # unclassified, non-vendor
-    assert "com.google.foo" not in d["new"]   # vendor auto-ignored
-    assert d["removed"] == []                 # both notes agents present
+    assert d["new"] == ["com.x.NEW"]  # unclassified, non-vendor
+    assert "com.google.foo" not in d["new"]  # vendor auto-ignored
+    assert d["removed"] == []  # both notes agents present
 
 
 def test_render_groups_and_flags(fixture_env):
     md = catalog.render()
     assert "Sys One" in md
     assert "com.x.managed" in md and "🟢 managed" in md
-    assert "Unclassified" in md and "com.x.NEW" in md      # triage section
+    assert "Unclassified" in md and "com.x.NEW" in md  # triage section
     assert "Suggested next adoptions" in md and "com.x.adopt" in md
 
 
@@ -54,8 +54,9 @@ def test_retired_cactus_agents_are_not_adoption_targets(monkeypatch):
         "com.neochro.needle-router",
         "com.neochro.cactus-serve",
     ]
-    monkeypatch.setattr(launchd, "observe_existing",
-                        lambda: [{"label": label, "schedule": "retired"} for label in retired])
+    monkeypatch.setattr(
+        launchd, "observe_existing", lambda: [{"label": label, "schedule": "retired"} for label in retired]
+    )
 
     rendered = catalog.render(notes)
     for label in retired:
@@ -71,29 +72,29 @@ def test_check_true_after_write_then_false_on_drift(fixture_env, monkeypatch):
     catalog.write()
     assert catalog.check() is True
     # A new agent appears on the machine -> render changes -> stale.
-    monkeypatch.setattr(launchd, "observe_existing",
-                        lambda: OBSERVE + [{"label": "com.x.LATER", "schedule": "every 5m"}])
+    monkeypatch.setattr(
+        launchd, "observe_existing", lambda: OBSERVE + [{"label": "com.x.LATER", "schedule": "every 5m"}]
+    )
     assert catalog.check() is False
 
 
 def test_health_scan_counts_and_grades(fixture_env, monkeypatch):
     # (pid, last-exit): "-" pid means not currently running.
-    monkeypatch.setattr(health, "_launchctl_list",
-                        lambda: {"com.x.managed": ("-", "0"), "com.x.adopt": ("-", "78")})
+    monkeypatch.setattr(health, "_launchctl_list", lambda: {"com.x.managed": ("-", "0"), "com.x.adopt": ("-", "78")})
     r = health.scan()
     assert r["ok"] == 1 and r["failing"] == 1 and r["not_loaded"] == 0
     by = {row["label"]: row for row in r["rows"]}
     assert by["com.x.managed"]["health"] == "ok"
-    assert by["com.x.managed"]["breaker"] == "closed"       # managed → breaker overlay
+    assert by["com.x.managed"]["breaker"] == "closed"  # managed → breaker overlay
     assert "FAIL" in by["com.x.adopt"]["health"] and "78" in by["com.x.adopt"]["health"]
     assert r["unclassified"] == ["com.x.NEW"]
 
 
 def test_health_not_loaded(fixture_env, monkeypatch):
-    monkeypatch.setattr(health, "_launchctl_list", lambda: {})   # nothing loaded
+    monkeypatch.setattr(health, "_launchctl_list", lambda: {})  # nothing loaded
     r = health.scan()
     assert r["not_loaded"] == 2 and r["ok"] == 0 and r["failing"] == 0
-    assert r["launchctl_available"] is True      # empty ≠ unreadable
+    assert r["launchctl_available"] is True  # empty ≠ unreadable
 
 
 def test_running_pid_beats_prior_sigterm_exit(fixture_env, monkeypatch):
@@ -102,26 +103,29 @@ def test_running_pid_beats_prior_sigterm_exit(fixture_env, monkeypatch):
     Regression for the GH-146 bug class: the exit-status column describes the
     *previous* instance, so reading it alone calls a running server failing.
     """
-    monkeypatch.setattr(health, "_launchctl_list",
-                        lambda: {"com.x.managed": ("35845", "-15"), "com.x.adopt": ("-", "0")})
+    monkeypatch.setattr(
+        health, "_launchctl_list", lambda: {"com.x.managed": ("35845", "-15"), "com.x.adopt": ("-", "0")}
+    )
     r = health.scan()
     assert r["failing"] == 0 and r["ok"] == 2
     by = {row["label"]: row for row in r["rows"]}
     assert by["com.x.managed"]["health"] == "ok"
     assert by["com.x.managed"]["running"] is True
-    assert by["com.x.managed"]["last_exit"] == "-15"     # retained, but not a verdict
-    assert "prior exit -15" in health.format_report(r)   # surfaced, not hidden
+    assert by["com.x.managed"]["last_exit"] == "-15"  # retained, but not a verdict
+    assert "prior exit -15" in health.format_report(r)  # surfaced, not hidden
 
 
 def test_unreachable_launchctl_reports_unknown_not_healthy(fixture_env, monkeypatch):
     """A probe that could not run must not return a confident answer."""
+
     def boom():
         raise health.LaunchctlUnavailable("launchctl list exited 1: no output")
+
     monkeypatch.setattr(health, "_launchctl_list", boom)
     r = health.scan()
     assert r["launchctl_available"] is False
     assert r["unknown"] == 2
-    assert r["ok"] == 0 and r["failing"] == 0 and r["not_loaded"] == 0   # no false verdict
+    assert r["ok"] == 0 and r["failing"] == 0 and r["not_loaded"] == 0  # no false verdict
     assert all(row["health"] == "unknown" for row in r["rows"])
     text = health.format_report(r)
     assert "UNKNOWN" in text and "NOT a clean bill of health" in text
@@ -129,8 +133,10 @@ def test_unreachable_launchctl_reports_unknown_not_healthy(fixture_env, monkeypa
 
 def test_launchctl_nonzero_exit_raises_rather_than_returning_empty(monkeypatch):
     """rc!=0 with empty stdout (the sandboxed case) must raise, not read as 'nothing loaded'."""
+
     class FakeProc:
         returncode, stdout, stderr = 1, "", ""
+
     monkeypatch.setattr(health.subprocess, "run", lambda *a, **k: FakeProc())
     with pytest.raises(health.LaunchctlUnavailable):
         health._launchctl_list()
@@ -141,9 +147,9 @@ def test_launchctl_parses_pid_and_status_columns(monkeypatch):
         returncode = 0
         stdout = "PID\tStatus\tLabel\n35845\t-15\tcom.x.server\n-\t0\tcom.x.batch\n"
         stderr = ""
+
     monkeypatch.setattr(health.subprocess, "run", lambda *a, **k: FakeProc())
-    assert health._launchctl_list() == {"com.x.server": ("35845", "-15"),
-                                        "com.x.batch": ("-", "0")}
+    assert health._launchctl_list() == {"com.x.server": ("35845", "-15"), "com.x.batch": ("-", "0")}
 
 
 def test_compact_schedule_formatting():

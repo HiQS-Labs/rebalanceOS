@@ -552,9 +552,3 @@ def test_deleting_vault_note_removes_from_search_and_errored_walk_retains(tmp_pa
         assert remaining_after_err[0].startswith("vault:note2.md:")
     finally:
         conn.close()
-
-
-
-
-
-

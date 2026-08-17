@@ -47,7 +47,7 @@ from . import config, registry
 # Load the existing job_guard (GH-172) by path — do not reinvent it
 # --------------------------------------------------------------------------- #
 
-_JOB_GUARD_PATH = config.ROOT.parent / "job_guard.py"   # utils/job_guard.py
+_JOB_GUARD_PATH = config.ROOT.parent / "job_guard.py"  # utils/job_guard.py
 
 
 def _load_job_guard():
@@ -73,9 +73,7 @@ except (OSError, ImportError):  # pragma: no cover - job_guard should always be 
 #: Mirrors ``job_guard.DEFERRED_EXIT_CODES``; the literals are the fallback for the
 #: (defensive) case where job_guard could not be loaded, so a missing guard cannot
 #: silently turn deferrals back into failures.
-DEFERRED_EXIT_CODES: frozenset[int] = getattr(
-    job_guard, "DEFERRED_EXIT_CODES", frozenset({3, 75})
-)
+DEFERRED_EXIT_CODES: frozenset[int] = getattr(job_guard, "DEFERRED_EXIT_CODES", frozenset({3, 75}))
 
 #: How long a quarantined job waits before it is allowed one probe run. Doubles on
 #: each failed probe, capped at :data:`MAX_COOLDOWN_SECONDS`, so a job that is
@@ -101,6 +99,7 @@ def classify_exit(code: int) -> str:
 # Global kill-switch
 # --------------------------------------------------------------------------- #
 
+
 def global_halt() -> bool:
     """True when every job must halt (PANIC file or explicit disable)."""
     return config.kill_switch_engaged()
@@ -109,6 +108,7 @@ def global_halt() -> bool:
 # --------------------------------------------------------------------------- #
 # Interprocess-locked state (GH-195 review S6)
 # --------------------------------------------------------------------------- #
+
 
 @contextmanager
 def _locked(name: str):
@@ -152,14 +152,13 @@ def _load_state() -> dict[str, Any]:
 # Per-job failure breaker
 # --------------------------------------------------------------------------- #
 
+
 class FailureBreaker:
     """Consecutive-failure breaker with a flock-guarded on-disk counter per job."""
 
     @staticmethod
     def _job(state: dict[str, Any], job_id: str) -> dict[str, Any]:
-        return state.setdefault(
-            job_id, {"consecutive_failures": 0, "quarantined": False, "last": None}
-        )
+        return state.setdefault(job_id, {"consecutive_failures": 0, "quarantined": False, "last": None})
 
     def is_open(self, job_id: str) -> bool:
         """True when the job is quarantined and must not run (lock-free read)."""
@@ -190,8 +189,7 @@ class FailureBreaker:
                     # A success closes the breaker completely: clear the half-open
                     # bookkeeping too, or the next trip would inherit a stale
                     # (already doubled) cooldown from a previous episode.
-                    for key in ("quarantined_at", "cooldown_seconds", "probe_at",
-                                "skip_notice_at"):
+                    for key in ("quarantined_at", "cooldown_seconds", "probe_at", "skip_notice_at"):
                         node.pop(key, None)
             else:
                 node["consecutive_failures"] = int(node.get("consecutive_failures", 0)) + 1
@@ -205,12 +203,7 @@ class FailureBreaker:
                 # every hour forever, which is the backoff invariant 6 promises and
                 # the plain trip logic silently skips.
                 self._rearm(node, doubled=True)
-            elif (
-                not ok
-                and trip_after > 0
-                and node["consecutive_failures"] >= trip_after
-                and not node["quarantined"]
-            ):
+            elif not ok and trip_after > 0 and node["consecutive_failures"] >= trip_after and not node["quarantined"]:
                 node["quarantined"] = True
                 self._rearm(node, doubled=False)
                 opened = True
@@ -349,6 +342,7 @@ class FailureBreaker:
 # Guarded command execution — allowlist-resolved, gated (GH-195 review B1/B4)
 # --------------------------------------------------------------------------- #
 
+
 def _resolve_argv(spec: dict) -> list[str]:
     """Resolve a command spec to an absolute argv against the repo root.
 
@@ -388,12 +382,6 @@ def run_job_command(job) -> int:
         raise RuntimeError("job_guard is unavailable; refusing to run unguarded")
     allow = registry.load_commands_allow()
     if job.command not in allow:
-        raise registry.RegistryError(
-            f"command {job.command!r} is not in commands.allow; refusing to run"
-        )
+        raise registry.RegistryError(f"command {job.command!r} is not in commands.allow; refusing to run")
     argv = _resolve_argv(allow[job.command])
-    return int(
-        job_guard.run_guarded(
-            f"3eyes.{job.id}", argv, max_rss_gb=job.max_rss_gb, on_conflict="refuse"
-        )
-    )
+    return int(job_guard.run_guarded(f"3eyes.{job.id}", argv, max_rss_gb=job.max_rss_gb, on_conflict="refuse"))

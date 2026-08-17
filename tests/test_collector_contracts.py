@@ -12,6 +12,7 @@ point the ``xfail`` marker should be removed so the contract is enforced strictl
 
 Row references are to DASHBOARD.md's compliance matrix.
 """
+
 from __future__ import annotations
 
 import ast
@@ -28,9 +29,18 @@ RAW_SOURCES = {"vault", "github", "calendar", "sleuth", "email"}
 # Leaf ingest functions that user-facing surfaces (CLI/MCP/web) must not call
 # directly — they route through the orchestrator (`refresh_index`) instead.
 LEAF_INGEST_FNS = {
-    "sync_calendar", "sync_sleuth_reminders", "sync_gmail", "ingest_email_messages",
-    "scan_github", "upsert_github_activity", "sync_github_repo", "embed_github_documents",
-    "ingest_vault", "embed_chunks", "backfill_semantic_documents", "embed_pending",
+    "sync_calendar",
+    "sync_sleuth_reminders",
+    "sync_gmail",
+    "ingest_email_messages",
+    "scan_github",
+    "upsert_github_activity",
+    "sync_github_repo",
+    "embed_github_documents",
+    "ingest_vault",
+    "embed_chunks",
+    "backfill_semantic_documents",
+    "embed_pending",
     "sync_figma_comments",
 }
 
@@ -54,39 +64,50 @@ def test_github_activity_and_commits_are_distinct_not_redundant():
     redundant. Resolved 2026-06-10; guard that the schema keeps both shapes."""
     schema = (SRC / "ingest" / "db" / "schema.py").read_text(encoding="utf-8")
     assert "github_activity" in schema
-    assert "scan_date" in schema      # activity = scan-date snapshot
-    assert "committed_at" in schema   # commits = real commit time
+    assert "scan_date" in schema  # activity = scan-date snapshot
+    assert "committed_at" in schema  # commits = real commit time
 
 
 # --- Phase 1a — explicit collector taxonomy (`kind`) --------------------------
 EXPECTED_KIND = {
-    "vault": "raw_source", "github": "raw_source", "calendar": "raw_source",
-    "sleuth": "raw_source", "email": "raw_source", "figma": "raw_source",
-    "code": "derived_scan", "focus5": "derived_scan", "ask_self": "derived_scan",
-    "semantic": "projection", "sync": "export",
+    "vault": "raw_source",
+    "github": "raw_source",
+    "calendar": "raw_source",
+    "sleuth": "raw_source",
+    "email": "raw_source",
+    "figma": "raw_source",
+    "code": "derived_scan",
+    "focus5": "derived_scan",
+    "ask_self": "derived_scan",
+    "semantic": "projection",
+    "sync": "export",
 }
 
 
 def test_every_collector_has_valid_kind():
     from rebalance.ingest.index_ops import COLLECTORS, _COLLECTOR_KINDS
+
     for name, c in COLLECTORS.items():
         assert c.kind in _COLLECTOR_KINDS, f"{name} has invalid kind {c.kind!r}"
 
 
 def test_known_collectors_are_classified_as_expected():
     from rebalance.ingest.index_ops import COLLECTORS
+
     for name, expected in EXPECTED_KIND.items():
         assert COLLECTORS[name].kind == expected, f"{name}: {COLLECTORS[name].kind!r} != {expected!r}"
 
 
 def test_raw_source_membership_is_exactly_the_five():
     from rebalance.ingest.index_ops import _raw_source_scopes
+
     assert set(_raw_source_scopes()) == RAW_SOURCES
 
 
 # --- Decision A / Phase 1b — `all` TOKEN = raw sources only (DONE) ------------
 def test_all_expands_to_raw_sources_only():
     from rebalance.ingest.index_ops import _all_scope_names
+
     assert set(_all_scope_names()) == RAW_SOURCES
 
 
@@ -94,6 +115,7 @@ def test_default_refresh_recipe_preserves_follow_on_stages():
     """`all` is narrowed to raw sources, but the default (no-scope) recipe still
     runs the follow-on stages, so a full refresh behaves as before (Decision A)."""
     from rebalance.ingest.index_ops import _default_refresh_scopes
+
     recipe = set(_default_refresh_scopes())
     assert RAW_SOURCES <= recipe
     assert {"code", "semantic", "sync"} <= recipe
@@ -122,11 +144,10 @@ def test_all_semantic_sources_includes_registry_providers():
     the contract stays as a load-bearing regression guard.
     """
     from rebalance.ingest.index_ops import _all_semantic_sources, _semantic_source_names
+
     all_sem = set(_all_semantic_sources())
     missing = set(_semantic_source_names()) - all_sem
-    assert not missing, (
-        f"sources with semantic_docs not in _all_semantic_sources(): {missing}"
-    )
+    assert not missing, f"sources with semantic_docs not in _all_semantic_sources(): {missing}"
 
 
 # --- DASHBOARD row 8 (SOLID/OCP) / Phase 2 — no leaf-ingest bypasses (ENFORCED) -

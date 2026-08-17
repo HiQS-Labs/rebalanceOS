@@ -24,6 +24,5 @@ def test_runtime_version_matches_pyproject():
     m = re.search(r'^version = "([^"]+)"', pyproject, flags=re.MULTILINE)
     assert m, "no version field found in pyproject.toml"
     assert rebalance.__version__ == m.group(1), (
-        f"pyproject says {m.group(1)} but rebalance.__version__ is "
-        f"{rebalance.__version__} — bump both together"
+        f"pyproject says {m.group(1)} but rebalance.__version__ is {rebalance.__version__} — bump both together"
     )

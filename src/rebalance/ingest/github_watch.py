@@ -108,9 +108,7 @@ def _fetch_repo_commit_activity(
         for row in data:
             count += 1
             commit = row.get("commit") or {}
-            stamp = (commit.get("committer") or {}).get("date") or (
-                commit.get("author") or {}
-            ).get("date")
+            stamp = (commit.get("committer") or {}).get("date") or (commit.get("author") or {}).get("date")
             if stamp and (last_iso is None or stamp > last_iso):
                 last_iso = stamp
         if len(data) < 100:
@@ -139,12 +137,10 @@ def derive_watched_repo_activity(
     repo = normalize_github_repo_name(repo_full_name)
     now = now_utc()
     scan_date = now.strftime("%Y-%m-%d")
-    cutoff_day = (now.replace(microsecond=0).isoformat())
+    cutoff_day = now.replace(microsecond=0).isoformat()
     cutoff_date = _cutoff_iso(since_days)[:10]
 
-    commits, last_commit = _fetch_repo_commit_activity(
-        repo, token, since_days=since_days, api_get_json=api_get_json
-    )
+    commits, last_commit = _fetch_repo_commit_activity(repo, token, since_days=since_days, api_get_json=api_get_json)
 
     with db_connection(database_path, ensure_github_schema) as conn:
         prs_opened = conn.execute(
@@ -164,8 +160,7 @@ def derive_watched_repo_activity(
             (repo, cutoff_date),
         ).fetchone()[0]
         issue_comments = conn.execute(
-            "SELECT COUNT(*) FROM github_comments WHERE repo_full_name=? "
-            "AND substr(created_at,1,10) >= ?",
+            "SELECT COUNT(*) FROM github_comments WHERE repo_full_name=? AND substr(created_at,1,10) >= ?",
             (repo, cutoff_date),
         ).fetchone()[0]
         last_item = conn.execute(
@@ -173,9 +168,7 @@ def derive_watched_repo_activity(
             (repo,),
         ).fetchone()[0]
 
-        last_active = max(x for x in (last_commit, last_item, None) if x) if (
-            last_commit or last_item
-        ) else None
+        last_active = max(x for x in (last_commit, last_item, None) if x) if (last_commit or last_item) else None
 
         conn.execute(
             _ROLLUP_UPSERT_SQL,
@@ -224,6 +217,7 @@ def purge_watched_repo_activity(database_path: Path, repo_full_name: str) -> int
 # Lifecycle — is this watched repo now "active work"?
 # ---------------------------------------------------------------------------
 
+
 def watched_repo_is_active_work(
     database_path: Path,
     repo_full_name: str,
@@ -251,9 +245,7 @@ def watched_repo_is_active_work(
     if not database_path.exists():
         return False
 
-    recent_local_ts = int(
-        now_utc().timestamp() - _LOCAL_RECENCY_DAYS * 86400
-    )
+    recent_local_ts = int(now_utc().timestamp() - _LOCAL_RECENCY_DAYS * 86400)
 
     with db_connection(database_path, ensure_github_schema) as conn:
         # 1) Live local clone with a recent operator commit.
@@ -331,7 +323,5 @@ def reconcile_watched_repo(
     if watched_repo_is_active_work(database_path, repo, since_days=since_days):
         purged = purge_watched_repo_activity(database_path, repo)
         return {"repo": repo, "mode": "active", "purged": purged}
-    summary = derive_watched_repo_activity(
-        database_path, repo, token, since_days=since_days, api_get_json=api_get_json
-    )
+    summary = derive_watched_repo_activity(database_path, repo, token, since_days=since_days, api_get_json=api_get_json)
     return {"repo": repo, "mode": "external", **summary}

@@ -193,13 +193,18 @@ class DashboardRenderCliTests(unittest.TestCase):
             goals_path = root / "4X4.md"
             _seed_dashboard_db(db_path)
             changelog_path.write_text("# Changelog\n", encoding="utf-8")
-            goals_path.write_text("B. CURRENT WEEK GOALS\n1. [ ] Keep momentum.\nC. LAST WEEKS ACCOMPLISHMENTS\n", encoding="utf-8")
+            goals_path.write_text(
+                "B. CURRENT WEEK GOALS\n1. [ ] Keep momentum.\nC. LAST WEEKS ACCOMPLISHMENTS\n", encoding="utf-8"
+            )
 
             with (
                 patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=_calendar_config()),
                 patch("rebalance.ingest.note_builder.load_review_decisions", return_value={}),
                 patch("rebalance.ingest.note_builder.get_gemini_api_key", return_value="test-key"),
-                patch("rebalance.ingest.note_builder.synthesize_dashboard_narrative", return_value="Short operator summary.") as mock_synth,
+                patch(
+                    "rebalance.ingest.note_builder.synthesize_dashboard_narrative",
+                    return_value="Short operator summary.",
+                ) as mock_synth,
             ):
                 result = self.runner.invoke(
                     app,

@@ -37,9 +37,7 @@ QUESTIONS: list[tuple[str, list[str]]] = [
 
 
 def _recalled(cites: list[dict], expect: list[str]) -> bool:
-    blob = " ".join(
-        ((c.get("path") or "") + " " + (c.get("title") or "")).lower() for c in cites
-    )
+    blob = " ".join(((c.get("path") or "") + " " + (c.get("title") or "")).lower() for c in cites)
     return any(e.lower() in blob for e in expect)
 
 
@@ -65,11 +63,15 @@ def main() -> int:
         latencies.append(r["elapsed_ms"])
         used_union.update(r["used_sources"])
         top = (cites[0].get("path") or cites[0].get("title") or "—")[:38] if cites else "—"
-        print(f"| {i} | {q[:44]} | {'✅' if ok else '❌'} | {r['elapsed_ms']} | {','.join(r['used_sources']) or '—'} | {top} |")
+        print(
+            f"| {i} | {q[:44]} | {'✅' if ok else '❌'} | {r['elapsed_ms']} | {','.join(r['used_sources']) or '—'} | {top} |"
+        )
 
     med = int(statistics.median(latencies))
     p95 = int(statistics.quantiles(latencies, n=100)[94]) if len(latencies) >= 100 else int(max(latencies))
-    print(f"\n**recall@{args.top_k} = {hits}/{len(QUESTIONS)}**  ·  latency median={med}ms p95≈{p95}ms  ·  used={','.join(sorted(used_union)) or '—'}")
+    print(
+        f"\n**recall@{args.top_k} = {hits}/{len(QUESTIONS)}**  ·  latency median={med}ms p95≈{p95}ms  ·  used={','.join(sorted(used_union)) or '—'}"
+    )
     return 0
 
 

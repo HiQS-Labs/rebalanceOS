@@ -242,9 +242,7 @@ def compute_schema_fingerprint(db_path: Path) -> dict[str, Any]:
         if reminder_table:
             cols = sorted(_table_columns(conn, reminder_table))
             fp["reminder_column_count"] = len(cols)
-            fp["columns_sha"] = hashlib.sha256(
-                ",".join(cols).encode("utf-8")
-            ).hexdigest()[:12]
+            fp["columns_sha"] = hashlib.sha256(",".join(cols).encode("utf-8")).hexdigest()[:12]
     except sqlite3.Error:
         pass
     finally:
@@ -253,10 +251,7 @@ def compute_schema_fingerprint(db_path: Path) -> dict[str, Any]:
 
 
 def _resolve_table(conn: sqlite3.Connection, candidates: tuple[str, ...]) -> str | None:
-    present = {
-        row[0]
-        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    }
+    present = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     for name in candidates:
         if name in present:
             return name
@@ -291,9 +286,7 @@ def discover_stores_dir() -> Path:
         except OSError:
             continue
         return path
-    raise AppleRemindersAccessError(
-        "No readable Reminders store directory found. Tried: " + ", ".join(tried)
-    )
+    raise AppleRemindersAccessError("No readable Reminders store directory found. Tried: " + ", ".join(tried))
 
 
 def snapshot_stores(stores_dir: Path, dest: Path) -> list[Path]:
@@ -313,9 +306,7 @@ def snapshot_stores(stores_dir: Path, dest: Path) -> list[Path]:
                 shutil.copy2(sidecar, dest / sidecar.name)
         copied.append(target)
     if not copied:
-        raise AppleRemindersAccessError(
-            f"No Data-*.sqlite stores found under {stores_dir}"
-        )
+        raise AppleRemindersAccessError(f"No Data-*.sqlite stores found under {stores_dir}")
     return copied
 
 
@@ -352,9 +343,7 @@ def pick_active_store(snapshot_paths: list[Path]) -> Path:
     ranked = sorted(snapshot_paths, key=_count_reminders, reverse=True)
     best = ranked[0]
     if _count_reminders(best) == 0:
-        raise AppleRemindersSchemaError(
-            "No store contains any reminders (empty or unrecognized schema)"
-        )
+        raise AppleRemindersSchemaError("No store contains any reminders (empty or unrecognized schema)")
     return best
 
 
@@ -393,15 +382,11 @@ def extract_reminders(
     try:
         reminder_table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
         if reminder_table is None:
-            raise AppleRemindersSchemaError(
-                f"No reminder table found (looked for {_REMINDER_TABLE_CANDIDATES})"
-            )
+            raise AppleRemindersSchemaError(f"No reminder table found (looked for {_REMINDER_TABLE_CANDIDATES})")
         cols = _table_columns(conn, reminder_table)
         for required in ("ZTITLE", "ZCKIDENTIFIER"):
             if required not in cols:
-                raise AppleRemindersSchemaError(
-                    f"{reminder_table} missing required column {required}"
-                )
+                raise AppleRemindersSchemaError(f"{reminder_table} missing required column {required}")
 
         fallbacks: list[str] = []
         present_optional = [c for c in _OPTIONAL_REMINDER_COLUMNS if c in cols]
@@ -415,9 +400,7 @@ def extract_reminders(
             list_cols = _table_columns(conn, list_table)
             name_col = "ZNAME" if "ZNAME" in list_cols else None
             if name_col:
-                for row in conn.execute(
-                    f"SELECT Z_PK, {name_col} FROM {list_table}"
-                ):
+                for row in conn.execute(f"SELECT Z_PK, {name_col} FROM {list_table}"):
                     if row[1] is not None:
                         list_names[int(row[0])] = str(row[1])
             else:
@@ -426,9 +409,7 @@ def extract_reminders(
             fallbacks.append("missing_list_table")
 
         select_cols = ["ZTITLE", "ZCKIDENTIFIER", *present_optional]
-        rows = conn.execute(
-            f"SELECT {', '.join(select_cols)} FROM {reminder_table}"
-        ).fetchall()
+        rows = conn.execute(f"SELECT {', '.join(select_cols)} FROM {reminder_table}").fetchall()
     finally:
         conn.close()
 
@@ -552,8 +533,7 @@ def extract_apple_reminders(
     )
     # Log counts only — never reminder titles/notes (privacy).
     logger.info(
-        "apple_reminders extract: %d reminders, %d skipped, %d lists, "
-        "%.3fs, fallbacks=%s",
+        "apple_reminders extract: %d reminders, %d skipped, %d lists, %.3fs, fallbacks=%s",
         result.extracted_count,
         result.skipped_count,
         result.list_count,
@@ -641,22 +621,10 @@ def ensure_apple_reminders_schema(conn: sqlite3.Connection) -> None:
     )
     # is_completed index: the in-scope (default) list is mostly completed history,
     # so Phase 3 must filter to active fast.
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_apple_reminders_completed "
-        "ON apple_reminders(is_completed)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_apple_reminders_active "
-        "ON apple_reminders(is_active)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_apple_reminders_list "
-        "ON apple_reminders(list_name)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_apple_reminders_parent "
-        "ON apple_reminders(parent_reminder_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apple_reminders_completed ON apple_reminders(is_completed)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apple_reminders_active ON apple_reminders(is_active)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apple_reminders_list ON apple_reminders(list_name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apple_reminders_parent ON apple_reminders(parent_reminder_id)")
     conn.commit()
 
 
@@ -731,20 +699,16 @@ def upsert_apple_reminders(
         for r in reminders:
             desired = _sync_row_values(r)
             row = conn.execute(
-                f"SELECT {', '.join(_SYNC_UPDATE_FIELDS)} "
-                f"FROM apple_reminders WHERE reminder_id = ?",
+                f"SELECT {', '.join(_SYNC_UPDATE_FIELDS)} FROM apple_reminders WHERE reminder_id = ?",
                 (r.reminder_id,),
             ).fetchone()
 
             if row is None:
-                cols = ["reminder_id", *_SYNC_UPDATE_FIELDS,
-                        "first_seen_at", "last_seen_at", "last_synced_at"]
+                cols = ["reminder_id", *_SYNC_UPDATE_FIELDS, "first_seen_at", "last_seen_at", "last_synced_at"]
                 placeholders = ", ".join("?" * len(cols))
                 conn.execute(
-                    f"INSERT INTO apple_reminders ({', '.join(cols)}) "
-                    f"VALUES ({placeholders})",
-                    (r.reminder_id, *[desired[f] for f in _SYNC_UPDATE_FIELDS],
-                     now, now, now),
+                    f"INSERT INTO apple_reminders ({', '.join(cols)}) VALUES ({placeholders})",
+                    (r.reminder_id, *[desired[f] for f in _SYNC_UPDATE_FIELDS], now, now, now),
                 )
                 inserted += 1
             elif _sync_row_differs(row, desired):
@@ -757,8 +721,7 @@ def upsert_apple_reminders(
                 updated += 1
             else:
                 conn.execute(
-                    "UPDATE apple_reminders SET last_seen_at = ?, last_synced_at = ? "
-                    "WHERE reminder_id = ?",
+                    "UPDATE apple_reminders SET last_seen_at = ?, last_synced_at = ? WHERE reminder_id = ?",
                     (now, now, r.reminder_id),
                 )
                 unchanged += 1
@@ -775,8 +738,7 @@ def upsert_apple_reminders(
             )
         else:
             cur = conn.execute(
-                "UPDATE apple_reminders SET is_active = 0, last_synced_at = ? "
-                "WHERE is_active = 1",
+                "UPDATE apple_reminders SET is_active = 0, last_synced_at = ? WHERE is_active = 1",
                 (now,),
             )
         retired = cur.rowcount or 0
@@ -814,9 +776,7 @@ def get_apple_reminders_meta(database_path: Path) -> dict[str, Any]:
     conn = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
     try:
         try:
-            rows = conn.execute(
-                "SELECT key, value FROM apple_reminders_sync_meta"
-            ).fetchall()
+            rows = conn.execute("SELECT key, value FROM apple_reminders_sync_meta").fetchall()
         except sqlite3.OperationalError:
             return {}
     finally:
@@ -881,6 +841,7 @@ def sync_apple_reminders(
 
     if list_name is None:
         from rebalance.ingest.config import get_apple_reminders_list_name
+
         list_name = get_apple_reminders_list_name()
 
     started = time.monotonic()
@@ -897,9 +858,7 @@ def sync_apple_reminders(
         "drift_fallbacks": json.dumps(drift),
         "all_fallbacks": json.dumps(list(extract_result.mapping_fallbacks)),
     }
-    counts = upsert_apple_reminders(
-        database_path, scoped, list_name=list_name, now_iso=now_iso, meta=meta
-    )
+    counts = upsert_apple_reminders(database_path, scoped, list_name=list_name, now_iso=now_iso, meta=meta)
     active_count = sum(1 for r in scoped if not r.is_completed)
     if drift:
         logger.warning("apple_reminders SCHEMA DRIFT — missing: %s", ", ".join(drift))
@@ -922,11 +881,18 @@ def sync_apple_reminders(
         "apple_reminders sync: list=%r scoped=%d active=%d "
         "(ins=%d upd=%d unch=%d retired=%d) %.3fs "
         "[fingerprint macos=%s sqlite=%s cols=%s/%s]",
-        result.list_name, result.scoped_count, result.active_count,
-        result.inserted_count, result.updated_count, result.unchanged_count,
-        result.retired_count, result.duration_seconds,
-        fp.get("macos"), fp.get("sqlite"),
-        fp.get("reminder_column_count"), fp.get("columns_sha"),
+        result.list_name,
+        result.scoped_count,
+        result.active_count,
+        result.inserted_count,
+        result.updated_count,
+        result.unchanged_count,
+        result.retired_count,
+        result.duration_seconds,
+        fp.get("macos"),
+        fp.get("sqlite"),
+        fp.get("reminder_column_count"),
+        fp.get("columns_sha"),
     )
     return result
 
@@ -976,9 +942,7 @@ def list_apple_reminders(
     ``tags`` already parsed from JSON. Empty/absent table → ``[]`` (never raises
     on a not-yet-synced source)."""
     if order_by not in _ORDER_BY_COLUMNS:
-        raise ValueError(
-            f"order_by must be one of {sorted(_ORDER_BY_COLUMNS)}, got {order_by!r}"
-        )
+        raise ValueError(f"order_by must be one of {sorted(_ORDER_BY_COLUMNS)}, got {order_by!r}")
     if not Path(database_path).exists():
         return []  # DB never created (source never synced) — mode=ro would error
 

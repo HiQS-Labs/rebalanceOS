@@ -27,8 +27,8 @@ class DirectCommitCaptureResult:
     events_seen: int = 0
     events_new: int = 0
     events_enriched: int = 0
-    events_deferred: int = 0       # genuinely failed, will retry (costs an attempt)
-    events_over_budget: int = 0     # ran out of per-run quota (costs nothing)
+    events_deferred: int = 0  # genuinely failed, will retry (costs an attempt)
+    events_over_budget: int = 0  # ran out of per-run quota (costs nothing)
     commits_captured: int = 0
     head_only: int = 0
     api_calls_used: int = 0
@@ -108,8 +108,13 @@ def capture_direct_commits(
             if gh.insert_push_event(
                 conn,
                 (
-                    _event_id(event), repo, ref, payload.get("before"), payload.get("head"),
-                    event.get("created_at"), now,
+                    _event_id(event),
+                    repo,
+                    ref,
+                    payload.get("before"),
+                    payload.get("head"),
+                    event.get("created_at"),
+                    now,
                 ),
             ):
                 result.events_new += 1
@@ -119,9 +124,11 @@ def capture_direct_commits(
     compare_used = detail_used = 0
     with db_connection(database_path, ensure_github_schema) as conn:
         pending = gh.pending_push_events(
-            conn, max(compare_cap + detail_cap, compare_cap), MAX_EVENT_ATTEMPTS,
+            conn,
+            max(compare_cap + detail_cap, compare_cap),
+            MAX_EVENT_ATTEMPTS,
         )
-        for event in pending:
+        for event in pending:  # type: ignore[assignment]
             event_id = event["event_id"]
             repo = event["repo_full_name"]
             ref = event["ref"]
@@ -134,32 +141,58 @@ def capture_direct_commits(
 
             if not before:
                 if detail_used >= detail_cap:
-                    gh.update_push_event(conn, event_id, state="deferred", now=attempt_now,
-                                         reason="commit detail cap reached", deferral_kind="budget")
+                    gh.update_push_event(
+                        conn,
+                        event_id,
+                        state="deferred",
+                        now=attempt_now,
+                        reason="commit detail cap reached",
+                        deferral_kind="budget",
+                    )
                     result.events_over_budget += 1
                     continue
                 status, detail = fetch(f"{GITHUB_API}/repos/{quote(repo, safe='/')}/commits/{head}")
                 detail_used += 1
                 result.api_calls_used += 1
                 if status == 200 and isinstance(detail, dict):
-                    gh.upsert_direct_commit(conn, _commit_values(
-                        repo=repo, sha=head, event_id=event_id, ref=ref, row=detail,
-                        coverage="complete", now=attempt_now,
-                    ))
+                    gh.upsert_direct_commit(
+                        conn,
+                        _commit_values(
+                            repo=repo,
+                            sha=head,
+                            event_id=event_id,
+                            ref=ref,
+                            row=detail,
+                            coverage="complete",
+                            now=attempt_now,
+                        ),
+                    )
                     gh.replace_direct_commit_files(conn, repo, head, detail.get("files") or [])
                     gh.update_push_event(conn, event_id, state="head_only", now=attempt_now, reason="missing push base")
                     result.commits_captured += 1
                     result.head_only += 1
                 else:
                     state = "deferred" if status in (429, 500, 502, 503, 504) else "failed"
-                    gh.update_push_event(conn, event_id, state=state, now=attempt_now,
-                                         reason=f"head fetch HTTP {status}", deferral_kind="failure")
+                    gh.update_push_event(
+                        conn,
+                        event_id,
+                        state=state,
+                        now=attempt_now,
+                        reason=f"head fetch HTTP {status}",
+                        deferral_kind="failure",
+                    )
                     result.events_deferred += state == "deferred"
                 continue
 
             if compare_used >= compare_cap:
-                gh.update_push_event(conn, event_id, state="deferred", now=attempt_now,
-                                     reason="compare cap reached", deferral_kind="budget")
+                gh.update_push_event(
+                    conn,
+                    event_id,
+                    state="deferred",
+                    now=attempt_now,
+                    reason="compare cap reached",
+                    deferral_kind="budget",
+                )
                 result.events_over_budget += 1
                 continue
             compare_url = f"{GITHUB_API}/repos/{quote(repo, safe='/')}/compare/{before}...{head}"
@@ -168,13 +201,21 @@ def capture_direct_commits(
             result.api_calls_used += 1
             if status != 200 or not isinstance(comparison, dict):
                 state = "deferred" if status in (429, 500, 502, 503, 504) else "failed"
-                gh.update_push_event(conn, event_id, state=state, now=attempt_now,
-                                     reason=f"compare HTTP {status}", deferral_kind="failure")
+                gh.update_push_event(
+                    conn,
+                    event_id,
+                    state=state,
+                    now=attempt_now,
+                    reason=f"compare HTTP {status}",
+                    deferral_kind="failure",
+                )
                 result.events_deferred += state == "deferred"
                 continue
             commits = comparison.get("commits") or []
             if int(comparison.get("ahead_by") or len(commits)) > MAX_COMMITS_PER_PUSH:
-                gh.update_push_event(conn, event_id, state="failed", now=attempt_now, reason="compare range exceeds direct-commit cap")
+                gh.update_push_event(
+                    conn, event_id, state="failed", now=attempt_now, reason="compare range exceeds direct-commit cap"
+                )
                 continue
 
             complete = True
@@ -191,41 +232,68 @@ def capture_direct_commits(
                 if existing and existing["path_coverage"] == "complete":
                     continue
                 if detail_used >= detail_cap:
-                    gh.upsert_direct_commit(conn, _commit_values(
-                        repo=repo, sha=sha, event_id=event_id, ref=ref, row=summary,
-                        coverage="unavailable", now=attempt_now,
-                    ))
+                    gh.upsert_direct_commit(
+                        conn,
+                        _commit_values(
+                            repo=repo,
+                            sha=sha,
+                            event_id=event_id,
+                            ref=ref,
+                            row=summary,
+                            coverage="unavailable",
+                            now=attempt_now,
+                        ),
+                    )
                     complete = False
                     continue
                 detail_status, detail = fetch(f"{GITHUB_API}/repos/{quote(repo, safe='/')}/commits/{sha}")
                 detail_used += 1
                 result.api_calls_used += 1
                 if detail_status != 200 or not isinstance(detail, dict):
-                    gh.upsert_direct_commit(conn, _commit_values(
-                        repo=repo, sha=sha, event_id=event_id, ref=ref, row=summary,
-                        coverage="unavailable", now=attempt_now,
-                    ))
+                    gh.upsert_direct_commit(
+                        conn,
+                        _commit_values(
+                            repo=repo,
+                            sha=sha,
+                            event_id=event_id,
+                            ref=ref,
+                            row=summary,
+                            coverage="unavailable",
+                            now=attempt_now,
+                        ),
+                    )
                     complete = False
                     terminal_detail_error |= detail_status not in (429, 500, 502, 503, 504)
                     deferral_kind = "failure"
                     continue
-                gh.upsert_direct_commit(conn, _commit_values(
-                    repo=repo, sha=sha, event_id=event_id, ref=ref, row=detail,
-                    coverage="complete", now=attempt_now,
-                ))
+                gh.upsert_direct_commit(
+                    conn,
+                    _commit_values(
+                        repo=repo,
+                        sha=sha,
+                        event_id=event_id,
+                        ref=ref,
+                        row=detail,
+                        coverage="complete",
+                        now=attempt_now,
+                    ),
+                )
                 gh.replace_direct_commit_files(conn, repo, sha, detail.get("files") or [])
                 result.commits_captured += 1
             state = "enriched" if complete else ("failed" if terminal_detail_error else "deferred")
             # A partial pass that ran out of DETAIL budget has not failed at
             # anything; charging it an attempt is what evicted live events.
             kind = None if complete else ("failure" if terminal_detail_error else deferral_kind)
-            reason = "" if complete else (
-                "non-retryable commit detail failure" if terminal_detail_error
-                else ("commit detail cap reached" if kind == "budget"
-                      else "transient commit detail fetch failure")
+            reason = (
+                ""
+                if complete
+                else (
+                    "non-retryable commit detail failure"
+                    if terminal_detail_error
+                    else ("commit detail cap reached" if kind == "budget" else "transient commit detail fetch failure")
+                )
             )
-            gh.update_push_event(conn, event_id, state=state, now=attempt_now,
-                                 reason=reason, deferral_kind=kind)
+            gh.update_push_event(conn, event_id, state=state, now=attempt_now, reason=reason, deferral_kind=kind)
             result.events_enriched += complete
             if not complete and not terminal_detail_error:
                 if kind == "budget":
@@ -259,7 +327,8 @@ def sync_direct_commit_documents(database_path: Path) -> int:
             source_key = f"{row['repo_full_name']}:direct_commit:{row['sha']}"
             valid_source_keys.add(source_key)
             paths = [
-                file_row["path"] for file_row in conn.execute(
+                file_row["path"]
+                for file_row in conn.execute(
                     "SELECT path FROM github_direct_commit_files WHERE repo_full_name = ? AND sha = ? "
                     "ORDER BY path LIMIT 50",
                     (row["repo_full_name"], row["sha"]),
@@ -289,9 +358,7 @@ def sync_direct_commit_documents(database_path: Path) -> int:
         existing_docs = conn.execute(
             "SELECT id, source_key FROM github_documents WHERE doc_type = 'direct_commit'"
         ).fetchall()
-        stale_doc_ids = [
-            doc["id"] for doc in existing_docs if doc["source_key"] not in valid_source_keys
-        ]
+        stale_doc_ids = [doc["id"] for doc in existing_docs if doc["source_key"] not in valid_source_keys]
         if stale_doc_ids:
             gh.delete_github_documents(conn, stale_doc_ids)
 

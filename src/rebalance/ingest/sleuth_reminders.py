@@ -170,16 +170,14 @@ def _local_source_path(base_url: str) -> Path | None:
     """
     raw = (base_url or "").strip()
     if raw.startswith("file://"):
-        raw = raw[len("file://"):]
+        raw = raw[len("file://") :]
     elif not (raw.startswith("/") or raw.startswith("~")):
         return None
     # Require an absolute or ~-anchored path. A relative file:// path would resolve
     # against the process cwd — which differs between an interactive shell and the
     # launchd daemon — so reject it outright rather than read the wrong file.
     if not (raw.startswith("/") or raw.startswith("~")):
-        raise SleuthApiError(
-            f"Sleuth file source must be an absolute or ~-anchored path, got: {base_url!r}"
-        )
+        raise SleuthApiError(f"Sleuth file source must be an absolute or ~-anchored path, got: {base_url!r}")
     return Path(raw).expanduser()
 
 
@@ -196,7 +194,10 @@ def _refresh_file_source(file_path: Path) -> str:
     def _git(cwd: Path, *args: str) -> str:
         return subprocess.run(
             ["git", "-C", str(cwd), *args],
-            capture_output=True, text=True, timeout=60, check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
         ).stdout.strip()
 
     try:
@@ -340,14 +341,8 @@ def ensure_sleuth_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_sleuth_reminders_state "
-        "ON sleuth_reminders(state)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_sleuth_reminders_active "
-        "ON sleuth_reminders(is_active)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sleuth_reminders_state ON sleuth_reminders(state)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sleuth_reminders_active ON sleuth_reminders(is_active)")
     # Source-level metadata (key/value), e.g. the publisher heartbeat
     # `export_generated_at`. Used by `doctor` to detect a dead publisher — a
     # signal the per-row `last_synced_at` cannot give (local re-reads keep
@@ -375,18 +370,18 @@ def get_export_generated_at(database_path: Path) -> datetime | None:
         return None
     conn = sqlite3.connect(database_path)
     try:
-        row = conn.execute(
-            "SELECT value FROM sleuth_sync_meta WHERE key = ?", (EXPORT_GENERATED_AT_KEY,)
-        ).fetchone() if _table_exists(conn, "sleuth_sync_meta") else None
+        row = (
+            conn.execute("SELECT value FROM sleuth_sync_meta WHERE key = ?", (EXPORT_GENERATED_AT_KEY,)).fetchone()
+            if _table_exists(conn, "sleuth_sync_meta")
+            else None
+        )
     finally:
         conn.close()
     return _parse_datetime(row[0]) if row and row[0] else None
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
-    return conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    ).fetchone() is not None
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
 
 
 _UPDATE_FIELDS = (
@@ -467,15 +462,12 @@ def _validate_payload_contract(
     if is_file_source:
         filters = data.get("filters")
         if not isinstance(filters, dict) or filters.get("activeOnly") is not True:
-            raise SleuthApiError(
-                "Sleuth file source missing filters.activeOnly=true — refusing to reconcile"
-            )
+            raise SleuthApiError("Sleuth file source missing filters.activeOnly=true — refusing to reconcile")
         source = data.get("source")
         source_type = source.get("type") if isinstance(source, dict) else None
         if source_type != _EXPECTED_FILE_SOURCE_TYPE:
             raise SleuthApiError(
-                f"Sleuth file source.type {source_type!r} != {_EXPECTED_FILE_SOURCE_TYPE!r} "
-                f"— refusing to reconcile"
+                f"Sleuth file source.type {source_type!r} != {_EXPECTED_FILE_SOURCE_TYPE!r} — refusing to reconcile"
             )
 
     # 3. Every entry must be a dict with a usable reminderId. Reject the whole batch
@@ -544,13 +536,12 @@ def sync_sleuth_reminders(
 
     source_refresh: str | None = None
     if is_file_source and refresh_source:
+        assert file_path is not None
         source_refresh = _refresh_file_source(file_path)
 
     data = _fetch_payload(base_url, token, workspace_name, active_only)
 
-    reminders = _validate_payload_contract(
-        data, workspace_name=workspace_name, is_file_source=is_file_source
-    )
+    reminders = _validate_payload_contract(data, workspace_name=workspace_name, is_file_source=is_file_source)
 
     now_iso = time_ops.now_iso()
     inserted = updated = unchanged = 0
@@ -657,8 +648,7 @@ def sync_sleuth_reminders(
                 updated += 1
             else:
                 conn.execute(
-                    "UPDATE sleuth_reminders SET last_seen_at = ?, last_synced_at = ? "
-                    "WHERE reminder_id = ?",
+                    "UPDATE sleuth_reminders SET last_seen_at = ?, last_synced_at = ? WHERE reminder_id = ?",
                     (now_iso, now_iso, r.reminder_id),
                 )
                 unchanged += 1
@@ -701,11 +691,7 @@ def sync_sleuth_reminders(
         workspace_name=str(data.get("workspaceName") or workspace_name),
         fetched_at=str(data.get("exportGeneratedAt") or data.get("fetchedAt") or ""),
         total_reminder_count=int(data.get("totalReminderCount") or 0),
-        returned_reminder_count=int(
-            data.get("returnedReminderCount")
-            if data.get("returnedReminderCount") is not None
-            else len(reminders)
-        ),
+        returned_reminder_count=int(data.get("returnedReminderCount") or 0),
         inserted_count=inserted,
         updated_count=updated,
         unchanged_count=unchanged,

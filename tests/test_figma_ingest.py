@@ -76,9 +76,7 @@ class FigmaIngestTests(unittest.TestCase):
             self.assertEqual(r2.comments_updated, 1)
 
             with db_connection(db_path) as conn:
-                row = conn.execute(
-                    "SELECT message FROM figma_comments WHERE comment_key = 'fileA:c1'"
-                ).fetchone()
+                row = conn.execute("SELECT message FROM figma_comments WHERE comment_key = 'fileA:c1'").fetchone()
             self.assertEqual(row["message"], "New")
 
     def test_figma_comments_backfill_to_semantic_documents(self) -> None:
@@ -88,9 +86,7 @@ class FigmaIngestTests(unittest.TestCase):
             sync_figma_comments(db_path, file_keys=["fileA"], token="t", client=client)
             # figma rides the registry-driven provider path, so it must be
             # explicitly enabled (the strangler flag).
-            result = backfill_semantic_documents(
-                db_path, source_types=["figma"], use_registry_providers=True
-            )
+            result = backfill_semantic_documents(db_path, source_types=["figma"], use_registry_providers=True)
 
             self.assertEqual(result.inserted_count, 1)
             with db_connection(db_path) as conn:

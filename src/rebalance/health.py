@@ -43,23 +43,24 @@ from rebalance.doctor import (
 # freshness registry's warn_days for the same source. Vault is the one check
 # with no freshness registry entry, so it keeps an explicit 2-day default.
 CREDENTIAL_SUPPRESSION_HOURS: dict[str, int] = {
-    "vault":    48,  # no freshness check; 2d safe default
+    "vault": 48,  # no freshness check; 2d safe default
     "calendar": freshness_warn_hours("calendar data"),
-    "gmail":    freshness_warn_hours("email data"),
-    "sleuth":   freshness_warn_hours("sleuth data"),
+    "gmail": freshness_warn_hours("email data"),
+    "sleuth": freshness_warn_hours("sleuth data"),
 }
 
 # auth:* check name → (freshness status key, window hours). A recent successful
 # sync of the underlying collector clears a stale auth WARN.
 AUTH_RECOVERY: dict[str, tuple[str, int]] = {
-    "auth:github":   ("github data", freshness_warn_hours("github data")),
-    "auth:gmail":    ("gmail", freshness_warn_hours("email data")),
+    "auth:github": ("github data", freshness_warn_hours("github data")),
+    "auth:gmail": ("gmail", freshness_warn_hours("email data")),
     "auth:calendar": ("calendar", freshness_warn_hours("calendar data")),
 }
 
 
 def _parse_iso(raw: Any) -> datetime | None:
     from rebalance.lib.time_ops import _parse_iso as common_parse_iso
+
     return common_parse_iso(raw, force_utc=True)
 
 
@@ -83,9 +84,7 @@ def status_timestamp(status: dict[str, Any], key: str) -> str | None:
     return mapping.get(key)
 
 
-def source_recently_succeeded(
-    status: dict[str, Any], key: str, now: datetime, *, within_hours: int = 48
-) -> bool:
+def source_recently_succeeded(status: dict[str, Any], key: str, now: datetime, *, within_hours: int = 48) -> bool:
     dt = _parse_iso(status_timestamp(status, key))
     if dt is None:
         return False
@@ -94,9 +93,7 @@ def source_recently_succeeded(
 
 def _is_suppressed(name: str, status: dict[str, Any], now: datetime) -> bool:
     if name in CREDENTIAL_SUPPRESSION_HOURS:
-        return source_recently_succeeded(
-            status, name, now, within_hours=CREDENTIAL_SUPPRESSION_HOURS[name]
-        )
+        return source_recently_succeeded(status, name, now, within_hours=CREDENTIAL_SUPPRESSION_HOURS[name])
     if name in AUTH_RECOVERY:
         fresh_key, hours = AUTH_RECOVERY[name]
         return source_recently_succeeded(status, fresh_key, now, within_hours=hours)
@@ -109,9 +106,7 @@ def _is_attention(check: Check) -> bool:
     return check.status in {FAIL, WARN} or check.severity == NOTICE
 
 
-def visible_problem_checks(
-    checks: list[Check], status: dict[str, Any], now: datetime
-) -> list[Check]:
+def visible_problem_checks(checks: list[Check], status: dict[str, Any], now: datetime) -> list[Check]:
     """Attention checks plus explicit notices, minus recovered WARNs."""
     visible: list[Check] = []
     for check in checks:
@@ -128,10 +123,9 @@ def visible_problem_checks(
     return visible
 
 
-def ordered_problem_checks(
-    checks: list[Check], status: dict[str, Any], now: datetime
-) -> list[Check]:
+def ordered_problem_checks(checks: list[Check], status: dict[str, Any], now: datetime) -> list[Check]:
     """Visible checks, worst-first by explicit severity; launchd noise last."""
+
     def priority(check: Check) -> tuple[int, int, str]:
         severity = {ERROR: 0, WARNING: 1, NOTICE: 2}[check.severity]
         launchd = 1 if check.name.startswith("launchd:") else 0
@@ -196,9 +190,7 @@ class HealthStatus:
             (len(self.warnings), "warning"),
             (len(self.notices), "notice"),
         )
-        return " · ".join(
-            _bucket_label(count, name) for count, name in buckets if count
-        )
+        return " · ".join(_bucket_label(count, name) for count, name in buckets if count)
 
 
 def _bucket_label(count: int, name: str) -> str:
@@ -222,6 +214,7 @@ def compute_health_status(
     if notice_patterns is None:
         try:
             from rebalance.ingest.config import get_health_notice_patterns
+
             notice_patterns = get_health_notice_patterns()
         except Exception:  # noqa: BLE001 — never let config break the verdict
             notice_patterns = []
@@ -231,9 +224,7 @@ def compute_health_status(
     notices: list[Check] = []
     for check in visible:
         configured_notice = (
-            check.severity == WARNING
-            and check.status == WARN
-            and _matches_notice(check.name, notice_patterns)
+            check.severity == WARNING and check.status == WARN and _matches_notice(check.name, notice_patterns)
         )
         if check.severity == NOTICE or configured_notice:
             notices.append(check)
@@ -249,9 +240,7 @@ def compute_health_status(
     return HealthStatus(verdict=verdict, problems=problems, notices=notices)
 
 
-def check_dispositions(
-    checks: list[Check], health: HealthStatus
-) -> list[tuple[Check, str]]:
+def check_dispositions(checks: list[Check], health: HealthStatus) -> list[tuple[Check, str]]:
     """Classify every raw check against a computed ``HealthStatus``.
 
     This is what makes a binary verdict diagnosable: raw checks alone cannot

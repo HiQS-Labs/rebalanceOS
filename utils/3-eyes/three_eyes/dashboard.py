@@ -103,8 +103,7 @@ def render(registry_dir: Path | None = None) -> str:
     for job in jobs:
         relief = job.relief or {}
         relief_s = (
-            f"llm {relief.get('llm_per_run_max', '—')}/run, {relief.get('llm_daily_max', '—')}/day"
-            if relief else "—"
+            f"llm {relief.get('llm_per_run_max', '—')}/run, {relief.get('llm_daily_max', '—')}/day" if relief else "—"
         )
         routes_s = ", ".join(job.routes) or "—"
         lines.append(

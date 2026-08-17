@@ -83,9 +83,7 @@ class TestSyncCalendarMigratesPre0005(unittest.TestCase):
         )
         conn = sqlite3.connect(self.db)
         try:
-            row = conn.execute(
-                "SELECT calendar_id, person FROM calendar_events WHERE id = 'op1'"
-            ).fetchone()
+            row = conn.execute("SELECT calendar_id, person FROM calendar_events WHERE id = 'op1'").fetchone()
         finally:
             conn.close()
         self.assertIsNotNone(row, "the operator event must have been stored")
@@ -100,9 +98,7 @@ class TestSyncCalendarMigratesPre0005(unittest.TestCase):
         )
         conn = sqlite3.connect(self.db)
         try:
-            row = conn.execute(
-                "SELECT calendar_id, person FROM calendar_events WHERE id = 'tm1'"
-            ).fetchone()
+            row = conn.execute("SELECT calendar_id, person FROM calendar_events WHERE id = 'tm1'").fetchone()
         finally:
             conn.close()
         self.assertIsNotNone(row)

@@ -30,7 +30,9 @@ def _isolate_env(monkeypatch):
       `_load_user_config()` returns `{}` (no `database_path` candidate).
     """
     monkeypatch.delenv("REBALANCE_DB", raising=False)
-    monkeypatch.setattr(paths_module, "USER_CONFIG_FILE", paths_module.USER_CONFIG_FILE.with_name("does-not-exist.json"))
+    monkeypatch.setattr(
+        paths_module, "USER_CONFIG_FILE", paths_module.USER_CONFIG_FILE.with_name("does-not-exist.json")
+    )
 
 
 def test_explicit_valid_database_path_is_honored(tmp_path):

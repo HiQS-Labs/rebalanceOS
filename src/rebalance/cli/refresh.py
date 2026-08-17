@@ -53,7 +53,7 @@ def refresh_cmd(
         True,
         "--publish/--no-publish",
         help="Render the markdown pulse and push to the configured private repo "
-             "(gated on content change). Use --no-publish to skip the remote push.",
+        "(gated on content change). Use --no-publish to skip the remote push.",
     ),
     pulse_web: bool = typer.Option(
         True,
@@ -103,8 +103,10 @@ def refresh_cmd(
     # ---- Step 2: web/pulse.html ----
     def _step_pulse_web() -> dict[str, Any]:
         from rebalance.ingest.config import get_vault_path
+
         # pulse_web.py lives in scripts/, not in the package. Import via path.
         import importlib.util as _importlib_util
+
         pulse_web_path = _PROJECT_ROOT / "scripts" / "pulse_web.py"
         spec = _importlib_util.spec_from_file_location("rebalance_pulse_web", pulse_web_path)
         assert spec and spec.loader, f"could not load {pulse_web_path}"
@@ -115,7 +117,9 @@ def refresh_cmd(
         goals_path = (Path(vault_path) / "0. Goals.md") if vault_path else None
         out_path = _PROJECT_ROOT / "web" / "pulse.html"
         if goals_path and goals_path.exists():
-            mod.write_page(out_path, goals_path=goals_path, vault_path=Path(vault_path) if vault_path else None, refresh_seconds=30)
+            mod.write_page(
+                out_path, goals_path=goals_path, vault_path=Path(vault_path) if vault_path else None, refresh_seconds=30
+            )
             return {"ok": True, "output_path": str(out_path)}
         return {
             "ok": False,
@@ -130,6 +134,7 @@ def refresh_cmd(
     # ---- Step 3: publish_pulse (markdown → private repo) ----
     def _step_publish() -> dict[str, Any]:
         from rebalance.ingest.pulse import publish_pulse as _publish_pulse
+
         publish_result = _publish_pulse(db_path, dry_run=False, push=True)
         record: dict[str, Any] = {
             "ok": bool(publish_result.get("ok", True)) and not publish_result.get("error"),
@@ -157,8 +162,7 @@ def refresh_cmd(
 
     console = Console()
     console.print(
-        f"[bold]rebalance refresh[/bold] · db=[dim]{db_path}[/dim] · "
-        f"{summary['total_elapsed_seconds']}s total"
+        f"[bold]rebalance refresh[/bold] · db=[dim]{db_path}[/dim] · {summary['total_elapsed_seconds']}s total"
     )
     table = Table(show_header=True, header_style="bold")
     table.add_column("step", no_wrap=True)
@@ -179,9 +183,7 @@ def refresh_cmd(
         result = step.get("result") or {}
         if name == "refresh_index" and isinstance(result, dict):
             scope_results = result.get("results") or []
-            scope_names = sorted(
-                {(r.get("scope") or "?") for r in scope_results if isinstance(r, dict)}
-            )
+            scope_names = sorted({(r.get("scope") or "?") for r in scope_results if isinstance(r, dict)})
             scope_summary = ", ".join(scope_names) if scope_names else "(no scopes)"
             notes_parts.append(f"scopes: {scope_summary}")
         if name == "pulse_web" and step.get("output_path"):

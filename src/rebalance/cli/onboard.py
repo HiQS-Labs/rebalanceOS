@@ -54,28 +54,24 @@ def _render_setup_status(database: Path | None) -> None:
     for stage in report["stages"]:
         optional = " (optional)" if stage["optional"] else ""
         skipped_note = " — skipped; re-enterable" if stage["status"] == "skipped" else ""
-        typer.echo(
-            f"  {_STATUS_GLYPHS[stage['status']]} {stage['title']}{optional}"
-            f" — {stage['detail']}{skipped_note}"
-        )
+        typer.echo(f"  {_STATUS_GLYPHS[stage['status']]} {stage['title']}{optional} — {stage['detail']}{skipped_note}")
         if stage["status"] in ("now", "blocked"):
             typer.echo(f"      fix: {stage['remediation']}")
 
 
 @app.command("onboard")
 def onboard_cmd(
-    vault_path: str = typer.Option(
-        "", "--vault-path", help="Obsidian vault path (default: the configured one)."
-    ),
+    vault_path: str = typer.Option("", "--vault-path", help="Obsidian vault path (default: the configured one)."),
     yes: bool = typer.Option(
-        False, "--yes", "-y",
+        False,
+        "--yes",
+        "-y",
         help="Register every discovered active project without prompting.",
     ),
-    skip_refresh: bool = typer.Option(
-        False, "--skip-refresh", help="Skip the initial data refresh."
-    ),
+    skip_refresh: bool = typer.Option(False, "--skip-refresh", help="Skip the initial data refresh."),
     status: bool = typer.Option(
-        False, "--status",
+        False,
+        "--status",
         help="Render the setup stage map (where am I / what's next) and exit.",
     ),
     database: Path | None = DBOption(),
@@ -115,9 +111,7 @@ def onboard_cmd(
     #    launchd sync jobs (which run with a minimal environment) can reach it.
     token, source = get_github_token_with_source()
     if not token:
-        typer.echo(
-            "No GitHub token configured. Run: rebalance config set-github-token", err=True
-        )
+        typer.echo("No GitHub token configured. Run: rebalance config set-github-token", err=True)
         raise typer.Exit(1)
     if source != "config":
         set_github_token(token)
@@ -128,9 +122,7 @@ def onboard_cmd(
     # 3. Discover candidates.
     registry_path = vp / "Projects" / "00-project-registry.md"
     typer.echo("Discovering project candidates from vault + GitHub activity...")
-    discovery = discover_candidates(
-        vault_path=vp, registry_path=registry_path, github_token=token
-    )
+    discovery = discover_candidates(vault_path=vp, registry_path=registry_path, github_token=token)
     if getattr(discovery, "github_error", None):
         typer.echo(f"  ! GitHub discovery error: {discovery.github_error}", err=True)
 
@@ -148,7 +140,9 @@ def onboard_cmd(
         raise typer.Exit(0)
 
     def _as_dict(c: Any) -> dict[str, Any]:
-        return asdict(c) if is_dataclass(c) else dict(c)
+        if is_dataclass(c) and not isinstance(c, type):
+            return asdict(c)
+        return dict(c)
 
     # 4. Select which to register.
     if yes:
@@ -160,10 +154,7 @@ def onboard_cmd(
         picked = questionary.checkbox(
             "Select projects to register (space to toggle, enter to confirm):",
             choices=[
-                questionary.Choice(
-                    _as_dict(c)["name"], checked=_as_dict(c)["name"] in active_names
-                )
-                for c in candidates
+                questionary.Choice(_as_dict(c)["name"], checked=_as_dict(c)["name"] in active_names) for c in candidates
             ],
         ).ask()
         if picked is None:
@@ -197,9 +188,7 @@ def onboard_cmd(
         projects_yaml_path=vp / "projects.yaml",
         database_path=db,
     )
-    typer.echo(
-        f"Registered {result.project_count} project(s) -> {result.registry_path}"
-    )
+    typer.echo(f"Registered {result.project_count} project(s) -> {result.registry_path}")
 
     # 6. Initial refresh.
     if skip_refresh:
@@ -227,8 +216,10 @@ def onboard_cmd(
             "first pulse (scripts/pulse_web_sync.sh)."
         )
 
-    typer.echo("\nOnboarding done. Run `rebalance onboard --status` for the stage map"
-               " and `rebalance doctor` to verify the install.")
+    typer.echo(
+        "\nOnboarding done. Run `rebalance onboard --status` for the stage map"
+        " and `rebalance doctor` to verify the install."
+    )
 
 
 def _offer_optional_stages(database: Path | None) -> None:
@@ -254,10 +245,7 @@ def _offer_optional_stages(database: Path | None) -> None:
         database_path=database,
     )
     repo_root = find_project_root(Path(__file__).resolve())
-    offered = [
-        s for s in report["stages"]
-        if s["optional"] and s["status"] in ("next", "blocked", "skipped")
-    ]
+    offered = [s for s in report["stages"] if s["optional"] and s["status"] in ("next", "blocked", "skipped")]
     if not offered:
         return
 
@@ -278,9 +266,7 @@ def _offer_optional_stages(database: Path | None) -> None:
         if stage["status"] == "blocked":
             typer.echo(f"  - {stage['title']}: blocked ({stage['detail']}) — skipping offer.")
             continue
-        run_it = questionary.confirm(
-            f"{stage['title']} — set up now?", default=False
-        ).ask()
+        run_it = questionary.confirm(f"{stage['title']} — set up now?", default=False).ask()
         if run_it is None:
             # Ctrl+C / EOF: abort the offers without persisting anything —
             # an interrupt is not a skip decision (review finding).

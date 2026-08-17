@@ -10,20 +10,24 @@ from unittest.mock import patch
 
 from rebalance.ingest import config
 
-_BLOB = json.dumps({
-    "token": "access",
-    "refresh_token": "rt_gmail",
-    "client_id": "c",
-    "client_secret": "s",
-    "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
-})
+_BLOB = json.dumps(
+    {
+        "token": "access",
+        "refresh_token": "rt_gmail",
+        "client_id": "c",
+        "client_secret": "s",
+        "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
+    }
+)
 
 
 class GmailKeyringTests(unittest.TestCase):
     def test_explicit_auth_logs_and_records_sidecar(self) -> None:
-        with patch.object(config, "_keyring_set", return_value=True), \
-             patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev, \
-             patch("rebalance.ingest.token_meta.record_token_set") as sidecar:
+        with (
+            patch.object(config, "_keyring_set", return_value=True),
+            patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev,
+            patch("rebalance.ingest.token_meta.record_token_set") as sidecar,
+        ):
             ok = config.set_gmail_oauth_token_json(_BLOB, source="manual", record=True)
         self.assertTrue(ok)
         logev.assert_called_once()
@@ -34,16 +38,20 @@ class GmailKeyringTests(unittest.TestCase):
 
     def test_refresh_persist_does_not_log_or_record(self) -> None:
         # An access-token refresh (record=False) is not a re-authorization.
-        with patch.object(config, "_keyring_set", return_value=True), \
-             patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev, \
-             patch("rebalance.ingest.token_meta.record_token_set") as sidecar:
+        with (
+            patch.object(config, "_keyring_set", return_value=True),
+            patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev,
+            patch("rebalance.ingest.token_meta.record_token_set") as sidecar,
+        ):
             config.set_gmail_oauth_token_json(_BLOB, source="refresh", record=False)
         logev.assert_not_called()
         sidecar.assert_not_called()
 
     def test_keyring_failure_skips_recording(self) -> None:
-        with patch.object(config, "_keyring_set", return_value=False), \
-             patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev:
+        with (
+            patch.object(config, "_keyring_set", return_value=False),
+            patch("rebalance.ingest.auth_log.log_gmail_token_set") as logev,
+        ):
             ok = config.set_gmail_oauth_token_json(_BLOB, record=True)
         self.assertFalse(ok)
         logev.assert_not_called()
@@ -55,15 +63,22 @@ class GmailLoadCredentialsTests(unittest.TestCase):
     def test_keyring_blob_is_preferred_over_pickle(self) -> None:
         from rebalance.ingest import gmail
 
-        fake_creds = type("Creds", (), {
-            "expired": False,
-            "refresh_token": "rt_gmail",
-            "scopes": [gmail.GMAIL_READONLY_SCOPE],
-        })()
+        fake_creds = type(
+            "Creds",
+            (),
+            {
+                "expired": False,
+                "refresh_token": "rt_gmail",
+                "scopes": [gmail.GMAIL_READONLY_SCOPE],
+            },
+        )()
 
-        with patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB), \
-             patch("google.oauth2.credentials.Credentials.from_authorized_user_info",
-                   return_value=fake_creds) as from_info:
+        with (
+            patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB),
+            patch(
+                "google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=fake_creds
+            ) as from_info,
+        ):
             creds = gmail._load_credentials(required_scopes=[gmail.GMAIL_READONLY_SCOPE])
         from_info.assert_called_once()
         self.assertIs(creds, fake_creds)
@@ -71,8 +86,10 @@ class GmailLoadCredentialsTests(unittest.TestCase):
     def test_missing_everywhere_raises_gmail_auth_error(self) -> None:
         from rebalance.ingest import gmail
 
-        with patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=None), \
-             patch("pathlib.Path.exists", return_value=False):
+        with (
+            patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=None),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
             with self.assertRaises(gmail.GmailAuthError) as ctx:
                 gmail._load_credentials(required_scopes=[gmail.GMAIL_READONLY_SCOPE])
         self.assertIn("setup_gmail_oauth.py", str(ctx.exception))
@@ -80,14 +97,19 @@ class GmailLoadCredentialsTests(unittest.TestCase):
     def test_missing_required_scope_raises(self) -> None:
         from rebalance.ingest import gmail
 
-        narrow = type("Creds", (), {
-            "expired": False,
-            "refresh_token": "rt_gmail",
-            "scopes": ["https://www.googleapis.com/auth/userinfo.email"],
-        })()
-        with patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB), \
-             patch("google.oauth2.credentials.Credentials.from_authorized_user_info",
-                   return_value=narrow):
+        narrow = type(
+            "Creds",
+            (),
+            {
+                "expired": False,
+                "refresh_token": "rt_gmail",
+                "scopes": ["https://www.googleapis.com/auth/userinfo.email"],
+            },
+        )()
+        with (
+            patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB),
+            patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=narrow),
+        ):
             with self.assertRaises(gmail.GmailAuthError):
                 gmail._load_credentials(required_scopes=[gmail.GMAIL_READONLY_SCOPE])
 

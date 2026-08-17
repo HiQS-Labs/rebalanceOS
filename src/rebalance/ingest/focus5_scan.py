@@ -29,6 +29,7 @@ Why the spike forced this shape (see PROJECT/2-WORKING/FOCUS-5.md):
 Everything here is read-only with respect to the scanned repos: we only run
 read-only git plumbing and ``stat`` files; we never write to a foreign repo.
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,6 +42,7 @@ from typing import Any, Callable, Iterable, Iterator
 from rebalance.lib.time_ops import now_iso, now_utc
 from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
+
 # Reuse the prune discipline and the (already tested) remote-URL → owner/repo
 # parser rather than duplicating them; both are low-churn and shared by intent.
 from rebalance.ingest.ask_self_scan import derive_repo_full_name
@@ -60,6 +62,7 @@ SLOW_REPO_SECONDS = 1.5
 # ---------------------------------------------------------------------------
 # Signal model — the mode-agnostic facts a repo exposes
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class RepoSignals:
@@ -155,8 +158,11 @@ def _classify_reflog_op(subject: str) -> bool | None:
 
 
 def resolve_recency(
-    *, reflog_commit_ts: int | None, reflog_available: bool,
-    author_email_ts: int | None, any_commit_ts: int | None,
+    *,
+    reflog_commit_ts: int | None,
+    reflog_available: bool,
+    author_email_ts: int | None,
+    any_commit_ts: int | None,
 ) -> tuple[int | None, str]:
     """Resolve the headline ranking recency + its (recorded, never silent) basis.
 
@@ -204,8 +210,10 @@ def basis_badge(recency_basis: str | None) -> str:
 
 
 def explain_recency(
-    recency_basis: str | None, my_local_commit_ts: int | None,
-    rank_cutoff_ts: int | None, now_ts: int,
+    recency_basis: str | None,
+    my_local_commit_ts: int | None,
+    rank_cutoff_ts: int | None,
+    now_ts: int,
 ) -> str:
     """One-line operator-facing "why does this repo rank where it does?" string.
 
@@ -238,10 +246,7 @@ def pick_newest_dirty_off_roster(off_roster_warnings: list[dict]) -> dict | None
     off-roster repo is dirty (unpushed-only entries don't count — this banner
     is specifically "you left uncommitted work", not "you forgot to push").
     """
-    candidates = [
-        w for w in off_roster_warnings
-        if w.get("is_dirty") and w.get("my_local_commit_ts") is not None
-    ]
+    candidates = [w for w in off_roster_warnings if w.get("is_dirty") and w.get("my_local_commit_ts") is not None]
     if not candidates:
         return None
     return max(candidates, key=lambda w: (w["my_local_commit_ts"], w["repo_name"]))
@@ -266,6 +271,7 @@ def off_roster_reason(w: dict | RepoSignals) -> str:
 # ---------------------------------------------------------------------------
 # Ranking strategies — a pure function per mode, selected by config
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class RankVerdict:
@@ -372,8 +378,10 @@ def rank_any_touch(s: RepoSignals, now_ts: int) -> RankVerdict:
     surfaced dormant clones). Eligible for every discovered repo.
     """
     recency = max(
-        s.index_mtime_ts or 0, s.head_reflog_ts or 0,
-        s.last_commit_ts or 0, s.my_last_commit_ts or 0,
+        s.index_mtime_ts or 0,
+        s.head_reflog_ts or 0,
+        s.last_commit_ts or 0,
+        s.my_last_commit_ts or 0,
     )
     return RankVerdict(True, (recency,), f"local activity {_humanize_ago(recency, now_ts)}")
 
@@ -408,7 +416,11 @@ class RankedRepo:
 
 
 def rank_repos(
-    signals: list[RepoSignals], *, mode: str, now_ts: int, limit: int = DEFAULT_ROSTER_SIZE,
+    signals: list[RepoSignals],
+    *,
+    mode: str,
+    now_ts: int,
+    limit: int = DEFAULT_ROSTER_SIZE,
     hidden: Iterable[str] = (),
 ) -> list[RankedRepo]:
     """Apply *mode* to *signals* and return the top *limit* eligible repos.
@@ -435,13 +447,16 @@ def rank_repos(
 # Discovery — bounded, zero-config .git walk (reuses the ask_self prune list)
 # ---------------------------------------------------------------------------
 
+
 def _should_descend(name: str) -> bool:
     # ".git" is matched by marker, never descended.
     return should_descend(name)
 
 
 def iter_git_repos(
-    roots: list[str] | list[Path], *, max_depth: int = DEFAULT_MAX_DEPTH,
+    roots: list[str] | list[Path],
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> Iterator[Path]:
     """Yield each git repo root under *roots*, bounded by depth + the prune list.
 
@@ -474,6 +489,7 @@ def iter_git_repos(
 # Signal probing — read-only git plumbing per repo
 # ---------------------------------------------------------------------------
 
+
 def _parse_status(out: str) -> dict[str, Any]:
     """Parse ``git status --porcelain=v2 --branch`` into health fields."""
     branch = upstream = None
@@ -496,9 +512,13 @@ def _parse_status(out: str) -> dict[str, Any]:
         elif line.startswith("?"):
             untracked += 1
     return {
-        "branch": branch, "upstream": upstream, "has_upstream": has_upstream,
-        "ahead": ahead, "behind": behind,
-        "modified_count": modified, "untracked_count": untracked,
+        "branch": branch,
+        "upstream": upstream,
+        "has_upstream": has_upstream,
+        "ahead": ahead,
+        "behind": behind,
+        "modified_count": modified,
+        "untracked_count": untracked,
         "is_dirty": modified > 0 or untracked > 0,
     }
 
@@ -511,7 +531,8 @@ def _mtime(path: Path) -> int | None:
 
 
 def _probe_head_reflog_commit(
-    repo: Path, stats: dict[str, Any] | None = None,
+    repo: Path,
+    stats: dict[str, Any] | None = None,
 ) -> tuple[int | None, bool]:
     """GH-81: ``(newest local-commit-op epoch | None, reflog_available)``.
 
@@ -535,7 +556,8 @@ def _probe_head_reflog_commit(
         if verdict is None:
             logger.info(
                 "focus5: unrecognized HEAD-reflog op %r in %s (treated as reject)",
-                subject.split(":", 1)[0][:40], repo,
+                subject.split(":", 1)[0][:40],
+                repo,
             )
             if stats is not None:
                 stats.setdefault("unknown_reflog_ops", []).append(subject.split(":", 1)[0][:40])
@@ -543,7 +565,11 @@ def _probe_head_reflog_commit(
 
 
 def probe_repo_signals(
-    repo: Path, *, device_id: str, probed_at: str, stats: dict[str, Any] | None = None,
+    repo: Path,
+    *,
+    device_id: str,
+    probed_at: str,
+    stats: dict[str, Any] | None = None,
 ) -> RepoSignals:
     """Read one repo's signals with read-only git plumbing + file stats.
 
@@ -581,8 +607,10 @@ def probe_repo_signals(
     # recorded fallback basis (never raises — degrades to author_email/any_commit).
     reflog_commit_ts, reflog_available = _probe_head_reflog_commit(repo, stats)
     my_local_commit_ts, recency_basis = resolve_recency(
-        reflog_commit_ts=reflog_commit_ts, reflog_available=reflog_available,
-        author_email_ts=my_last_commit_ts, any_commit_ts=last_commit_ts,
+        reflog_commit_ts=reflog_commit_ts,
+        reflog_available=reflog_available,
+        author_email_ts=my_last_commit_ts,
+        any_commit_ts=last_commit_ts,
     )
 
     remote_url = (_git(repo, "remote", "get-url", "origin") or "").strip() or None
@@ -616,8 +644,12 @@ def probe_repo_signals(
 
 
 def scan_focus5_repos(
-    roots: list[str] | list[Path], *, device_id: str, probed_at: str,
-    max_depth: int = DEFAULT_MAX_DEPTH, stats: dict[str, Any] | None = None,
+    roots: list[str] | list[Path],
+    *,
+    device_id: str,
+    probed_at: str,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+    stats: dict[str, Any] | None = None,
 ) -> list[RepoSignals]:
     """Discover repos under *roots* and probe each one's signals.
 
@@ -635,11 +667,26 @@ def scan_focus5_repos(
 # ---------------------------------------------------------------------------
 
 _SIGNAL_COLUMNS = (
-    "device_id", "local_path", "repo_name", "repo_full_name", "branch",
-    "upstream", "has_upstream", "ahead", "behind", "modified_count",
-    "untracked_count", "is_dirty", "last_commit_at", "last_commit_ts",
-    "my_last_commit_ts", "my_local_commit_ts", "recency_basis",
-    "head_reflog_ts", "index_mtime_ts", "remote_url",
+    "device_id",
+    "local_path",
+    "repo_name",
+    "repo_full_name",
+    "branch",
+    "upstream",
+    "has_upstream",
+    "ahead",
+    "behind",
+    "modified_count",
+    "untracked_count",
+    "is_dirty",
+    "last_commit_at",
+    "last_commit_ts",
+    "my_last_commit_ts",
+    "my_local_commit_ts",
+    "recency_basis",
+    "head_reflog_ts",
+    "index_mtime_ts",
+    "remote_url",
     "probed_at",
 )
 
@@ -679,7 +726,8 @@ def _row_to_signals(row: Any) -> RepoSignals:
 
 
 def sync_focus5(
-    database_path: Path, *,
+    database_path: Path,
+    *,
     roots: list[str] | list[Path] | None = None,
     device_id: str | None = None,
     mode: str | None = None,
@@ -695,11 +743,14 @@ def sync_focus5(
     dev = device_id or get_device_id()
     if roots is None:
         from rebalance.ingest.config import get_focus5_scan_roots
+
         roots = get_focus5_scan_roots()
     if mode is None:
         from rebalance.ingest.config import get_focus5_ranking_mode
+
         mode = get_focus5_ranking_mode()
     from rebalance.ingest.config import get_focus5_hidden_repos
+
     hidden = get_focus5_hidden_repos()
 
     now = now_utc()
@@ -708,9 +759,7 @@ def sync_focus5(
 
     started = perf_counter()
     stats: dict[str, Any] = {}
-    signals = scan_focus5_repos(
-        roots, device_id=dev, probed_at=computed_at, max_depth=max_depth, stats=stats
-    )
+    signals = scan_focus5_repos(roots, device_id=dev, probed_at=computed_at, max_depth=max_depth, stats=stats)
     t_scan = perf_counter() - started
     # resolve_ranking_strategy raises on a bad mode BEFORE we touch the DB.
     # Hidden repos still get their signals cached (so an un-hide can re-rank them
@@ -725,8 +774,7 @@ def sync_focus5(
         run_migrations(conn)  # ensure tables exist even on a direct call
         conn.execute("DELETE FROM focus5_repo_signals WHERE device_id=?", (dev,))
         conn.executemany(
-            f"INSERT INTO focus5_repo_signals ({', '.join(_SIGNAL_COLUMNS)}) "
-            f"VALUES ({placeholders})",
+            f"INSERT INTO focus5_repo_signals ({', '.join(_SIGNAL_COLUMNS)}) VALUES ({placeholders})",
             [_signal_row(s) for s in signals],
         )
         conn.execute("DELETE FROM focus5_roster WHERE device_id=?", (dev,))
@@ -734,10 +782,7 @@ def sync_focus5(
             "INSERT INTO focus5_roster "
             "(device_id, local_path, position, rank_reason, ranking_mode, computed_at) "
             "VALUES (?,?,?,?,?,?)",
-            [
-                (dev, r.signals.local_path, r.position, r.reason, mode, computed_at)
-                for r in ranked
-            ],
+            [(dev, r.signals.local_path, r.position, r.reason, mode, computed_at) for r in ranked],
         )
         conn.commit()
     t_persist = perf_counter() - t0
@@ -745,15 +790,23 @@ def sync_focus5(
     elapsed = perf_counter() - started
     slow_repos, failed_repos = len(stats.get("slow", [])), stats.get("failed", 0)
     logger.info(
-        "focus5 sync: %d repos in %.2fs (scan %.2fs, rank %.3fs, persist %.3fs); "
-        "roster=%d mode=%s slow=%d failed=%d",
-        len(signals), elapsed, t_scan, t_rank, t_persist,
-        len(ranked), mode, slow_repos, failed_repos,
+        "focus5 sync: %d repos in %.2fs (scan %.2fs, rank %.3fs, persist %.3fs); roster=%d mode=%s slow=%d failed=%d",
+        len(signals),
+        elapsed,
+        t_scan,
+        t_rank,
+        t_persist,
+        len(ranked),
+        mode,
+        slow_repos,
+        failed_repos,
     )
     if failed_repos:
         logger.warning(
             "focus5 sync: %d/%d repo(s) failed their git probe — health for those is "
-            "stale/blank (see per-repo warnings above)", failed_repos, len(signals),
+            "stale/blank (see per-repo warnings above)",
+            failed_repos,
+            len(signals),
         )
 
     return Focus5SyncResult(
@@ -770,7 +823,8 @@ def sync_focus5(
 
 
 def rerank_focus5_from_cache(
-    database_path: Path, *,
+    database_path: Path,
+    *,
     device_id: str | None = None,
     mode: str | None = None,
     limit: int = DEFAULT_ROSTER_SIZE,
@@ -789,8 +843,10 @@ def rerank_focus5_from_cache(
     dev = device_id or get_device_id()
     if mode is None:
         from rebalance.ingest.config import get_focus5_ranking_mode
+
         mode = get_focus5_ranking_mode()
     from rebalance.ingest.config import get_focus5_hidden_repos
+
     hidden = get_focus5_hidden_repos()
 
     now = now_utc()
@@ -799,9 +855,7 @@ def rerank_focus5_from_cache(
 
     with db_connection(database_path) as conn:
         run_migrations(conn)
-        rows = conn.execute(
-            "SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)).fetchall()
         signals = [_row_to_signals(r) for r in rows]
         # resolve_ranking_strategy raises on a bad mode BEFORE we touch the roster.
         ranked = rank_repos(signals, mode=mode, now_ts=now_ts, limit=limit, hidden=hidden)
@@ -810,16 +864,16 @@ def rerank_focus5_from_cache(
             "INSERT INTO focus5_roster "
             "(device_id, local_path, position, rank_reason, ranking_mode, computed_at) "
             "VALUES (?,?,?,?,?,?)",
-            [
-                (dev, r.signals.local_path, r.position, r.reason, mode, computed_at)
-                for r in ranked
-            ],
+            [(dev, r.signals.local_path, r.position, r.reason, mode, computed_at) for r in ranked],
         )
         conn.commit()
 
     logger.info(
         "focus5 re-rank from cache: %d candidates -> roster=%d (mode=%s, hidden=%d)",
-        len(signals), len(ranked), mode, len(hidden),
+        len(signals),
+        len(ranked),
+        mode,
+        len(hidden),
     )
     return len(ranked)
 
@@ -828,9 +882,11 @@ def rerank_focus5_from_cache(
 # Read side — what the web view consumes
 # ---------------------------------------------------------------------------
 
+
 def vscode_url(local_path: str) -> str:
     """Build a ``vscode://file/...`` URL that opens the repo root in VS Code."""
     from urllib.parse import quote
+
     return f"vscode://file{quote(local_path, safe='/')}"
 
 
@@ -842,23 +898,35 @@ def recent_activity(local_path: str, *, limit: int = 3) -> list[dict[str, Any]]:
     any printable character without breaking the parse.
     """
     out = _git(
-        Path(local_path), "log", f"-{limit}",
+        Path(local_path),
+        "log",
+        f"-{limit}",
         "--format=%h%x1f%s%x1f%cI%x1f%ce",
     )
     items: list[dict[str, Any]] = []
     for line in (out or "").splitlines():
         parts = line.split("\x1f")
         if len(parts) == 4:
-            items.append({
-                "sha": parts[0], "subject": parts[1],
-                "committed_at": parts[2], "author_email": parts[3],
-            })
+            items.append(
+                {
+                    "sha": parts[0],
+                    "subject": parts[1],
+                    "committed_at": parts[2],
+                    "author_email": parts[3],
+                }
+            )
     return items
 
 
 _LIVE_HEALTH_FIELDS = (
-    "branch", "upstream", "has_upstream", "ahead", "behind",
-    "modified_count", "untracked_count", "is_dirty",
+    "branch",
+    "upstream",
+    "has_upstream",
+    "ahead",
+    "behind",
+    "modified_count",
+    "untracked_count",
+    "is_dirty",
 )
 
 
@@ -890,13 +958,10 @@ def get_roster_meta(database_path: Path, *, device_id: str | None = None) -> dic
     try:
         with db_connection(database_path) as conn:
             row = conn.execute(
-                "SELECT computed_at, ranking_mode FROM focus5_roster "
-                "WHERE device_id=? ORDER BY position LIMIT 1",
+                "SELECT computed_at, ranking_mode FROM focus5_roster WHERE device_id=? ORDER BY position LIMIT 1",
                 (dev,),
             ).fetchone()
-            n = conn.execute(
-                "SELECT COUNT(*) FROM focus5_roster WHERE device_id=?", (dev,)
-            ).fetchone()[0]
+            n = conn.execute("SELECT COUNT(*) FROM focus5_roster WHERE device_id=?", (dev,)).fetchone()[0]
     except Exception:  # noqa: BLE001 — table absent on a brand-new DB
         return {"computed_at": None, "ranking_mode": None, "roster_size": 0}
     return {
@@ -927,9 +992,12 @@ def _newest_pr(conn: Any, repo_full_name: str | None) -> dict[str, Any] | None:
     if row is None:
         return None
     return {
-        "number": row["number"], "title": row["title"], "state": row["state"],
+        "number": row["number"],
+        "title": row["title"],
+        "state": row["state"],
         "html_url": row["html_url"],
-        "is_draft": bool(row["is_draft"]), "is_merged": bool(row["is_merged"]),
+        "is_draft": bool(row["is_draft"]),
+        "is_merged": bool(row["is_merged"]),
     }
 
 
@@ -950,7 +1018,11 @@ def _repo_path_live(local_path: Any) -> bool:
 
 
 def _build_roster_card(
-    conn: Any, base: dict[str, Any], *, with_activity: bool, with_live_health: bool,
+    conn: Any,
+    base: dict[str, Any],
+    *,
+    with_activity: bool,
+    with_live_health: bool,
 ) -> dict[str, Any]:
     """Finish one roster card: coerce flags, attach the open/PR/activity enrichments.
 
@@ -964,9 +1036,7 @@ def _build_roster_card(
     card["has_upstream"] = bool(card["has_upstream"])
     card["vscode_url"] = vscode_url(card["local_path"])
     card["newest_pr"] = _newest_pr(conn, card.get("repo_full_name"))
-    card["recent_activity"] = (
-        recent_activity(card["local_path"]) if with_activity else []
-    )
+    card["recent_activity"] = recent_activity(card["local_path"]) if with_activity else []
     # Overlay live working-tree health on top of the stored snapshot so "did I
     # forget to commit/push?" is answered against now.
     if with_live_health:
@@ -983,9 +1053,13 @@ def _build_roster_card(
 
 
 def summarize_focus5(
-    database_path: Path, *, device_id: str | None = None,
-    with_activity: bool = True, with_live_health: bool = True,
-    mode: str | None = None, drop_missing_paths: bool = True,
+    database_path: Path,
+    *,
+    device_id: str | None = None,
+    with_activity: bool = True,
+    with_live_health: bool = True,
+    mode: str | None = None,
+    drop_missing_paths: bool = True,
 ) -> dict[str, Any]:
     """Return the roster cards, off-roster warnings, and snapshot metadata.
 
@@ -1013,11 +1087,13 @@ def summarize_focus5(
     can be disabled for a pure DB read.
     """
     dev = device_id or get_device_id()
-    empty = {
-        "roster": [], "off_roster_warnings": [], "dirty_banner": None,
-        "computed_at": None, "ranking_mode": None,
-        "summary": {"discovered": 0, "roster_size": 0,
-                    "off_roster_attention": 0, "rank_cutoff_ts": None},
+    empty: dict[str, Any] = {
+        "roster": [],
+        "off_roster_warnings": [],
+        "dirty_banner": None,
+        "computed_at": None,
+        "ranking_mode": None,
+        "summary": {"discovered": 0, "roster_size": 0, "off_roster_attention": 0, "rank_cutoff_ts": None},
     }
     try:
         with db_connection(database_path) as conn:
@@ -1036,18 +1112,22 @@ def summarize_focus5(
                 # under *mode* — never writes focus5_roster, so the default snapshot
                 # stays put. Freshness = the signals' probed_at (the last sync).
                 from rebalance.ingest.config import get_focus5_hidden_repos
+
                 signals = [
-                    _row_to_signals(r) for r in conn.execute(
-                        "SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)
-                    ).fetchall()
+                    _row_to_signals(r)
+                    for r in conn.execute("SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)).fetchall()
                 ]
                 now_ts = int(now_utc().timestamp())
-                ranked = rank_repos(signals, mode=mode, now_ts=now_ts,
-                                    hidden=get_focus5_hidden_repos())
+                ranked = rank_repos(signals, mode=mode, now_ts=now_ts, hidden=get_focus5_hidden_repos())
                 computed_at = signals[0].probed_at if signals else None
                 bases = [
-                    {**asdict(r.signals), "position": r.position, "rank_reason": r.reason,
-                     "ranking_mode": mode, "computed_at": computed_at}
+                    {
+                        **asdict(r.signals),
+                        "position": r.position,
+                        "rank_reason": r.reason,
+                        "ranking_mode": mode,
+                        "computed_at": computed_at,
+                    }
                     for r in ranked
                 ]
             # Drop cached entries whose checkout/worktree was removed from disk
@@ -1057,8 +1137,7 @@ def summarize_focus5(
             if drop_missing_paths:
                 bases = [b for b in bases if _repo_path_live(b.get("local_path"))]
             roster = [
-                _build_roster_card(conn, b, with_activity=with_activity,
-                                   with_live_health=with_live_health)
+                _build_roster_card(conn, b, with_activity=with_activity, with_live_health=with_live_health)
                 for b in bases
             ]
 
@@ -1067,6 +1146,7 @@ def summarize_focus5(
             # otherwise hiding a *dirty* repo would just relocate it from a card
             # into the nag strip, the opposite of what the ✕ promises.
             from rebalance.ingest.config import get_focus5_hidden_repos
+
             hidden = set(get_focus5_hidden_repos())
             warn_rows = conn.execute(
                 "SELECT repo_name, local_path, repo_full_name, branch, ahead, "
@@ -1089,9 +1169,9 @@ def summarize_focus5(
                 wd["warning_reason"] = off_roster_reason(wd)
                 off_roster.append(wd)
 
-            discovered = conn.execute(
-                "SELECT COUNT(*) FROM focus5_repo_signals WHERE device_id=?", (dev,)
-            ).fetchone()[0]
+            discovered = conn.execute("SELECT COUNT(*) FROM focus5_repo_signals WHERE device_id=?", (dev,)).fetchone()[
+                0
+            ]
     except Exception:  # noqa: BLE001 — tables absent on a brand-new DB
         return empty
 

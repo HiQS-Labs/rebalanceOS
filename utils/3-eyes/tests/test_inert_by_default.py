@@ -19,8 +19,10 @@ def test_gate_is_closed_without_runtime_env():
 def test_run_job_is_a_noop_when_inert(monkeypatch):
     # Any attempt to actually execute a command would go through run_job_command.
     import three_eyes.breakers as breakers
+
     monkeypatch.setattr(
-        breakers, "run_job_command",
+        breakers,
+        "run_job_command",
         lambda *a, **k: pytest.fail("run_job_command called while inert"),
     )
     assert run.run_job("selfcheck") == 0
@@ -28,8 +30,10 @@ def test_run_job_is_a_noop_when_inert(monkeypatch):
 
 def test_classify_makes_no_network_call_when_inert(monkeypatch):
     import urllib.request
+
     monkeypatch.setattr(
-        urllib.request, "urlopen",
+        urllib.request,
+        "urlopen",
         lambda *a, **k: pytest.fail("classify hit the network while inert"),
     )
     result = classify.classify("fatal error: kernel panic")
@@ -38,8 +42,10 @@ def test_classify_makes_no_network_call_when_inert(monkeypatch):
 
 def test_gh_route_refuses_and_never_shells_out_when_inert(monkeypatch):
     import three_eyes.routes as routes_mod
+
     monkeypatch.setattr(
-        routes_mod.subprocess, "run",
+        routes_mod.subprocess,
+        "run",
         lambda *a, **k: pytest.fail("gh route shelled out while inert"),
     )
     [res] = routes.route({"title": "x", "text": "y"}, ["gh-issue"])
@@ -48,8 +54,10 @@ def test_gh_route_refuses_and_never_shells_out_when_inert(monkeypatch):
 
 def test_pdda_and_notify_routes_refuse_when_inert(monkeypatch):
     import three_eyes.routes as routes_mod
+
     monkeypatch.setattr(
-        routes_mod.subprocess, "run",
+        routes_mod.subprocess,
+        "run",
         lambda *a, **k: pytest.fail("a route shelled out while inert"),
     )
     results = routes.route({"title": "x", "text": "y", "summary": "s"}, ["pdda-inbox", "notify"])
@@ -74,7 +82,7 @@ def test_kill_switch_forces_inert_even_when_enabled(monkeypatch, tmp_path):
     env.write_text("THREE_EYES_ENABLE=1\n")
     monkeypatch.setenv("THREE_EYES_RUNTIME_ENV", str(env))
     assert config.three_eyes_active() is True
-    monkeypatch.setenv("THREE_EYES_ENABLE", "0")   # explicit off beats the file
+    monkeypatch.setenv("THREE_EYES_ENABLE", "0")  # explicit off beats the file
     assert config.three_eyes_active() is False
 
 

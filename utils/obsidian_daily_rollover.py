@@ -39,9 +39,11 @@ from pathlib import Path
 # importable (e.g. when run under the system python3 fallback, not the venv).
 try:
     from rebalance.ingest.auth_log import log_job_completed, log_job_failed, log_job_started as _ljs
+
     _JOB_LOG = True
 except ImportError:
     _JOB_LOG = False
+
 
 def _log_job(event: str, elapsed: float | None = None, exit_code: int | None = None) -> None:
     if not _JOB_LOG:
@@ -52,6 +54,7 @@ def _log_job(event: str, elapsed: float | None = None, exit_code: int | None = N
         log_job_completed("obsidian-rollover", elapsed)
     elif event == "failed":
         log_job_failed("obsidian-rollover", exit_code or 1, elapsed)
+
 
 # --- Configuration -----------------------------------------------------------
 # Operator-specific. Set OBSIDIAN_VAULT to your own vault; the former hardcoded
@@ -160,8 +163,7 @@ def ensure_today_file() -> bool:
 
     TODAY_FILE.write_text(TODAY_TEMPLATE, encoding="utf-8")
     _record_create(state)
-    log(f"auto-created {TODAY_FILE.name} (create #{len(recent) + 1} of "
-        f"{MAX_CREATES_PER_DAY} allowed in 24h)")
+    log(f"auto-created {TODAY_FILE.name} (create #{len(recent) + 1} of {MAX_CREATES_PER_DAY} allowed in 24h)")
     return True
 
 
@@ -193,8 +195,7 @@ def prepend_to_yesterday(entry: str) -> None:
 def rollover(dry_run: bool = False) -> int:
     if not vault_ready():
         names = ", ".join(f"'{s.name}'" for s in VAULT_SENTINELS)
-        log(f"vault not ready (no sentinel found; looked for {names}) — "
-            f"skipping safely. Nothing created or changed.")
+        log(f"vault not ready (no sentinel found; looked for {names}) — skipping safely. Nothing created or changed.")
         return 0
 
     if not ensure_today_file():
@@ -244,13 +245,11 @@ def show_status() -> int:
 
 def main(argv: list[str]) -> int:
     import time
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--setup", action="store_true",
-                        help="create the two files if missing, reset the breaker")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="show what would happen without changing anything")
-    parser.add_argument("--status", action="store_true",
-                        help="show circuit-breaker state, then exit")
+    parser.add_argument("--setup", action="store_true", help="create the two files if missing, reset the breaker")
+    parser.add_argument("--dry-run", action="store_true", help="show what would happen without changing anything")
+    parser.add_argument("--status", action="store_true", help="show circuit-breaker state, then exit")
     args = parser.parse_args(argv)
 
     if args.status:
@@ -263,8 +262,10 @@ def main(argv: list[str]) -> int:
     if args.setup:
         if not vault_ready():
             names = ", ".join(f"'{s.name}'" for s in VAULT_SENTINELS)
-            log(f"vault not ready (no sentinel found; looked for {names}) — "
-                f"refusing to create files. Mount/sync the vault first.")
+            log(
+                f"vault not ready (no sentinel found; looked for {names}) — "
+                f"refusing to create files. Mount/sync the vault first."
+            )
             return 1
         _reset_breaker()
         ensure_today_file()

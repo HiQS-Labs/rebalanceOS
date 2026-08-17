@@ -93,7 +93,7 @@ class SyncCodeTests(unittest.TestCase):
             c.row_factory = sqlite3.Row
             ensure_semantic_schema(c)
             sync_code_documents(c, root)
-            (root / "src" / "auth_log.py").write_text('def kept():\n    return 1\n')
+            (root / "src" / "auth_log.py").write_text("def kept():\n    return 1\n")
             res = sync_code_documents(c, root)
             self.assertGreaterEqual(res["deleted"], 1)  # log_auth_failure/AuthLogger gone
             remaining = {r["source_pk"] for r in sem.semantic_documents_for_source(c, "code")}

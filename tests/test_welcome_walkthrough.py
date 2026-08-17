@@ -43,8 +43,10 @@ class WelcomeWalkthroughTest(unittest.TestCase):
             config_module.CONFIG_PATH = root / "temp" / "rbos.config"
 
             def status():
-                with patch("rebalance.ingest.lifecycle._launch_agents_dir", return_value=agents_dir), \
-                     patch("rebalance.ingest.lifecycle._pulse_html_path", return_value=pulse_html):
+                with (
+                    patch("rebalance.ingest.lifecycle._launch_agents_dir", return_value=agents_dir),
+                    patch("rebalance.ingest.lifecycle._pulse_html_path", return_value=pulse_html),
+                ):
                     return evaluate_setup(vault_path=vault, database_path=db)
 
             def stage(report, sid):
@@ -81,22 +83,24 @@ class WelcomeWalkthroughTest(unittest.TestCase):
                     fake = RepoCandidate(
                         repo_full_name="acme/side-quest",
                         last_active_at="2026-06-10T12:00:00Z",
-                        activity_score=9, commit_count=4, bands=["A"],
+                        activity_score=9,
+                        commit_count=4,
+                        bands=["A"],
                     )
                     registry_path = vault / "Projects" / "00-project-registry.md"
-                    with patch("rebalance.ingest.preflight.discover_repos_from_activity",
-                               return_value=[fake]):
+                    with patch("rebalance.ingest.preflight.discover_repos_from_activity", return_value=[fake]):
                         discovery = discover_candidates(
-                            vault_path=vault, registry_path=registry_path,
+                            vault_path=vault,
+                            registry_path=registry_path,
                             github_token="ghp_sandbox",
                         )
                     curated = [
                         dict(c, status="active")
-                        for c in discovery.most_likely_active_projects
-                        + discovery.potential_projects
+                        for c in discovery.most_likely_active_projects + discovery.potential_projects
                     ]
                     confirm_and_write(
-                        projects=curated, vault_path=vault,
+                        projects=curated,
+                        vault_path=vault,
                         registry_path=registry_path,
                         projects_yaml_path=vault / "projects.yaml",
                         database_path=db,

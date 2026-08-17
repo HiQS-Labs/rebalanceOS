@@ -38,9 +38,7 @@ class CalendarConfigLoadTests(unittest.TestCase):
             "exclude_titles": ["Stand-up"],
             "timezone": "America/Los_Angeles",
             "hours_format": "hm",
-            "projects": [
-                {"name": "Acme", "aliases": ["AC", "Acme Corp"]}
-            ],
+            "projects": [{"name": "Acme", "aliases": ["AC", "Acme Corp"]}],
         }
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _write_config(tmpdir, data)
@@ -74,10 +72,10 @@ class CalendarConfigLoadTests(unittest.TestCase):
         data = {
             "projects": [
                 {"name": "Valid", "aliases": ["V"]},
-                {"aliases": ["no-name"]},          # missing name
-                "not-a-dict",                       # wrong type
-                {"name": "", "aliases": []},        # blank name
-                {"name": "AlsoValid"},              # no aliases key
+                {"aliases": ["no-name"]},  # missing name
+                "not-a-dict",  # wrong type
+                {"name": "", "aliases": []},  # blank name
+                {"name": "AlsoValid"},  # no aliases key
             ]
         }
         with tempfile.TemporaryDirectory() as tmpdir:

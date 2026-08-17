@@ -15,9 +15,7 @@ NOW = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
 DAILY_SYNC_STATUS_ONE = "-\t1\tcom.rebalance-os.daily-sync\n"
 
 
-def _write_daily_result(
-    log_dir: Path, outcome: str | None, *, age: timedelta = timedelta(minutes=10)
-) -> Path:
+def _write_daily_result(log_dir: Path, outcome: str | None, *, age: timedelta = timedelta(minutes=10)) -> Path:
     log_dir.mkdir()
     log_path = log_dir / "daily_sync_2026-07-18.log"
     payload = {"results": []}
@@ -67,9 +65,7 @@ def test_missing_recent_run_is_stale_unknown_not_current_failure(tmp_path: Path)
 
 
 def test_job_without_structured_result_keeps_launchctl_behavior(tmp_path: Path) -> None:
-    checks = _check_launchd(
-        "-\t1\tcom.rebalance-os.github-sync\n", log_dir=tmp_path / "logs", now=NOW
-    )
+    checks = _check_launchd("-\t1\tcom.rebalance-os.github-sync\n", log_dir=tmp_path / "logs", now=NOW)
 
     assert checks[0].status == WARN
     assert checks[0].detail == "last run exited with status 1"

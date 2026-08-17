@@ -36,8 +36,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
 
         # Legacy shape: flat steps with name/complete/detail.
         report["steps"] = [
-            {"name": s["id"], "complete": s["complete"], "detail": s["detail"]}
-            for s in report["stages"]
+            {"name": s["id"], "complete": s["complete"], "detail": s["detail"]} for s in report["stages"]
         ]
         return report
 
@@ -114,7 +113,9 @@ def register(mcp: FastMCP, database_path: Path) -> None:
             registry_path=registry_path,
             github_token=token,
         )
-        return discovery
+        import dataclasses
+
+        return discovery.model_dump() if hasattr(discovery, "model_dump") else dataclasses.asdict(discovery)
 
     @mcp.tool()
     def confirm_projects(projects: list[dict[str, Any]], vault_path: str) -> dict[str, Any]:
@@ -166,7 +167,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         from rebalance.ingest.gmail import push_email_messages
 
         result = push_email_messages(database_path, messages)
-        out = {
+        out: dict[str, Any] = {
             "messages_listed": result.messages_listed,
             "messages_stored": result.messages_stored,
             "messages_inserted": result.messages_inserted,

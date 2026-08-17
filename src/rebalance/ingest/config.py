@@ -57,6 +57,7 @@ def _keyring_get(key: str) -> str | None:
         return None
     try:
         import keyring  # noqa: PLC0415
+
         return keyring.get_password(KEYRING_SERVICE, key)
     except Exception:  # noqa: BLE001 — keyring backend missing or locked
         return None
@@ -68,6 +69,7 @@ def _keyring_set(key: str, value: str) -> bool:
         return False
     try:
         import keyring  # noqa: PLC0415
+
         keyring.set_password(KEYRING_SERVICE, key, value)
         return True
     except Exception:  # noqa: BLE001
@@ -81,6 +83,7 @@ def _keyring_delete(key: str) -> bool:
     try:
         import keyring  # noqa: PLC0415
         import keyring.errors  # noqa: PLC0415
+
         keyring.delete_password(KEYRING_SERVICE, key)
         return True
     except Exception:  # noqa: BLE001
@@ -110,6 +113,7 @@ def _migrate_to_keyring(config_key: str) -> str | None:
 # auth-log / token_meta side effects on top.
 # See PROJECT/2-WORKING/AUTH-AND-API-KEY-STORAGE-HARDENING.md (Phase 1).
 # ---------------------------------------------------------------------------
+
 
 def _set_secret_dual_store(key: str, value: str) -> None:
     """Write *value* to the keyring (interactive primary) and the out-of-repo
@@ -168,9 +172,7 @@ def _get_secret_dual_store(key: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _set_google_oauth_token_json(
-    service: str, key: str, token_json: str, *, source: str, record: bool
-) -> bool:
+def _set_google_oauth_token_json(service: str, key: str, token_json: str, *, source: str, record: bool) -> bool:
     """Store a Google OAuth token JSON blob in keyring for *service*.
 
     Shared by the Calendar and Gmail setters: keyring-only persistence (the
@@ -185,6 +187,7 @@ def _set_google_oauth_token_json(
         try:  # never let logging break a credential write
             import json as _json
             from rebalance.ingest import auth_log, token_meta  # noqa: PLC0415
+
             refresh = str((_json.loads(token_json) or {}).get("refresh_token") or "")
             getattr(auth_log, f"log_{service}_token_set")(source=source)
             if refresh:
@@ -361,6 +364,7 @@ def set_github_token(token: str, *, source: str = "manual") -> None:
     _set_secret_dual_store("github_token", cleaned)
     try:  # never let logging break a credential write
         from rebalance.ingest import auth_log, token_meta  # noqa: PLC0415
+
         kind = classify_github_token(cleaned)
         auth_log.log_github_token_set(kind, source=source)
         # Sidecar: remember when THIS token value was first added (lifetime tracking).
@@ -571,6 +575,7 @@ def describe_gmail_query_filter() -> str:
 # Health notices — demote intentional/non-actionable WARNs to a calmer tier
 # ---------------------------------------------------------------------------
 
+
 def get_health_notice_patterns() -> list[str]:
     """Return check-name substrings the user has demoted to "notices".
 
@@ -621,6 +626,7 @@ def remove_health_notice_pattern(pattern: str) -> bool:
 # ---------------------------------------------------------------------------
 # ask_self federation (chat_with_data code/doc retrieval)
 # ---------------------------------------------------------------------------
+
 
 def get_ask_self_path() -> str | None:
     """Return the ask-self install path for chat federation, or None.
@@ -904,9 +910,7 @@ def set_gmail_ingest_method(method: str) -> None:
     """Store the Gmail ingest method (``oauth`` or ``mcp``)."""
     normalized = method.strip().lower()
     if normalized not in GMAIL_INGEST_METHODS:
-        raise ValueError(
-            f"gmail_ingest_method must be one of {GMAIL_INGEST_METHODS}, got {method!r}"
-        )
+        raise ValueError(f"gmail_ingest_method must be one of {GMAIL_INGEST_METHODS}, got {method!r}")
     config = _read_config()
     config["gmail_ingest_method"] = normalized
     _write_config(config)
@@ -1029,11 +1033,7 @@ def get_github_related_repos(repo: str) -> list[str]:
 def set_github_related_repos(repo: str, related_repos: list[str]) -> None:
     """Store affiliate implementation repos for one central GitHub tracker repo."""
     normalized_repo = normalize_github_repo_name(repo)
-    normalized_related = [
-        item
-        for item in _normalize_github_repo_list(related_repos)
-        if item != normalized_repo
-    ]
+    normalized_related = [item for item in _normalize_github_repo_list(related_repos) if item != normalized_repo]
     config = _read_config()
     value = config.get("github_related_repos")
     mapping = value if isinstance(value, dict) else {}
@@ -1278,8 +1278,14 @@ def get_claude_cloud_config() -> dict[str, Any]:
 def set_pulse_config(**values: Any) -> None:
     """Update one or more pulse config keys. Pass None to leave a key unchanged."""
     allowed = {
-        "github_login", "slack_user_id", "pulse_target_path", "pulse_filename", "pulse_timezone",
-        "git_pulse_clio_enabled", "git_pulse_clio_subdir", "git_pulse_clio_filename",
+        "github_login",
+        "slack_user_id",
+        "pulse_target_path",
+        "pulse_filename",
+        "pulse_timezone",
+        "git_pulse_clio_enabled",
+        "git_pulse_clio_subdir",
+        "git_pulse_clio_filename",
     }
     config = _read_config()
     for key, value in values.items():
@@ -1294,6 +1300,7 @@ def set_pulse_config(**values: Any) -> None:
 # ---------------------------------------------------------------------------
 # Calendar OAuth token (keyring-backed)
 # ---------------------------------------------------------------------------
+
 
 def get_calendar_oauth_token_json() -> str | None:
     """Return the serialized Google OAuth2 token JSON from keyring, or None if absent."""
@@ -1311,9 +1318,7 @@ def set_calendar_oauth_token_json(token_json: str, *, source: str = "manual", re
     event + sidecar metadata keyed on the stable ``refresh_token`` so the
     authorization's age is tracked (and not reset on every access-token refresh).
     """
-    return _set_google_oauth_token_json(
-        "calendar", "calendar_oauth_token", token_json, source=source, record=record
-    )
+    return _set_google_oauth_token_json("calendar", "calendar_oauth_token", token_json, source=source, record=record)
 
 
 def clear_calendar_oauth_token() -> None:
@@ -1324,6 +1329,7 @@ def clear_calendar_oauth_token() -> None:
 # ---------------------------------------------------------------------------
 # Gmail OAuth token (keyring-backed) — mirrors the Calendar helpers above
 # ---------------------------------------------------------------------------
+
 
 def get_gmail_oauth_token_json() -> str | None:
     """Return the serialized Gmail OAuth2 token JSON from keyring, or None if absent."""
@@ -1341,9 +1347,7 @@ def set_gmail_oauth_token_json(token_json: str, *, source: str = "manual", recor
     event + sidecar metadata keyed on the stable ``refresh_token`` so the
     authorization's age is tracked (and not reset on every access-token refresh).
     """
-    return _set_google_oauth_token_json(
-        "gmail", "gmail_oauth_token", token_json, source=source, record=record
-    )
+    return _set_google_oauth_token_json("gmail", "gmail_oauth_token", token_json, source=source, record=record)
 
 
 def clear_gmail_oauth_token() -> None:
@@ -1378,9 +1382,7 @@ def migrate_oauth_pickles() -> dict[str, str]:
                     retired = True
                 except OSError:
                     pass
-            results[service] = "JSON fallback written from keyring" + (
-                " · legacy pickle retired" if retired else ""
-            )
+            results[service] = "JSON fallback written from keyring" + (" · legacy pickle retired" if retired else "")
         elif pickle_path.exists():
             results[service] = "legacy pickle present — migrates to JSON on next sync (keyring empty)"
         else:
@@ -1391,6 +1393,7 @@ def migrate_oauth_pickles() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Sync repo config (Issue #39 — multi-device snapshot sharing)
 # ---------------------------------------------------------------------------
+
 
 def get_sync_subdir() -> str:
     """Return the subfolder within pulse_target_path used for device snapshots.
@@ -1413,8 +1416,6 @@ def set_sync_subdir(subdir: str) -> None:
 # ---------------------------------------------------------------------------
 # LLM API keys
 # ---------------------------------------------------------------------------
-
-
 
 
 def get_gemini_api_key() -> str | None:
@@ -1447,6 +1448,7 @@ def get_gemini_api_key() -> str | None:
     if project:
         try:
             from google.cloud import secretmanager  # noqa: PLC0415
+
             client = secretmanager.SecretManagerServiceClient()
             resource = f"projects/{project}/secrets/{secret_name}/versions/latest"
             response = client.access_secret_version(request={"name": resource})
@@ -1553,9 +1555,7 @@ def _gemini_key_via_gcloud(project: str | None, secret_name: str) -> str | None:
     if project:
         cmd += ["--project", project]
     try:
-        completed = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=15, check=True
-        )
+        completed = subprocess.run(cmd, capture_output=True, text=True, timeout=15, check=True)
     except Exception:  # noqa: BLE001 — gcloud missing/unauthed/secret absent
         return None
     value = completed.stdout.strip()
@@ -1593,9 +1593,7 @@ def _derive_git_repo_root(path_str: str) -> str | None:
     return None
 
 
-def set_sleuth_credentials(
-    base_url: str, token: str, workspace: str, *, source: str = "manual"
-) -> None:
+def set_sleuth_credentials(base_url: str, token: str, workspace: str, *, source: str = "manual") -> None:
     """Store Sleuth Web API creds in the keyring and the out-of-repo secret store.
 
     Mirrors set_github_token: keyring is the interactive primary; the
@@ -1620,6 +1618,7 @@ def set_sleuth_credentials(
     keyring_ok = _keyring_set(SLEUTH_KEYRING_KEY, _json.dumps(creds))
     try:
         from . import secret_store  # noqa: PLC0415
+
         secret_store.write_secret_json(SLEUTH_KEYRING_KEY, creds)
         store_ok = True
     except OSError:
@@ -1631,10 +1630,9 @@ def set_sleuth_credentials(
         set_sleuth_sync_repo_path(repo_root)
     try:  # never let logging break a credential write
         from rebalance.ingest import auth_log, token_meta  # noqa: PLC0415
+
         auth_log.log_sleuth_credentials_set(source=source, workspace=creds["SLEUTH_WORKSPACE_NAME"])
-        token_meta.record_token_set(
-            "sleuth", creds["SLEUTH_WEB_API_TOKEN"], kind="sleuth web api", source=source
-        )
+        token_meta.record_token_set("sleuth", creds["SLEUTH_WEB_API_TOKEN"], kind="sleuth web api", source=source)
     except Exception:  # noqa: BLE001
         pass
 
@@ -1688,6 +1686,7 @@ def get_sleuth_credentials(which: str = "production") -> dict[str, str]:
             return creds
     # Out-of-repo secret store (preferred launchd-safe fallback).
     from . import secret_store  # noqa: PLC0415
+
     creds = _sleuth_creds_complete(secret_store.read_secret_json(SLEUTH_KEYRING_KEY))
     if creds:
         return creds
@@ -1713,9 +1712,7 @@ def _read_sleuth_env_file(which: str = "production") -> dict[str, str]:
     elif fallback.exists():
         path = fallback
     else:
-        raise FileNotFoundError(
-            f"Sleuth env file not found: tried {primary} then {fallback}"
-        )
+        raise FileNotFoundError(f"Sleuth env file not found: tried {primary} then {fallback}")
 
     values: dict[str, str] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -1727,9 +1724,7 @@ def _read_sleuth_env_file(which: str = "production") -> dict[str, str]:
 
     missing = [k for k in _SLEUTH_REQUIRED if not values.get(k)]
     if missing:
-        raise ValueError(
-            f"Sleuth env file missing required keys: {', '.join(missing)} (in {path})"
-        )
+        raise ValueError(f"Sleuth env file missing required keys: {', '.join(missing)} (in {path})")
     return values
 
 

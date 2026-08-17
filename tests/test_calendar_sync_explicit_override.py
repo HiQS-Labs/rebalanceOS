@@ -51,11 +51,18 @@ class TestRefreshCalendarSourceResolution(unittest.TestCase):
         # No explicit id; config resolves to a non-'primary' email which must be
         # canonicalised to 'primary' for the operator's own calendar.
         cfg = CalendarConfig(
-            calendar_id="devops@neochro.me", exclude_titles=[], aggregator_skip_words=[],
-            timezone="UTC", projects=[], hours_format="decimal", team_calendars=[],
+            calendar_id="devops@neochro.me",
+            exclude_titles=[],
+            aggregator_skip_words=[],
+            timezone="UTC",
+            projects=[],
+            hours_format="decimal",
+            team_calendars=[],
         )
-        with patch.object(calmod, "sync_calendar", side_effect=fake_sync), \
-             patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg):
+        with (
+            patch.object(calmod, "sync_calendar", side_effect=fake_sync),
+            patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg),
+        ):
             refresh_calendar_source(Path("/tmp/x.db"))  # no calendar_id => operator default
         self.assertEqual(captured["calendar_id"], "primary")
 
@@ -68,9 +75,7 @@ class TestRefreshCalendarSourceResolution(unittest.TestCase):
     def test_teammate_with_person_is_verbatim(self) -> None:
         captured, fake_sync = self._capture_calendar_id()
         with patch.object(calmod, "sync_calendar", side_effect=fake_sync):
-            refresh_calendar_source(
-                Path("/tmp/x.db"), calendar_id="matt@group.calendar.google.com", person="matt"
-            )
+            refresh_calendar_source(Path("/tmp/x.db"), calendar_id="matt@group.calendar.google.com", person="matt")
         self.assertEqual(captured["calendar_id"], "matt@group.calendar.google.com")
         self.assertEqual(captured["person"], "matt")
 
@@ -87,11 +92,11 @@ class TestCalendarSyncCliWiring(unittest.TestCase):
             captured["calendar_id"] = calendar_id
             return _result(calendar_id or "primary")
 
-        with patch("rebalance.cli.calendar.resolve_database_path", return_value=Path("/tmp/x.db")), \
-             patch("rebalance.ingest.calendar.refresh_calendar_source", side_effect=fake_refresh):
-            result = CliRunner().invoke(
-                app, ["calendar-sync", "--calendar-id", "team@group.calendar.google.com"]
-            )
+        with (
+            patch("rebalance.cli.calendar.resolve_database_path", return_value=Path("/tmp/x.db")),
+            patch("rebalance.ingest.calendar.refresh_calendar_source", side_effect=fake_refresh),
+        ):
+            result = CliRunner().invoke(app, ["calendar-sync", "--calendar-id", "team@group.calendar.google.com"])
         self.assertEqual(result.exit_code, 0, result.output)
         # The explicit override reaches refresh_calendar_source verbatim (not pre-rewritten).
         self.assertEqual(captured["calendar_id"], "team@group.calendar.google.com")
@@ -109,8 +114,10 @@ class TestCalendarSyncCliWiring(unittest.TestCase):
             captured["calendar_id"] = calendar_id
             return _result("primary")
 
-        with patch("rebalance.cli.calendar.resolve_database_path", return_value=Path("/tmp/x.db")), \
-             patch("rebalance.ingest.calendar.refresh_calendar_source", side_effect=fake_refresh):
+        with (
+            patch("rebalance.cli.calendar.resolve_database_path", return_value=Path("/tmp/x.db")),
+            patch("rebalance.ingest.calendar.refresh_calendar_source", side_effect=fake_refresh),
+        ):
             result = CliRunner().invoke(app, ["calendar-sync"])
         self.assertEqual(result.exit_code, 0, result.output)
         # No override => empty calendar_id passed; the function resolves the default.

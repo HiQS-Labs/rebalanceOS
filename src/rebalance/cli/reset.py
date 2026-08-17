@@ -45,11 +45,13 @@ def _installed_plists() -> list[Path]:
 @app.command("reset")
 def reset_cmd(
     force: bool = typer.Option(
-        False, "--force",
+        False,
+        "--force",
         help="Actually execute. Without it, this is a dry-run plan.",
     ),
     include_keyring: bool = typer.Option(
-        False, "--include-keyring",
+        False,
+        "--include-keyring",
         help="Also delete the enumerated keyring secrets (default: list only).",
     ),
     database: Path | None = DBOption(),
@@ -74,13 +76,11 @@ def reset_cmd(
         candidate = canonical_database_path()
         db_path = candidate if candidate.exists() else None
     db_files = (
-        [p for p in (db_path, *(db_path.with_name(db_path.name + s) for s in ("-wal", "-shm")))
-         if p and p.exists()]
-        if db_path else []
+        [p for p in (db_path, *(db_path.with_name(db_path.name + s) for s in ("-wal", "-shm"))) if p and p.exists()]
+        if db_path
+        else []
     )
-    oauth_files = [
-        p for p in (resolve_oauth_token_path(s) for s in OAUTH_FILE_SERVICES) if p.exists()
-    ]
+    oauth_files = [p for p in (resolve_oauth_token_path(s) for s in OAUTH_FILE_SERVICES) if p.exists()]
     keyring_present = [k for k in KEYRING_KEYS if _keyring_get(k)]
 
     mode = "RESET" if force else "DRY-RUN (pass --force to execute)"
@@ -94,7 +94,8 @@ def reset_cmd(
     for p in oauth_files:
         typer.echo(f"    - {p}")
     typer.echo(
-        "  keyring secrets present: " + (", ".join(keyring_present) or "none")
+        "  keyring secrets present: "
+        + (", ".join(keyring_present) or "none")
         + ("" if include_keyring else "  [kept — pass --include-keyring to delete]")
     )
     typer.echo("  vault: untouched (registry markdown and projects.yaml stay where they are)")

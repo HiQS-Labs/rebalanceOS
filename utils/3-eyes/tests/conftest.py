@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-_PKG_PARENT = Path(__file__).resolve().parent.parent   # utils/3-eyes
+_PKG_PARENT = Path(__file__).resolve().parent.parent  # utils/3-eyes
 if str(_PKG_PARENT) not in sys.path:
     sys.path.insert(0, str(_PKG_PARENT))
 
@@ -43,4 +43,5 @@ def _activate(monkeypatch, tmp_path):
 def activate(monkeypatch, tmp_path):
     def _do():
         return _activate(monkeypatch, tmp_path)
+
     return _do

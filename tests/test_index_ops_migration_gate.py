@@ -33,9 +33,7 @@ class MigrationGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "test.db"
             try:
-                register_collector(
-                    Collector("gate_test", _mock_refresh, included_in_all=False)
-                )
+                register_collector(Collector("gate_test", _mock_refresh, included_in_all=False))
                 with patch(
                     "rebalance.ingest.index_ops.run_migrations",
                     side_effect=RuntimeError("disk full during 0005 rebuild"),
@@ -51,17 +49,13 @@ class MigrationGateTests(unittest.TestCase):
                 self.assertEqual(calls, [], "collector ran despite failed migrations")
 
                 # Exactly one clear migrations error is reported.
-                migration_errors = [
-                    e for e in result["errors"] if e.get("scope") == "migrations"
-                ]
+                migration_errors = [e for e in result["errors"] if e.get("scope") == "migrations"]
                 self.assertEqual(len(migration_errors), 1)
                 self.assertIn("disk full", migration_errors[0]["error"])
 
                 # The scope is recorded as skipped (informative, not silent), and
                 # there is no derivative collector error for it.
-                gate_results = [
-                    r for r in result["results"] if r.get("scope") == "gate_test"
-                ]
+                gate_results = [r for r in result["results"] if r.get("scope") == "gate_test"]
                 self.assertEqual(len(gate_results), 1)
                 self.assertTrue(gate_results[0].get("skipped"))
                 self.assertIn("migration", gate_results[0].get("reason", ""))
@@ -85,9 +79,7 @@ class MigrationGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "test.db"
             try:
-                register_collector(
-                    Collector("gate_test_ok", _mock_refresh, included_in_all=False)
-                )
+                register_collector(Collector("gate_test_ok", _mock_refresh, included_in_all=False))
                 result = refresh_index(
                     db_path,
                     scope=["gate_test_ok"],

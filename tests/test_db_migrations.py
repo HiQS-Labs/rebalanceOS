@@ -20,9 +20,7 @@ class MigrationRunnerTests(unittest.TestCase):
         # available migration. The expected final version is the highest
         # NNNN_*.sql prefix (or the baseline if no migrations exist yet), so this
         # stays correct as migrations accrue without hardcoding a number.
-        expected = max(
-            [v for v, _ in migrate.discover_migrations()] + [BASELINE_SCHEMA_VERSION]
-        )
+        expected = max([v for v, _ in migrate.discover_migrations()] + [BASELINE_SCHEMA_VERSION])
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "rebalance.db"
             with db_connection(db_path, ensure_schema) as conn:
@@ -30,9 +28,7 @@ class MigrationRunnerTests(unittest.TestCase):
                 self.assertEqual(version, expected)
                 self.assertEqual(current_schema_version(conn), expected)
                 # The baseline is always recorded, regardless of later migrations.
-                recorded = {
-                    int(r[0]) for r in conn.execute("SELECT version FROM schema_version")
-                }
+                recorded = {int(r[0]) for r in conn.execute("SELECT version FROM schema_version")}
                 self.assertIn(BASELINE_SCHEMA_VERSION, recorded)
 
     def test_run_migrations_is_idempotent(self) -> None:
@@ -40,13 +36,9 @@ class MigrationRunnerTests(unittest.TestCase):
             db_path = Path(tmp) / "rebalance.db"
             with db_connection(db_path, ensure_schema) as conn:
                 first = run_migrations(conn)
-                rows_first = conn.execute(
-                    "SELECT COUNT(*) FROM schema_version"
-                ).fetchone()[0]
+                rows_first = conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
                 second = run_migrations(conn)
-                rows_second = conn.execute(
-                    "SELECT COUNT(*) FROM schema_version"
-                ).fetchone()[0]
+                rows_second = conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
                 # Re-running changes nothing: same version, no new rows.
                 self.assertEqual(second, first)
                 self.assertEqual(rows_second, rows_first)
@@ -72,10 +64,7 @@ class MigrationRunnerTests(unittest.TestCase):
                     conn.execute("SELECT COUNT(*) FROM migration_probe")
                     # Re-running applies nothing further.
                     self.assertEqual(run_migrations(conn), 2)
-                    recorded = {
-                        int(r[0])
-                        for r in conn.execute("SELECT version FROM schema_version")
-                    }
+                    recorded = {int(r[0]) for r in conn.execute("SELECT version FROM schema_version")}
                     self.assertEqual(recorded, {BASELINE_SCHEMA_VERSION, 2})
             finally:
                 migrate.MIGRATIONS_DIR = original_dir
@@ -104,24 +93,19 @@ class MigrationRunnerTests(unittest.TestCase):
             try:
                 with db_connection(db_path, ensure_schema) as conn:
                     conn.execute("CREATE TABLE keepme (id TEXT PRIMARY KEY, v TEXT)")
-                    conn.executemany(
-                        "INSERT INTO keepme VALUES (?, ?)", [("a", "1"), ("b", "2")])
+                    conn.executemany("INSERT INTO keepme VALUES (?, ?)", [("a", "1"), ("b", "2")])
                     conn.commit()
                     with self.assertRaises(Exception):
                         run_migrations(conn)
                     # Original table + data fully intact after the rollback — the
                     # DROP/RENAME earlier in the script must NOT have stuck.
-                    rows = conn.execute(
-                        "SELECT id, v FROM keepme ORDER BY id").fetchall()
+                    rows = conn.execute("SELECT id, v FROM keepme ORDER BY id").fetchall()
                     self.assertEqual([tuple(r) for r in rows], [("a", "1"), ("b", "2")])
                     # The scratch table must not survive either.
-                    leftover = conn.execute(
-                        "SELECT name FROM sqlite_master WHERE name = 'keepme_new'"
-                    ).fetchall()
+                    leftover = conn.execute("SELECT name FROM sqlite_master WHERE name = 'keepme_new'").fetchall()
                     self.assertEqual(leftover, [])
                     # Version did not advance past the baseline.
-                    self.assertEqual(
-                        current_schema_version(conn), BASELINE_SCHEMA_VERSION)
+                    self.assertEqual(current_schema_version(conn), BASELINE_SCHEMA_VERSION)
             finally:
                 migrate.MIGRATIONS_DIR = original_dir
 
@@ -132,8 +116,7 @@ class MigrationRunnerTests(unittest.TestCase):
             mig_dir = Path(tmp) / "migrations"
             mig_dir.mkdir()
             (mig_dir / "0002_two_tables.sql").write_text(
-                "CREATE TABLE alpha (id INTEGER PRIMARY KEY);\n"
-                "CREATE TABLE beta (id INTEGER PRIMARY KEY);\n",
+                "CREATE TABLE alpha (id INTEGER PRIMARY KEY);\nCREATE TABLE beta (id INTEGER PRIMARY KEY);\n",
                 encoding="utf-8",
             )
             db_path = Path(tmp) / "rebalance.db"
@@ -156,9 +139,7 @@ class MigrationRunnerTests(unittest.TestCase):
             mig_dir = Path(tmp) / "migrations"
             mig_dir.mkdir()
             (mig_dir / "0002_self_wrapped.sql").write_text(
-                "BEGIN;\n"
-                "CREATE TABLE should_not_exist (id INTEGER PRIMARY KEY);\n"
-                "COMMIT;\n",
+                "BEGIN;\nCREATE TABLE should_not_exist (id INTEGER PRIMARY KEY);\nCOMMIT;\n",
                 encoding="utf-8",
             )
             db_path = Path(tmp) / "rebalance.db"
@@ -168,12 +149,9 @@ class MigrationRunnerTests(unittest.TestCase):
                 with db_connection(db_path, ensure_schema) as conn:
                     with self.assertRaises(Exception):
                         run_migrations(conn)
-                    leftover = conn.execute(
-                        "SELECT name FROM sqlite_master WHERE name = 'should_not_exist'"
-                    ).fetchall()
+                    leftover = conn.execute("SELECT name FROM sqlite_master WHERE name = 'should_not_exist'").fetchall()
                     self.assertEqual(leftover, [])
-                    self.assertEqual(
-                        current_schema_version(conn), BASELINE_SCHEMA_VERSION)
+                    self.assertEqual(current_schema_version(conn), BASELINE_SCHEMA_VERSION)
             finally:
                 migrate.MIGRATIONS_DIR = original_dir
 

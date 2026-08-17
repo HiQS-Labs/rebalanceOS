@@ -30,6 +30,7 @@ from three_eyes import breakers, config, dashboard, launchd, registry, relief, r
 # Plain, testable tool functions
 # --------------------------------------------------------------------------- #
 
+
 def list_jobs() -> dict:
     """List every job in the registry with its schedule, command, and routes."""
     return {
@@ -90,8 +91,13 @@ def dry_run(job_id: str) -> dict:
         job = registry.load_job(job_id)
     except registry.RegistryError as exc:
         return {"error": str(exc)}
-    sample = {"source": job.id, "title": f"sample from {job.id}", "severity": "warn",
-              "summary": "dry-run sample", "text": "sample"}
+    sample = {
+        "source": job.id,
+        "title": f"sample from {job.id}",
+        "severity": "warn",
+        "summary": "dry-run sample",
+        "text": "sample",
+    }
     return {
         "id": job.id,
         "command": job.command,
@@ -125,6 +131,7 @@ TOOLS = [list_jobs, job_status, why, dry_run, pause, resume, observe_agents, syn
 # --------------------------------------------------------------------------- #
 # MCP transport (built only when actually serving)
 # --------------------------------------------------------------------------- #
+
 
 def build_server():  # pragma: no cover - exercised only under a live MCP host
     from mcp.server.fastmcp import FastMCP

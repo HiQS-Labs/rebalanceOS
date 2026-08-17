@@ -49,45 +49,57 @@ def test_secret_prefers_keyring_over_file_and_environment(tmp_path):
     secret_path = tmp_path / "secrets.json"
     _write_secret_file(secret_path, {"TOKEN": "from-file"})
 
-    assert secret(
-        "TOKEN",
-        secret_file=secret_path,
-        environ={"TOKEN": "from-environment"},
-        keyring_getter=lambda _name: "from-keyring",
-    ) == "from-keyring"
+    assert (
+        secret(
+            "TOKEN",
+            secret_file=secret_path,
+            environ={"TOKEN": "from-environment"},
+            keyring_getter=lambda _name: "from-keyring",
+        )
+        == "from-keyring"
+    )
 
 
 def test_secret_uses_private_file_when_keyring_has_no_value(tmp_path):
     secret_path = tmp_path / "secrets.json"
     _write_secret_file(secret_path, {"TOKEN": "from-file"})
 
-    assert secret(
-        "TOKEN",
-        secret_file=secret_path,
-        environ={"TOKEN": "from-environment"},
-        keyring_getter=lambda _name: None,
-    ) == "from-file"
+    assert (
+        secret(
+            "TOKEN",
+            secret_file=secret_path,
+            environ={"TOKEN": "from-environment"},
+            keyring_getter=lambda _name: None,
+        )
+        == "from-file"
+    )
 
 
 def test_secret_uses_environment_when_other_rungs_have_no_value(tmp_path):
-    assert secret(
-        "TOKEN",
-        secret_file=tmp_path / "missing.json",
-        environ={"TOKEN": "from-environment"},
-        keyring_getter=lambda _name: None,
-    ) == "from-environment"
+    assert (
+        secret(
+            "TOKEN",
+            secret_file=tmp_path / "missing.json",
+            environ={"TOKEN": "from-environment"},
+            keyring_getter=lambda _name: None,
+        )
+        == "from-environment"
+    )
 
 
 def test_secret_returns_none_for_missing_or_empty_values(tmp_path):
     secret_path = tmp_path / "secrets.json"
     _write_secret_file(secret_path, {"TOKEN": ""})
 
-    assert secret(
-        "TOKEN",
-        secret_file=secret_path,
-        environ={"TOKEN": ""},
-        keyring_getter=lambda _name: "",
-    ) is None
+    assert (
+        secret(
+            "TOKEN",
+            secret_file=secret_path,
+            environ={"TOKEN": ""},
+            keyring_getter=lambda _name: "",
+        )
+        is None
+    )
 
 
 def test_secret_refuses_a_file_that_is_not_0600(tmp_path):

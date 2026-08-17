@@ -77,8 +77,16 @@ def get_device_id() -> str:
 # clause in export_calendar_snapshot), and `person` is NULL on primary rows
 # anyway. Do not add it here without a deliberate privacy review.
 _CALENDAR_COLUMNS = (
-    "id", "summary", "start_time", "end_time", "location",
-    "attendees_json", "calendar_id", "status", "description", "fetched_at",
+    "id",
+    "summary",
+    "start_time",
+    "end_time",
+    "location",
+    "attendees_json",
+    "calendar_id",
+    "status",
+    "description",
+    "fetched_at",
 )
 
 
@@ -142,8 +150,15 @@ def export_calendar_snapshot(
 # ---------------------------------------------------------------------------
 
 _EMAIL_COLUMNS = (
-    "message_id", "thread_id", "from_address", "from_name",
-    "subject", "snippet", "received_at", "labels_json", "synced_at",
+    "message_id",
+    "thread_id",
+    "from_address",
+    "from_name",
+    "subject",
+    "snippet",
+    "received_at",
+    "labels_json",
+    "synced_at",
 )
 
 
@@ -196,6 +211,7 @@ def export_email_snapshot(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_snapshot(
     sync_dir: Path,
     source: str,
@@ -236,9 +252,14 @@ def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) 
 # Git commit + push for the sync directory
 # ---------------------------------------------------------------------------
 
+
 def _run_git(args: list[str], *, cwd: Path) -> tuple[int, str, str]:
     proc = subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False,
+        ["git", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
@@ -259,9 +280,7 @@ def commit_and_push_sync(
     if rc != 0:
         return {"committed": False, "pushed": False, "git_error": err}
 
-    rc_status, status_out, _ = _run_git(
-        ["status", "--porcelain", sync_subdir], cwd=target_repo
-    )
+    rc_status, status_out, _ = _run_git(["status", "--porcelain", sync_subdir], cwd=target_repo)
     if rc_status != 0 or not status_out:
         return {"committed": False, "pushed": False, "reason": "no changes to sync"}
 
@@ -276,6 +295,7 @@ def commit_and_push_sync(
 
     git_error = err
     if "fetch first" in git_error or "rejected" in git_error:
+
         def pull_rebase() -> RepairResult:
             rc2, _, e2 = _run_git(["pull", "--rebase"], cwd=target_repo)
             if rc2 != 0:

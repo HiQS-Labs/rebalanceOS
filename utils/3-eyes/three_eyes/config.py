@@ -33,8 +33,8 @@ from pathlib import Path
 # Canonical paths (all relative to the package, never hardcoded to a machine)
 # --------------------------------------------------------------------------- #
 
-PKG_DIR = Path(__file__).resolve().parent          # .../utils/3-eyes/three_eyes
-ROOT = PKG_DIR.parent                               # .../utils/3-eyes
+PKG_DIR = Path(__file__).resolve().parent  # .../utils/3-eyes/three_eyes
+ROOT = PKG_DIR.parent  # .../utils/3-eyes
 REGISTRY_DIR = ROOT / "registry"
 JOBS_DIR = REGISTRY_DIR / "jobs.d"
 COMMANDS_ALLOW = REGISTRY_DIR / "commands.allow"

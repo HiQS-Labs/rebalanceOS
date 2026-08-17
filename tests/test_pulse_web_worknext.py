@@ -69,7 +69,10 @@ class PulseWebWorkNextTeaserTests(unittest.TestCase):
         ]
 
         html = pulse_web.render_work_next(
-            rows, NOW, computed_at="2026-06-17T17:30:00+00:00", blended=True,
+            rows,
+            NOW,
+            computed_at="2026-06-17T17:30:00+00:00",
+            blended=True,
         )
 
         self.assertIn('class="card work-next work-next-teaser"', html)

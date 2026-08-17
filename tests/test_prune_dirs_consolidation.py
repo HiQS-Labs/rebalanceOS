@@ -112,10 +112,7 @@ class StandaloneScriptStaysDecoupledTests(unittest.TestCase):
     own lighter walk; this pins that it is not silently coupled later."""
 
     def test_discover_repos_does_not_import_rebalance(self) -> None:
-        script = (
-            Path(__file__).resolve().parents[1]
-            / "experimental" / "git-pulse" / "discover-repos.py"
-        )
+        script = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse" / "discover-repos.py"
         source = script.read_text(encoding="utf-8")
         self.assertNotIn("import rebalance", source)
         self.assertNotIn("from rebalance", source)

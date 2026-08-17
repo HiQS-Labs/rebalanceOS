@@ -30,8 +30,18 @@ def _seed_calendar(db: Path, events: list[dict]) -> None:
     for ev in events:
         conn.execute(
             "INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (ev["id"], ev.get("summary"), ev["start_time"], ev.get("end_time"),
-             None, None, "primary", "confirmed", None, "2026-06-01T00:00:00Z"),
+            (
+                ev["id"],
+                ev.get("summary"),
+                ev["start_time"],
+                ev.get("end_time"),
+                None,
+                None,
+                "primary",
+                "confirmed",
+                None,
+                "2026-06-01T00:00:00Z",
+            ),
         )
     conn.commit()
     conn.close()
@@ -49,9 +59,17 @@ def _seed_email(db: Path, messages: list[dict]) -> None:
     for msg in messages:
         conn.execute(
             "INSERT OR REPLACE INTO email_messages VALUES (?,?,?,?,?,?,?,?,?)",
-            (msg["message_id"], msg.get("thread_id"), msg.get("from_address"),
-             None, msg.get("subject"), msg.get("snippet"),
-             msg.get("received_at"), '["INBOX"]', "2026-06-01T00:00:00Z"),
+            (
+                msg["message_id"],
+                msg.get("thread_id"),
+                msg.get("from_address"),
+                None,
+                msg.get("subject"),
+                msg.get("snippet"),
+                msg.get("received_at"),
+                '["INBOX"]',
+                "2026-06-01T00:00:00Z",
+            ),
         )
     conn.commit()
     conn.close()
@@ -59,6 +77,7 @@ def _seed_email(db: Path, messages: list[dict]) -> None:
 
 def _future(days: int = 1) -> str:
     return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+
 
 def _past(days: int = 1) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -87,21 +106,25 @@ class TestCalendarSnapshot(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_writes_snapshot_file(self) -> None:
-        _seed_calendar(self.db, [
-            {"id": "evt1", "summary": "Standup", "start_time": _future(1)},
-        ])
+        _seed_calendar(
+            self.db,
+            [
+                {"id": "evt1", "summary": "Standup", "start_time": _future(1)},
+            ],
+        )
         out = export_calendar_snapshot(self.db, self.sync_dir, device_id="test-device")
         self.assertTrue(out.exists())
         self.assertEqual(out, self.sync_dir / "calendar" / "test-device.json")
 
     def test_snapshot_schema(self) -> None:
-        _seed_calendar(self.db, [
-            {"id": "evt1", "summary": "Meeting", "start_time": _future(1)},
-            {"id": "evt2", "summary": "Old event", "start_time": _past(200)},  # outside window
-        ])
-        out = export_calendar_snapshot(
-            self.db, self.sync_dir, window_days=90, device_id="mac"
+        _seed_calendar(
+            self.db,
+            [
+                {"id": "evt1", "summary": "Meeting", "start_time": _future(1)},
+                {"id": "evt2", "summary": "Old event", "start_time": _past(200)},  # outside window
+            ],
         )
+        out = export_calendar_snapshot(self.db, self.sync_dir, window_days=90, device_id="mac")
         data = json.loads(out.read_text())
         self.assertEqual(data["schema_version"], SCHEMA_VERSION)
         self.assertEqual(data["source"], "calendar")
@@ -114,27 +137,52 @@ class TestCalendarSnapshot(unittest.TestCase):
         self.assertEqual(data["rows"][0]["summary"], "Meeting")
 
     def test_row_contains_all_columns(self) -> None:
-        _seed_calendar(self.db, [
-            {"id": "evt1", "summary": "Review", "start_time": _future(1)},
-        ])
+        _seed_calendar(
+            self.db,
+            [
+                {"id": "evt1", "summary": "Review", "start_time": _future(1)},
+            ],
+        )
         out = export_calendar_snapshot(self.db, self.sync_dir, device_id="mac")
         row = json.loads(out.read_text())["rows"][0]
-        for col in ("id", "summary", "start_time", "end_time", "location",
-                    "attendees_json", "calendar_id", "status", "description", "fetched_at"):
+        for col in (
+            "id",
+            "summary",
+            "start_time",
+            "end_time",
+            "location",
+            "attendees_json",
+            "calendar_id",
+            "status",
+            "description",
+            "fetched_at",
+        ):
             self.assertIn(col, row)
 
     def test_excludes_non_primary_calendars(self) -> None:
         # Default deny (P2 decision #3): teammate (non-'primary') calendars must
         # never be exported to the pulse repo.
-        _seed_calendar(self.db, [
-            {"id": "mine", "summary": "My block", "start_time": _future(1)},
-        ])
+        _seed_calendar(
+            self.db,
+            [
+                {"id": "mine", "summary": "My block", "start_time": _future(1)},
+            ],
+        )
         conn = sqlite3.connect(self.db)
         conn.execute(
             "INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?)",
-            ("teammate-evt", "Teammate block", _future(1), None, None, None,
-             "teammate@group.calendar.google.com", "confirmed", None,
-             "2026-06-01T00:00:00Z"),
+            (
+                "teammate-evt",
+                "Teammate block",
+                _future(1),
+                None,
+                None,
+                None,
+                "teammate@group.calendar.google.com",
+                "confirmed",
+                None,
+                "2026-06-01T00:00:00Z",
+            ),
         )
         conn.commit()
         conn.close()
@@ -166,11 +214,34 @@ class TestCalendarSnapshot(unittest.TestCase):
         # teammate row. Neither the teammate row nor either label may survive.
         conn.executemany(
             "INSERT INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            [("mine", "My block", _future(1), None, None, None,
-              "primary", "confirmed", None, "2026-06-01T00:00:00Z", "OPERATOR_LABEL"),
-             ("mate", "Teammate block", _future(1), None, None, None,
-              "teammate@group.calendar.google.com", "confirmed", None,
-              "2026-06-01T00:00:00Z", "matthew")],
+            [
+                (
+                    "mine",
+                    "My block",
+                    _future(1),
+                    None,
+                    None,
+                    None,
+                    "primary",
+                    "confirmed",
+                    None,
+                    "2026-06-01T00:00:00Z",
+                    "OPERATOR_LABEL",
+                ),
+                (
+                    "mate",
+                    "Teammate block",
+                    _future(1),
+                    None,
+                    None,
+                    None,
+                    "teammate@group.calendar.google.com",
+                    "confirmed",
+                    None,
+                    "2026-06-01T00:00:00Z",
+                    "matthew",
+                ),
+            ],
         )
         conn.commit()
         conn.close()
@@ -201,9 +272,12 @@ class TestCalendarSnapshot(unittest.TestCase):
             export_calendar_snapshot(self.tmp / "missing.db", self.sync_dir)
 
     def test_writes_latest_pointer(self) -> None:
-        _seed_calendar(self.db, [
-            {"id": "e1", "summary": "X", "start_time": _future(1)},
-        ])
+        _seed_calendar(
+            self.db,
+            [
+                {"id": "e1", "summary": "X", "start_time": _future(1)},
+            ],
+        )
         export_calendar_snapshot(self.db, self.sync_dir, device_id="mac")
         latest = json.loads((self.sync_dir / "calendar" / "latest.json").read_text())
         self.assertEqual(latest["device_id"], "mac")
@@ -221,18 +295,20 @@ class TestEmailSnapshot(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_writes_snapshot_file(self) -> None:
-        _seed_email(self.db, [
-            {"message_id": "m1", "subject": "Hello", "received_at": _past(1)},
-        ])
+        _seed_email(
+            self.db,
+            [
+                {"message_id": "m1", "subject": "Hello", "received_at": _past(1)},
+            ],
+        )
         out = export_email_snapshot(self.db, self.sync_dir, device_id="mac")
         self.assertTrue(out.exists())
         self.assertEqual(out, self.sync_dir / "email" / "mac.json")
 
     def test_snapshot_schema(self) -> None:
-        _seed_email(self.db, [
-            {"message_id": f"m{i}", "subject": f"msg {i}", "received_at": _past(i)}
-            for i in range(5)
-        ])
+        _seed_email(
+            self.db, [{"message_id": f"m{i}", "subject": f"msg {i}", "received_at": _past(i)} for i in range(5)]
+        )
         out = export_email_snapshot(self.db, self.sync_dir, limit=3, device_id="mac")
         data = json.loads(out.read_text())
         self.assertEqual(data["schema_version"], SCHEMA_VERSION)
@@ -243,13 +319,25 @@ class TestEmailSnapshot(unittest.TestCase):
         self.assertEqual(len(data["rows"]), 3)
 
     def test_row_contains_all_columns(self) -> None:
-        _seed_email(self.db, [
-            {"message_id": "m1", "subject": "Hi", "received_at": _past(1)},
-        ])
+        _seed_email(
+            self.db,
+            [
+                {"message_id": "m1", "subject": "Hi", "received_at": _past(1)},
+            ],
+        )
         out = export_email_snapshot(self.db, self.sync_dir, device_id="mac")
         row = json.loads(out.read_text())["rows"][0]
-        for col in ("message_id", "thread_id", "from_address", "from_name",
-                    "subject", "snippet", "received_at", "labels_json", "synced_at"):
+        for col in (
+            "message_id",
+            "thread_id",
+            "from_address",
+            "from_name",
+            "subject",
+            "snippet",
+            "received_at",
+            "labels_json",
+            "synced_at",
+        ):
             self.assertIn(col, row)
 
     def test_missing_db_raises(self) -> None:
@@ -303,9 +391,12 @@ class TestReadLatestSnapshot(unittest.TestCase):
 
     def test_returns_snapshot_after_export(self) -> None:
         db = Path(self._tmp.name) / "db.sqlite"
-        _seed_calendar(db, [
-            {"id": "e1", "summary": "Meeting", "start_time": _future(1)},
-        ])
+        _seed_calendar(
+            db,
+            [
+                {"id": "e1", "summary": "Meeting", "start_time": _future(1)},
+            ],
+        )
         export_calendar_snapshot(db, self.sync_dir, device_id="mac")
         result = read_latest_snapshot(self.sync_dir, "calendar")
         self.assertIsNotNone(result)

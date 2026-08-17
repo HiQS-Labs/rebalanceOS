@@ -28,7 +28,11 @@ NOTES = config.REGISTRY_DIR / "catalog-notes.toml"
 VENDOR_PREFIXES = ("com.google.", "com.setapp.", "homebrew.", "com.apple.")
 
 STATUS_EMOJI = {
-    "managed": "🟢", "to-adopt": "🎯", "observe": "👁", "server": "⚙️", "system": "⚙️",
+    "managed": "🟢",
+    "to-adopt": "🎯",
+    "observe": "👁",
+    "server": "⚙️",
+    "system": "⚙️",
 }
 
 
@@ -55,10 +59,7 @@ def drift(notes: dict | None = None) -> dict:
     notes = notes or load_notes()
     known = set(notes.get("agent", {}))
     live = {a["label"] for a in launchd.observe_existing() if not a.get("unreadable")}
-    new = sorted(
-        lbl for lbl in live
-        if lbl not in known and not any(lbl.startswith(p) for p in VENDOR_PREFIXES)
-    )
+    new = sorted(lbl for lbl in live if lbl not in known and not any(lbl.startswith(p) for p in VENDOR_PREFIXES))
     removed = sorted(known - live)
     return {"new": new, "removed": removed}
 
@@ -103,7 +104,8 @@ def render(notes: dict | None = None) -> str:
         "",
         f"**Inventory:** {len([a for a in agents if not a.get('unreadable')])} launchd agents "
         f"({managed} 🟢 managed · {to_adopt} 🎯 to-adopt · {vendor} vendor/OS ignored"
-        + (f" · **{len(unclassified)} ⚠️ unclassified**" if unclassified else "") + ").",
+        + (f" · **{len(unclassified)} ⚠️ unclassified**" if unclassified else "")
+        + ").",
         "",
         "Legend: 🟢 managed · 🎯 to-adopt · 👁 observe-only · ⚙️ server/system.",
         "",
@@ -113,7 +115,7 @@ def render(notes: dict | None = None) -> str:
         lines += [
             "## ⚠️ Unclassified — needs triage",
             "",
-            "New agents not in `catalog-notes.toml`. Add an `[agent.\"<label>\"]` block to file them:",
+            'New agents not in `catalog-notes.toml`. Add an `[agent."<label>"]` block to file them:',
             "",
         ]
         lines += [f"- `{lbl}` — {by_label[lbl].get('schedule', '?')}" for lbl in d["new"]]
@@ -123,9 +125,12 @@ def render(notes: dict | None = None) -> str:
         rows = buckets.get(sys, [])
         if not rows:
             continue
-        lines += [f"## {names.get(sys, sys)}", "",
-                  "| Automation | Does what | Schedule | Status |",
-                  "|---|---|---|---|"]
+        lines += [
+            f"## {names.get(sys, sys)}",
+            "",
+            "| Automation | Does what | Schedule | Status |",
+            "|---|---|---|---|",
+        ]
         for label, note, a in rows:
             emoji = STATUS_EMOJI.get(note.get("status", "observe"), "👁")
             lines.append(
@@ -135,8 +140,12 @@ def render(notes: dict | None = None) -> str:
         lines.append("")
 
     if d["removed"]:
-        lines += ["## Curated but not currently present", "",
-                  "In `catalog-notes.toml` but not loaded on this device (uninstalled / renamed?):", ""]
+        lines += [
+            "## Curated but not currently present",
+            "",
+            "In `catalog-notes.toml` but not loaded on this device (uninstalled / renamed?):",
+            "",
+        ]
         lines += [f"- `{lbl}`" for lbl in d["removed"]]
         lines += [""]
 

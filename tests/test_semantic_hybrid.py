@@ -21,8 +21,7 @@ def _add(c, i, source_type, title, body, pk="p"):
         "INSERT INTO semantic_documents(id,source_type,source_table,source_pk,doc_kind,"
         "title,body,content_hash,metadata_json,created_at,updated_at) "
         "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-        (i, source_type, source_type, f"{pk}{i}", "doc", title, body, "h", "{}",
-         "2026-06-06", "2026-06-06"),
+        (i, source_type, source_type, f"{pk}{i}", "doc", title, body, "h", "{}", "2026-06-06", "2026-06-06"),
     )
     c.commit()
 
@@ -85,8 +84,8 @@ class RrfFuseTests(unittest.TestCase):
         fts = [{"doc_id": 2, "distance": None}, {"doc_id": 3, "distance": None}]
         fused = _rrf_fuse([vec, fts], top_k=10)
         ids = [r["doc_id"] for r in fused]
-        self.assertEqual(ids[0], 2)              # in both lists → highest fused score
-        self.assertEqual(set(ids), {1, 2, 3})    # deduped
+        self.assertEqual(ids[0], 2)  # in both lists → highest fused score
+        self.assertEqual(set(ids), {1, 2, 3})  # deduped
         # doc 2 kept as the vector row (carries a distance for scoring)
         self.assertEqual(next(r for r in fused if r["doc_id"] == 2)["distance"], 0.2)
 

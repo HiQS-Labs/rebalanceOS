@@ -317,14 +317,20 @@ def _parse_event_time(raw: str) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _merge_calendar_signal(seed: _ProjectSeed, *, summary: str, start_time: str, end_time: str, label: str | None) -> None:
+def _merge_calendar_signal(
+    seed: _ProjectSeed, *, summary: str, start_time: str, end_time: str, label: str | None
+) -> None:
     seed.calendar_event_count += 1
     seed.calendar_total_minutes += event_duration_minutes(start_time, end_time)
     if label:
-        seed.calendar_labels[label] += 1
+        labels = seed.calendar_labels
+        assert labels is not None
+        labels[label] += 1
         normalized_label = _normalize_text(label)
         if normalized_label:
-            seed.aliases.add(normalized_label)
+            aliases = seed.aliases
+            assert aliases is not None
+            aliases.add(normalized_label)
     start_dt = _parse_event_time(start_time)
     if start_dt:
         start_iso = start_dt.isoformat()
@@ -332,7 +338,9 @@ def _merge_calendar_signal(seed: _ProjectSeed, *, summary: str, start_time: str,
             seed.calendar_last_event_at = start_iso
     normalized_summary = _normalize_text(summary)
     if normalized_summary:
-        seed.aliases.add(normalized_summary)
+        aliases = seed.aliases
+        assert aliases is not None
+        aliases.add(normalized_summary)
 
 
 def _build_seeds_from_github(database_path: Path) -> dict[str, _ProjectSeed]:
@@ -357,7 +365,9 @@ def _build_seeds_from_github(database_path: Path) -> dict[str, _ProjectSeed]:
         if seed is None:
             seed = _ProjectSeed(
                 key=seed_key,
-                display_name=_repo_slug_to_title(grouped_key.replace(" ", "-")) if grouped_key else _choose_display_name(repo_full_name),
+                display_name=_repo_slug_to_title(grouped_key.replace(" ", "-"))
+                if grouped_key
+                else _choose_display_name(repo_full_name),
                 repos=set(),
                 github_score=0,
                 github_last_active_at=None,
@@ -372,9 +382,11 @@ def _build_seeds_from_github(database_path: Path) -> dict[str, _ProjectSeed]:
             not seed.github_last_active_at or row["last_active_at"] > seed.github_last_active_at
         ):
             seed.github_last_active_at = row["last_active_at"]
-        seed.aliases.update(_build_repo_aliases(repo_full_name))
+        seed_aliases = seed.aliases
+        assert seed_aliases is not None
+        seed_aliases.update(_build_repo_aliases(repo_full_name))
         if grouped_key:
-            seed.aliases.add(grouped_key)
+            seed_aliases.add(grouped_key)
     return seeds
 
 
@@ -420,7 +432,9 @@ def _apply_calendar_signal(
                 display_name=label.strip(),
                 repos=set(),
             )
-            seed.aliases.add(normalized_label)
+            seed_aliases = seed.aliases
+            assert seed_aliases is not None
+            seed_aliases.add(normalized_label)
             seeds[key] = seed
         _merge_calendar_signal(
             seed,
@@ -463,9 +477,7 @@ def _seed_summary(seed: _ProjectSeed) -> str:
     parts: list[str] = []
     if seed.repos:
         repo_count = len(seed.repos)
-        parts.append(
-            f"GitHub inferred from {repo_count} repo{'s' if repo_count != 1 else ''}"
-        )
+        parts.append(f"GitHub inferred from {repo_count} repo{'s' if repo_count != 1 else ''}")
         if seed.github_score:
             parts[-1] += f" with score {seed.github_score}"
     if seed.calendar_event_count:
@@ -521,7 +533,7 @@ def _project_activity_snippets(seed: _ProjectSeed) -> list[str]:
 def _build_client_gapfill_prompt(candidates: list[tuple[_ProjectSeed, dict[str, Any]]]) -> str:
     lines = [
         "Infer the client/customer for each project from the evidence below.",
-        "Return STRICT JSON only: {\"Project Name\": \"Client Name\" | null}.",
+        'Return STRICT JSON only: {"Project Name": "Client Name" | null}.',
         "Rules:",
         "- Use only explicit evidence from the project name, repos, or activity snippets.",
         "- If the project looks internal, personal, open-source, or the client is not evident, return null.",
@@ -622,13 +634,7 @@ def _gapfill_missing_clients(candidates: list[tuple[_ProjectSeed, dict[str, Any]
 def _seed_to_project_row(seed: _ProjectSeed) -> dict[str, Any]:
     name = _choose_seed_name(seed)
     aliases = sorted(
-        {
-            alias
-            for alias in seed.aliases or set()
-            if alias
-            and alias != _normalize_text(name)
-            and len(alias) >= 2
-        }
+        {alias for alias in seed.aliases or set() if alias and alias != _normalize_text(name) and len(alias) >= 2}
     )
     calendar_aliases = sorted(label for label in (seed.calendar_labels or Counter()).keys() if label != name)
     tags = ["inferred"]
@@ -679,14 +685,11 @@ def _delete_stale_inferred_rows(database_path: Path, project_names: set[str]) ->
     simply not this pass's row to judge.
     """
     with db_connection(database_path, ensure_project_schema) as conn:
-        rows = conn.execute(
-            "SELECT name, custom_fields_json FROM project_registry"
-        ).fetchall()
+        rows = conn.execute("SELECT name, custom_fields_json FROM project_registry").fetchall()
         stale_names: list[str] = [
             row["name"]
             for row in rows
-            if _generated_by(row["custom_fields_json"]) == INFERENCE_GENERATED_BY
-            and row["name"] not in project_names
+            if _generated_by(row["custom_fields_json"]) == INFERENCE_GENERATED_BY and row["name"] not in project_names
         ]
 
         if stale_names:
@@ -705,12 +708,8 @@ def _partition_writable_rows(
     is keyed by name, so writing would clobber the curated row wholesale).
     """
     with db_connection(database_path, ensure_project_schema) as conn:
-        rows = conn.execute(
-            "SELECT name, custom_fields_json FROM project_registry"
-        ).fetchall()
-    curated_names = {
-        row["name"] for row in rows if not _is_inference_owned(row["custom_fields_json"])
-    }
+        rows = conn.execute("SELECT name, custom_fields_json FROM project_registry").fetchall()
+    curated_names = {row["name"] for row in rows if not _is_inference_owned(row["custom_fields_json"])}
     writable = [p for p in projects if p["name"] not in curated_names]
     skipped = sorted(p["name"] for p in projects if p["name"] in curated_names)
     return writable, skipped
@@ -818,8 +817,7 @@ def _count_operator_commits(conn: Any, repo_full_name: str, github_login: str) -
     from rebalance.ingest.pulse import CLOUD_AGENT_AUTHORS
 
     activity_row = conn.execute(
-        "SELECT COALESCE(SUM(commits), 0) AS n FROM github_activity "
-        "WHERE repo_full_name = ? AND login = ?",
+        "SELECT COALESCE(SUM(commits), 0) AS n FROM github_activity WHERE repo_full_name = ? AND login = ?",
         (repo_full_name, github_login),
     ).fetchone()
     operator_push_count = int(activity_row["n"] or 0) if activity_row else 0
@@ -943,9 +941,7 @@ def sync_commit_threshold_promotions(database_path: Path) -> AutoPromoteSummary:
     candidates = get_watched_repos(database_path)["auto_discovered"]
 
     with db_connection(database_path, ensure_project_schema) as conn:
-        taken_names = {
-            row["name"] for row in conn.execute("SELECT name FROM project_registry").fetchall()
-        }
+        taken_names = {row["name"] for row in conn.execute("SELECT name FROM project_registry").fetchall()}
 
     promoted_rows: list[dict[str, Any]] = []
     with db_connection(database_path, ensure_github_schema) as conn:
@@ -953,7 +949,9 @@ def sync_commit_threshold_promotions(database_path: Path) -> AutoPromoteSummary:
             commit_count = _count_operator_commits(conn, repo_full_name, github_login)
             if commit_count >= threshold:
                 row = _repo_to_promoted_row(
-                    repo_full_name, commit_count=commit_count, threshold=threshold,
+                    repo_full_name,
+                    commit_count=commit_count,
+                    threshold=threshold,
                     taken_names=taken_names,
                 )
                 taken_names.add(row["name"])

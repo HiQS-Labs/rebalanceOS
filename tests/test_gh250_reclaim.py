@@ -66,14 +66,10 @@ def make_db(path: Path, live: int = 3, orphans: int = 5) -> Path:
             "INSERT INTO github_documents (id, repo_full_name, source_key) VALUES (?,?,?)",
             (i, "o/r", f"k{i}"),
         )
-        conn.execute(
-            "INSERT INTO github_embeddings (doc_id, embedding) VALUES (?,?)", (i, _vec(i))
-        )
+        conn.execute("INSERT INTO github_embeddings (doc_id, embedding) VALUES (?,?)", (i, _vec(i)))
     # Orphans: vectors whose doc_id has no document (ids well clear of live ones).
     for j in range(1000, 1000 + orphans):
-        conn.execute(
-            "INSERT INTO github_embeddings (doc_id, embedding) VALUES (?,?)", (j, _vec(j))
-        )
+        conn.execute("INSERT INTO github_embeddings (doc_id, embedding) VALUES (?,?)", (j, _vec(j)))
     conn.commit()
     conn.close()
     return path

@@ -279,7 +279,9 @@ def config_set_project_priority(
     name: str = typer.Argument(..., help="Canonical project name"),
     alias: list[str] = typer.Option([], "--alias", help="Project/client alias. Repeat for multiple aliases."),
     client: str = typer.Option("", "--client", help="Client or account label"),
-    priority_tier: int | None = typer.Option(None, "--priority-tier", min=1, max=5, help="Priority tier: 1 is highest, 5 is lowest"),
+    priority_tier: int | None = typer.Option(
+        None, "--priority-tier", min=1, max=5, help="Priority tier: 1 is highest, 5 is lowest"
+    ),
     value_score: int | None = typer.Option(None, "--value-score", min=1, max=10, help="Value score: 10 is highest"),
     value_level: str = typer.Option("", "--value-level", help="Value level, e.g. strategic or revenue-generating"),
     risk_level: str = typer.Option("", "--risk-level", help="Risk level, e.g. high, medium, low"),
@@ -357,6 +359,7 @@ def config_doctor() -> None:
     typer.echo("\n── Keyring ──────────────────────────────────")
     try:
         import keyring as _kr
+
         _kr.get_password(KEYRING_SERVICE, "__probe__")
         row("OS keyring", True, f"service={KEYRING_SERVICE}  backend={type(_kr.get_keyring()).__name__}")
     except Exception as exc:
@@ -375,8 +378,13 @@ def config_doctor() -> None:
 
     typer.echo("\n── Calendar OAuth ───────────────────────────")
     from rebalance.ingest.config import get_calendar_oauth_token_json
+
     cal_token_json = get_calendar_oauth_token_json()
-    row("Calendar OAuth (keyring)", bool(cal_token_json), "token stored in keyring" if cal_token_json else "not in keyring — using pickle fallback")
+    row(
+        "Calendar OAuth (keyring)",
+        bool(cal_token_json),
+        "token stored in keyring" if cal_token_json else "not in keyring — using pickle fallback",
+    )
 
     typer.echo("\n── Vault & database ─────────────────────────")
     vault = get_vault_path()
@@ -408,6 +416,7 @@ def config_doctor() -> None:
 
     typer.echo("\n── Auth activity (last event per collector) ─")
     from rebalance.ingest import auth_log
+
     latest = auth_log.latest_event_by_source()
     if not latest:
         typer.echo("  ·  no auth events logged yet (temp/logs/auth_activity.jsonl)")
@@ -438,7 +447,7 @@ def config_get_github_token() -> None:
     token, source = get_github_token_with_source()
     if token:
         masked = token[:10] + "..." + token[-4:] if len(token) > 14 else "***"
-        label = {"config": "stored PAT", "gh-cli": "via `gh auth token`"}.get(source, source or "unknown")
+        label = {"config": "stored PAT", "gh-cli": "via `gh auth token`"}.get(source or "", source or "unknown")
         typer.echo(f"✓ GitHub token available: {masked}  (source: {label})")
     else:
         typer.echo("✗ No GitHub token available. Either:")
@@ -460,7 +469,8 @@ def config_set_sleuth(
     token: str = typer.Option("", "--token", help="Sleuth Web API token"),
     workspace: str = typer.Option("", "--workspace", help="Sleuth workspace name"),
     from_env: Path = typer.Option(
-        None, "--from-env",
+        None,
+        "--from-env",
         help="Import all three values from an existing sleuth-web-api env file.",
     ),
 ) -> None:
@@ -488,14 +498,16 @@ def config_set_sleuth(
         workspace = workspace or vals.get("SLEUTH_WORKSPACE_NAME", "")
 
     missing = [
-        name for name, value in (
-            ("--base-url", base_url), ("--token", token), ("--workspace", workspace),
-        ) if not value.strip()
+        name
+        for name, value in (
+            ("--base-url", base_url),
+            ("--token", token),
+            ("--workspace", workspace),
+        )
+        if not value.strip()
     ]
     if missing:
-        raise typer.BadParameter(
-            f"missing required value(s): {', '.join(missing)} (pass them or use --from-env)"
-        )
+        raise typer.BadParameter(f"missing required value(s): {', '.join(missing)} (pass them or use --from-env)")
 
     set_sleuth_credentials(base_url, token, workspace, source="manual")
     typer.echo(f"✓ Sleuth credentials stored in keyring + config (workspace: {workspace.strip()})")
@@ -506,13 +518,16 @@ def config_set_sleuth(
 def config_clear_sleuth() -> None:
     """Remove Sleuth credentials from keyring + rbos.config (env file untouched)."""
     from rebalance.ingest.config import clear_sleuth_credentials
+
     clear_sleuth_credentials()
     typer.echo("✓ Sleuth credentials cleared from keyring + config.")
 
 
 @config_app.command("add-health-notice")
 def config_add_health_notice(
-    pattern: str = typer.Argument(..., help="Check-name substring to demote, e.g. 'email data' or 'fleet:noel’s MacBook'"),
+    pattern: str = typer.Argument(
+        ..., help="Check-name substring to demote, e.g. 'email data' or 'fleet:noel’s MacBook'"
+    ),
 ) -> None:
     """Demote a health WARN to a 'notice' (shown on the dashboard, but not
     counted as 'collector attention needed'). Matches the check name as a
@@ -572,6 +587,7 @@ def _refresh_token_of(token_json: str | None) -> str:
     if not token_json:
         return ""
     import json as _json
+
     try:
         return str((_json.loads(token_json) or {}).get("refresh_token") or "")
     except (ValueError, TypeError):
@@ -595,6 +611,7 @@ def _migrate_google_pickle_to_keyring(
     entry, instead of silently keeping the stale token.
     """
     import pickle
+
     try:
         keyring_blob = get_keyring()
         if not token_path.exists():
@@ -632,6 +649,7 @@ def config_migrate_to_keyring() -> None:
 
     # calendar: pickle → keyring
     from rebalance.ingest.calendar import TOKEN_PATH as CALENDAR_TOKEN_PATH
+
     _migrate_google_pickle_to_keyring(
         label="calendar",
         token_path=CALENDAR_TOKEN_PATH,
@@ -642,13 +660,13 @@ def config_migrate_to_keyring() -> None:
 
     # gmail: pickle → keyring (mirrors calendar)
     from rebalance.ingest.gmail import TOKEN_PATH as GMAIL_TOKEN_PATH
+
     _migrate_google_pickle_to_keyring(
         label="gmail",
         token_path=GMAIL_TOKEN_PATH,
         get_keyring=cfg.get_gmail_oauth_token_json,
         set_keyring=cfg.set_gmail_oauth_token_json,
-        missing_hint="run scripts/setup_gmail_oauth.py "
-                     "(or stay on the Gmail MCP connector: gmail_ingest_method=mcp)",
+        missing_hint="run scripts/setup_gmail_oauth.py (or stay on the Gmail MCP connector: gmail_ingest_method=mcp)",
     )
 
     # sleuth: env file → keyring
@@ -659,8 +677,10 @@ def config_migrate_to_keyring() -> None:
             try:
                 creds = cfg.get_sleuth_credentials()  # falls back to the env file
                 cfg.set_sleuth_credentials(
-                    creds["SLEUTH_WEB_API_BASE_URL"], creds["SLEUTH_WEB_API_TOKEN"],
-                    creds["SLEUTH_WORKSPACE_NAME"], source="migrate",
+                    creds["SLEUTH_WEB_API_BASE_URL"],
+                    creds["SLEUTH_WEB_API_TOKEN"],
+                    creds["SLEUTH_WORKSPACE_NAME"],
+                    source="migrate",
                 )
                 typer.echo("sleuth: migrated env file → keyring ✓")
             except FileNotFoundError:
@@ -706,7 +726,9 @@ def config_migrate_secrets() -> None:
 
 @config_app.command("set-vault")
 def config_set_vault(
-    path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Absolute path to the Obsidian vault root"),
+    path: Path = typer.Argument(
+        ..., exists=True, file_okay=False, dir_okay=True, help="Absolute path to the Obsidian vault root"
+    ),
 ) -> None:
     """Store Obsidian vault path in local config (temp/rbos.config). Canonical source for all ingest/sync workflows."""
     resolved = str(path.expanduser().resolve())

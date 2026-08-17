@@ -22,6 +22,7 @@ from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_pa
 # Raw activity probe (calibration tool)
 # ---------------------------------------------------------------------------
 
+
 def _raw_summarize_event(event: dict[str, Any]) -> str:
     """One-line summary of a GitHub user-event dict."""
     kind = event.get("type") or ""
@@ -32,26 +33,26 @@ def _raw_summarize_event(event: dict[str, Any]) -> str:
         return f"{n} commit{'s' if n != 1 else ''} → {ref}" if ref else f"{n} commit{'s' if n != 1 else ''}"
     if kind == "PullRequestEvent":
         pr = p.get("pull_request") or {}
-        return f"#{pr.get('number','?')} {p.get('action','')} — {(pr.get('title') or '').strip()[:160]}"
+        return f"#{pr.get('number', '?')} {p.get('action', '')} — {(pr.get('title') or '').strip()[:160]}"
     if kind == "IssuesEvent":
         issue = p.get("issue") or {}
-        return f"#{issue.get('number','?')} {p.get('action','')} — {(issue.get('title') or '').strip()[:160]}"
+        return f"#{issue.get('number', '?')} {p.get('action', '')} — {(issue.get('title') or '').strip()[:160]}"
     if kind == "IssueCommentEvent":
         issue = p.get("issue") or {}
-        return f"comment on #{issue.get('number','?')}"
+        return f"comment on #{issue.get('number', '?')}"
     if kind == "PullRequestReviewEvent":
         pr = p.get("pull_request") or {}
-        return f"review on #{pr.get('number','?')}"
+        return f"review on #{pr.get('number', '?')}"
     if kind == "PullRequestReviewCommentEvent":
         pr = p.get("pull_request") or {}
-        return f"review comment on #{pr.get('number','?')}"
+        return f"review comment on #{pr.get('number', '?')}"
     if kind == "CreateEvent":
-        return f"create {p.get('ref_type','')} {p.get('ref','') or ''}".strip()
+        return f"create {p.get('ref_type', '')} {p.get('ref', '') or ''}".strip()
     if kind == "DeleteEvent":
-        return f"delete {p.get('ref_type','')} {p.get('ref','') or ''}".strip()
+        return f"delete {p.get('ref_type', '')} {p.get('ref', '') or ''}".strip()
     if kind == "ReleaseEvent":
         rel = p.get("release") or {}
-        return f"release {rel.get('tag_name','')}"
+        return f"release {rel.get('tag_name', '')}"
     if kind == "WatchEvent":
         return "starred"
     if kind == "ForkEvent":
@@ -62,6 +63,7 @@ def _raw_summarize_event(event: dict[str, Any]) -> str:
 def _raw_get_top_active_repos(db_path: Path, top_n: int) -> list[str]:
     """Top N watched repos by 7-day activity score (commits + PRs + issues + comments + reviews)."""
     from rebalance.ingest.db import db_connection, top_active_repos
+
     with db_connection(db_path) as conn:
         return top_active_repos(conn, top_n)
 
@@ -69,6 +71,7 @@ def _raw_get_top_active_repos(db_path: Path, top_n: int) -> list[str]:
 def _raw_fetch_repo_events(repo: str, token: str, per_page: int = 30) -> list[dict[str, Any]]:
     """Fetch the most recent events for a single repo. Returns [] on any failure."""
     from rebalance.ingest.github_scan import GITHUB_API, _get
+
     try:
         status, data = _get(f"{GITHUB_API}/repos/{repo}/events?per_page={per_page}", token)
     except Exception:
@@ -78,9 +81,7 @@ def _raw_fetch_repo_events(repo: str, token: str, per_page: int = 30) -> list[di
     return data
 
 
-def _raw_gather_team_activity(
-    login: str, token: str, db_path: Path, minutes: int, top_n: int
-) -> dict[str, Any]:
+def _raw_gather_team_activity(login: str, token: str, db_path: Path, minutes: int, top_n: int) -> dict[str, Any]:
     """Per-repo events for the top N most-active watched repos, filtered to the last
     N minutes and excluding the current user (those are already in the user-activity
     section).
@@ -93,6 +94,7 @@ def _raw_gather_team_activity(
     last_active_map: dict[str, datetime] = {}
     if top_repos:
         from rebalance.ingest.db import db_connection, repo_last_active
+
         with db_connection(db_path) as conn:
             last_active_raw = repo_last_active(conn, top_repos)
         for repo, ts in last_active_raw.items():
@@ -118,15 +120,17 @@ def _raw_gather_team_activity(
             status = "captured" if (la and la >= event_time) else "pending"
             counts[status] += 1
 
-            items.append({
-                "time": event_time.isoformat(timespec="seconds"),
-                "type": event.get("type") or "",
-                "repo": repo,
-                "actor": f"@{actor}" if actor else "",
-                "summary": _raw_summarize_event(event),
-                "status": status,
-                "last_active_at": la.isoformat(timespec="seconds") if la else None,
-            })
+            items.append(
+                {
+                    "time": event_time.isoformat(timespec="seconds"),
+                    "type": event.get("type") or "",
+                    "repo": repo,
+                    "actor": f"@{actor}" if actor else "",
+                    "summary": _raw_summarize_event(event),
+                    "status": status,
+                    "last_active_at": la.isoformat(timespec="seconds") if la else None,
+                }
+            )
 
     items.sort(key=lambda x: x["time"], reverse=True)
 
@@ -183,12 +187,14 @@ def _raw_gather_unwatched_active_repos(
         pushed = parse_utc_iso(rec.pushed_at)
         if not pushed or pushed < cutoff:
             continue
-        repos.append({
-            "full_name": rec.repo_full_name,
-            "pushed_at": pushed.isoformat(timespec="seconds"),
-            "private": rec.private,
-            "fork": rec.fork,
-        })
+        repos.append(
+            {
+                "full_name": rec.repo_full_name,
+                "pushed_at": pushed.isoformat(timespec="seconds"),
+                "private": rec.private,
+                "fork": rec.fork,
+            }
+        )
 
     result["repos"] = repos
     return result
@@ -215,6 +221,7 @@ def _raw_gather_snapshot(login: str, token: str, db_path: Path, minutes: int, to
     recent.sort(key=lambda x: x[0], reverse=True)
 
     from rebalance.ingest.db import db_connection, repo_last_active, repo_meta_names
+
     with db_connection(db_path) as conn:
         watched = repo_meta_names(conn)
         last_active_raw = repo_last_active(conn)
@@ -239,14 +246,16 @@ def _raw_gather_snapshot(login: str, token: str, db_path: Path, minutes: int, to
             la_iso = la.isoformat(timespec="seconds") if la else None
             status = "captured" if (la and la >= event_time) else "pending"
         counts[status] += 1
-        items.append({
-            "time": event_time.isoformat(timespec="seconds"),
-            "type": event.get("type") or "",
-            "repo": repo,
-            "summary": _raw_summarize_event(event),
-            "status": status,
-            "last_active_at": la_iso,
-        })
+        items.append(
+            {
+                "time": event_time.isoformat(timespec="seconds"),
+                "type": event.get("type") or "",
+                "repo": repo,
+                "summary": _raw_summarize_event(event),
+                "status": status,
+                "last_active_at": la_iso,
+            }
+        )
 
     team_activity = _raw_gather_team_activity(login, token, db_path, minutes, top_n)
     unwatched_active_repos = _raw_gather_unwatched_active_repos(token, db_path)
@@ -376,8 +385,7 @@ def _raw_render_text(snapshot: dict[str, Any]) -> None:
     elif unwatched.get("checked_count"):
         console.print()
         console.print(
-            f"[dim]All {unwatched['checked_count']} most-recently-pushed accessible repos "
-            f"are watched or ignored.[/dim]"
+            f"[dim]All {unwatched['checked_count']} most-recently-pushed accessible repos are watched or ignored.[/dim]"
         )
 
 
@@ -385,12 +393,15 @@ def _raw_render_text(snapshot: dict[str, Any]) -> None:
 def raw(
     minutes: int = typer.Option(30, "--minutes", "-m", help="Look back this many minutes (default 30)."),
     watch: int | None = typer.Option(
-        None, "--watch", "-w",
+        None,
+        "--watch",
+        "-w",
         help="Re-run every N seconds until Ctrl-C. Floor 30s recommended (GH events API has ~30s eventual consistency).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON instead of a Rich table."),
     top_n: int = typer.Option(
-        10, "--top",
+        10,
+        "--top",
         help="How many of the most-active watched repos to scan for team activity (cost: 1 GH API request per repo per probe).",
     ),
     database: Path | None = DBOption(),
@@ -439,7 +450,9 @@ def raw(
         raise typer.Exit(2) from exc
 
     if watch is not None and watch < 30:
-        typer.echo(f"[warn] --watch {watch}s is below the recommended 30s floor; rate-limit fine but events API won't refresh faster.")
+        typer.echo(
+            f"[warn] --watch {watch}s is below the recommended 30s floor; rate-limit fine but events API won't refresh faster."
+        )
 
     while True:
         snapshot = _raw_gather_snapshot(login, token, db_path, minutes, top_n)

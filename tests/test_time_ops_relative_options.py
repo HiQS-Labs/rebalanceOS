@@ -78,17 +78,13 @@ class DashboardAgoEquivalenceTests(unittest.TestCase):
     """The gate: TUI output is unchanged by the consolidation."""
 
     def _new_ago(self, value, now=None):
-        return format_relative(
-            value, now=now, empty="—", allow_future=True, sub_minute=True
-        )
+        return format_relative(value, now=now, empty="—", allow_future=True, sub_minute=True)
 
     def test_past_timestamps_match_legacy_exactly(self) -> None:
         for offset in OFFSETS:
             value = NOW - offset
             with self.subTest(offset=str(offset)):
-                self.assertEqual(
-                    _legacy_ago(value, now=NOW), self._new_ago(value, now=NOW)
-                )
+                self.assertEqual(_legacy_ago(value, now=NOW), self._new_ago(value, now=NOW))
 
     def test_future_timestamps_match_legacy_exactly(self) -> None:
         for offset in OFFSETS:
@@ -96,9 +92,7 @@ class DashboardAgoEquivalenceTests(unittest.TestCase):
                 continue
             value = NOW + offset
             with self.subTest(offset=str(offset)):
-                self.assertEqual(
-                    _legacy_ago(value, now=NOW), self._new_ago(value, now=NOW)
-                )
+                self.assertEqual(_legacy_ago(value, now=NOW), self._new_ago(value, now=NOW))
 
     def test_none_renders_the_tui_empty_marker(self) -> None:
         self.assertEqual("—", self._new_ago(None, now=NOW))

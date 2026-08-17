@@ -41,6 +41,7 @@ ACTIVE_JSON_PATH = PROJECT_ROOT / "temp" / "apple-reminders" / "active.json"
 PYTHON = sys.executable
 
 import _bootstrap  # noqa: E402, F401  — puts src/ and scripts/ on sys.path
+
 # _open_bundle_invoker is a private symbol; coupling is intentional and documented here.
 # It is the only public-facing invoker for the signed Apple Reminders helper bundle.
 # Promote to a public name in apple_reminders_write.py when the module API stabilises.
@@ -162,13 +163,9 @@ def apple_reminders_complete(req: AppleReminderCompleteRequest):
     if not reminder_id:
         raise HTTPException(status_code=400, detail="reminder_id is required")
 
-    request = build_request(
-        [WriteOp(op="complete", reminder_id=reminder_id)], mode="apply"
-    )
+    request = build_request([WriteOp(op="complete", reminder_id=reminder_id)], mode="apply")
     try:
-        result = apply_reminder_writes(
-            resolve_database_path(), request, reconcile=False
-        )
+        result = apply_reminder_writes(resolve_database_path(), request, reconcile=False)
     except AppleRemindersWriteError as exc:
         # Helper missing/unauthorized, scope/confirmation failure, IPC error, …
         raise HTTPException(status_code=502, detail=f"{type(exc).__name__}: {exc}")
@@ -260,10 +257,9 @@ def api_chat(req: ChatRequest):
     """
     from rebalance.chat import chat_with_data
     from rebalance.paths import resolve_database_path
+
     try:
-        result = chat_with_data(
-            resolve_database_path(), req.query, scope=req.scope, top_k=req.top_k
-        )
+        result = chat_with_data(resolve_database_path(), req.query, scope=req.scope, top_k=req.top_k)
         return JSONResponse(result)
     except Exception as exc:  # noqa: BLE001 — surface the error to the UI, don't 500-crash
         return JSONResponse(
@@ -321,7 +317,7 @@ def refresh():
             "request_id": req_id,
             "mode": "apply",
             "confirm_destructive": False,
-            "operations": [{"op": "list-active", "list_name": list_name}]
+            "operations": [{"op": "list-active", "list_name": list_name}],
         }
 
         response = _open_bundle_invoker(request, timeout_seconds=5.0)
@@ -395,10 +391,7 @@ def add_figma_project(req: FigmaProjectRequest):
     try:
         result = refresh_index(resolve_database_path(), scope=["figma", "semantic"], dry_run=False)
         figma_result = next(
-            (
-                row for row in (result.get("results") or [])
-                if isinstance(row, dict) and row.get("scope") == "figma"
-            ),
+            (row for row in (result.get("results") or []) if isinstance(row, dict) and row.get("scope") == "figma"),
             {},
         )
         top_errors = result.get("errors") or []
@@ -408,11 +401,14 @@ def add_figma_project(req: FigmaProjectRequest):
         if scoped_error:
             sync_error = scoped_error
         elif scoped_errors:
-            sync_error = "; ".join(
-                str(err.get("error") or "").strip()
-                for err in scoped_errors
-                if isinstance(err, dict) and str(err.get("error") or "").strip()
-            ) or "Figma sync reported file-level errors."
+            sync_error = (
+                "; ".join(
+                    str(err.get("error") or "").strip()
+                    for err in scoped_errors
+                    if isinstance(err, dict) and str(err.get("error") or "").strip()
+                )
+                or "Figma sync reported file-level errors."
+            )
         elif top_errors:
             sync_error = "; ".join(str(err) for err in top_errors)
     except Exception as exc:  # noqa: BLE001
@@ -471,11 +467,13 @@ def _history_payload(goals_path: Path) -> list[dict[str, str]]:
                     ago = f"{secs // 86400}d ago"
             except ValueError:
                 ago = "just now"
-        out.append({
-            "id": str(item.get("id") or ""),
-            "title": str(item.get("title") or ""),
-            "completed_ago": ago,
-        })
+        out.append(
+            {
+                "id": str(item.get("id") or ""),
+                "title": str(item.get("title") or ""),
+                "completed_ago": ago,
+            }
+        )
     return out
 
 

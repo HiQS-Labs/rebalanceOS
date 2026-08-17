@@ -74,8 +74,12 @@ def install_deps() -> None:
     print("  Installing core dependencies...")
     subprocess.run(
         [
-            sys.executable, "-m", "pip", "install",
-            "--target", str(LIB_DIR),
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--target",
+            str(LIB_DIR),
             "--no-user",
             "--no-cache-dir",
             "--quiet",
@@ -95,8 +99,12 @@ def install_deps() -> None:
     print("  Installing MLX dependencies (Apple Silicon)...")
     subprocess.run(
         [
-            sys.executable, "-m", "pip", "install",
-            "--target", str(LIB_DIR),
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--target",
+            str(LIB_DIR),
             "--no-user",
             "--no-cache-dir",
             "--quiet",

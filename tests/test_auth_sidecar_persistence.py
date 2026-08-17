@@ -48,15 +48,11 @@ class AuthSidecarPersistenceTests(unittest.TestCase):
 
         meta = token_meta.current_token_meta("github")
         self.assertIsNotNone(meta)
-        self.assertEqual(
-            meta["fingerprint"], token_meta.fingerprint("ghp_AAA_first_value_000000")
-        )
+        self.assertEqual(meta["fingerprint"], token_meta.fingerprint("ghp_AAA_first_value_000000"))
         self.assertEqual(meta["set_count"], 1)
         raw = (self._logs / "token_meta.json").read_text(encoding="utf-8")
         self.assertNotIn("ghp_AAA_first_value_000000", raw)  # fingerprint-only
-        self.assertIn(
-            "fingerprint", json.loads(raw)["github"]["tokens"][meta["fingerprint"]]
-        )
+        self.assertIn("fingerprint", json.loads(raw)["github"]["tokens"][meta["fingerprint"]])
 
     def test_first_added_at_retained_across_reset_then_resets_for_new_token(self) -> None:
         with patch.object(config_mod, "_keyring_set", return_value=False):
@@ -72,9 +68,7 @@ class AuthSidecarPersistenceTests(unittest.TestCase):
             # A genuinely NEW token value → fresh record.
             config_mod.set_github_token("ghp_BBB_rotated_value_111111")
         rotated = token_meta.current_token_meta("github")
-        self.assertEqual(
-            rotated["fingerprint"], token_meta.fingerprint("ghp_BBB_rotated_value_111111")
-        )
+        self.assertEqual(rotated["fingerprint"], token_meta.fingerprint("ghp_BBB_rotated_value_111111"))
         self.assertEqual(rotated["set_count"], 1)
         self.assertGreaterEqual(rotated["first_added_at"], first)
 

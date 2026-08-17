@@ -177,7 +177,9 @@ class CalendarAuthAndWriteTests(unittest.TestCase):
     def test_load_credentials_rejects_missing_scope(self, mock_from_json: MagicMock, _keyring: MagicMock) -> None:
         # keyring returns a blob → creds reconstructed via _creds_from_json (seamed);
         # the token carries only readonly scope, so requesting write must reject.
-        creds = type("Creds", (), {"expired": False, "refresh_token": "x", "scopes": [calendar.CALENDAR_READONLY_SCOPE]})()
+        creds = type(
+            "Creds", (), {"expired": False, "refresh_token": "x", "scopes": [calendar.CALENDAR_READONLY_SCOPE]}
+        )()
         mock_from_json.return_value = creds
 
         with self.assertRaises(PermissionError):

@@ -26,6 +26,7 @@ from rebalance.lib.time_ops import now_iso, now_utc
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.lib.time_ops import parse_date
 from rebalance.paths import resolve_oauth_token_path
+
 TOKEN_PATH = resolve_oauth_token_path("calendar")
 CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar"
@@ -122,6 +123,7 @@ def _load_credentials(required_scopes: list[str] | None = None) -> Any:
 def _build_service(required_scopes: list[str] | None = None) -> Any:
     """Build a Google Calendar API service client."""
     from googleapiclient.discovery import build
+
     creds = _load_credentials(required_scopes=required_scopes)
     return build("calendar", "v3", credentials=creds)
 
@@ -209,15 +211,19 @@ def sync_calendar(
     all_events: list[dict[str, Any]] = []
     page_token = None
     while True:
-        result = service.events().list(
-            calendarId=calendar_id,
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy="startTime",
-            maxResults=250,
-            pageToken=page_token,
-        ).execute()
+        result = (
+            service.events()
+            .list(
+                calendarId=calendar_id,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy="startTime",
+                maxResults=250,
+                pageToken=page_token,
+            )
+            .execute()
+        )
 
         all_events.extend(result.get("items", []))
         page_token = result.get("nextPageToken")
@@ -251,11 +257,13 @@ def sync_calendar(
 
             attendees = []
             for a in event.get("attendees", []):
-                attendees.append({
-                    "email": a.get("email", ""),
-                    "name": a.get("displayName", ""),
-                    "response": a.get("responseStatus", ""),
-                })
+                attendees.append(
+                    {
+                        "email": a.get("email", ""),
+                        "name": a.get("displayName", ""),
+                        "response": a.get("responseStatus", ""),
+                    }
+                )
 
             conn.execute(
                 """INSERT OR REPLACE INTO calendar_events
@@ -451,11 +459,7 @@ def get_upcoming_events(
     cutoff = (now_utc() + timedelta(days=days_forward)).isoformat()
 
     cal_clause, cal_params = _calendar_id_filter(calendar_id)
-    where = (
-        "julianday(start_time) >= julianday(?) "
-        "AND julianday(start_time) <= julianday(?) "
-        f"{cal_clause}"
-    )
+    where = f"julianday(start_time) >= julianday(?) AND julianday(start_time) <= julianday(?) {cal_clause}"
     return _query_events(
         database_path,
         where=where,
@@ -488,11 +492,7 @@ def get_team_upcoming_by_person(
     cutoff = (now_utc() + timedelta(days=days_forward)).isoformat()
 
     person_clause, person_params = _person_filter(persons)
-    where = (
-        "julianday(start_time) >= julianday(?) "
-        "AND julianday(start_time) <= julianday(?) "
-        f"{person_clause}"
-    )
+    where = f"julianday(start_time) >= julianday(?) AND julianday(start_time) <= julianday(?) {person_clause}"
     return _query_events(
         database_path,
         where=where,
@@ -546,6 +546,7 @@ def get_recent_events(
 @dataclass
 class DailyEventTotal:
     """Summary of events for a single day."""
+
     date: str  # YYYY-MM-DD format
     day_name: str  # Monday, Tuesday, etc.
     event_count: int
@@ -623,11 +624,13 @@ def get_daily_totals(
         day_obj = parse_date(date_str)
         day_name = day_obj.strftime("%A") if day_obj else ""
 
-        results.append(DailyEventTotal(
-            date=date_str,
-            day_name=day_name,
-            event_count=count,
-            total_minutes=max(0, total_mins),
-        ))
+        results.append(
+            DailyEventTotal(
+                date=date_str,
+                day_name=day_name,
+                event_count=count,
+                total_minutes=max(0, total_mins),
+            )
+        )
 
     return results

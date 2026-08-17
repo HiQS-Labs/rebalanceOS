@@ -100,9 +100,7 @@ def _fts_search(connection: sqlite3.Connection, query: str, limit: int = 50) -> 
             tokens = _FTS_TOKEN.findall(query)
             if tokens:
                 try:
-                    rows = connection.execute(
-                        sql, (" OR ".join(f'"{t}"' for t in tokens), limit)
-                    ).fetchall()
+                    rows = connection.execute(sql, (" OR ".join(f'"{t}"' for t in tokens), limit)).fetchall()
                 except sqlite3.OperationalError:
                     rows = []
 
@@ -230,9 +228,7 @@ def search(
         # sibling documents can never reorder or displace direct retrieval.
         from hiqs.affinity import append_affinity_hits
 
-        return append_affinity_hits(
-            connection, query, direct_hits, limit, enabled_edges=affinity_edges
-        )
+        return append_affinity_hits(connection, query, direct_hits, limit, enabled_edges=affinity_edges)
     finally:
         if owns_connection:
             connection.close()

@@ -32,9 +32,7 @@ from threading import Lock
 from typing import Any
 
 
-SLACK_USERS_PATH = (
-    Path(__file__).parent.parent.parent.parent / "temp" / "slack_users.json"
-)
+SLACK_USERS_PATH = Path(__file__).parent.parent.parent.parent / "temp" / "slack_users.json"
 
 # Slack mention forms we know about:
 #   <@U12345678>           — plain user mention

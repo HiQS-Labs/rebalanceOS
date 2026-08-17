@@ -88,7 +88,7 @@ AUDIT_WORTHY_EXTS = {".py", ".sh", ".plist"}
 # Files that are NOT considered standalone modules (helpers, configs, etc.)
 IGNORED_FILES = {
     "__init__.py",
-    "__main__.py",                   # CLI entry point shim, not a module
+    "__main__.py",  # CLI entry point shim, not a module
     "config.py",
     "calendar_config.py",
     "calendar_helpers.py",
@@ -97,10 +97,10 @@ IGNORED_FILES = {
     "md_parser.py",
     "setup_calendar_oauth.py",
     "build_extension.py",
-    "dashboard.py",                  # Poller, doesn't need same fan-out
-    "audit_modules.py",              # This script
-    "audit.py",                      # Internal helper for destructive-op logging
-    "_bootstrap.py",                 # sys.path shim, not a module
+    "dashboard.py",  # Poller, doesn't need same fan-out
+    "audit_modules.py",  # This script
+    "audit.py",  # Internal helper for destructive-op logging
+    "_bootstrap.py",  # sys.path shim, not a module
 }
 
 
@@ -108,13 +108,11 @@ IGNORED_FILES = {
 # Setup / discovery
 # ---------------------------------------------------------------------------
 
+
 def validate_ignored_files():
     """Return list of stale IGNORED_FILES entries, or empty list."""
     search_dirs = [SRC_PACKAGE_DIR, INGEST_DIR, SCRIPTS_DIR]
-    return sorted(
-        name for name in IGNORED_FILES
-        if not any((d / name).exists() for d in search_dirs)
-    )
+    return sorted(name for name in IGNORED_FILES if not any((d / name).exists() for d in search_dirs))
 
 
 def get_candidate_modules():
@@ -137,6 +135,7 @@ def get_candidate_modules():
 # File-level mention checks (checks #1 and #2)
 # ---------------------------------------------------------------------------
 
+
 def check_file_mentions(modules, target_file):
     """Return sorted list of module names not mentioned in target_file.
 
@@ -151,16 +150,14 @@ def check_file_mentions(modules, target_file):
     # false-positive risk (English word matching a module stem) for catching the
     # genuinely-undocumented case.
     content = target_file.read_text(encoding="utf-8").lower()
-    missing = [
-        mod.name for mod in modules
-        if mod.name.lower() not in content and mod.stem.lower() not in content
-    ]
+    missing = [mod.name for mod in modules if mod.name.lower() not in content and mod.stem.lower() not in content]
     return sorted(missing)
 
 
 # ---------------------------------------------------------------------------
 # Lockfile (baseline of pre-existing gaps)
 # ---------------------------------------------------------------------------
+
 
 def load_lockfile():
     """Return parsed lockfile dict, or None if absent. Exits on invalid JSON."""
@@ -212,8 +209,8 @@ def parse_most_recent_changelog_version():
         return None, None, None
     first = matches[0]
     end = matches[1].start() if len(matches) > 1 else len(content)
-    section_text = content[first.start():end]
-    header_line = content[first.start():content.find("\n", first.start())]
+    section_text = content[first.start() : end]
+    header_line = content[first.start() : content.find("\n", first.start())]
     date_match = VERSION_DATE_RE.search(header_line)
     date_str = date_match.group(2) if date_match else None
     return first.group(1), date_str, section_text
@@ -294,11 +291,13 @@ def check_recent_commits(n=20):
                 relevant.append(f)
 
         if relevant:
-            missing.append({
-                "sha": commit["sha"][:7],
-                "subject": commit["subject"],
-                "files": sorted(relevant),
-            })
+            missing.append(
+                {
+                    "sha": commit["sha"][:7],
+                    "subject": commit["subject"],
+                    "files": sorted(relevant),
+                }
+            )
 
     result["missing_from_changelog"] = missing
     result["status"] = "fail" if missing else "pass"
@@ -374,6 +373,7 @@ def check_working_tree():
 # Audit assembly
 # ---------------------------------------------------------------------------
 
+
 def run_audit(commits_window, include_uncommitted=False):
     """Run all checks and return the structured result dict."""
     result = {
@@ -396,13 +396,9 @@ def run_audit(commits_window, include_uncommitted=False):
     if stale:
         result["passed"] = False
         result["exit_code"] = 2
-        result["summary"] = (
-            f"IGNORED_FILES has {len(stale)} stale entry/entries. "
-            "Audit cannot proceed."
-        )
+        result["summary"] = f"IGNORED_FILES has {len(stale)} stale entry/entries. Audit cannot proceed."
         result["next_steps"].append(
-            f"Remove stale IGNORED_FILES entries from scripts/audit_modules.py: "
-            f"{', '.join(stale)}"
+            f"Remove stale IGNORED_FILES entries from scripts/audit_modules.py: {', '.join(stale)}"
         )
         return result
 
@@ -468,20 +464,14 @@ def run_audit(commits_window, include_uncommitted=False):
     result["checks"]["working_tree"] = wt
 
     # ---- Aggregate pass/fail --------------------------------------------
-    failed = (
-        bool(arch_new)
-        or bool(changelog_new)
-        or recent["status"] == "fail"
-        or wt.get("status") == "fail"
-    )
+    failed = bool(arch_new) or bool(changelog_new) or recent["status"] == "fail" or wt.get("status") == "fail"
     result["passed"] = not failed
     result["exit_code"] = 1 if failed else 0
 
     # ---- Build next_steps -----------------------------------------------
     if arch_new:
         result["next_steps"].append(
-            "Add to ARCHITECTURE.md (module map and/or Signal Sources table): "
-            + ", ".join(arch_new)
+            "Add to ARCHITECTURE.md (module map and/or Signal Sources table): " + ", ".join(arch_new)
         )
     if changelog_new:
         result["next_steps"].append(
@@ -489,9 +479,7 @@ def run_audit(commits_window, include_uncommitted=False):
             f"(any past version section): {', '.join(changelog_new)}"
         )
     if recent["status"] == "fail":
-        all_files = sorted({
-            f for entry in recent["missing_from_changelog"] for f in entry["files"]
-        })
+        all_files = sorted({f for entry in recent["missing_from_changelog"] for f in entry["files"]})
         version_label = recent.get("version_section_checked", "<latest>")
         result["next_steps"].append(
             f"Append the following file changes to CHANGELOG.md version [{version_label}]: "
@@ -522,14 +510,10 @@ def run_audit(commits_window, include_uncommitted=False):
         if changelog_new:
             bits.append(f"{len(changelog_new)} new CHANGELOG.md miss(es)")
         if recent["status"] == "fail":
-            bits.append(
-                f"{len(recent['missing_from_changelog'])} commit(s) with "
-                "undocumented changes"
-            )
+            bits.append(f"{len(recent['missing_from_changelog'])} commit(s) with undocumented changes")
         if wt.get("status") == "fail":
             bits.append(
-                f"{len(wt['missing_from_changelog'])} uncommitted file(s) "
-                "missing from latest CHANGELOG section"
+                f"{len(wt['missing_from_changelog'])} uncommitted file(s) missing from latest CHANGELOG section"
             )
         result["summary"] = "Audit failed: " + "; ".join(bits) + "."
 
@@ -539,6 +523,7 @@ def run_audit(commits_window, include_uncommitted=False):
 # ---------------------------------------------------------------------------
 # Output renderers
 # ---------------------------------------------------------------------------
+
 
 def render_text(result):
     """Human-readable rendering of the audit result."""
@@ -562,7 +547,9 @@ def render_text(result):
         for m in arch["new_misses"]:
             print(f"  - {m}")
     elif arch.get("silenced_by_baseline"):
-        print(f"\n[~] ARCHITECTURE.md: {len(arch['silenced_by_baseline'])} pre-existing miss(es) silenced by baseline lockfile.")
+        print(
+            f"\n[~] ARCHITECTURE.md: {len(arch['silenced_by_baseline'])} pre-existing miss(es) silenced by baseline lockfile."
+        )
     else:
         print("\n[+] ARCHITECTURE.md audit passed.")
 
@@ -574,7 +561,9 @@ def render_text(result):
         for m in cl["new_misses"]:
             print(f"  - {m}")
     elif cl.get("silenced_by_baseline"):
-        print(f"\n[~] CHANGELOG.md: {len(cl['silenced_by_baseline'])} pre-existing miss(es) silenced by baseline lockfile.")
+        print(
+            f"\n[~] CHANGELOG.md: {len(cl['silenced_by_baseline'])} pre-existing miss(es) silenced by baseline lockfile."
+        )
     else:
         print("\n[+] CHANGELOG.md audit passed.")
 
@@ -593,8 +582,7 @@ def render_text(result):
     elif rc.get("status") == "fail":
         version = rc.get("version_section_checked", "<latest>")
         print(
-            f"\n[!] CHANGELOG version [{version}] does not cover changes in the "
-            f"last {rc['commits_examined']} commits:"
+            f"\n[!] CHANGELOG version [{version}] does not cover changes in the last {rc['commits_examined']} commits:"
         )
         for entry in rc["missing_from_changelog"]:
             print(f"  - {entry['sha']}  {entry['subject']}")
@@ -603,8 +591,7 @@ def render_text(result):
     else:
         version = rc.get("version_section_checked", "<latest>")
         print(
-            f"\n[+] Recent-commits check passed "
-            f"({rc['commits_examined']} commits checked against version [{version}])."
+            f"\n[+] Recent-commits check passed ({rc['commits_examined']} commits checked against version [{version}])."
         )
 
     wt = result["checks"].get("working_tree", {})
@@ -638,6 +625,7 @@ def render_text(result):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -694,13 +682,18 @@ def main():
 
         payload = write_lockfile(arch_missing, changelog_missing)
         if args.json:
-            print(json.dumps({
-                "audit_version": AUDIT_VERSION,
-                "init": True,
-                "lockfile_path": str(LOCK_FILE.relative_to(PROJECT_ROOT)),
-                "missing_from_architecture": payload["missing_from_architecture"],
-                "missing_from_changelog": payload["missing_from_changelog"],
-            }, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "audit_version": AUDIT_VERSION,
+                        "init": True,
+                        "lockfile_path": str(LOCK_FILE.relative_to(PROJECT_ROOT)),
+                        "missing_from_architecture": payload["missing_from_architecture"],
+                        "missing_from_changelog": payload["missing_from_changelog"],
+                    },
+                    indent=2,
+                )
+            )
         else:
             print(f"[+] Wrote baseline lockfile to {LOCK_FILE.relative_to(PROJECT_ROOT)}")
             print(f"    {len(arch_missing)} silenced from ARCHITECTURE.md")

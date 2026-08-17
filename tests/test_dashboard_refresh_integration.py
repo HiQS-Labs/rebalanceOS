@@ -49,9 +49,7 @@ class DashboardRefreshIntegrationTests(unittest.TestCase):
         config_mod.CONFIG_PATH = self._orig_config
 
     def test_dry_run_reports_plan_without_touching_fs(self) -> None:
-        result = _refresh_dashboard_note(
-            self._db, vault_path=self._vault, since_days=30, dry_run=True
-        )
+        result = _refresh_dashboard_note(self._db, vault_path=self._vault, since_days=30, dry_run=True)
         self.assertEqual(result["scope"], "dashboard")
         self.assertTrue(result["dry_run"])
         self.assertIn("ingest_vault()", result["steps"])
@@ -59,11 +57,11 @@ class DashboardRefreshIntegrationTests(unittest.TestCase):
         self.assertFalse((self._vault / "Dashboards" / "rebalanceOS Dashboard.md").exists())
 
     def test_real_chain_writes_note_reingests_and_embeds(self) -> None:
-        with patch.object(embedder, "_load_model", return_value=(object(), object())), \
-             patch.object(embedder, "_embed_batch", side_effect=_fake_embed_batch):
-            result = _refresh_dashboard_note(
-                self._db, vault_path=self._vault, since_days=30, dry_run=False
-            )
+        with (
+            patch.object(embedder, "_load_model", return_value=(object(), object())),
+            patch.object(embedder, "_embed_batch", side_effect=_fake_embed_batch),
+        ):
+            result = _refresh_dashboard_note(self._db, vault_path=self._vault, since_days=30, dry_run=False)
 
         # The real chain returned the live ingest/embed result shapes.
         self.assertEqual(result["scope"], "dashboard")

@@ -55,6 +55,7 @@ try:
         log_job_failed,
         log_job_started as _ljs,
     )
+
     _JOB_LOG = True
 except ImportError:
     _JOB_LOG = False
@@ -181,8 +182,10 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
     now = now or datetime.now()
 
     if not force and is_late_run(now):
-        log(f"SKIP: late catch-up run at {now:%H:%M} (< {RUN_HOUR_FLOOR:02d}:00) — the 00:00 "
-            f"rollover has already moved Today->Yesterday. Writing nothing.")
+        log(
+            f"SKIP: late catch-up run at {now:%H:%M} (< {RUN_HOUR_FLOOR:02d}:00) — the 00:00 "
+            f"rollover has already moved Today->Yesterday. Writing nothing."
+        )
         return 0
 
     if not vault_ready():
@@ -230,12 +233,11 @@ def show_status() -> int:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="print the block that would be written; change nothing")
-    parser.add_argument("--force", action="store_true",
-                        help="bypass the 6 PM floor guard for manual runs (uses real current time)")
-    parser.add_argument("--status", action="store_true",
-                        help="show vault/block state, then exit")
+    parser.add_argument("--dry-run", action="store_true", help="print the block that would be written; change nothing")
+    parser.add_argument(
+        "--force", action="store_true", help="bypass the 6 PM floor guard for manual runs (uses real current time)"
+    )
+    parser.add_argument("--status", action="store_true", help="show vault/block state, then exit")
     args = parser.parse_args(argv)
 
     if args.status:

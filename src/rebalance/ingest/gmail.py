@@ -41,11 +41,11 @@ DEFAULT_MAX_RESULTS = 100
 # the daily-sync's stripped environment). Mirrors calendar's TOKEN_PATH.
 from rebalance.lib.time_ops import now_iso
 from rebalance.paths import resolve_oauth_token_path
+
 TOKEN_PATH = resolve_oauth_token_path("gmail")
 
 GMAIL_SETUP_HINT = (
-    "python scripts/setup_gmail_oauth.py   "
-    "(one-time browser consent; then `rebalance config migrate-to-keyring`)"
+    "python scripts/setup_gmail_oauth.py   (one-time browser consent; then `rebalance config migrate-to-keyring`)"
 )
 
 
@@ -124,6 +124,7 @@ def _load_credentials(required_scopes: list[str] | None = None) -> Any:
 def _build_service() -> Any:
     """Build a Gmail API v1 service client from the desktop OAuth token."""
     from googleapiclient.discovery import build
+
     creds = _load_credentials(required_scopes=[GMAIL_READONLY_SCOPE])
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
@@ -233,18 +234,23 @@ def sync_gmail(
         service = _build_service()
 
     try:
-        list_response = service.users().messages().list(
-            userId="me",
-            q=query_filter,
-            maxResults=max_results,
-        ).execute()
+        list_response = (
+            service.users()
+            .messages()
+            .list(
+                userId="me",
+                q=query_filter,
+                maxResults=max_results,
+            )
+            .execute()
+        )
     except Exception as exc:
         if _is_insufficient_scope_error(exc):
             from rebalance.ingest import auth_log
+
             auth_log.log_gmail_scope_insufficient(str(exc))
             raise GmailAuthError(
-                "Gmail OAuth token is missing the gmail.readonly scope. Re-run:\n"
-                f"  {GMAIL_SETUP_HINT}"
+                f"Gmail OAuth token is missing the gmail.readonly scope. Re-run:\n  {GMAIL_SETUP_HINT}"
             ) from exc
         raise
     message_refs = list_response.get("messages", []) or []
@@ -262,12 +268,17 @@ def sync_gmail(
             if not msg_id:
                 continue
 
-            msg = service.users().messages().get(
-                userId="me",
-                id=msg_id,
-                format="metadata",
-                metadataHeaders=metadata_headers,
-            ).execute()
+            msg = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=msg_id,
+                    format="metadata",
+                    metadataHeaders=metadata_headers,
+                )
+                .execute()
+            )
 
             payload = msg.get("payload", {}) or {}
             headers = _headers_to_dict(payload.get("headers", []) or [])
@@ -278,10 +289,13 @@ def sync_gmail(
             thread_id = msg.get("threadId", "") or ""
             labels = msg.get("labelIds", []) or []
 
-            existed = conn.execute(
-                "SELECT 1 FROM email_messages WHERE message_id = ?",
-                (msg_id,),
-            ).fetchone() is not None
+            existed = (
+                conn.execute(
+                    "SELECT 1 FROM email_messages WHERE message_id = ?",
+                    (msg_id,),
+                ).fetchone()
+                is not None
+            )
 
             conn.execute(
                 """INSERT OR REPLACE INTO email_messages
@@ -382,9 +396,9 @@ def ingest_email_messages(
             ):
                 skipped += 1
                 continue
-            existed = conn.execute(
-                "SELECT 1 FROM email_messages WHERE message_id = ?", (msg_id,)
-            ).fetchone() is not None
+            existed = (
+                conn.execute("SELECT 1 FROM email_messages WHERE message_id = ?", (msg_id,)).fetchone() is not None
+            )
             conn.execute(
                 """INSERT OR REPLACE INTO email_messages
                    (message_id, thread_id, from_address, from_name, subject,

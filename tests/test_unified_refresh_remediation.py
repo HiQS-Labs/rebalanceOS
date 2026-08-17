@@ -6,6 +6,7 @@ Covers the three gate items from UNIFIED-REFRESH-RESTART.md Phase QA-R:
   2. Failing-invoker assertion — active.json is byte-for-byte unchanged on error.
   3. Cold-start (active.json absent) renders empty without crashing.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,10 +21,12 @@ import unittest
 class ListActiveParseTests(unittest.TestCase):
     """The helper's list-active response shape is parseable and stable."""
 
-    FIXTURE = json.dumps([
-        {"reminder_id": "abc123", "title": "Buy oat milk", "due_at": "2026-07-01T09:00:00Z"},
-        {"reminder_id": "def456", "title": "Call dentist", "due_at": None},
-    ])
+    FIXTURE = json.dumps(
+        [
+            {"reminder_id": "abc123", "title": "Buy oat milk", "due_at": "2026-07-01T09:00:00Z"},
+            {"reminder_id": "def456", "title": "Call dentist", "due_at": None},
+        ]
+    )
 
     def test_fixture_parses_to_list(self) -> None:
         items = json.loads(self.FIXTURE)
@@ -59,9 +62,9 @@ class ListActiveParseTests(unittest.TestCase):
 class FailingInvokerTests(unittest.TestCase):
     """A helper error must not overwrite (or delete) the prior active.json snapshot."""
 
-    PRIOR_CONTENT = json.dumps({"schema_version": 1, "items": [
-        {"reminder_id": "prior1", "title": "Prior item", "due_at": None}
-    ]})
+    PRIOR_CONTENT = json.dumps(
+        {"schema_version": 1, "items": [{"reminder_id": "prior1", "title": "Prior item", "due_at": None}]}
+    )
 
     def _run_refresh_with_failing_helper(self, active_json_path: pathlib.Path) -> dict:
         """
@@ -69,6 +72,7 @@ class FailingInvokerTests(unittest.TestCase):
         Returns the response dict that the endpoint would return.
         """
         import sys
+
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
         helper_error = None
@@ -89,10 +93,10 @@ class FailingInvokerTests(unittest.TestCase):
 
             result = self._run_refresh_with_failing_helper(active_path)
 
-            self.assertEqual(active_path.read_bytes(), prior_bytes,
-                             "active.json must be byte-for-byte unchanged on helper error")
-            self.assertFalse(result["ok"],
-                             "response ok must be False when helper_error is set")
+            self.assertEqual(
+                active_path.read_bytes(), prior_bytes, "active.json must be byte-for-byte unchanged on helper error"
+            )
+            self.assertFalse(result["ok"], "response ok must be False when helper_error is set")
             self.assertIsNotNone(result["helper_error"])
 
     def test_response_ok_false_on_helper_error(self) -> None:
@@ -125,8 +129,7 @@ class ColdStartTests(unittest.TestCase):
                 except (json.JSONDecodeError, OSError, TypeError):
                     pass
 
-            self.assertEqual(apple_reminders, [],
-                             "cold-start must yield an empty list, never crash")
+            self.assertEqual(apple_reminders, [], "cold-start must yield an empty list, never crash")
 
     def test_malformed_active_json_yields_empty_list(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -143,8 +146,7 @@ class ColdStartTests(unittest.TestCase):
                 except (json.JSONDecodeError, OSError, TypeError):
                     pass
 
-            self.assertEqual(apple_reminders, [],
-                             "malformed active.json must silently yield empty list")
+            self.assertEqual(apple_reminders, [], "malformed active.json must silently yield empty list")
 
 
 if __name__ == "__main__":

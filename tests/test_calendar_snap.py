@@ -204,9 +204,7 @@ class SnapDayEdgesTests(unittest.TestCase):
         ]
         mock_service = self._mock_service_with_events(events)
 
-        result = snap_day_edges(
-            mock_service, "primary", date(2026, 4, 15), "America/Los_Angeles"
-        )
+        result = snap_day_edges(mock_service, "primary", date(2026, 4, 15), "America/Los_Angeles")
 
         self.assertEqual(len(result.snapped), 1)
         # Gapless suggested boundary (no time lost), and NO write-back.
@@ -220,9 +218,7 @@ class SnapDayEdgesTests(unittest.TestCase):
         ]
         mock_service = self._mock_service_with_events(events)
 
-        result = snap_day_edges(
-            mock_service, "primary", date(2026, 4, 15), "America/Los_Angeles"
-        )
+        result = snap_day_edges(mock_service, "primary", date(2026, 4, 15), "America/Los_Angeles")
 
         self.assertEqual(len(result.snapped), 0)
         self.assertEqual(len(result.skipped_clusters), 0)
@@ -287,11 +283,13 @@ class SnapCalendarEdgesMCPDaysValidationTests(unittest.TestCase):
             def _wrap(fn):
                 captured[fn.__name__] = fn
                 return fn
+
             return _wrap
 
         mock_mcp.tool = _tool_decorator
 
         import rebalance.mcp.tools.calendar as cal_mod
+
         cal_mod.register(mock_mcp, Path("/fake/db.sqlite"))
         return captured["snap_calendar_edges"]
 
@@ -321,20 +319,19 @@ class SnapCalendarEdgesMCPDaysValidationTests(unittest.TestCase):
 
         snap_fn = self._get_snap_fn()
         for valid in (1, 7):
-            with patch(
-                "rebalance.ingest.calendar_config.CalendarConfig"
-            ) as mock_cfg, patch(
-                "rebalance.ingest.calendar_snap.snap_edges",
-                return_value=_FakeSnap(),
+            with (
+                patch("rebalance.ingest.calendar_config.CalendarConfig") as mock_cfg,
+                patch(
+                    "rebalance.ingest.calendar_snap.snap_edges",
+                    return_value=_FakeSnap(),
+                ),
             ):
                 mock_cfg.load.return_value = MagicMock(
                     calendar_id="primary",
                     timezone="America/Los_Angeles",
                     snap_gap_minutes=0,
                 )
-                result = snap_fn(
-                    date_str="2026-04-15", days=valid, calendar_id="", timezone_name=""
-                )
+                result = snap_fn(date_str="2026-04-15", days=valid, calendar_id="", timezone_name="")
                 self.assertNotEqual(
                     result.get("status"),
                     "error",

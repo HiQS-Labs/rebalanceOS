@@ -99,9 +99,11 @@ class GitHubTokenKeyringTests(unittest.TestCase):
 
     def test_keyring_token_wins_over_config(self) -> None:
         """Keyring takes priority over rbos.config."""
-        with patch.object(config_module, "_keyring_get", return_value="ghp_fromkeyring"), \
-             patch.object(config_module, "_keyring_set", return_value=True), \
-             patch.object(config_module, "_keyring_delete", return_value=True):
+        with (
+            patch.object(config_module, "_keyring_get", return_value="ghp_fromkeyring"),
+            patch.object(config_module, "_keyring_set", return_value=True),
+            patch.object(config_module, "_keyring_delete", return_value=True),
+        ):
             token, source = get_github_token_with_source()
         self.assertEqual(token, "ghp_fromkeyring")
         self.assertEqual(source, "keyring")
@@ -112,23 +114,28 @@ class GitHubTokenKeyringTests(unittest.TestCase):
         (it's removed by `migrate_repo_local_secrets`, not by setters).
         """
         from rebalance.ingest import secret_store
+
         # Pre-seed rbos.config with a legacy token; `set` must NOT touch it.
         cfg_path = config_module.CONFIG_PATH
         cfg_path.write_text('{"github_token": "ghp_legacy"}', encoding="utf-8")
 
         stored: dict = {}
+
         def fake_set(key: str, value: str) -> bool:
             stored[key] = value
             return True
 
-        with patch.object(config_module, "_keyring_set", side_effect=fake_set), \
-             patch.object(config_module, "_keyring_get", return_value=None):
+        with (
+            patch.object(config_module, "_keyring_set", side_effect=fake_set),
+            patch.object(config_module, "_keyring_get", return_value=None),
+        ):
             set_github_token("ghp_new")
 
-        self.assertEqual(stored.get("github_token"), "ghp_new")              # keyring
+        self.assertEqual(stored.get("github_token"), "ghp_new")  # keyring
         self.assertEqual(secret_store.read_secret_file("github_token"), "ghp_new")  # secret store
         # rbos.config is not written by `set`; the legacy value is left for migration.
         import json as _json
+
         self.assertEqual(_json.loads(cfg_path.read_text()).get("github_token"), "ghp_legacy")
 
     def test_auto_migration_moves_token_from_config_to_keyring(self) -> None:
@@ -137,12 +144,15 @@ class GitHubTokenKeyringTests(unittest.TestCase):
         cfg_path.write_text('{"github_token": "ghp_legacy"}', encoding="utf-8")
 
         stored: dict = {}
+
         def fake_set(key: str, value: str) -> bool:
             stored[key] = value
             return True
 
-        with patch.object(config_module, "_keyring_get", return_value=None), \
-             patch.object(config_module, "_keyring_set", side_effect=fake_set):
+        with (
+            patch.object(config_module, "_keyring_get", return_value=None),
+            patch.object(config_module, "_keyring_set", side_effect=fake_set),
+        ):
             token, source = get_github_token_with_source()
 
         self.assertEqual(token, "ghp_legacy")

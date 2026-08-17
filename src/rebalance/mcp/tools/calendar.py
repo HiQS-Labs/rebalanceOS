@@ -94,12 +94,14 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         for event in day.needs_review:
             start_str = event.get("start_time", "")
             end_str = event.get("end_time", "")
-            review_items.append({
-                "summary": event.get("summary", ""),
-                "start_time": start_str,
-                "end_time": end_str,
-                "duration_minutes": event_duration_minutes(start_str, end_str),
-            })
+            review_items.append(
+                {
+                    "summary": event.get("summary", ""),
+                    "start_time": start_str,
+                    "end_time": end_str,
+                    "duration_minutes": event_duration_minutes(start_str, end_str),
+                }
+            )
 
         project_names = [m.name for m in matchers]
         return {

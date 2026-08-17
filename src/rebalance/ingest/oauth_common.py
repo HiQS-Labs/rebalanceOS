@@ -68,7 +68,7 @@ def _migrate_legacy_pickle(svc: OAuthService, store_key: str) -> Any | None:
     try:
         token_json = creds.to_json()
         svc.set_token_json(token_json, source="migrate", record=False)  # keyring (best-effort)
-        secret_store.write_secret_file(store_key, token_json)            # JSON fallback
+        secret_store.write_secret_file(store_key, token_json)  # JSON fallback
     except Exception:  # noqa: BLE001 — if JSON persist fails, keep the pickle for a retry
         return creds
     try:
@@ -126,6 +126,7 @@ def load_credentials(svc: OAuthService, required_scopes: list[str] | None = None
     # Refresh if expired — persist the rotated access token to keyring + JSON fallback.
     if creds.expired and creds.refresh_token:
         from google.auth.transport.requests import Request  # noqa: PLC0415
+
         try:
             creds.refresh(Request())
             # record=False: an access-token refresh is not a re-authorization.

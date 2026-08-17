@@ -12,12 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-SCRIPT_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "experimental"
-    / "git-pulse"
-    / "health-check.py"
-)
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "experimental" / "git-pulse" / "health-check.py"
 
 
 def _git(repo: Path, *args: str, env_override: dict | None = None) -> subprocess.CompletedProcess[str]:
@@ -112,9 +107,7 @@ class HealthCheckCliTests(unittest.TestCase):
         sync = self._prepare_sync_repo()
         self._write_device(sync, "alpha", "Alpha Mac")
         recent = datetime.now(timezone.utc) - timedelta(hours=1)
-        self._commit_at(
-            sync, "recent alpha commit", recent, ["devices/alpha.yaml", "pulse-alpha.md"]
-        )
+        self._commit_at(sync, "recent alpha commit", recent, ["devices/alpha.yaml", "pulse-alpha.md"])
         result = self._run_health(sync)
         self.assertEqual(result.returncode, 0, msg=result.stderr + result.stdout)
         self.assertIn("ALIVE", result.stdout)
@@ -124,9 +117,7 @@ class HealthCheckCliTests(unittest.TestCase):
         sync = self._prepare_sync_repo()
         self._write_device(sync, "beta", "Beta Mac")
         stale = datetime.now(timezone.utc) - timedelta(hours=6)
-        self._commit_at(
-            sync, "stale beta commit", stale, ["devices/beta.yaml", "pulse-beta.md"]
-        )
+        self._commit_at(sync, "stale beta commit", stale, ["devices/beta.yaml", "pulse-beta.md"])
         result = self._run_health(sync, "--warn-hours", "3", "--alert-hours", "24")
         self.assertEqual(result.returncode, 1, msg=result.stderr + result.stdout)
         self.assertIn("STALE", result.stdout)
@@ -140,7 +131,7 @@ class HealthCheckCliTests(unittest.TestCase):
             "quiet",
             "Quiet Mac",
             pulse_rows=(
-                f'{int(old_commit.timestamp())}\t{old_commit.strftime("%Y-%m-%dT%H:%M:%SZ")}'
+                f"{int(old_commit.timestamp())}\t{old_commit.strftime('%Y-%m-%dT%H:%M:%SZ')}"
                 "\trebalance-OS\tmain\tdeadbee\tEarlier local commit\n"
             ),
         )
@@ -224,7 +215,7 @@ class HealthCheckCliTests(unittest.TestCase):
             extra_yaml=textwrap.dedent(
                 f"""\
                 last_scan_epoch: "{int(recent_scan.timestamp())}"
-                last_scan_utc: "{recent_scan.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                last_scan_utc: "{recent_scan.strftime("%Y-%m-%dT%H:%M:%SZ")}"
                 repo_scan_failures: "1"
                 scan_status: "degraded"
                 scan_failure_examples: "/Users/operator/Documents/GH Repos/project-a"

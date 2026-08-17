@@ -30,8 +30,7 @@ from rebalance.ingest.apple_reminders_write import (
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
 
 apple_reminders_app = typer.Typer(
-    help="Apple Reminders write-back (create/update/complete/delete). "
-    "Dry-run by default; pass --apply to execute."
+    help="Apple Reminders write-back (create/update/complete/delete). Dry-run by default; pass --apply to execute."
 )
 app.add_typer(apple_reminders_app, name="apple-reminders")
 
@@ -63,9 +62,7 @@ def create_cmd(
     title: str = typer.Option(..., "--title", help="Reminder title."),
     notes: str = typer.Option("", "--notes", help="Reminder notes."),
     due: str = typer.Option("", "--due", help="Due datetime (ISO 8601)."),
-    list_name: str | None = typer.Option(
-        None, "--list", help="Target list (defaults to the configured ingest list)."
-    ),
+    list_name: str | None = typer.Option(None, "--list", help="Target list (defaults to the configured ingest list)."),
     apply: bool = typer.Option(False, "--apply", help="Execute (default: dry-run)."),
     database: Path | None = DBOption(),
 ) -> None:
@@ -73,6 +70,7 @@ def create_cmd(
     db_path = _resolve_db(database)
     if not list_name:
         from rebalance.ingest.config import get_apple_reminders_list_name
+
         list_name = get_apple_reminders_list_name()
     fields: dict[str, object] = {"title": title}
     if notes:
@@ -124,9 +122,7 @@ def complete_cmd(
 def delete_cmd(
     reminder_id: str = typer.Argument(..., help="Reminder id (ZCKIDENTIFIER)."),
     apply: bool = typer.Option(False, "--apply", help="Execute (default: dry-run)."),
-    yes: bool = typer.Option(
-        False, "--yes", help="Confirm the destructive delete (required with --apply)."
-    ),
+    yes: bool = typer.Option(False, "--yes", help="Confirm the destructive delete (required with --apply)."),
     database: Path | None = DBOption(),
 ) -> None:
     """Delete an existing reminder (destructive — needs --apply and --yes)."""
@@ -153,8 +149,14 @@ def audit_cmd(
         ).fetchall()
     out = [
         {
-            "created_at": r[0], "request_id": r[1], "op": r[2], "reminder_id": r[3],
-            "mode": r[4], "state": r[5], "op_status": r[6], "detail": r[7],
+            "created_at": r[0],
+            "request_id": r[1],
+            "op": r[2],
+            "reminder_id": r[3],
+            "mode": r[4],
+            "state": r[5],
+            "op_status": r[6],
+            "detail": r[7],
         }
         for r in rows
     ]

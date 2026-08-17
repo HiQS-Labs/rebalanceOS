@@ -19,9 +19,7 @@ PULSE_SERVER_PORT = 8767
 
 @app.command("serve")
 def serve_cmd(
-    port: int = typer.Option(
-        8787, "--port", "-p", help="Port to listen on (8767 is the pulse server's)"
-    ),
+    port: int = typer.Option(8787, "--port", "-p", help="Port to listen on (8767 is the pulse server's)"),
     host: str = typer.Option("127.0.0.1", "--host", help="Bind address"),
 ) -> None:
     """Start the local web dashboard (auth log, future dashboards).
@@ -52,6 +50,7 @@ def serve_cmd(
     threading.Timer(0.8, lambda: webbrowser.open(f"{url}/auth-log")).start()
 
     from rebalance.web import app as web_app
+
     # ponytail: show tracebacks in-browser for local dev; off on a public bind so
     # they never leak off-box.
     web_app.state.show_tracebacks = host in ("127.0.0.1", "localhost", "::1")

@@ -45,7 +45,7 @@ def _strip_copy_payload(html: str) -> str:
     if start < 0:
         return html
     end = html.find('"', start + len(marker))
-    return html[:start] + html[end + 1:]
+    return html[:start] + html[end + 1 :]
 
 
 def _banner(checks: list[Check]) -> str:
@@ -59,13 +59,15 @@ class BannerLeadDisambiguationTests(unittest.TestCase):
     "Last collector activity …" and aria-label="Copy collector warning text"."""
 
     def test_activity_label_does_not_share_wording_with_a_pulse_collector_pill(self) -> None:
-        html = _banner([
-            Check(
-                "fleet:noel's Mac Studio",
-                WARN,
-                "not collecting — last scan 2026-08-11 7:08 PM",
-            ),
-        ])
+        html = _banner(
+            [
+                Check(
+                    "fleet:noel's Mac Studio",
+                    WARN,
+                    "not collecting — last scan 2026-08-11 7:08 PM",
+                ),
+            ]
+        )
         lead_start = html.index('class="health-banner-lead"')
         items_start = html.index('class="health-banner-items"')
         lead_html = html[lead_start:items_start]
@@ -83,17 +85,19 @@ class BannerLeadDisambiguationTests(unittest.TestCase):
         """Disambiguating must not remove the information — the timestamp is
         still there, just no longer mislabelled."""
         html = _banner([Check("vault", WARN, "stale")])
-        lead_html = html[html.index('class="health-banner-lead"'):html.index('class="health-banner-items"')]
+        lead_html = html[html.index('class="health-banner-lead"') : html.index('class="health-banner-items"')]
         self.assertIn("Last data ingest", lead_html)
         self.assertIn("2026-08-16", lead_html)
 
     def test_per_device_collector_items_keep_their_own_wording(self) -> None:
         """Only the general-ingestion label changed. The pulse-collector problem
         items legitimately say "collector" — that IS what they measure."""
-        html = _banner([
-            Check("fleet:Mac Studio", WARN, "not collecting — last scan earlier"),
-        ])
-        items_html = html[html.index('class="health-banner-items"'):]
+        html = _banner(
+            [
+                Check("fleet:Mac Studio", WARN, "not collecting — last scan earlier"),
+            ]
+        )
+        items_html = html[html.index('class="health-banner-items"') :]
         self.assertIn("fleet:Mac Studio", items_html)
 
 

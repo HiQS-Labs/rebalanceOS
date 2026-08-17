@@ -52,9 +52,7 @@ def is_real_user_turn(entry):
     content = entry.get("message", {}).get("content")
     if isinstance(content, list):
         # A turn carrying tool_result blocks is the harness replying, not the user.
-        if any(
-            isinstance(b, dict) and b.get("type") == "tool_result" for b in content
-        ):
+        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
             return False
     text = block_text(content).strip()
     if not text:

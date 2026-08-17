@@ -66,9 +66,13 @@ def _warn_check_constructors() -> list[tuple[str, str | None]]:
 
         def visit_Call(self, node: ast.Call) -> None:
             if isinstance(node.func, ast.Name) and node.func.id == "Check":
-                status = ast.unparse(node.args[1]) if len(node.args) >= 2 else next(
-                    (ast.unparse(k.value) for k in node.keywords if k.arg == "status"),
-                    None,
+                status = (
+                    ast.unparse(node.args[1])
+                    if len(node.args) >= 2
+                    else next(
+                        (ast.unparse(k.value) for k in node.keywords if k.arg == "status"),
+                        None,
+                    )
                 )
                 severity = next(
                     (ast.unparse(k.value) for k in node.keywords if k.arg == "severity"),
@@ -108,20 +112,12 @@ class BlastRadiusEnumerationTests(unittest.TestCase):
     DYNAMIC_SEVERITY_WARN_CAPABLE = {"_check_pulse_collectors"}
 
     def test_literal_warn_error_sites_match_the_pin(self) -> None:
-        actual = Counter(
-            fn
-            for fn, severity in _warn_check_constructors()
-            if severity == "ERROR"
-        )
+        actual = Counter(fn for fn, severity in _warn_check_constructors() if severity == "ERROR")
         self.assertEqual(self.LITERAL_WARN_ERROR, actual)
 
     def test_dynamic_severity_sites_match_the_pin(self) -> None:
         named = {"ERROR", "WARNING", "NOTICE", "None"}
-        actual = {
-            fn
-            for fn, severity in _warn_check_constructors()
-            if severity is not None and severity not in named
-        }
+        actual = {fn for fn, severity in _warn_check_constructors() if severity is not None and severity not in named}
         self.assertEqual(self.DYNAMIC_SEVERITY_WARN_CAPABLE, actual)
 
     def test_pulse_state_table_error_states_are_the_known_three(self) -> None:
@@ -179,6 +175,7 @@ class OnboardingPolicyTests(unittest.TestCase):
     def test_broken_configured_probe_fails_toward_surfacing(self) -> None:
         """A probe exception must never silently downgrade a real empty-source
         error into a skip."""
+
         def boom() -> bool:
             raise RuntimeError("keyring unavailable")
 
@@ -242,10 +239,7 @@ class OnboardingPolicyTests(unittest.TestCase):
             patch.object(doctor_mod, "_google_oauth_source", return_value=None),
         ):
             db = _empty_db(tmp)
-            checks = [
-                _check_collector_freshness(db, **entry)
-                for entry in _COLLECTOR_FRESHNESS
-            ]
+            checks = [_check_collector_freshness(db, **entry) for entry in _COLLECTOR_FRESHNESS]
             health = compute_health_status(checks, {}, NOW, notice_patterns=[])
         self.assertEqual([OK] * len(_COLLECTOR_FRESHNESS), [c.status for c in checks])
         self.assertEqual(OK, health.verdict)
@@ -328,9 +322,7 @@ class FleetDemotionTests(unittest.TestCase):
 
         recent = (NOW - timedelta(hours=1)).isoformat()
         status = {"sources": {"sleuth": {"last_synced_at": recent}}}
-        checks = [
-            Check("sleuth export", WARN, "publisher export is stale", severity=WARNING)
-        ]
+        checks = [Check("sleuth export", WARN, "publisher export is stale", severity=WARNING)]
         health = compute_health_status(checks, status, NOW, notice_patterns=[])
         self.assertEqual(["sleuth export"], [c.name for c in health.problems])
 

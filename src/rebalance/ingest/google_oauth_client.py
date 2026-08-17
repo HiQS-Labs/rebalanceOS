@@ -87,9 +87,7 @@ def resolve_client_file() -> Path:
         if path.is_file():
             return path
     tried = "\n".join(f"  - {p}" for p in candidates)
-    raise GoogleOAuthClientNotConfigured(
-        f"No Google OAuth client credentials found. Tried:\n{tried}\n\n{_SETUP_HINT}"
-    )
+    raise GoogleOAuthClientNotConfigured(f"No Google OAuth client credentials found. Tried:\n{tried}\n\n{_SETUP_HINT}")
 
 
 def build_google_oauth_client_config() -> dict:
@@ -118,9 +116,7 @@ def build_google_oauth_client_config() -> dict:
     client_id = section.get("client_id")
     client_secret = section.get("client_secret")
     if not client_id or not client_secret:
-        raise GoogleOAuthClientNotConfigured(
-            f"{path} is missing client_id and/or client_secret.\n\n{_SETUP_HINT}"
-        )
+        raise GoogleOAuthClientNotConfigured(f"{path} is missing client_id and/or client_secret.\n\n{_SETUP_HINT}")
 
     redirect_uris = section.get("redirect_uris") or ["http://localhost"]
     if "http://localhost" not in redirect_uris:

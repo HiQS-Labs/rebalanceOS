@@ -23,10 +23,15 @@ from rebalance.ingest.local_repos import (
 def _git(cwd: Path, *args: str) -> None:
     subprocess.run(
         ["git", "-C", str(cwd), *args],
-        check=True, capture_output=True,
-        env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
-             "PATH": "/usr/bin:/bin"},
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+            "PATH": "/usr/bin:/bin",
+        },
     )
 
 
@@ -84,8 +89,11 @@ class ScanTests(unittest.TestCase):
 
     def test_no_upstream_counts_as_unpushed_work(self):
         repo = LocalRepo(
-            path=Path("/x"), origin_url="git@github.com:a/b.git",
-            full_name="a/b", branch="main", unpushed_commits=None,
+            path=Path("/x"),
+            origin_url="git@github.com:a/b.git",
+            full_name="a/b",
+            branch="main",
+            unpushed_commits=None,
         )
         self.assertEqual(unpushed_work([repo]), [repo])
 
@@ -110,7 +118,9 @@ class DiscoveryIntegrationTests(unittest.TestCase):
         fake = LocalRepo(
             path=Path("/Users/op/GH/forgotten"),
             origin_url="git@github.com:acme/forgotten.git",
-            full_name="acme/forgotten", branch="main", unpushed_commits=3,
+            full_name="acme/forgotten",
+            branch="main",
+            unpushed_commits=3,
         )
         with tempfile.TemporaryDirectory() as tmp:
             vault = Path(tmp) / "vault"
@@ -138,11 +148,17 @@ class DetachedHeadTests(unittest.TestCase):
         # Review finding: detached HEAD can't have an upstream by definition —
         # flagging it is noise, not signal.
         detached = LocalRepo(
-            path=Path("/x"), origin_url="git@github.com:a/b.git",
-            full_name="a/b", branch="HEAD", unpushed_commits=None,
+            path=Path("/x"),
+            origin_url="git@github.com:a/b.git",
+            full_name="a/b",
+            branch="HEAD",
+            unpushed_commits=None,
         )
         named_no_upstream = LocalRepo(
-            path=Path("/y"), origin_url="git@github.com:a/c.git",
-            full_name="a/c", branch="feat/x", unpushed_commits=None,
+            path=Path("/y"),
+            origin_url="git@github.com:a/c.git",
+            full_name="a/c",
+            branch="feat/x",
+            unpushed_commits=None,
         )
         self.assertEqual(unpushed_work([detached, named_no_upstream]), [named_no_upstream])

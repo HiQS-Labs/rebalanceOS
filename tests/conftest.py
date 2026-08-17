@@ -146,10 +146,14 @@ def pytest_collection_modifyitems(config, items):
             )
         if item.get_closest_marker("requires_metal") is not None:
             if metal_skip is None:
-                metal_skip = pytest.mark.skip(
-                    reason="no usable Metal device (probed out-of-process; "
-                    "MLX would abort this run rather than raise) — GH-250"
-                ) if not metal_available() else False
+                metal_skip = (
+                    pytest.mark.skip(
+                        reason="no usable Metal device (probed out-of-process; "
+                        "MLX would abort this run rather than raise) — GH-250"
+                    )
+                    if not metal_available()
+                    else False
+                )
             if metal_skip is not False:
                 item.add_marker(metal_skip)
 

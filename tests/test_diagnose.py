@@ -81,9 +81,7 @@ class LiveProbeTests(unittest.TestCase):
     def test_commit_probe_survives_an_empty_commit_message(self) -> None:
         """git allows empty messages; ''.splitlines() is [] and indexing it
         crashed the probe (agy review Blocker, pre-existing)."""
-        fake = _client_cls(
-            result={"sha": "abc123", "commit": {"message": "", "committer": {}}}
-        )
+        fake = _client_cls(result={"sha": "abc123", "commit": {"message": "", "committer": {}}})
         with patch.object(diagnose, "GitHubClient", fake):
             out = diagnose._live_probe_commit("someone/repo", "abc123", "tok")
         self.assertTrue(out["exists"])
@@ -116,8 +114,10 @@ class DiagnoseRepoFunnelTests(unittest.TestCase):
 
     def test_live_pat_failure_surfaces_first_next_action(self) -> None:
         probe = {"can_see": False, "status": 404, "error": "Not Found"}
-        with patch.object(diagnose, "get_github_token", return_value="tok"), \
-             patch.object(diagnose, "_live_probe_repo", return_value=probe):
+        with (
+            patch.object(diagnose, "get_github_token", return_value="tok"),
+            patch.object(diagnose, "_live_probe_repo", return_value=probe),
+        ):
             result = diagnose.diagnose_repo(self._empty_db(), repo="someone/unknown-repo", live=True)
         self.assertTrue(result["pat"]["checked"])
         self.assertFalse(result["pat"]["can_see"])

@@ -50,13 +50,12 @@ class MockMLXCoreForCap:
 class MockGenerateOutput:
     def __init__(self, n: int) -> None:
         self.text_embeds = MagicMock()
-        self.text_embeds.tolist.return_value = [
-            [0.0] * embedder.EMBEDDING_DIM for _ in range(n)
-        ]
+        self.text_embeds.tolist.return_value = [[0.0] * embedder.EMBEDDING_DIM for _ in range(n)]
 
 
 def mock_generate(_model, _tokenizer, texts):
     import sys
+
     core = sys.modules.get("mlx.core")
     if hasattr(core, "_simulated_cache"):
         total_len = sum(len(t) for t in texts)
@@ -75,8 +74,9 @@ def mock_mlx_cap():
     mock_embeddings.generate = mock_generate
     mock_embeddings.load = MagicMock(return_value=("mock_model", "mock_tokenizer"))
 
-    with patch.object(mlx, "core", mock_core), patch.dict(
-        sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}
+    with (
+        patch.object(mlx, "core", mock_core),
+        patch.dict(sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}),
     ):
         yield mock_core
 
@@ -217,9 +217,7 @@ def test_all_four_call_sites_covered(module: str, site: str):
     full_mod_name = f"rebalance.ingest.{mod_name}"
     mod = importlib.import_module(full_mod_name)
 
-    with patch(f"{full_mod_name}._load_model") as mock_load, \
-         patch(f"{full_mod_name}._embed_batch") as mock_embed:
-
+    with patch(f"{full_mod_name}._load_model") as mock_load, patch(f"{full_mod_name}._embed_batch") as mock_embed:
         mock_load.return_value = ("mock_model", "mock_tokenizer")
         mock_embed.return_value = [[0.1] * 1024]
 
@@ -230,10 +228,8 @@ def test_all_four_call_sites_covered(module: str, site: str):
                 mock_conn.execute.return_value.fetchall.return_value = [{"id": "1", "body": "test"}]
                 mod.embed_chunks(Path("/tmp/fake.db"))
 
-
         elif site == "embed_pending":
-            with patch(f"{full_mod_name}.sem") as mock_sem, \
-                 patch(f"{full_mod_name}.db_connection") as mock_db:
+            with patch(f"{full_mod_name}.sem") as mock_sem, patch(f"{full_mod_name}.db_connection") as mock_db:
                 mock_sem.semantic_documents_pending_embed.return_value = [{"id": 1, "body": "test"}]
                 mock_sem.count_embeddable_semantic_documents.return_value = 1
                 mod.embed_pending(Path("/tmp/fake.db"))
@@ -277,8 +273,9 @@ def test_degrades_safely_when_mlx_unavailable(caplog, propagating_logs):
     mock_embeddings.generate = mock_generate
     mock_embeddings.load = MagicMock(return_value=("mock_model", "mock_tokenizer"))
 
-    with patch.object(mlx, "core", broken), patch.dict(
-        sys.modules, {"mlx.core": broken, "mlx_embeddings": mock_embeddings}
+    with (
+        patch.object(mlx, "core", broken),
+        patch.dict(sys.modules, {"mlx.core": broken, "mlx_embeddings": mock_embeddings}),
     ):
         embedder._cache_limit_set = False
         embedder._cached_model = None

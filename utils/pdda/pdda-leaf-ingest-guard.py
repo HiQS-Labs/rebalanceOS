@@ -13,6 +13,7 @@ PreToolUse hook-output schema (the same schema gsd-core's gsd-read-guard.js uses
 A future hardening pass could escalate a well-proven pattern to a hard block (exit 2) once this
 has run false-positive-free for a while — deliberately not done yet (GH-106).
 """
+
 import json
 import sys
 
@@ -30,9 +31,7 @@ def main():
     if not command:
         return 0
 
-    has_inline_python = any(
-        marker in command for marker in ("python -c", "python3 -c", ".venv/bin/python -c")
-    )
+    has_inline_python = any(marker in command for marker in ("python -c", "python3 -c", ".venv/bin/python -c"))
     if not has_inline_python or "rebalance.ingest" not in command:
         return 0
 

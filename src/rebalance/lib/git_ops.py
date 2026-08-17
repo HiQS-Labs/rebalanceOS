@@ -28,6 +28,7 @@ def parse_github_remote_url(remote_url: str | None) -> str | None:
         return None
     return f"{match.group('owner')}/{match.group('repo')}"
 
+
 # Directories never worth descending into when walking for git checkouts or
 # harness files. Canonical owner (GH-5 Phase 2) — moved here from
 # ``ask_self_scan._PRUNE_DIRS``, which was the de-facto owner via a leaf import.
@@ -35,12 +36,33 @@ def parse_github_remote_url(remote_url: str | None) -> str | None:
 # Standalone scripts that cannot reach ``rebalance.lib`` at runtime (notably
 # ``experimental/git-pulse/discover-repos.py``, which sets up no sys.path)
 # deliberately keep their own lighter rule rather than coupling to this module.
-DEFAULT_PRUNE_DIRS = frozenset({
-    "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache",
-    ".mypy_cache", ".ruff_cache", "build", "dist", ".next", ".cache",
-    "Library", ".Trash", ".npm", ".cargo", "site-packages", ".tox",
-    ".gradle", "target", "vendor", ".terraform", "DerivedData", ".git",
-})
+DEFAULT_PRUNE_DIRS = frozenset(
+    {
+        "node_modules",
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "build",
+        "dist",
+        ".next",
+        ".cache",
+        "Library",
+        ".Trash",
+        ".npm",
+        ".cargo",
+        "site-packages",
+        ".tox",
+        ".gradle",
+        "target",
+        "vendor",
+        ".terraform",
+        "DerivedData",
+        ".git",
+    }
+)
 
 
 def should_descend(name: str, *, prune: frozenset[str] = DEFAULT_PRUNE_DIRS) -> bool:
@@ -58,12 +80,7 @@ def should_descend(name: str, *, prune: frozenset[str] = DEFAULT_PRUNE_DIRS) -> 
 def _git(repo_path: Path, *args: str, timeout: float = 30.0) -> str | None:
     """Run git in *repo_path* and return stdout. Returns None if it fails."""
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_path), *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
+        result = subprocess.run(["git", "-C", str(repo_path), *args], capture_output=True, text=True, timeout=timeout)
         return result.stdout.strip() if result.returncode == 0 else None
     except subprocess.TimeoutExpired:
         return None

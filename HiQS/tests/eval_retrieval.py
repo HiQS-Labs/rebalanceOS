@@ -54,22 +54,16 @@ def compute_queryset_sha(committed_path: str | Path, sidecar_path: str | Path) -
     s_path = Path(sidecar_path)
 
     if not c_path.exists():
-        raise FileNotFoundError(
-            f"Missing query set file '{committed_path}' per §6.3 protocol."
-        )
+        raise FileNotFoundError(f"Missing query set file '{committed_path}' per §6.3 protocol.")
     if not s_path.exists():
-        raise FileNotFoundError(
-            f"Sidecar missing: unknown query set sidecar at '{sidecar_path}' (§19.2)."
-        )
+        raise FileNotFoundError(f"Sidecar missing: unknown query set sidecar at '{sidecar_path}' (§19.2).")
 
     c_bytes = c_path.read_bytes()
     s_bytes = s_path.read_bytes()
     return hashlib.sha256(c_bytes + s_bytes).hexdigest()
 
 
-def load_query_set(
-    committed_path: str | Path, sidecar_path: str | Path
-) -> tuple[list[dict[str, Any]], str]:
+def load_query_set(committed_path: str | Path, sidecar_path: str | Path) -> tuple[list[dict[str, Any]], str]:
     """Load queries from committed JSON and local sidecar, validating §6.3/§19.2 split."""
     queryset_sha = compute_queryset_sha(committed_path, sidecar_path)
 
@@ -91,9 +85,7 @@ def load_query_set(
     for item in committed_data:
         q_id = item.get("id")
         if not q_id or q_id not in sidecar_map:
-            raise ValueError(
-                f"Sidecar missing text for query id '{q_id}': unknown query text (§19.2)."
-            )
+            raise ValueError(f"Sidecar missing text for query id '{q_id}': unknown query text (§19.2).")
 
         sc_entry = sidecar_map[q_id]
         if isinstance(sc_entry, str):
@@ -104,16 +96,12 @@ def load_query_set(
             text = ""
 
         if not text.strip():
-            raise ValueError(
-                f"Empty text for query id '{q_id}': unknown query text (§19.2)."
-            )
+            raise ValueError(f"Empty text for query id '{q_id}': unknown query text (§19.2).")
 
         # Canonical §19.2 fields: doc_id and shape
         raw_doc_ids = item.get(
             "doc_id",
-            item.get(
-                "target_doc_ids", item.get("doc_ids", item.get("target_doc_id", []))
-            ),
+            item.get("target_doc_ids", item.get("doc_ids", item.get("target_doc_id", []))),
         )
         if isinstance(raw_doc_ids, str):
             target_doc_ids = [raw_doc_ids] if raw_doc_ids.strip() else []
@@ -123,13 +111,9 @@ def load_query_set(
             target_doc_ids = []
 
         if not target_doc_ids:
-            raise ValueError(
-                f"Query item '{q_id}' missing canonical target doc_id (§19.2)."
-            )
+            raise ValueError(f"Query item '{q_id}' missing canonical target doc_id (§19.2).")
 
-        raw_shape = item.get(
-            "shape", item.get("shape_tags", item.get("tags", []))
-        )
+        raw_shape = item.get("shape", item.get("shape_tags", item.get("tags", [])))
         if isinstance(raw_shape, str):
             shape_tags = [raw_shape] if raw_shape.strip() else []
         elif isinstance(raw_shape, list):
@@ -138,9 +122,7 @@ def load_query_set(
             shape_tags = []
 
         if not shape_tags:
-            raise ValueError(
-                f"Query item '{q_id}' missing canonical shape tag (§19.2)."
-            )
+            raise ValueError(f"Query item '{q_id}' missing canonical shape tag (§19.2).")
 
         queries.append(
             {
@@ -154,9 +136,7 @@ def load_query_set(
     return queries, queryset_sha
 
 
-def score_single_query(
-    target_doc_ids: list[str], hits: list[Doc]
-) -> tuple[float, float]:
+def score_single_query(target_doc_ids: list[str], hits: list[Doc]) -> tuple[float, float]:
     """Score recall@10 and MRR@10 for a single query."""
     top10 = hits[:10]
     matched_ranks: list[int] = []
@@ -184,6 +164,7 @@ def get_offline_embedder(model_name: str) -> Any:
     """Load embedder with strict local_files_only=True semantics to prevent network downloads (§6.3)."""
     try:
         from sentence_transformers import SentenceTransformer
+
         return SentenceTransformer(model_name, local_files_only=True)
     except Exception as err:
         raise RuntimeError(
@@ -255,6 +236,7 @@ def evaluate_retrieval(
             fused_top_hits[q_id] = fused_hits[0].id
 
     n = len(queries)
+
     def mean(arr):
         return sum(arr) / n if n > 0 else 0.0
 
@@ -293,8 +275,8 @@ def compute_paired_disagreement_set(
         for j in range(i + 1, n):
             r1 = results[i]
             r2 = results[j]
-            m1_name = r1.get("model", f"model_{i+1}")
-            m2_name = r2.get("model", f"model_{j+1}")
+            m1_name = r1.get("model", f"model_{i + 1}")
+            m2_name = r2.get("model", f"model_{j + 1}")
             m1_hits = r1.get("top_hits", {}).get(leg, {})
             m2_hits = r2.get("top_hits", {}).get(leg, {})
 
@@ -334,9 +316,7 @@ def capture_costs(
         elif callable(embedder):
             embedder(texts)
         else:
-            raise RuntimeError(
-                f"Embedder for model '{model_name}' is invalid or missing encode method (§6.3)."
-            )
+            raise RuntimeError(f"Embedder for model '{model_name}' is invalid or missing encode method (§6.3).")
     t1 = time.perf_counter()
     embed_ms = (t1 - t0) * 1000.0
 
@@ -415,10 +395,13 @@ def _log_eval_completed(connection: sqlite3.Connection, payload: dict[str, Any])
     class _NonClosingConn:
         def __init__(self, conn: sqlite3.Connection):
             self._conn = conn
+
         def execute(self, *args, **kwargs):
             return self._conn.execute(*args, **kwargs)
+
         def commit(self):
             return self._conn.commit()
+
         def close(self):
             pass
 
@@ -457,9 +440,7 @@ def run_eval_and_log(
         else:
             m_embedder = get_offline_embedder(m)
 
-        res = evaluate_retrieval(
-            connection, queries, model_name=m, embedder=m_embedder
-        )
+        res = evaluate_retrieval(connection, queries, model_name=m, embedder=m_embedder)
         costs = capture_costs(connection, m, embedder=m_embedder)
 
         eval_results.append(res)
@@ -540,12 +521,8 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for running retrieval evaluation."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Run HiQS retrieval evaluation (§6.3, §19.2)."
-    )
-    parser.add_argument(
-        "--db", default=None, help="Path to SQLite database file."
-    )
+    parser = argparse.ArgumentParser(description="Run HiQS retrieval evaluation (§6.3, §19.2).")
+    parser.add_argument("--db", default=None, help="Path to SQLite database file.")
     parser.add_argument(
         "--queries",
         default="HiQS/tests/eval_queries.json",

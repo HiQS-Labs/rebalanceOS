@@ -11,9 +11,7 @@ from three_eyes import dashboard
 def _seed_registry(root: Path, jobs: dict[str, str]) -> Path:
     reg = root / "registry"
     (reg / "jobs.d").mkdir(parents=True)
-    (reg / "commands.allow").write_text(
-        '[commands.noop]\nexec = "/bin/echo"\nargs = ["ok"]\ndescription = "noop"\n'
-    )
+    (reg / "commands.allow").write_text('[commands.noop]\nexec = "/bin/echo"\nargs = ["ok"]\ndescription = "noop"\n')
     (reg / "routes.toml").write_text('[routes.log-only]\ndescription = "local"\n')
     for name, body in jobs.items():
         (reg / "jobs.d" / f"{name}.toml").write_text(textwrap.dedent(body))
@@ -61,11 +59,9 @@ def test_fingerprint_changes_with_registry(tmp_path):
     first = dashboard.render(reg)
     (reg / "jobs.d" / "beta.toml").write_text(textwrap.dedent(ONE_JOB).replace("alpha", "beta"))
     second = dashboard.render(reg)
-    assert first != second   # fingerprint + job row both change
+    assert first != second  # fingerprint + job row both change
 
 
 def test_committed_dashboard_is_current():
     """The checked-in DASHBOARD.md must match the checked-in registry."""
-    assert dashboard.check() is True, (
-        "DASHBOARD.md is stale — run `python -m three_eyes sync-dashboard`"
-    )
+    assert dashboard.check() is True, "DASHBOARD.md is stale — run `python -m three_eyes sync-dashboard`"

@@ -26,16 +26,27 @@ EXEMPT = {"classify.py", "routes.py"}
 #: Network-capable stdlib/3rd-party module roots. Importing any of these outside
 #: the two boundary modules is a potential hidden egress path (GH-195 review B5).
 NETWORK_IMPORTS = {
-    "socket", "ssl", "http", "urllib", "ftplib", "smtplib", "telnetlib",
-    "poplib", "imaplib", "requests", "httpx", "aiohttp", "asyncio",
+    "socket",
+    "ssl",
+    "http",
+    "urllib",
+    "ftplib",
+    "smtplib",
+    "telnetlib",
+    "poplib",
+    "imaplib",
+    "requests",
+    "httpx",
+    "aiohttp",
+    "asyncio",
 }
 
 # Quoted argv tokens (e.g. subprocess.run(["gh", ...])) + direct urllib + raw sockets.
 FORBIDDEN = re.compile(
-    r"""["'](?:gh|curl|wget|nc|ollama)["']"""   # egress binary as an argv literal
-    r"""|urlopen\("""                            # direct HTTP
-    r"""|/dev/tcp"""                             # raw socket
-    r"""|["']push["']"""                         # git push as an argv literal
+    r"""["'](?:gh|curl|wget|nc|ollama)["']"""  # egress binary as an argv literal
+    r"""|urlopen\("""  # direct HTTP
+    r"""|/dev/tcp"""  # raw socket
+    r"""|["']push["']"""  # git push as an argv literal
 )
 
 
@@ -92,8 +103,12 @@ def test_no_dynamic_import_outside_boundary_modules():
                 fn = node.func
                 if isinstance(fn, ast.Name) and fn.id == "__import__":
                     offenders.append(f"{path.name}:{node.lineno}: __import__()")
-                elif (isinstance(fn, ast.Attribute) and fn.attr in ("import_module", "__import__")
-                      and isinstance(fn.value, ast.Name) and fn.value.id == "importlib"):
+                elif (
+                    isinstance(fn, ast.Attribute)
+                    and fn.attr in ("import_module", "__import__")
+                    and isinstance(fn.value, ast.Name)
+                    and fn.value.id == "importlib"
+                ):
                     offenders.append(f"{path.name}:{node.lineno}: importlib.{fn.attr}()")
     # breakers.py legitimately loads job_guard by path via importlib.util — that is
     # a LOCAL module load, not network egress, and uses spec_from_file_location, not
@@ -107,9 +122,13 @@ def test_no_os_system_anywhere():
     for path in sorted(PKG.glob("*.py")):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and isinstance(node.func.value, ast.Name)
-                    and node.func.value.id == "os" and node.func.attr in ("system", "popen")):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "os"
+                and node.func.attr in ("system", "popen")
+            ):
                 offenders.append(f"{path.name}:{node.lineno}: os.{node.func.attr}")
     assert not offenders, "os.system/os.popen found:\n" + "\n".join(offenders)
 

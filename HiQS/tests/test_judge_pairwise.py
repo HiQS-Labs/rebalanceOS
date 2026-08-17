@@ -117,9 +117,7 @@ def test_the_exclusion_can_be_turned_off_for_a_real_use_ranking(monkeypatch):
     hits = [Doc(source="vault", id="d0", title="t", body="b", unit="0. Claude Prompts.md")]
     monkeypatch.setattr(judge_pairwise, "search", lambda *a, **k: hits)
 
-    sets = judge_pairwise.result_sets(
-        None, [{"id": "q-1", "query": "x"}], "m", excluded_units=frozenset()
-    )
+    sets = judge_pairwise.result_sets(None, [{"id": "q-1", "query": "x"}], "m", excluded_units=frozenset())
     assert sets["q-1"] == ["d0"]
 
 
@@ -167,9 +165,7 @@ def test_a_model_with_no_vectors_is_not_ready_to_be_compared(tmp_path):
 def test_partial_vector_coverage_is_not_ready_either(tmp_path):
     connection = _corpus(tmp_path, ["a b c"] * 3)
     try:
-        connection.execute(
-            "INSERT INTO docs_vec (doc_id, model, dim, vec) VALUES ('d0', 'm', 1, X'00')"
-        )
+        connection.execute("INSERT INTO docs_vec (doc_id, model, dim, vec) VALUES ('d0', 'm', 1, X'00')")
         connection.commit()
         result = vector_leg_ready(connection, "m")
         assert result["ready"] is False

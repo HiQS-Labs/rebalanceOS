@@ -15,6 +15,7 @@ from three_eyes import classify, routes
 
 # ------------------------- classifier (stubbed) --------------------------- #
 
+
 @pytest.fixture
 def stubbed(monkeypatch):
     monkeypatch.setenv("THREE_EYES_CLASSIFY_STUB", "1")
@@ -29,8 +30,10 @@ def test_stub_classifies_severities(stubbed):
 
 def test_stub_makes_no_network_call(stubbed, monkeypatch):
     import urllib.request
+
     monkeypatch.setattr(
-        urllib.request, "urlopen",
+        urllib.request,
+        "urlopen",
         lambda *a, **k: pytest.fail("stub classify hit the network"),
     )
     assert classify.classify("error")["stub"] is True
@@ -57,6 +60,7 @@ def test_active_classifier_sends_editable_system_instructions(activate, monkeypa
         return Response()
 
     import urllib.request
+
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
     result = classify.classify("collector returned no fresh rows")
@@ -69,17 +73,18 @@ def test_active_classifier_sends_editable_system_instructions(activate, monkeypa
 
 # ------------------------------- routes ----------------------------------- #
 
+
 def test_pdda_dry_run_has_required_frontmatter():
     [res] = routes.route(
-        {"source": "job", "title": "disk full", "severity": "error",
-         "summary": "root at 98%", "text": "df output"},
-        ["pdda-inbox"], dry_run=True,
+        {"source": "job", "title": "disk full", "severity": "error", "summary": "root at 98%", "text": "df output"},
+        ["pdda-inbox"],
+        dry_run=True,
     )
     assert res["status"] == "dry-run"
     md = res["content"]
     for key in ("title:", "status:", "created:", "updated:", "owner:", "goal:"):
         assert key in md, f"PDDA draft missing frontmatter key {key!r}"
-    assert "ratings_provisional: true" in md   # machine drafts are always provisional
+    assert "ratings_provisional: true" in md  # machine drafts are always provisional
 
 
 def test_pdda_writes_when_active(activate, monkeypatch, tmp_path):
@@ -101,6 +106,7 @@ def test_log_only_appends_jsonl():
     assert res["status"] == "logged"
     import json
     from pathlib import Path
+
     rows = Path(res["path"]).read_text().strip().splitlines()
     assert json.loads(rows[-1])["title"] == "x"
 

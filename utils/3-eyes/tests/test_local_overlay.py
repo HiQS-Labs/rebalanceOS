@@ -13,13 +13,12 @@ from pathlib import Path
 from three_eyes import dashboard, registry
 
 
-def _seed(root: Path, *, committed: dict[str, str], local: dict[str, str] | None = None,
-          local_allow: str | None = None) -> Path:
+def _seed(
+    root: Path, *, committed: dict[str, str], local: dict[str, str] | None = None, local_allow: str | None = None
+) -> Path:
     reg = root / "registry"
     (reg / "jobs.d").mkdir(parents=True)
-    (reg / "commands.allow").write_text(
-        '[commands.noop]\nexec = "/bin/echo"\nargs = ["ok"]\ndescription = "noop"\n'
-    )
+    (reg / "commands.allow").write_text('[commands.noop]\nexec = "/bin/echo"\nargs = ["ok"]\ndescription = "noop"\n')
     (reg / "routes.toml").write_text('[routes.log-only]\ndescription = "local"\n')
     for name, body in committed.items():
         (reg / "jobs.d" / f"{name}.toml").write_text(textwrap.dedent(body))
@@ -64,16 +63,14 @@ def test_load_jobs_can_exclude_local(tmp_path):
 
 
 def test_commands_allow_merges_local_overlay(tmp_path):
-    reg = _seed(tmp_path, committed={"alpha": COMMITTED},
-                local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
+    reg = _seed(tmp_path, committed={"alpha": COMMITTED}, local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
     allow = registry.load_commands_allow(reg)
     assert "noop" in allow and "local-cmd" in allow
     assert registry.load_commands_allow(reg, include_local=False).keys() == {"noop"}
 
 
 def test_local_job_validates_when_its_command_is_in_local_allow(tmp_path):
-    reg = _seed(tmp_path, committed={"alpha": COMMITTED},
-                local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
+    reg = _seed(tmp_path, committed={"alpha": COMMITTED}, local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
     assert registry.validate(reg) == []
     # Without the local allowlist, the local job's command is unresolved → a problem,
     # but only when the overlay is in scope. Committed-only view stays clean.
@@ -83,15 +80,15 @@ def test_local_job_validates_when_its_command_is_in_local_allow(tmp_path):
 
 
 def test_dashboard_excludes_local_jobs(tmp_path):
-    reg = _seed(tmp_path, committed={"alpha": COMMITTED},
-                local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
+    reg = _seed(tmp_path, committed={"alpha": COMMITTED}, local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
     md = dashboard.render(reg)
     assert "alpha" in md
-    assert "zeta-local" not in md          # machine-local job never drifts the mirror
+    assert "zeta-local" not in md  # machine-local job never drifts the mirror
 
 
 def test_dashboard_stable_whether_or_not_local_present(tmp_path):
     a = dashboard.render(_seed(tmp_path / "a", committed={"alpha": COMMITTED}))
-    b = dashboard.render(_seed(tmp_path / "b", committed={"alpha": COMMITTED},
-                               local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW))
-    assert a == b   # identical committed registry → identical dashboard, local or not
+    b = dashboard.render(
+        _seed(tmp_path / "b", committed={"alpha": COMMITTED}, local={"zeta": LOCAL}, local_allow=LOCAL_ALLOW)
+    )
+    assert a == b  # identical committed registry → identical dashboard, local or not

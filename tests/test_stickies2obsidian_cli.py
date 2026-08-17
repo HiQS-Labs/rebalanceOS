@@ -12,18 +12,8 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / "utils"
-    / "stickies-to-obsidian"
-    / "stickies2obsidian.sh"
-)
-INSTALL_SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / "utils"
-    / "stickies-to-obsidian"
-    / "install_launch_agent.sh"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "utils" / "stickies-to-obsidian" / "stickies2obsidian.sh"
+INSTALL_SCRIPT = Path(__file__).resolve().parents[1] / "utils" / "stickies-to-obsidian" / "install_launch_agent.sh"
 
 
 def _write_executable(path: Path, content: str) -> None:

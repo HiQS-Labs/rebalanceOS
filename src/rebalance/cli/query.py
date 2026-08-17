@@ -112,7 +112,9 @@ def ask_cmd(
             if g.get("is_idle"):
                 typer.echo(f"  {g['project_name']:25s}  IDLE")
             else:
-                typer.echo(f"  {g['project_name']:25s}  {g['total_commits']:3d} commits  {g['prs_opened']} PRs  {g['issues_opened']} issues")
+                typer.echo(
+                    f"  {g['project_name']:25s}  {g['total_commits']:3d} commits  {g['prs_opened']} PRs  {g['issues_opened']} issues"
+                )
 
     if result.github_semantic_context:
         typer.echo("\n--- Relevant GitHub Artifacts ---")

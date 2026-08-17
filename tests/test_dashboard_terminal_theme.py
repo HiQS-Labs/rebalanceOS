@@ -131,7 +131,7 @@ class DashboardTerminalThemeTests(unittest.TestCase):
                         "Visible issue",
                         "open",
                         "noelsaw1",
-                        "[\"noelsaw1\"]",
+                        '["noelsaw1"]',
                         "[]",
                         "https://example.test/visible",
                         "2026-05-04T16:00:00Z",

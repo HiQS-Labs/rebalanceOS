@@ -58,8 +58,7 @@ def truncation_gate(connection, embedder: Any) -> dict[str, Any]:
         raise ValueError("Refusing to gate an empty corpus: nothing has been indexed.")
 
     lengths = sorted(
-        len(tokenizer.encode(f"{title}\n{body}" if title else body, add_special_tokens=True))
-        for title, body in rows
+        len(tokenizer.encode(f"{title}\n{body}" if title else body, add_special_tokens=True)) for title, body in rows
     )
     fitting = sum(1 for length in lengths if length <= limit)
     rate = fitting / len(lengths)
@@ -83,9 +82,7 @@ def vector_leg_ready(connection, model: str) -> dict[str, Any]:
     neither model was consulted. Checkpoint A would have been decided by FTS against itself.
     """
     total = connection.execute("SELECT count(*) FROM docs").fetchone()[0]
-    vectors = connection.execute(
-        "SELECT count(*) FROM docs_vec WHERE model = ?", (model,)
-    ).fetchone()[0]
+    vectors = connection.execute("SELECT count(*) FROM docs_vec WHERE model = ?", (model,)).fetchone()[0]
     return {
         "model": model,
         "docs": total,
@@ -107,8 +104,7 @@ def load_queries(committed: str | Path, sidecar: str | Path) -> list[dict[str, A
         entry = sidecar_rows.get(row["id"])
         if entry is None:
             raise ValueError(
-                f"unknown query text for {row['id']}: sidecar missing. "
-                "Refusing to score a subset silently (§19.2)."
+                f"unknown query text for {row['id']}: sidecar missing. Refusing to score a subset silently (§19.2)."
             )
         text = entry["query"] if isinstance(entry, dict) else entry
         queries.append({**row, "query": text})
@@ -184,7 +180,9 @@ def win_rate(judgments: dict[str, str], model_a: str, model_b: str) -> dict[str,
         "ties": ties,
         "winner": (model_a if a_wins > b_wins else model_b) if decisive else "unknown",
         "decisive": decisive,
-        "note": "" if decisive else (
+        "note": ""
+        if decisive
+        else (
             f"{judged} judgments with a margin of {abs(a_wins - b_wins)} cannot separate these "
             "models. Report unknown and widen the query set rather than picking the leader."
         ),
@@ -230,8 +228,7 @@ def parse_sheet(text: str) -> dict[str, str]:
                 continue
             if raw not in {"a", "b", "tie"}:
                 raise ValueError(
-                    f"{query_id}: unreadable verdict {raw!r}. Expected A, B, or tie — "
-                    "refusing to guess what was meant."
+                    f"{query_id}: unreadable verdict {raw!r}. Expected A, B, or tie — refusing to guess what was meant."
                 )
             verdicts[query_id] = raw
     return verdicts
@@ -295,10 +292,7 @@ def main() -> int:
             MINILM: shipped,
             QWEN: SentenceTransformer(QWEN, local_files_only=True),
         }
-        sets = {
-            model: result_sets(connection, queries, model, embedder=embedders[model])
-            for model in (MINILM, QWEN)
-        }
+        sets = {model: result_sets(connection, queries, model, embedder=embedders[model]) for model in (MINILM, QWEN)}
         differing = disagreements(sets[MINILM], sets[QWEN])
         print(f"\nqueries scored: {len(queries)}   disagreements: {len(differing)}")
 

@@ -19,6 +19,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         Read-only; cheap.
         """
         from rebalance.ingest.index_ops import get_index_status
+
         return get_index_status(database_path)
 
     @mcp.tool()
@@ -57,6 +58,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         and can take minutes. Use dry_run=True first if unsure.
         """
         from rebalance.ingest.index_ops import refresh_index as _refresh
+
         return _refresh(
             database_path,
             scope=scope,
@@ -103,6 +105,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         commit{} | None, pr{} | None, pat{}, next_actions[].
         """
         from rebalance.ingest.diagnose import diagnose_repo as _diagnose_repo
+
         return _diagnose_repo(
             database_path,
             repo=repo,
@@ -131,6 +134,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
                 Default 14 — matches refresh_index defaults.
         """
         from rebalance.ingest.index_ops import get_watched_repos
+
         return get_watched_repos(database_path, since_days=since_days)
 
     @mcp.tool()
@@ -152,6 +156,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         and which machine is it on?".
         """
         from rebalance.ingest.ask_self_scan import summarize_ask_self_indexes
+
         return summarize_ask_self_indexes(database_path)
 
     @mcp.tool()
@@ -185,6 +190,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         dry_run=False, push=True between 6 AM and 11 PM local time.
         """
         from rebalance.ingest.pulse import publish_pulse as _publish_pulse
+
         return _publish_pulse(database_path, dry_run=dry_run, push=push)
 
     # Raw source tables a client may peek, mapped to the column to sort newest-first.
@@ -293,6 +299,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
                 Non-GitHub results are unaffected.
         """
         from rebalance.ingest.semantic_index import query as _semantic_query
+
         return _semantic_query(
             database_path,
             query,

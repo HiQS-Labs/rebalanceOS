@@ -32,9 +32,7 @@ class ExtractFigmaKeyTests(unittest.TestCase):
         )
 
     def test_rejects_non_figma_url(self) -> None:
-        self.assertIsNone(
-            pulse_server._extract_figma_file_key("https://example.com/design/VoQWc0fhO020JoxOyqeE1P")
-        )
+        self.assertIsNone(pulse_server._extract_figma_file_key("https://example.com/design/VoQWc0fhO020JoxOyqeE1P"))
 
 
 class AddFigmaProjectApiTests(unittest.TestCase):
@@ -45,20 +43,28 @@ class AddFigmaProjectApiTests(unittest.TestCase):
         # real config (failed 409 locally, wrote real config in CI).
         client = TestClient(pulse_server.app)
 
-        with patch.object(pulse_server, "_run_pulse_render") as run_render, \
-             patch.object(pulse_server, "add_figma_file_key", return_value=True) as add_key, \
-             patch.object(pulse_server, "get_figma_file_keys", return_value=["VoQWc0fhO020JoxOyqeE1P"]), \
-             patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")), \
-             patch.object(pulse_server, "refresh_index", return_value={
-                 "results": [{
-                     "scope": "figma",
-                     "comments_fetched": 12,
-                     "comments_inserted": 12,
-                     "comments_updated": 0,
-                     "errors": [],
-                 }],
-                 "errors": [],
-             }):
+        with (
+            patch.object(pulse_server, "_run_pulse_render") as run_render,
+            patch.object(pulse_server, "add_figma_file_key", return_value=True) as add_key,
+            patch.object(pulse_server, "get_figma_file_keys", return_value=["VoQWc0fhO020JoxOyqeE1P"]),
+            patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")),
+            patch.object(
+                pulse_server,
+                "refresh_index",
+                return_value={
+                    "results": [
+                        {
+                            "scope": "figma",
+                            "comments_fetched": 12,
+                            "comments_inserted": 12,
+                            "comments_updated": 0,
+                            "errors": [],
+                        }
+                    ],
+                    "errors": [],
+                },
+            ),
+        ):
             run_render.return_value.returncode = 0
             run_render.return_value.stderr = ""
             res = client.post("/api/figma/projects", json={"project": "VoQWc0fhO020JoxOyqeE1P"})

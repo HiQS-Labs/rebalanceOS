@@ -13,9 +13,27 @@ from hiqs.plugins import Doc
 _TOKEN_RE = re.compile(r"[a-z][a-z0-9]*")
 _STOP_TOKENS = frozenset(
     {
-        "and", "app", "api", "code", "dev", "docs", "for", "from", "main",
-        "our", "project", "repo", "service", "test", "tests", "the", "tool",
-        "tools", "web", "with", "www",
+        "and",
+        "app",
+        "api",
+        "code",
+        "dev",
+        "docs",
+        "for",
+        "from",
+        "main",
+        "our",
+        "project",
+        "repo",
+        "service",
+        "test",
+        "tests",
+        "the",
+        "tool",
+        "tools",
+        "web",
+        "with",
+        "www",
     }
 )
 _EDGE_WEIGHTS = {"same_org": 1.0, "name_token": 0.5}
@@ -50,9 +68,7 @@ def _tokens(value: str) -> set[str]:
 def _project_rows(connection: sqlite3.Connection) -> dict[str, tuple[set[str], set[str]]]:
     """Return each project as (registered repos, significant name tokens)."""
     projects: dict[str, tuple[set[str], set[str]]] = {}
-    for name, aliases_json, repos_json in connection.execute(
-        "SELECT name, aliases_json, repos_json FROM projects"
-    ):
+    for name, aliases_json, repos_json in connection.execute("SELECT name, aliases_json, repos_json FROM projects"):
         aliases = _strings(aliases_json)
         repos = {repo.casefold() for repo in _strings(repos_json)}
         projects[name] = (repos, _tokens(" ".join((name, *aliases))))
@@ -121,7 +137,11 @@ def _issue_title_edges(
             repo_key = repo.casefold()
             matching_projects.update(name for name, repos in repos_by_project.items() if repo_key in repos)
     names = sorted(matching_projects)
-    return {_canonical_pair(project_a, project_b) for index, project_a in enumerate(names) for project_b in names[index + 1 :]}
+    return {
+        _canonical_pair(project_a, project_b)
+        for index, project_a in enumerate(names)
+        for project_b in names[index + 1 :]
+    }
 
 
 def _sibling_edges(
@@ -147,7 +167,9 @@ def _sibling_edges(
         issue_pairs = _issue_title_edges(connection, query, _project_rows(connection))
         for project_a, project_b in issue_pairs:
             for direct, sibling in ((project_a, project_b), (project_b, project_a)):
-                if direct in direct_projects and (sibling not in selected or selected[sibling][0] < _EDGE_WEIGHTS["name_token"]):
+                if direct in direct_projects and (
+                    sibling not in selected or selected[sibling][0] < _EDGE_WEIGHTS["name_token"]
+                ):
                     selected[sibling] = (_EDGE_WEIGHTS["name_token"], "issue_title")
     return {project: edge for project, (_weight, edge) in selected.items()}
 

@@ -64,9 +64,7 @@ class TestAdditivityGate(unittest.TestCase):
 
 class TestSignalWeightsOverride(unittest.TestCase):
     def _weights_with(self, block: dict) -> SignalWeights:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"signal_weights": block}, f)
             path = Path(f.name)
         try:
@@ -75,9 +73,7 @@ class TestSignalWeightsOverride(unittest.TestCase):
             path.unlink(missing_ok=True)
 
     def test_override_scalar_and_bool(self) -> None:
-        weights = self._weights_with(
-            {"min_team_events": 30, "owner_bias_correction": False}
-        )
+        weights = self._weights_with({"min_team_events": 30, "owner_bias_correction": False})
         self.assertEqual(weights.min_team_events, 30)
         self.assertFalse(weights.owner_bias_correction)
 
@@ -89,9 +85,7 @@ class TestSignalWeightsOverride(unittest.TestCase):
         self.assertEqual(weights.per_person["matthew"], 1.0)
 
     def test_absent_block_gives_defaults(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({}, f)
             path = Path(f.name)
         try:
