@@ -256,6 +256,23 @@ def _upsert_item_record(conn: Any, item_record: dict[str, Any]) -> None:
     gh.upsert_item(conn, item_record)
 
 
+def _upsert_item_links(conn: Any, item_record: dict[str, Any]) -> None:
+    """Store issue references found in an issue or pull request's text."""
+    combined_text = "\n".join(filter(None, [item_record["title"], item_record["body"]]))
+    for link_kind, issue_number in _parse_links(combined_text):
+        gh.upsert_link(
+            conn,
+            (
+                item_record["repo_full_name"],
+                item_record["item_type"],
+                item_record["number"],
+                "issue",
+                issue_number,
+                link_kind,
+            ),
+        )
+
+
 def _persist_issue_comments(
     conn: Any,
     *,
@@ -601,6 +618,7 @@ def sync_github_repo(
             item_number = int(issue["number"])
             item_record = _build_item_record(repo_full_name, item_type, issue, fetched_at=fetched_at)
             _upsert_item_record(conn, item_record)
+            _upsert_item_links(conn, item_record)
             comment_count, comment_docs = _persist_issue_comments(
                 conn,
                 repo_full_name=repo_full_name,
@@ -646,13 +664,7 @@ def sync_github_repo(
                 check_runs=check_runs,
             )
             _upsert_item_record(conn, item_record)
-
-            combined_text = "\n".join(filter(None, [item_record["title"], item_record["body"]]))
-            for link_kind, issue_number in _parse_links(combined_text):
-                gh.upsert_link(
-                    conn,
-                    (repo_full_name, item_type, item_number, "issue", issue_number, link_kind),
-                )
+            _upsert_item_links(conn, item_record)
 
             comment_count, comment_docs = _persist_issue_comments(
                 conn,

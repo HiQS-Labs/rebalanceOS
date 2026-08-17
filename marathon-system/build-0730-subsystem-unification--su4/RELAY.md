@@ -1,6 +1,6 @@
 # Marathon Phase su4
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU4-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -111,3 +111,9 @@ The deduplication changes are structurally sound, but the full-file sweep reveal
    In the refactored loop, `_parse_links()` and `gh.upsert_link()` are only called for `pr_payloads`. However, regular issues can also mention other issues in their body, and since both PRs and issues now share the `_build_item_record` logic, we should apply link parsing to `issue_payloads` as well. Please move the `_parse_links` and `gh.upsert_link` calls so they run for both issues and PRs.
 
 **Verdict:** Changes requested
+
+### Round 2 · Builder · codex
+
+- Fixed `get_connection()` so sqlite extension loading is disabled in a `finally` block, including when `sqlite_vec.load()` fails.
+- Added shared `_upsert_item_links()` and invoke it for both issues and pull requests, so references in issue bodies are persisted consistently.
+- Verification: `pytest tests/test_github_knowledge.py tests/test_sleuth_reminders.py -q` exited cleanly. The brief's DB-connection and Gmail test paths remain absent in this checkout.

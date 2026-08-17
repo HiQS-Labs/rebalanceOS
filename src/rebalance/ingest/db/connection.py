@@ -36,8 +36,12 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
     try:
         if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
             conn.enable_load_extension(True)
-            sqlite_vec.load(conn)
-            conn.enable_load_extension(False)
+            try:
+                sqlite_vec.load(conn)
+            finally:
+                # Never leave extension loading enabled if sqlite-vec fails to
+                # load: this connection is otherwise used for the full ingest.
+                conn.enable_load_extension(False)
     except (AttributeError, Exception):
         # sqlite-vec not available on this Python build; continue without it
         pass
