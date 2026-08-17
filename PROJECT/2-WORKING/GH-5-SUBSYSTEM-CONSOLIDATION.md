@@ -33,7 +33,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 4 executed** on `feat/gh-5-phase-4-unified-health` (PR #6 merged earlier): 4.1 `--json` (agy: Approved), 4.2 pins + onboarding gate (agy: Approved), 4.3 exit reroute. Two findings en route, recorded in the Phase 4 section: the hand-counted blast radius missed a **sixth site** (caught by the 4.2 AST enumeration), and fresh installs hit the *table-not-present* branch, not the empty branch (sleuth_reminders is created by first sync). `Check.status` deletion **deferred — it still has consumers** (renderers, health.py); goes with PR2's vocabulary unification. | Open the Phase 4 PR, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. Then Phase O2/O3. |
+| **Phase 4 executed** on `feat/gh-5-phase-4-unified-health` (PR #6 merged earlier): 4.1 `--json` (agy: Approved), 4.2 pins + onboarding gate (agy: Approved), 4.3 exit reroute. Two findings en route, recorded in the Phase 4 section: the hand-counted blast radius missed a **sixth site** (caught by the 4.2 AST enumeration), and fresh installs hit the *table-not-present* branch, not the empty branch (sleuth_reminders is created by first sync). `Check.status` deletion **deferred — it still has consumers** (renderers, health.py); goes with PR2's vocabulary unification. | PR [#8](https://github.com/HiQS-Suite/rebalanceOS/pull/8) open (Phase 4). Next: merge it, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. Then Phase O2/O3. |
 
 ## Orientation for a reader arriving cold
 
