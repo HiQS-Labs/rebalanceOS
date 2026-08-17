@@ -1034,7 +1034,12 @@ def _commit_and_push_if_changed(
 
     proc = run_git(target_repo, "add", file_rel)
     if proc.returncode != 0:
-        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": proc.stderr.strip() or proc.stdout.strip()}
+        return {
+            "wrote_file": True,
+            "committed": False,
+            "pushed": False,
+            "git_error": proc.stderr.strip() or proc.stdout.strip(),
+        }
 
     proc = run_git(target_repo, "status", "--porcelain", file_rel)
     if proc.returncode != 0 or not proc.stdout.strip():
@@ -1042,7 +1047,12 @@ def _commit_and_push_if_changed(
 
     proc = run_git(target_repo, "commit", "-m", commit_message)
     if proc.returncode != 0:
-        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": proc.stderr.strip() or proc.stdout.strip()}
+        return {
+            "wrote_file": True,
+            "committed": False,
+            "pushed": False,
+            "git_error": proc.stderr.strip() or proc.stdout.strip(),
+        }
 
     if not push:
         return {"wrote_file": True, "committed": True, "pushed": False}

@@ -2,9 +2,9 @@
 gh_issue: 7
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/7
 title: "GH-7 HiQS suite polluted by state leaked from tests/ when sharing pytest process"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su1) as PR #40 (0.73.0)"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 doc_type: bugfix
 goal: >

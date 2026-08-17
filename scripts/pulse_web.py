@@ -75,8 +75,6 @@ from rebalance.ingest.index_ops import COLLECTORS, get_index_status  # noqa: E40
 from rebalance.ingest import next_actions  # noqa: E402
 from rebalance.ingest.slack_users import compact_sleuth_reminder  # noqa: E402
 from rebalance.web_components import (  # noqa: E402
-    RB_CHROME_CSS,
-    RB_TOKENS_CSS,
     badge_html,
     button_link,
     data_row,

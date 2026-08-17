@@ -483,9 +483,7 @@ def sync_github_repo(
     issue_payloads: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
     for issue in issues:
         item_number = int(issue["number"])
-        issue_comments = client.paginate(
-            f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json
-        )
+        issue_comments = client.paginate(f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json)
         issue_payloads.append((issue, issue_comments))
 
     pr_payloads: list[
@@ -504,13 +502,9 @@ def sync_github_repo(
         if not isinstance(pr, dict):
             continue
 
-        pr_issue_comments = client.paginate(
-            f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json
-        )
+        pr_issue_comments = client.paginate(f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json)
         pr_reviews = client.paginate(f"{repo_base}/pulls/{item_number}/reviews", fetch_json=api_get_json)
-        pr_review_comments = client.paginate(
-            f"{repo_base}/pulls/{item_number}/comments", fetch_json=api_get_json
-        )
+        pr_review_comments = client.paginate(f"{repo_base}/pulls/{item_number}/comments", fetch_json=api_get_json)
         pr_commits = client.paginate(f"{repo_base}/pulls/{item_number}/commits", fetch_json=api_get_json)
         check_runs_resp = api_get(
             client.build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)

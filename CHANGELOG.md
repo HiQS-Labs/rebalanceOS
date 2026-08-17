@@ -10,6 +10,69 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.0] - 2026-08-17
+
+### Changed
+- **Subsystem unification: the collectors now share one implementation of each
+  foundational primitive instead of keeping private copies.** Every timestamp is
+  produced and parsed through the shared time helper, every GitHub API call goes
+  through the one authenticated client, every database write shares the same
+  persistence and connection helpers, and every git subprocess call goes through
+  a single wrapper. The behaviour operators see is unchanged; what changed is
+  that a fix to any of these now lands everywhere at once, rather than in the one
+  copy someone remembered to update.
+- **The GitHub client is now the only place an auth header is built.** Collectors
+  that previously assembled their own request headers, retry handling, and rate
+  limit checks inherit the shared client's behaviour, and a contract test pins
+  that no collector reintroduces a raw request path.
+
+### Fixed
+- **The two test suites no longer leak state into each other.** The HiQS suite
+  ran in the same process as the main suite and left resource accounting behind
+  it, which masked real failures and made results depend on the order the files
+  happened to run in. It is isolated now, so a single run reports the truth.
+
+### Removed
+- **Dead rendering code and stale documentation.** A group-rendering path and a
+  duplicated stylesheet composite that nothing called any more were deleted, and
+  the tool documentation that described behaviour the code no longer has was
+  corrected.
+
+## [0.69.13] - 2026-08-17
+
+### Fixed
+- **Restored the agent skill and command set that was dropped in the repository
+  consolidation.** The morning-brief, onboarding-walkthrough, cross-repo triage,
+  daily-activity-synthesis, and Git Pulse recap skills — plus the two RAG query
+  and refresh commands — are tracked product content again, and the blanket
+  ignore rule that silently excluded them now targets only the machine-local
+  settings files. The skills inventory is complete again (three previously
+  unlisted entries added), and one demo transcript had an operator identifier
+  replaced with a placeholder before recovery.
+## [0.69.12] - 2026-08-17
+
+### Changed
+- The scheduled-stack drift check now honours a declared runtime home: a machine
+  can pin which checkout its scheduled jobs must run from (a one-line file in the
+  user config directory), and the health check holds every job to that
+  declaration no matter which checkout runs it. This supports the new dedicated
+  runtime clone: development checkouts can switch branches freely without
+  changing what the scheduled jobs execute.
+
+## [0.69.11] - 2026-08-17
+
+### Fixed
+- The health-issue auto-filer now targets the canonical repository instead of the
+  retiring one it was still pointed at by default.
+
+### Added
+- A health check that catches the failure behind this release: every scheduled
+  job's configuration must point at the same checkout as the code answering the
+  health check. After the repository moved, the entire scheduled stack silently
+  kept running old code from the previous location for days while the
+  command-line tools looked fully up to date — that drift is now a named,
+  visible warning listing exactly which jobs are stranded.
+
 ## [0.69.10] - 2026-08-17
 
 ### Changed

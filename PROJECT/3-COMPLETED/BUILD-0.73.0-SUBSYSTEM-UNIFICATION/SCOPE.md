@@ -1,8 +1,8 @@
 ---
 title: "Build 0.73.0 Subsystem Unification Marathon Scope"
-status: "Draft"
+status: "Completed — all six phases shipped as PR #40 (0.73.0) on 2026-08-17"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 goal: "Autonomous marathon execution plan for Release 0.73.0 Subsystem Unification"
 effort: 3
@@ -19,7 +19,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase briefs and MARATHON.yaml generated following Relay XYZ consult with Codex. | Preflight and dry run validation of marathon plan. |
+| All six phases (su1–su6) executed and merged as PR #40, released as 0.73.0 on 2026-08-17. | Nothing — this scope is closed. The one carry-forward is a process note: the marathon's pre-advance gate ran the test suite but not the lint gate, so two lint regressions reached the PR and were fixed at merge time. |
 
 ## Overview
 

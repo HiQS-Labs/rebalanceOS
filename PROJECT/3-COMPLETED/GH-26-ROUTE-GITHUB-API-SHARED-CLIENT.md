@@ -2,9 +2,9 @@
 gh_issue: 26
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/26
 title: "GH-26 Route every GitHub API call through the shared client"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su3) as PR #40 (0.73.0)"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 doc_type: code-quality
 goal: >
