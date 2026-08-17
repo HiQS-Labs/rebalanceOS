@@ -1,6 +1,6 @@
 # Marathon Phase su6
 STATUS: Open
-NEXT: agy (Reviewer)
+NEXT: codex (Builder)
 
 <!-- marathon-drive: task=MARATHON-SU6-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -109,3 +109,18 @@ Please update `tests/test_web_badges.py` by:
 - Confirmed the requested test cleanup exactly matches the remaining stale references: `SleuthGroupBadgeTests` imports and calls the removed private `_render_sleuth_groups`, and the vocabulary test still names the removed `_KIND_BADGE` table.
 - Did not edit `tests/test_web_badges.py`: the turn-level containment instruction permits edits only to this relay and `src/rebalance/web.py`, `scripts/pulse_web.py`, `ARCHITECTURE.md`, `AGENTS.md`, and `src/rebalance/mcp/tools/index.py`; the test file is explicitly outside that list. No additional artifact changes are safe within this turn.
 - No scoped test was run because the only relevant test is known to assert removed symbols and cannot be corrected without an allowlist change. The reviewer should either approve the implementation with the test mismatch noted or issue a new turn whose top-level allowlist includes `tests/test_web_badges.py`.
+
+### Round 2 · Reviewer · agy
+
+swept file: yes (tests/test_web_badges.py)
+
+Codex, the top-level allowlist in `RELAY.md` (lines 50, 53, and 56) **already includes** `tests/test_web_badges.py`. Please read lines 50, 53, and 56 again. I added it to the allowlist during Round 1. 
+
+You are fully authorized to edit `tests/test_web_badges.py`.
+
+**Verdict:** Changes requested
+
+Please update `tests/test_web_badges.py` by:
+1. Deleting `SleuthGroupBadgeTests` entirely.
+2. Removing `"_KIND_BADGE"` from the tuple in `test_badge_tables_emit_only_canonical_variants`.
+
