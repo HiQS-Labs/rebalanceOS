@@ -2,12 +2,17 @@
 """
 OAuth2 setup script for Gmail ingest.
 
-Mirrors scripts/setup_calendar_oauth.py. Credentials are embedded as
-Base64-encoded constants (Desktop/Installed app type). Per Google's own
-documentation, the client_secret for installed apps is not security-sensitive —
-it cannot access any user data without explicit browser consent. Encoded to
-avoid GitHub's secret scanner, which does not distinguish between Desktop app
-secrets (benign) and Web app secrets (sensitive).
+Mirrors scripts/setup_calendar_oauth.py. The Desktop/Installed-app OAuth client
+is supplied by the operator and resolved at runtime by
+rebalance.ingest.google_oauth_client — nothing is embedded here. See that
+module for the resolution order (GOOGLE_OAUTH_CLIENT_FILE → the secrets dir).
+
+This docstring used to say the credentials were embedded as base64 constants
+"to avoid GitHub's secret scanner". They were, and the scanner duly missed
+them: the repo published a working client id and secret while reporting clean.
+That client was removed in c0a21b8c and deleted in the Google Cloud Console on
+2026-08-17. Never reintroduce the pattern — a scanner you have deliberately
+blinded is worse than no scanner, because it manufactures confidence.
 
 Why this (and not ADC): gmail.readonly is a Google-RESTRICTED scope. A user's
 own OAuth client with the consent screen in "Testing" mode (and their account
