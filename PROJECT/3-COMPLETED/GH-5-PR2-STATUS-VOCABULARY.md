@@ -2,7 +2,7 @@
 gh_issue: 5
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/5
 title: "GH-5 PR2 — one status vocabulary across every user-facing surface"
-status: "Executed — shipped as PR #18 (0.69.8); Phase 1b field collapse deliberately deferred"
+status: "Completed — shipped as PR #18 (0.69.8); Phase 1b field collapse deliberately deferred (own future slice)"
 created: 2026-08-16
 updated: 2026-08-16
 owner: noel
