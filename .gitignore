@@ -122,3 +122,8 @@ client_secret*.json
 MEMORY.md
 phases/
 DIAGRAM.md
+
+# Relay/marathon transcripts are agent working logs, never repo content (#33).
+# They stay on disk for the operator; they do not belong in public history —
+# committing them is what put 433MB of transcripts in this tree in the first place.
+relay-system/
