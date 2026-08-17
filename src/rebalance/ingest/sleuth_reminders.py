@@ -113,11 +113,6 @@ class SleuthSyncResult:
 # ---------------------------------------------------------------------------
 
 
-def _parse_datetime(value: Any) -> datetime | None:
-    # parse_utc_iso handles the trailing-Z dance + naive→UTC; guard non-str here.
-    return parse_utc_iso(value) if isinstance(value, str) else None
-
-
 def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
@@ -136,8 +131,8 @@ def _to_reminder(data: dict[str, Any]) -> SleuthReminder:
         reminder_id=str(data["reminderId"]),
         state=str(data.get("state", "")),
         is_active=bool(data.get("isActive", False)),
-        created_on=_parse_datetime(data.get("createdOn")),
-        should_post_on=_parse_datetime(data.get("shouldPostOn")),
+        created_on=parse_utc_iso(data.get("createdOn")),
+        should_post_on=parse_utc_iso(data.get("shouldPostOn")),
         reminder_message_text=str(data.get("reminderMessageText", "")),
         ignore_snooze=bool(data.get("ignoreSnooze", False)),
         assignee_id=_optional_str(data.get("assigneeId")),
@@ -377,7 +372,7 @@ def get_export_generated_at(database_path: Path) -> datetime | None:
         )
     finally:
         conn.close()
-    return _parse_datetime(row[0]) if row and row[0] else None
+    return parse_utc_iso(row[0]) if row and row[0] else None
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:

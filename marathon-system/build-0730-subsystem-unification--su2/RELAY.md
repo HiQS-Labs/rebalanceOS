@@ -1,6 +1,6 @@
 # Marathon Phase su2
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU2-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -79,3 +79,10 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Replaced the four ingest-local ISO timestamp wrappers with direct `parse_utc_iso` calls.
+- Made `parse_iso` / `now_iso` / `now_utc` the public implementations in `time_ops`; legacy private names remain compatibility bridges for out-of-scope callers.
+- Routed local-day and cutoff computations through `time_ops.now_utc()` so they share the freeze-clock seam.
+- Static checks confirm no targeted alias wrappers, private time imports, or raw clock reads remain in the four ingest files. Focused pytest invocation was attempted for the changed modules, but the local test runner terminated with exit code 134 and produced no diagnostic output.

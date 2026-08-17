@@ -13,7 +13,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
-def _parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
+def parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
     """Parse an ISO 8601 string into a datetime object.
 
     Handles space separation, trailing 'Z', offsets, and fractional seconds.
@@ -55,12 +55,13 @@ def _parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
     return parsed
 
 
-def parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
-    """Parse an ISO 8601 string into a datetime object.
+def _parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
+    """Backward-compatible private alias for :func:`parse_iso`.
 
-    Public alias for `_parse_iso`.
+    New callers must use the public parser. This bridge remains while legacy
+    consumers outside the timestamp-consolidation scope are migrated.
     """
-    return _parse_iso(raw, force_utc=force_utc)
+    return parse_iso(raw, force_utc=force_utc)
 
 
 def parse_utc_iso(value: Any) -> datetime | None:
@@ -69,7 +70,7 @@ def parse_utc_iso(value: Any) -> datetime | None:
     If the string specifies no timezone, it is assumed to be UTC.
     Returns None on empty input or parse failure.
     """
-    return _parse_iso(value, force_utc=True)
+    return parse_iso(value, force_utc=True)
 
 
 def parse_date(raw: Any) -> date | None:
@@ -97,7 +98,7 @@ def parse_date(raw: Any) -> date | None:
             return date.fromisoformat(raw_str)
         except ValueError:
             pass
-    parsed = _parse_iso(raw_str, force_utc=False)
+    parsed = parse_iso(raw_str, force_utc=False)
     if parsed is not None:
         return parsed.date()
     try:
@@ -113,34 +114,34 @@ def _current_time(tz: timezone | ZoneInfo | None = None) -> datetime:
     return datetime.now(tz or timezone.utc)
 
 
-def _now_iso() -> str:
+def now_iso() -> str:
     """Returns the current UTC time as an ISO format string."""
     return _current_time(timezone.utc).isoformat()
 
 
-def _now() -> str:
-    """Alias for _now_iso(). Returns current UTC time as an ISO format string."""
-    return _now_iso()
-
-
-def _now_utc() -> datetime:
-    """Returns the current UTC time as a timezone-aware datetime object."""
-    return _current_time(timezone.utc)
-
-
-def now_iso() -> str:
-    """Returns the current UTC time as an ISO format string."""
-    return _now_iso()
+def _now_iso() -> str:
+    """Backward-compatible private alias for :func:`now_iso`."""
+    return now_iso()
 
 
 def now() -> str:
     """Alias for now_iso(). Returns current UTC time as an ISO format string."""
-    return _now_iso()
+    return now_iso()
+
+
+def _now() -> str:
+    """Backward-compatible private alias for :func:`now`."""
+    return now()
 
 
 def now_utc() -> datetime:
     """Returns the current UTC time as a timezone-aware datetime object."""
-    return _now_utc()
+    return _current_time(timezone.utc)
+
+
+def _now_utc() -> datetime:
+    """Backward-compatible private alias for :func:`now_utc`."""
+    return now_utc()
 
 
 def local_tz() -> ZoneInfo:
