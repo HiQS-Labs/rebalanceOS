@@ -1,0 +1,82 @@
+# Marathon Phase su6
+STATUS: Open
+NEXT: codex (Builder)
+
+<!-- marathon-drive: task=MARATHON-SU6-TURN builder=codex reviewer=agy round-cap=7 -->
+
+## Phase Brief
+
+---
+title: "Phase su6 Dead Code Removal and Doc Reconciliation"
+status: "Draft"
+created: 2026-08-16
+updated: 2026-08-16
+owner: noel
+goal: "Phase su6 brief"
+roadmap_exempt: true
+pdda_hold: true
+---
+
+# Phase su6 — Dead Code Removal & Stale Architecture Docs (#30)
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Phase brief authored and dry-run validated. | Execute phase su6 in marathon harness. |
+
+## Objective
+Remove dead code (`_render_sleuth_groups`, CSS composite) and correct stale documentation references to removed legacy MCP tools.
+
+## Context & Files
+- Target files: `src/rebalance/web.py`, `tests/test_web_badges.py`, `scripts/pulse_web.py`, `ARCHITECTURE.md`, `AGENTS.md`, `src/rebalance/mcp/tools/index.py`
+- Issue: #30 — Dead `_render_sleuth_groups` in `web.py:416` and 5 stale references in docs to `query_notes` / `query_github_context`.
+
+## Tasks
+1. Delete `_render_sleuth_groups` in `web.py` and align `tests/test_web_badges.py`.
+2. Delete unused `CSS` composite in `scripts/pulse_web.py`.
+3. Update `ARCHITECTURE.md` and `AGENTS.md` tool tables to reference `semantic_query`.
+4. Update docstrings in `src/rebalance/mcp/tools/index.py`.
+
+## Definition of Done
+- `ruff check .` clean; `pytest tests/test_web.py tests/test_web_badges.py` green; `utils/pdda/pdda.sh governance` passes with 0 errors.
+
+
+---
+
+▶ TAKE YOUR TURN (codex — BUILDER role)
+
+You are the BUILDER for this phase. Read the phase brief above and implement it.
+1. Implement the brief by creating/editing the artifact file(s): src/rebalance/web.py,scripts/pulse_web.py,ARCHITECTURE.md,AGENTS.md,src/rebalance/mcp/tools/index.py
+2. Append a build block to this relay file: `### Round N · Builder · codex` summarizing what you did (files touched, key decisions).
+3. Use this exact tick binary (run it from any directory): /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick
+   - /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick claim MARATHON-SU6-TURN --agent codex --paths "marathon-system/build-0730-subsystem-unification--su6/RELAY.md,src/rebalance/web.py,scripts/pulse_web.py,ARCHITECTURE.md,AGENTS.md,src/rebalance/mcp/tools/index.py"
+   - /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick ping MARATHON-SU6-TURN --agent codex
+   - /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick release MARATHON-SU6-TURN --agent codex --to agy
+4. Edit ONLY these paths: marathon-system/build-0730-subsystem-unification--su6/RELAY.md and src/rebalance/web.py,scripts/pulse_web.py,ARCHITECTURE.md,AGENTS.md,src/rebalance/mcp/tools/index.py. Do NOT run git. Do NOT touch any other file — the harness commits for you.
+5. HAND OFF EXPLICITLY (GH-268): after releasing the token, end your turn by naming who acts next —
+   "handing off to agy — agy, take your turn." A turn that ends without that line
+   leaves a human guessing whether the relay is waiting on them or has stalled. Do this EVERY round,
+   not just the first. ALSO, you MUST update the `NEXT:` line at the top of this file to exactly: `NEXT: agy (Reviewer)`
+
+---
+
+▶ TAKE YOUR TURN (agy — REVIEWER role)
+
+You are the REVIEWER for this phase. Read the latest builder block above AND review the artifact file(s) on disk: src/rebalance/web.py,scripts/pulse_web.py,ARCHITECTURE.md,AGENTS.md,src/rebalance/mcp/tools/index.py. REVIEW THE WHOLE FILE, NOT JUST THE DIFF (GH-268): a beta test had this loop reach 'Approved' in two rounds while an independent audit of the same branch found 20 issues (1 critical, 4 high) — every one of them in the pre-existing code the change sat on, which nobody had read. Pre-existing defects in a file you are touching are IN SCOPE; say so explicitly if you find none. DECLARE IT: your review block MUST contain a literal 'swept file: yes' or 'swept file: no' line — without it a reviewer that skipped the sweep is indistinguishable in the transcript from one that did it and found nothing, which is exactly how those 20 issues stayed invisible.
+1. Append a review block: `### Round N · Reviewer · agy` followed by your assessment.
+2. If changes needed: add `**Verdict:** Changes requested`, update the `NEXT:` line to exactly `NEXT: codex (Builder)`, then: /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick release MARATHON-SU6-TURN --agent agy --to codex
+3. If satisfied: add `**Verdict:** Approved`, set `STATUS: Approved`, then: /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick done MARATHON-SU6-TURN --agent agy
+4. Use this exact tick binary (run it from any directory) for all token operations: /Users/noelsaw/Documents/GH Repos/rebalanceOS/.xyz/bin/tick
+   Edit ONLY marathon-system/build-0730-subsystem-unification--su6/RELAY.md (your review block + STATUS). Do NOT edit the artifact yourself — request changes instead. Do NOT run git.
+4b. TO VERIFY A FINDING, WRITE PROBE FILES OUTSIDE THE REPO — under $TMPDIR, never inside the
+   working tree. Creating even one scratch file in the repo is an off-lane write: containment
+   reverts it and FAILS YOUR WHOLE TURN, discarding the review you just did (GH-441). Observed
+   2026-08-08: a reviewer found a real latent crash, wrote two probe files in-tree to demonstrate
+   it, and lost the turn for doing so — the finding survived only because RELAY.md happens to be
+   on your allowlist. `cp` what you need to "$TMPDIR/probe.$$/" and work there instead. Verifying
+   is wanted; verifying in-tree is what costs you the turn.
+5. HAND OFF EXPLICITLY (GH-268): end your turn by naming who acts next — "handing off to codex —
+   codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
+   approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
+   Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
