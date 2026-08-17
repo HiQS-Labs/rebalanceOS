@@ -790,23 +790,46 @@ def _save_launchd_crash_state(path: Path, state: dict) -> None:
         pass
 
 
+RUNTIME_ROOT_FILE = Path.home() / ".config" / "rebalance" / "runtime-root"
+
+
+def _expected_runtime_root() -> tuple[Path, str]:
+    """Where the scheduled stack is REQUIRED to run from, and why.
+
+    With no declaration, the answer is "the checkout this doctor runs in" —
+    right for a single-checkout machine. On a machine with a dedicated
+    runtime clone (GH-36 follow-up: dev checkouts must not decide what the
+    scheduled jobs execute), the operator writes that clone's absolute path
+    into ``~/.config/rebalance/runtime-root``, and every checkout's doctor
+    then holds the plists to the same declared home.
+    """
+    try:
+        declared = RUNTIME_ROOT_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        declared = ""
+    if declared:
+        return Path(declared), f"the declared runtime root ({RUNTIME_ROOT_FILE})"
+    return Path(__file__).resolve().parents[2], "this checkout"
+
+
 def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Check]:
-    """Every scheduled job must run from THIS checkout (GH-36 tripwire).
+    """Every scheduled job must run from ONE declared checkout (GH-36 tripwire).
 
     The Mac Studio ran seventeen launchd jobs out of the retiring clone for
     days after the repo migrated — the plists pin absolute paths, so a repo
     move silently strands the entire scheduled stack on old code while the
     interactive CLI looks perfectly up to date. This check compares every
-    ``com.rebalance-os.*`` plist's script paths against the checkout the
-    running doctor lives in, and names each drifted job. One WARNING, not
-    per-job errors: the fix (repoint the plists) is one operator action.
+    ``com.rebalance-os.*`` plist's script paths against the expected runtime
+    root (see ``_expected_runtime_root``), and names each drifted job. One
+    WARNING, not per-job errors: the fix (repoint the plists) is one
+    operator action.
     """
     if agents_dir is None:
         agents_dir = Path.home() / "Library" / "LaunchAgents"
     if not agents_dir.is_dir():
         return []  # not macOS / no agents — nothing scheduled to drift
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root, root_why = _expected_runtime_root()
     drifted: list[str] = []
     path_re = re.compile(r"<string>(/[^<]*?\.(?:sh|py)|/[^<]*?/python3?)</string>")
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
@@ -825,14 +848,14 @@ def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Chec
             Check(
                 "scheduler checkout",
                 OK,
-                "every scheduled job runs from this checkout",
+                f"every scheduled job runs from {root_why}",
             )
         ]
     return [
         Check(
             "scheduler checkout",
             WARN,
-            f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than this code: {', '.join(drifted)}",
+            f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than {root_why}: {', '.join(drifted)}",
             f"their plists pin absolute paths into another clone — repoint them at {repo_root} and reload (see GH-36)",
         )
     ]

@@ -64,5 +64,53 @@ class ScheduledStackCheckoutTests(unittest.TestCase):
         self.assertEqual([], _check_scheduled_stack_checkout(Path("/nonexistent/LaunchAgents")))
 
 
+class DeclaredRuntimeRootTests(unittest.TestCase):
+    """A dedicated runtime clone (declared in ~/.config/rebalance/runtime-root)
+    becomes the expectation for EVERY checkout's doctor — dev checkouts no
+    longer read their own location as the required home."""
+
+    def test_declared_root_overrides_running_checkout(self) -> None:
+        from unittest.mock import patch
+
+        from rebalance import doctor
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp) / "rebalance-runtime"
+            (runtime / "scripts").mkdir(parents=True)
+            root_file = Path(tmp) / "runtime-root"
+            root_file.write_text(str(runtime) + "\n", encoding="utf-8")
+
+            agents = Path(tmp) / "agents"
+            agents.mkdir()
+            # Job in the declared runtime clone: OK even though it is not in
+            # the checkout running this test.
+            _write(agents, "pulse-server", str(runtime / "scripts" / "pulse_server.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+            self.assertEqual(checks[0].status, OK)
+            self.assertIn("declared runtime root", checks[0].detail)
+
+            # Job in THIS checkout now counts as drift — the declaration wins.
+            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+            self.assertEqual(checks[0].status, WARN)
+            self.assertIn("vault-sync", checks[0].detail)
+
+    def test_missing_declaration_falls_back_to_running_checkout(self) -> None:
+        from unittest.mock import patch
+
+        from rebalance import doctor
+
+        with tempfile.TemporaryDirectory() as tmp:
+            agents = Path(tmp) / "agents"
+            agents.mkdir()
+            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", Path(tmp) / "absent"):
+                checks = _check_scheduled_stack_checkout(agents)
+            self.assertEqual(checks[0].status, OK)
+            self.assertIn("this checkout", checks[0].detail)
+
+
 if __name__ == "__main__":
     unittest.main()

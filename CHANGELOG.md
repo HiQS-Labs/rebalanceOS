@@ -10,6 +10,16 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.12] - 2026-08-17
+
+### Changed
+- The scheduled-stack drift check now honours a declared runtime home: a machine
+  can pin which checkout its scheduled jobs must run from (a one-line file in the
+  user config directory), and the health check holds every job to that
+  declaration no matter which checkout runs it. This supports the new dedicated
+  runtime clone: development checkouts can switch branches freely without
+  changing what the scheduled jobs execute.
+
 ## [0.69.11] - 2026-08-17
 
 ### Fixed
