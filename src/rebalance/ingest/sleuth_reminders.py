@@ -226,7 +226,7 @@ def _read_payload_from_file(path: Path) -> dict[str, Any]:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise SleuthApiError(
-            f"Sleuth reminders file not found: {path}. Is the git-pulse repo cloned "
+            f"Sleuth reminders file not found: {path}. Is the fleet check-in sync repo (git-pulse) cloned "
             f"and pulled on this device? See SLEUTH_SYNC.md."
         ) from exc
     except OSError as exc:

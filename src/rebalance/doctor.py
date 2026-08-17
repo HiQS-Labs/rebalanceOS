@@ -1400,8 +1400,9 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
                 detail,
                 ""
                 if healthy
-                else "check the collector machine / its launchd git-pulse job; "
-                "`python experimental/git-pulse/health-check.py` for the full view",
+                else "check that device's fleet check-in job (transport: git-pulse, launchd "
+                "`com.user.git-pulse`); `python experimental/git-pulse/health-check.py` "
+                "for the full view",
                 severity=severity,
             )
         )
@@ -1553,9 +1554,9 @@ def _diagnostics_index() -> list[Check]:
 
     checks.append(
         Check(
-            "diagnostics: git-pulse",
+            "diagnostics: fleet check-in",
             OK,
-            "per-device collector health now shown inline above (`fleet:*`); "
+            "per-device fleet check-in health now shown inline above (`fleet:*`); "
             "`python experimental/git-pulse/health-check.py` for the full cross-machine "
             "table. Full module migration tracked in Phase 9.",
         )
@@ -1571,7 +1572,7 @@ def _diagnostics_index() -> list[Check]:
         Check(
             "diagnostics: health reporter",
             OK,
-            "launchd issue-filer (runs this doctor + git-pulse, opens GitHub issues): temp/health-reporter.log.jsonl",
+            "launchd issue-filer (runs this doctor + the fleet check-in health read, opens GitHub issues): temp/health-reporter.log.jsonl",
         )
     )
     return checks
