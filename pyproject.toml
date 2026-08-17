@@ -65,6 +65,9 @@ target-version = "py312"
 # against THIS repo when the old repo's stranded lint PR was recovered —
 # entries that only existed there were dropped.)
 extend-exclude = [
+  # .claude skills are prose documentation whose embedded code snippets are
+  # illustrative, not product code the formatter should gate (GH-34).
+  ".claude",
   "macOS",
   "vscode-extensions",
   "temp",
