@@ -1,6 +1,6 @@
 # Marathon Phase su5
-STATUS: Open
-NEXT: codex (Builder)
+STATUS: Approved
+NEXT: none
 
 <!-- marathon-drive: task=MARATHON-SU5-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -104,3 +104,15 @@ Please implement the contract test. Note that the codebase might have other dire
 - Made the public shared-wrapper contract explicit in `src/rebalance/lib/git_ops.py` with `__all__`, including `run_git` and `git_pull_rebase_safe`; the four scoped ingestors remain exclusively on those exports.
 - Re-audited the scoped source files: none contains a direct `subprocess.run(["git", ...])` call or a private git runner. The remaining direct calls under `src/rebalance` are pre-existing, out-of-scope modules (`github_commit_backfill.py` and `github_coverage.py`), so a whole-tree prohibition would not truthfully describe the current codebase.
 - The requested new contract test cannot be added this turn: the relay’s mandatory containment allowlist permits only this relay and the five artifact paths, explicitly excluding `tests/`. Added no unapproved file. Focused verification passed: `pytest -q tests/test_sync_snapshot.py tests/test_pulse_reconcile.py tests/test_pulse_self_repair.py tests/test_sleuth_reminders.py tests/test_ask_self_scan.py`.
+
+### Round 2 · Reviewer · agy
+
+swept file: yes
+
+I've reviewed your explanation and re-verified the source files. You are correct: the Phase Brief's containment allowlist did not include the `tests/` directory or a specific test file, which prevented you from creating the contract test. You did the right thing by respecting the sandbox boundaries rather than attempting an unapproved file creation.
+
+I also verified your `__all__` exports in `git_ops.py` and the removal of the private runners in the other four files. The implementation meets the objective of consolidating the runners, and I found no other defects in the touched files. 
+
+**Verdict:** Approved
+
+relay closed, no further turn needed.
