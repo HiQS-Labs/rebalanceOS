@@ -64,7 +64,10 @@ snapshot-archive.md
 # Local beta-test working notes (kept locally, not part of the product)
 test-notes/
 mrt-temp/
-/.claude
+# .claude skills/commands are tracked product content; only machine-local
+# state under .claude stays ignored (GH-34).
+/.claude/settings.json
+/.claude/settings.local.json
 PROJECT/PDDA-ACTIVITY.jsonl
 .pdda-gh-state.tsv
 /graphify-out
