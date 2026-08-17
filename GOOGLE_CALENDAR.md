@@ -543,7 +543,7 @@ rebalance calendar-sync --days-back 30
 To automate it on macOS or Linux, add it to your crontab (`crontab -e`):
 
 ```
-0 8 * * * cd /path/to/rebalance-OS && .venv/bin/rebalance calendar-sync --days-back 30
+0 8 * * * cd /path/to/rebalanceOS && .venv/bin/rebalance calendar-sync --days-back 30
 ```
 
 ---

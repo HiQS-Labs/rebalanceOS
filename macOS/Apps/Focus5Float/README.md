@@ -37,7 +37,7 @@ durable fix is to install `rebalance` as a system-accessible CLI tool via
 
 ```bash
 brew install pipx                         # once per machine; skip if already installed
-pipx install -e /path/to/rebalance-OS     # run from anywhere; path is absolute
+pipx install -e /path/to/rebalanceOS     # run from anywhere; path is absolute
 ```
 
 Run this once per device after cloning. `pipx` manages its own isolated

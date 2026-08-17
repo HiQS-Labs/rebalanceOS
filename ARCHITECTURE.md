@@ -3,7 +3,7 @@
 > **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](./ROUTER.md) — canonical there, deliberately not restated here.
 
 
-> How data flows through the system. For execution decisions see [PROJECT.md](./PROJECT.md), for tool specs see [MCP.md](./MCP.md), for the *why* behind these decisions see [GUIDING-PRINCIPLES.md](./GUIDING-PRINCIPLES.md).
+> How data flows through the system. For execution decisions see the [PROJECT/](./PROJECT/) docs — canonical detail for a specific effort, governed by [PROJECT/PDDA.md](./PROJECT/PDDA.md) — for tool specs see [MCP.md](./MCP.md), for the *why* behind these decisions see [GUIDING-PRINCIPLES.md](./GUIDING-PRINCIPLES.md).
 
 > **New maintainer? Start with [Maintainer Orientation](#maintainer-orientation-start-here)** — the load-bearing symbols, the two hubs, where to start reading, and one end-to-end trace. **This doc is load-bearing, not decorative:** `audit_modules` (the `audit_modules` MCP tool / [scripts/audit_modules.py](scripts/audit_modules.py)) and the PDDA gate enforce that collectors, render modules, and scheduled jobs stay documented here — update ARCHITECTURE.md in the *same PR* as any structural change.
 
@@ -116,7 +116,7 @@ A `rebalance refresh` (or the `refresh_index` MCP tool) flows through real symbo
 
 ## Signal Sources
 
-Raw incoming sources have a priority, a collector module, and a target table. For detailed field specs and status, see [PROJECT.md — Signals](./PROJECT.md).
+Raw incoming sources have a priority, a collector module, and a target table. The table below is the canonical field spec; for per-effort execution detail see the [PROJECT/](./PROJECT/) docs, and for current status see [ROADMAP.md](./ROADMAP.md).
 
 | Priority | Source | Collector | Storage | Vectorized | Status |
 |----------|--------|-----------|---------|------------|--------|
@@ -649,6 +649,8 @@ scripts/                   — Operator entry points (not part of the importable
 
 ## License
 
-Copyright 2025 Hypercart DBA Neochrome, Inc.
+Copyright 2025-2026 Hypercart DBA Neochrome, Inc.
 
-Licensed under the **Apache License, Version 2.0**. See [APACHE-LICENSE-2.0.txt](./APACHE-LICENSE-2.0.txt).
+rebalance is dual-licensed, matching the rest of the HiQS suite. **AGPL-3.0-only** is the
+default and covers nearly every use — see [`LICENSE`](./LICENSE). A commercial license is
+available for use that AGPL-3.0 does not fit; see [`LICENSE-COMMERCIAL.md`](./LICENSE-COMMERCIAL.md).

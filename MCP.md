@@ -324,10 +324,10 @@ Adapters are thin config files — no custom code. Each host reads the config an
    {
      "mcpServers": {
        "rebalance": {
-         "command": "/absolute/path/to/rebalance-OS/.venv/bin/python",
+         "command": "/absolute/path/to/rebalanceOS/.venv/bin/python",
          "args": ["-m", "rebalance.mcp_server"],
          "env": {
-           "REBALANCE_DB": "/absolute/path/to/rebalance-OS/rebalance.db"
+           "REBALANCE_DB": "/absolute/path/to/rebalanceOS/rebalance.db"
          }
        }
      }

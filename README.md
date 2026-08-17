@@ -6,6 +6,24 @@
 **Status: Beta.** Shipping weekly. We tell you what's real, and what isn't yet — see
 [Maturity](#maturity) below for the parts that aren't.
 
+### Just want to install it?
+
+Go straight to **[Getting Started](#getting-started)** — everything between here and
+there is context you can read later. Requires **Python 3.12+**; Apple Silicon macOS is
+the fully supported platform ([why](#platform-support)).
+
+```bash
+git clone https://github.com/HiQS-Suite/rebalanceOS.git
+cd rebalanceOS
+python3 -m venv .venv
+.venv/bin/pip install -e ".[embeddings,calendar]"
+.venv/bin/rebalance version   # checkpoint — no vault, tokens, or network needed
+```
+
+That is the whole credential-free path. [Step 1](#step-1--clone-and-install) explains
+each line; Steps 2-6 connect your vault, GitHub, and calendar, and each names what it
+needs before it needs it.
+
 ---
 
 ## HiQS — the system this belongs to
@@ -290,13 +308,16 @@ calendar, the full MCP tool surface — works anywhere Python 3.12+ runs.
 
 **First-run network egress** (matters behind an egress allowlist / agent sandbox):
 
+- `git clone` reaches **github.com**.
+- `pip install -e …` reaches **pypi.org** and **files.pythonhosted.org**.
 - First `semantic-embed` / `ingest embed` downloads **Qwen3-Embedding-0.6B** from
   **huggingface.co** — one-time, several hundred MB, then cached under `~/.cache/huggingface`.
 - `github-*` commands call **api.github.com** with your PAT.
 - Calendar / Gmail call **accounts.google.com** and **\*.googleapis.com** for OAuth and sync.
 
 Allow those hosts before first run if you operate behind an allowlist; the model
-download is the only large transfer and happens once.
+download is the only large transfer and happens once. The first two lines are needed
+just to complete Step 1 — the rest are per-feature and can wait.
 
 ### Step 1 — Clone and install
 
@@ -320,6 +341,19 @@ cd rebalanceOS
 python3 -m venv .venv
 .venv/bin/pip install -e ".[embeddings,calendar]"
 ```
+
+**Checkpoint — confirm the install before going further.** This needs no vault, no
+tokens, and no network:
+
+```bash
+.venv/bin/rebalance version
+```
+
+That should print the version (e.g. `0.73.0`). If it does, the install is sound and
+every later step is additive — Steps 2-6 are where you connect *your* data, and each
+one names what it needs before it needs it. If instead you get `command not found` or
+an import error, fix that here rather than in Step 2: re-run the `pip install` line
+above and check that `python3 --version` really was 3.12+.
 
 > On Linux / Windows / Intel Mac, drop the `embeddings` extra:
 > `pip install -e ".[calendar]"` (semantic search will be unavailable; everything else works).
@@ -542,7 +576,7 @@ filters, troubleshooting, and Claude Code prompts — see [GMAIL.md](./GMAIL.md)
 The `.mcp.json` at the project root auto-registers the MCP server. Open the project in Claude Code:
 
 ```bash
-cd rebalance-OS
+cd rebalanceOS
 claude
 ```
 
@@ -568,7 +602,7 @@ Claude Code calls the `ask` tool behind the scenes — it gathers your project r
    {
      "mcpServers": {
        "rebalance": {
-         "command": "/absolute/path/to/rebalance-OS/.venv/bin/python",
+         "command": "/absolute/path/to/rebalanceOS/.venv/bin/python",
          "args": ["-m", "rebalance.mcp_server"],
          "env": {
            "REBALANCE_DB": "/Users/<you>/Library/Application Support/rebalance-os/rebalance.db"
@@ -593,7 +627,7 @@ rebalance OS will also ship as a Claude Desktop Extension. The extension packagi
 
 The server works with any MCP-compatible client. Config files are provided for:
 
-- **Claude Code** — `.mcp.json` (auto-loaded on `cd rebalance-OS && claude`)
+- **Claude Code** — `.mcp.json` (auto-loaded on `cd rebalanceOS && claude`)
 - **VS Code (Copilot/Continue)** — `.vscode/mcp.json` (auto-loaded on workspace open)
 - **Claude Desktop** — manual config (see above) or extension (`.mcpb`, coming soon)
 - **Cursor** — see [MCP.md](./MCP.md) for config snippet
@@ -616,7 +650,7 @@ system-accessible path once per device so the app can find it:
 
 ```bash
 brew install pipx
-pipx install -e /path/to/rebalance-OS   # → ~/.local/bin/rebalance
+pipx install -e /path/to/rebalanceOS   # → ~/.local/bin/rebalance
 ```
 
 The app checks `~/.local/bin/rebalance` directly — no shell needed. Without
@@ -630,17 +664,28 @@ for the full resolution order and troubleshooting.
 
 `ask-self` is an external RAG-based code and docs scanner that builds a local queryable index for this repository without vendoring its code here.
 
-This repo runs ask-self in **portable mode** with **fully-local Qwen embeddings** — the SQLite index is committed at [ask_self/index/rebalance-OS.sqlite](ask_self/index/rebalance-OS.sqlite), so a fresh clone can query immediately with no ingest and no API keys.
+**This is a maintainer tool, not part of the install path.** Nothing in Getting Started
+needs it, and a fresh clone cannot query until it is set up — the index is generated,
+not committed (`ask_self/index/` is gitignored), and the current harness embeds via
+Gemini, so queries need a key.
 
-> Last ingested: 2026-05-28 on `fix/28-dev-install-fixes` after the hardened portable `qwen-local` refresh
+Before the first query you need all three:
 
-### Query this repo (no setup required)
+1. An `ask-self` checkout, with `ASK_SELF_PATH` pointing at it (no default — the
+   wrappers fail loudly if it is unset):
+   ```bash
+   export ASK_SELF_PATH="$HOME/Documents/GitHub/ask-self"
+   ```
+2. `GOOGLE_API_KEY` — required for **both** ingest and query while the harness is on
+   Gemini (`gemini-embedding-001`); query-time embedding needs it too, not just synthesis.
+3. A built index — run the ingest below at least once. The query wrapper pins
+   `--db-path` to `ask_self/index/rebalance-OS.sqlite`, which does not exist until you do.
+
+### Query this repo
 
 ```bash
 ./scripts/ask-self-query.sh "How does dashboard rendering work?"
 ```
-
-The query wrapper pins `--db-path` to the committed portable DB, so it works on a fresh clone.
 
 ### Refresh the index (maintainers only)
 
@@ -656,12 +701,7 @@ Notes:
 - Switching provider changes the embedding dimension, which forces a **full index rebuild**. That is the heaviest local job in the repo; do not flip it casually.
 - PR ingestion now fails loudly if neither `GITHUB_TOKEN` / `SLEUTH_RAG_GITHUB_PAT` nor a healthy `gh auth login` is available. Pass `--no-prs` only if you intentionally want a files-only refresh.
 - Synthesis (the answer step) still defaults to Gemini unless you pass `--retrieval-only` or configure a local synthesis provider in [ask_self/ask_self_harness.json](ask_self/ask_self_harness.json).
-
-The wrappers require `ASK_SELF_PATH` to point at your local `ask-self` checkout (no default — the scripts fail loudly if it isn't set):
-
-```bash
-export ASK_SELF_PATH="$HOME/Documents/GitHub/ask-self"
-```
+- Both wrappers require `ASK_SELF_PATH` (see the prerequisites above); neither has a default.
 
 ### CLI reference
 
