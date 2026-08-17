@@ -1,5 +1,5 @@
 # Marathon Phase su1
-STATUS: Open
+STATUS: Approved
 NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU1-TURN builder=codex reviewer=agy round-cap=7 -->
@@ -86,3 +86,15 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
 - Diagnosed the cross-suite behavior as the process-wide `ru_maxrss` high-water mark: prior test work can exceed the RSS guard and mask a real fetch failure as `warn`.
 - Made request failures take precedence over resource warnings, and added a regression seam that simulates an elevated ambient peak RSS while a repo request fails.
 - Verified: `pytest HiQS/tests/test_github.py -q` (3 passed).
+
+### Round 1 · Reviewer · agy
+
+swept file: yes
+
+I reviewed `HiQS/hiqs/sources/github.py` and `HiQS/tests/test_github.py`. The builder correctly identified that the `ru_maxrss` high-water mark from prior test work was inadvertently tripping the guard logic meant for the current sync, thus masking a real network failure as a resource warning. The source code was updated to check for actual request errors before falling back to the process-wide RSS limits. The regression test explicitly validates this behavior. 
+
+I successfully ran `uv run pytest tests/ HiQS/tests/ -q` locally and all tests across both test directories passed in a single pytest process invocation, satisfying the Definition of Done. The implementation is well-contained and robust.
+
+**Verdict:** Approved
+
+relay closed, no further turn needed
