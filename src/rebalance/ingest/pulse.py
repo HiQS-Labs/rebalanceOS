@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 import time
 import urllib.parse
 from dataclasses import dataclass, field
@@ -39,6 +38,7 @@ from rebalance.ingest.db import db_connection
 from rebalance.ingest.slack_users import compact_sleuth_reminder
 from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
+from rebalance.lib.git_ops import git_pull_rebase_safe, run_git
 
 
 # Author logins of known cloud-agent bots. Mirrors agent_tags.py — kept here
@@ -76,16 +76,8 @@ def reconcile_pulse_mirror(target_path: Path) -> None:
     # Defer to an operator's in-progress rebase rather than trampling it.
     if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
         raise PulseReconcileError(f"a git rebase is already in progress in {target_path}; deferring to operator")
-    proc = subprocess.run(
-        ["git", "pull", "--rebase"],
-        cwd=str(target_path),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    proc = git_pull_rebase_safe(target_path)
     if proc.returncode != 0:
-        # Restore the repo so a conflicted rebase does not linger for the next run.
-        subprocess.run(["git", "rebase", "--abort"], cwd=str(target_path), capture_output=True)
         detail = (proc.stderr or proc.stdout).strip()
         raise PulseReconcileError(f"git pull --rebase failed (code {proc.returncode}) in {target_path}: {detail}")
 
@@ -1017,22 +1009,6 @@ def _render_section_today_sleuth(today: DayActivity, tz: ZoneInfo) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Git ops
-# ---------------------------------------------------------------------------
-
-
-def _run_git(args: list[str], *, cwd: Path) -> tuple[int, str, str]:
-    proc = subprocess.run(
-        ["git", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-
-
 def _commit_and_push_if_changed(
     target_repo: Path,
     file_rel: str,
@@ -1056,24 +1032,24 @@ def _commit_and_push_if_changed(
 
     target_file.write_text(new_content, encoding="utf-8")
 
-    rc, out, err = _run_git(["add", file_rel], cwd=target_repo)
-    if rc != 0:
-        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": err or out}
+    proc = run_git(target_repo, "add", file_rel)
+    if proc.returncode != 0:
+        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": proc.stderr.strip() or proc.stdout.strip()}
 
-    rc_status, status_out, _ = _run_git(["status", "--porcelain", file_rel], cwd=target_repo)
-    if rc_status != 0 or not status_out:
+    proc = run_git(target_repo, "status", "--porcelain", file_rel)
+    if proc.returncode != 0 or not proc.stdout.strip():
         return {"wrote_file": True, "committed": False, "pushed": False, "reason": "nothing staged"}
 
-    rc, out, err = _run_git(["commit", "-m", commit_message], cwd=target_repo)
-    if rc != 0:
-        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": err or out}
+    proc = run_git(target_repo, "commit", "-m", commit_message)
+    if proc.returncode != 0:
+        return {"wrote_file": True, "committed": False, "pushed": False, "git_error": proc.stderr.strip() or proc.stdout.strip()}
 
     if not push:
         return {"wrote_file": True, "committed": True, "pushed": False}
 
-    rc, out, err = _run_git(["push"], cwd=target_repo)
-    if rc != 0:
-        git_error = err or out
+    proc = run_git(target_repo, "push")
+    if proc.returncode != 0:
+        git_error = proc.stderr.strip() or proc.stdout.strip()
         if "fetch first" in git_error or "rejected" in git_error:
             fsm = RepairFSM(
                 actions=_push_repair_actions(target_repo),
@@ -1121,19 +1097,19 @@ def _push_repair_actions(target_repo: Path) -> dict[str, Any]:
     """
 
     def pull_rebase() -> RepairResult:
-        rc, _, err = _run_git(["pull", "--rebase"], cwd=target_repo)
-        if rc != 0:
-            return RepairResult(ok=False, error=err)
-        rc, _, err = _run_git(["push"], cwd=target_repo)
-        return RepairResult(ok=rc == 0, error=err if rc != 0 else "")
+        proc = git_pull_rebase_safe(target_repo)
+        if proc.returncode != 0:
+            return RepairResult(ok=False, error=proc.stderr.strip())
+        proc = run_git(target_repo, "push")
+        return RepairResult(ok=proc.returncode == 0, error=proc.stderr.strip() if proc.returncode != 0 else "")
 
     def abort_rebase() -> RepairResult:
-        _run_git(["rebase", "--abort"], cwd=target_repo)  # best-effort
-        rc, _, err = _run_git(["pull", "--rebase"], cwd=target_repo)
-        if rc != 0:
-            return RepairResult(ok=False, error=err)
-        rc, _, err = _run_git(["push"], cwd=target_repo)
-        return RepairResult(ok=rc == 0, error=err if rc != 0 else "")
+        run_git(target_repo, "rebase", "--abort")  # best-effort
+        proc = git_pull_rebase_safe(target_repo)
+        if proc.returncode != 0:
+            return RepairResult(ok=False, error=proc.stderr.strip())
+        proc = run_git(target_repo, "push")
+        return RepairResult(ok=proc.returncode == 0, error=proc.stderr.strip() if proc.returncode != 0 else "")
 
     def notify_only() -> RepairResult:
         return RepairResult(ok=False, error="notify_only: repair deferred to operator")
@@ -1162,11 +1138,12 @@ def _verify_remote_content(target_repo: Path, file_rel: str, expected: str) -> b
     ``@{u}`` is by definition the ref the bare push targeted, so resolving it removes both cases.
     A missing upstream is still a genuine failure: without one there is nothing to have pushed to.
     """
-    rc, upstream, _ = _run_git(["rev-parse", "--abbrev-ref", "@{u}"], cwd=target_repo)
-    if rc != 0 or not upstream:
+    proc = run_git(target_repo, "rev-parse", "--abbrev-ref", "@{u}")
+    upstream = proc.stdout.strip()
+    if proc.returncode != 0 or not upstream:
         return False
-    rc, out, _ = _run_git(["show", f"{upstream}:{file_rel}"], cwd=target_repo)
-    return rc == 0 and out == expected.strip()
+    proc = run_git(target_repo, "show", f"{upstream}:{file_rel}")
+    return proc.returncode == 0 and proc.stdout.strip() == expected.strip()
 
 
 # ---------------------------------------------------------------------------

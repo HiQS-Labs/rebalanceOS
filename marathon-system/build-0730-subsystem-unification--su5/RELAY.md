@@ -1,6 +1,6 @@
 # Marathon Phase su5
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU5-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -79,3 +79,9 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Consolidated git subprocess execution in `rebalance.lib.git_ops`: exported `run_git()` and `git_pull_rebase_safe()`; retained `_git()` only as a compatibility adapter for existing out-of-scope imports.
+- Replaced private runners and direct subprocess git calls in pulse, sync snapshots, Sleuth file refresh, and ask-self discovery with the shared wrapper. Each caller keeps its existing result/error behavior while inheriting explicit timeouts.
+- Verified with `pytest -q tests/test_sync_snapshot.py tests/test_ask_self_scan.py tests/test_sleuth_reminders.py tests/test_pulse_reconcile.py tests/test_pulse_self_repair.py` (pass).

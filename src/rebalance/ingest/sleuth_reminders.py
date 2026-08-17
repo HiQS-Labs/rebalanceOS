@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from rebalance.lib import time_ops
+from rebalance.lib.git_ops import run_git
 from rebalance.lib.time_ops import parse_utc_iso
 from rebalance.ingest.db.connection import db_connection_readonly, table_exists
 
@@ -185,28 +186,29 @@ def _refresh_file_source(file_path: Path) -> str:
     jobs (pulse-sync), and a rebase there can race/conflict. Fetch never touches the
     working tree, and the scoped checkout updates only the export file — not the other
     jobs' files. Never raises; returns a short status string for the sync result."""
-    import subprocess
-
-    def _git(cwd: Path, *args: str) -> str:
-        return subprocess.run(
-            ["git", "-C", str(cwd), *args],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=True,
-        ).stdout.strip()
-
     try:
-        root = Path(_git(file_path.parent, "rev-parse", "--show-toplevel")).resolve()
+        result = run_git(file_path.parent, "rev-parse", "--show-toplevel", timeout=60)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
+            return f"skipped (git: {detail})"
+        root = Path(result.stdout.strip()).resolve()
         # Run subsequent git ops FROM the repo root so the checkout pathspec (which git
         # resolves relative to cwd, not the repo root) matches.
         rel = file_path.resolve().relative_to(root)
-        upstream = _git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-        _git(root, "fetch", "--quiet")
-        _git(root, "checkout", upstream, "--", str(rel))
+        result = run_git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", timeout=60)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
+            return f"skipped (git: {detail})"
+        upstream = result.stdout.strip()
+        result = run_git(root, "fetch", "--quiet", timeout=60)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
+            return f"skipped (git: {detail})"
+        result = run_git(root, "checkout", upstream, "--", str(rel), timeout=60)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
+            return f"skipped (git: {detail})"
         return "ok"
-    except subprocess.CalledProcessError as exc:
-        return f"skipped (git: {(exc.stderr or '').strip()[:120] or exc.returncode})"
     except Exception as exc:  # noqa: BLE001 — freshness is best-effort
         return f"skipped ({type(exc).__name__})"
 
