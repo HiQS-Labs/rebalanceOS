@@ -10,6 +10,32 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.8] - 2026-08-16
+
+### Changed
+- One status vocabulary everywhere. The same failing condition used to be called
+  "FAIL" in the health-check command, "fail" in its JSON output, "error" on the
+  dashboard banner, and "danger" in the activity-log badges; the middle tier was
+  split between "warn" and "warning" the same way. Every user-facing surface now
+  uses one set of words — ok / notice / warning / error — and a test pins the
+  vocabulary so a new surface cannot quietly invent another synonym. No stored
+  data used the old words (verified against the live database), so nothing
+  migrates.
+
+### Fixed
+- The reminders section's group badges rendered the wrong text: an internal
+  color-variant word (like "info") appeared as the visible badge label instead of
+  the group's own label (like "GH"). Caused by two swapped arguments; now fixed
+  with a regression test.
+- A health-check test silently depended on whether the machine running it had a
+  GitHub token, so it passed on workstations and failed in CI. It now pins the
+  configured state explicitly.
+
+### Removed
+- The legacy timezone helper module and its tests. Its last production caller was
+  removed in an earlier release; everything it provided lives in the shared time
+  library, and this removal was announced there.
+
 ## [0.69.7] - 2026-08-16
 
 ### Changed

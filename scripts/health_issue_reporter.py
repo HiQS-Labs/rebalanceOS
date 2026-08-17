@@ -678,7 +678,8 @@ def main() -> int:
     print(f"  {len(open_issues)} open, {len(recently_closed)} recently closed")
     print()
 
-    min_level = {"fail", "warn"} if args.warn else {"fail"}
+    # Status vocabulary is doctor's (GH-5 PR2): "error" / "warning" / "ok".
+    min_level = {"error", "warning"} if args.warn else {"error"}
     filed = closed = skipped = triaged_skip = 0
     llm_calls_this_run = 0
 

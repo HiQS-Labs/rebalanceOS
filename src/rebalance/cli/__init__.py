@@ -185,9 +185,9 @@ def doctor_cmd(
 
     console = Console()
     label = {
-        OK: "[green] OK [/green]",
-        WARN: "[yellow]WARN[/yellow]",
-        FAIL: "[red]FAIL[/red]",
+        OK: "[green]  OK   [/green]",
+        WARN: "[yellow]WARNING[/yellow]",
+        FAIL: "[red] ERROR [/red]",
     }
     console.print("\n[bold]rebalance doctor[/bold]\n")
     for c in report.checks:

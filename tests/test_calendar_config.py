@@ -20,7 +20,7 @@ class CalendarConfigLoadTests(unittest.TestCase):
     """Config loading from file, defaults, and field validation."""
 
     def test_load_returns_defaults_when_file_missing(self) -> None:
-        from rebalance.tz_utils import local_tz
+        from rebalance.lib.time_ops import local_tz
 
         config = CalendarConfig.load(Path("/nonexistent/path/config.json"))
         self.assertEqual(config.calendar_id, "primary")

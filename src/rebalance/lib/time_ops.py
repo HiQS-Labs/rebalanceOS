@@ -107,13 +107,9 @@ def parse_date(raw: Any) -> date | None:
 
 
 def _current_time(tz: timezone | ZoneInfo | None = None) -> datetime:
-    try:
-        import sys
-        tz_mod = sys.modules.get("rebalance.tz_utils")
-        if tz_mod is not None and hasattr(tz_mod, "datetime") and tz_mod.datetime is not datetime:
-            return tz_mod.datetime.now(tz or timezone.utc)
-    except Exception:
-        pass
+    # The old bridge that honoured a frozen clock patched onto the deleted
+    # legacy timezone shim went with the shim (GH-5 PR2); tests freeze time
+    # by patching this module directly.
     return datetime.now(tz or timezone.utc)
 
 

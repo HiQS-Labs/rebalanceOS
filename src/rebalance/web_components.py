@@ -96,14 +96,15 @@ RB_BUTTON_CSS = """
 """
 
 
-_BADGE_VARIANTS = frozenset({"ok", "warn", "danger", "info", "neutral"})
+_BADGE_VARIANTS = frozenset({"ok", "warning", "error", "info", "neutral"})
 
 
 def badge_html(variant: str, label: str) -> str:
     """Render a semantic pill badge: ``<span class="badge badge-{variant}">…</span>``.
 
     ``variant`` is validated against the five token-backed variants
-    (``ok | warn | danger | info | neutral``); anything else degrades to
+    (``ok | warning | error | info | neutral`` — the severity words are the
+    doctor's own vocabulary, GH-5 PR2); anything else degrades to
     ``neutral`` so a bad key can never emit an unstyled badge. ``label`` is
     HTML-escaped. The colour comes from the page's ``.badge-*`` rules (which map
     each variant to its design token), so no inline ``style`` hex is emitted.

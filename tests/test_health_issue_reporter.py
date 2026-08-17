@@ -712,14 +712,25 @@ class TestDoctorFixtures(unittest.TestCase):
             self.assertEqual(checks["github data"].status, OK)
 
     def test_no_github_activity_table_warns(self) -> None:
-        """A DB that has baseline schema but no github_activity table warns."""
+        """A DB that has baseline schema but no github_activity table warns —
+        on a machine where the source is configured. The onboarding gate
+        (GH-5 Phase 4.2) turns the same state into a clean skip when no
+        token exists, so the probe is pinned True here; without that this
+        test's result depended on whether the runner had a GitHub token
+        (green locally, red in CI)."""
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "rebalance.db"
             from rebalance.ingest.db import db_connection, ensure_baseline_schema  # noqa: PLC0415
-            from rebalance.doctor import WARN, run_doctor  # noqa: PLC0415
+            from rebalance.doctor import _COLLECTOR_FRESHNESS, WARN, run_doctor  # noqa: PLC0415
             with db_connection(db, ensure_baseline_schema):
                 pass  # baseline tables only, no migrations
-            checks = self._by_name(run_doctor(db))
+            entry = next(e for e in _COLLECTOR_FRESHNESS if e["name"] == "github data")
+            original = entry["configured"]
+            entry["configured"] = lambda: True
+            try:
+                checks = self._by_name(run_doctor(db))
+            finally:
+                entry["configured"] = original
             self.assertEqual(checks["github data"].status, WARN)
 
 

@@ -1,7 +1,8 @@
 """Contract for the consolidated ISO parser (GH-266 Phase 1).
 
 Four separate ISO-8601 readers were collapsed into `rebalance.lib.time_ops._parse_iso`:
-`health._parse_iso`, `tz_utils.parse_utc_iso`, `index_ops`'s private parser, and
+`health._parse_iso`, the old `tz_utils.parse_utc_iso` (shim deleted in GH-5 PR2;
+the survivor lives in `time_ops`), `index_ops`'s private parser, and
 `calendar_helpers.parse_calendar_dt`. They did *not* agree at the edges — one accepted
 space-separated timestamps, one raised instead of returning None, one preserved a
 non-UTC offset. Consolidation is only safe if the survivor honours each caller's
@@ -18,8 +19,7 @@ from datetime import datetime, timezone
 
 from rebalance.health import _parse_iso as health_parse
 from rebalance.ingest.calendar_helpers import parse_calendar_dt
-from rebalance.lib.time_ops import _parse_iso
-from rebalance.tz_utils import parse_utc_iso
+from rebalance.lib.time_ops import _parse_iso, parse_utc_iso
 
 
 class SharedParserContract(unittest.TestCase):
@@ -43,7 +43,7 @@ class SharedParserContract(unittest.TestCase):
         self.assertEqual(parsed.hour, 12)
 
     def test_force_utc_preserves_the_instant_not_the_offset(self) -> None:
-        # tz_utils.parse_utc_iso previously returned the original offset. It now
+        # the old tz_utils parser previously returned the original offset. It now
         # normalises to UTC. That is only safe because every caller compares
         # instants; this pins that the *instant* is unchanged.
         parsed = _parse_iso("2026-08-14T09:00:00-07:00")
