@@ -36,6 +36,7 @@ from typing import Any
 
 from rebalance.lib import time_ops
 from rebalance.lib.time_ops import parse_utc_iso
+from rebalance.ingest.db.connection import db_connection_readonly, table_exists
 
 HTTP_TIMEOUT_SECONDS = 30
 USER_AGENT = "rebalance-os/0.1"
@@ -363,20 +364,13 @@ def get_export_generated_at(database_path: Path) -> datetime | None:
     or the publisher predates the heartbeat). Doctor compares this to now."""
     if not database_path.exists():
         return None
-    conn = sqlite3.connect(database_path)
-    try:
+    with db_connection_readonly(database_path) as conn:
         row = (
             conn.execute("SELECT value FROM sleuth_sync_meta WHERE key = ?", (EXPORT_GENERATED_AT_KEY,)).fetchone()
-            if _table_exists(conn, "sleuth_sync_meta")
+            if table_exists(conn, "sleuth_sync_meta")
             else None
         )
-    finally:
-        conn.close()
     return parse_utc_iso(row[0]) if row and row[0] else None
-
-
-def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
-    return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
 
 
 _UPDATE_FIELDS = (

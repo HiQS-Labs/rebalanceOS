@@ -205,6 +205,47 @@ def _is_insufficient_scope_error(exc: Exception) -> bool:
     )
 
 
+def _upsert_email_message(
+    conn: Any,
+    *,
+    message_id: str,
+    thread_id: str,
+    from_address: str,
+    from_name: str,
+    subject: str,
+    snippet: str,
+    received_at: str,
+    labels: list[str],
+    synced_at: str,
+) -> bool:
+    """Upsert one email row and return whether it replaced an existing row."""
+    existed = (
+        conn.execute(
+            "SELECT 1 FROM email_messages WHERE message_id = ?",
+            (message_id,),
+        ).fetchone()
+        is not None
+    )
+    conn.execute(
+        """INSERT OR REPLACE INTO email_messages
+           (message_id, thread_id, from_address, from_name, subject,
+            snippet, received_at, labels_json, synced_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            message_id,
+            thread_id,
+            from_address,
+            from_name,
+            subject,
+            snippet,
+            received_at,
+            json.dumps(labels),
+            synced_at,
+        ),
+    )
+    return existed
+
+
 def sync_gmail(
     database_path: Path,
     *,
@@ -289,30 +330,17 @@ def sync_gmail(
             thread_id = msg.get("threadId", "") or ""
             labels = msg.get("labelIds", []) or []
 
-            existed = (
-                conn.execute(
-                    "SELECT 1 FROM email_messages WHERE message_id = ?",
-                    (msg_id,),
-                ).fetchone()
-                is not None
-            )
-
-            conn.execute(
-                """INSERT OR REPLACE INTO email_messages
-                   (message_id, thread_id, from_address, from_name, subject,
-                    snippet, received_at, labels_json, synced_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    msg_id,
-                    thread_id,
-                    from_address,
-                    from_name,
-                    subject,
-                    snippet,
-                    received_at,
-                    json.dumps(labels),
-                    synced_at,
-                ),
+            existed = _upsert_email_message(
+                conn,
+                message_id=msg_id,
+                thread_id=thread_id,
+                from_address=from_address,
+                from_name=from_name,
+                subject=subject,
+                snippet=snippet,
+                received_at=received_at,
+                labels=labels,
+                synced_at=synced_at,
             )
             if existed:
                 updated += 1
@@ -396,25 +424,17 @@ def ingest_email_messages(
             ):
                 skipped += 1
                 continue
-            existed = (
-                conn.execute("SELECT 1 FROM email_messages WHERE message_id = ?", (msg_id,)).fetchone() is not None
-            )
-            conn.execute(
-                """INSERT OR REPLACE INTO email_messages
-                   (message_id, thread_id, from_address, from_name, subject,
-                    snippet, received_at, labels_json, synced_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    msg_id,
-                    str(m.get("thread_id") or ""),
-                    str(m.get("from_address") or ""),
-                    str(m.get("from_name") or ""),
-                    str(m.get("subject") or ""),
-                    str(m.get("snippet") or ""),
-                    str(m.get("received_at") or ""),
-                    json.dumps(list(m.get("labels") or [])),
-                    synced_at,
-                ),
+            existed = _upsert_email_message(
+                conn,
+                message_id=msg_id,
+                thread_id=str(m.get("thread_id") or ""),
+                from_address=str(m.get("from_address") or ""),
+                from_name=str(m.get("from_name") or ""),
+                subject=str(m.get("subject") or ""),
+                snippet=str(m.get("snippet") or ""),
+                received_at=str(m.get("received_at") or ""),
+                labels=list(m.get("labels") or []),
+                synced_at=synced_at,
             )
             if existed:
                 updated += 1

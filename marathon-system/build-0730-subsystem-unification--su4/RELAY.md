@@ -1,6 +1,6 @@
 # Marathon Phase su4
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU4-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -80,3 +80,10 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Added shared `table_exists()` and read-only connection helpers; Sleuth's heartbeat lookup now uses them.
+- Consolidated Gmail's two nine-column email upsert loops into `_upsert_email_message()`.
+- Consolidated GitHub issue/PR record construction, item replacement, and repeated issue-comment persistence while preserving the existing counters and document writes.
+- Verification: `pytest tests/test_github_knowledge.py tests/test_sleuth_reminders.py -q` exited cleanly. The brief's `tests/test_db_connection.py` and `tests/test_gmail.py` paths are absent in this checkout.
