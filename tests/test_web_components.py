@@ -50,7 +50,7 @@ class BadgeHtmlTests(unittest.TestCase):
         self.assertEqual(out, '<span class="badge badge-ok">x</span>')
 
     def test_each_variant_maps_to_its_class(self) -> None:
-        for v in ("ok", "warn", "danger", "info", "neutral"):
+        for v in ("ok", "warning", "error", "info", "neutral"):
             self.assertIn(f'class="badge badge-{v}"', badge_html(v, "lbl"))
 
     def test_unknown_variant_degrades_to_neutral(self) -> None:

@@ -152,7 +152,11 @@ class DoctorCliTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("signal health", result.output)
         self.assertIn("vault", result.output)
-        self.assertIn("0 rows landed", result.output)
+        # "0 rows" and "landed" may straddle a Rich line wrap now that the
+        # status labels are wider (WARNING/ERROR, GH-5 PR2) — assert the
+        # pieces, not the exact phrase.
+        self.assertIn("0 rows", result.output)
+        self.assertIn("landed", result.output)
         self.assertIn("last 7d", result.output)
 
 

@@ -197,33 +197,33 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> Plain
 
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
-# Auth-log badges keyed to a semantic variant (ok|warn|danger|info|neutral),
+# Auth-log badges keyed to a semantic variant (ok|warning|error|info|neutral),
 # resolved to a design token by web_components.badge_html — no inline hex.
 _EVENT_BADGE = {
     # calendar
     "flow_started":         ("info",    "▶ flow started"),
     "flow_succeeded":       ("ok",      "✓ flow succeeded"),
-    "flow_failed":          ("danger",  "✗ flow failed"),
-    "token_missing":        ("warn",    "⚠ token missing"),
+    "flow_failed":          ("error",  "✗ flow failed"),
+    "token_missing":        ("warning",    "⚠ token missing"),
     "token_refreshed":      ("ok",      "↻ token refreshed"),
-    "token_refresh_failed": ("danger",  "✗ refresh failed"),
+    "token_refresh_failed": ("error",  "✗ refresh failed"),
     # github
     "token_validated":      ("ok",      "✓ token validated"),
     "token_set":            ("info",    "↻ token (re)set"),
-    "token_invalid":        ("danger",  "✗ token invalid"),
-    "auth_failed":          ("danger",  "✗ auth failed (401)"),
+    "token_invalid":        ("error",  "✗ token invalid"),
+    "auth_failed":          ("error",  "✗ auth failed (401)"),
     "gh_fallback":          ("ok",      "✓ healed via gh CLI"),
     # sleuth
     "sync_succeeded":       ("ok",      "✓ sync succeeded"),
     # gmail
-    "adc_missing":          ("warn",    "⚠ ADC missing"),
-    "scope_insufficient":   ("danger",  "✗ scope insufficient"),
+    "adc_missing":          ("warning",    "⚠ ADC missing"),
+    "scope_insufficient":   ("error",  "✗ scope insufficient"),
     # launchd jobs
     "job_started":          ("info",    "▶ started"),
     "job_completed":        ("ok",      "✓ completed"),
-    "job_failed":           ("danger",  "✗ failed"),
+    "job_failed":           ("error",  "✗ failed"),
     # watch-list coverage guard (only emitted on a concerning drop)
-    "watched_repos_reduced": ("warn",   "⚠ watched repos reduced"),
+    "watched_repos_reduced": ("warning",   "⚠ watched repos reduced"),
     # GH-124: commit-threshold auto-promotion
     "project_auto_promoted": ("ok",     "✓ project auto-added"),
 }
@@ -255,8 +255,8 @@ tr:hover td { background: var(--zebra); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 12px;
          font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
 .badge-ok      { background: var(--ok);     color: #fff; }
-.badge-warn    { background: var(--warn);   color: #fff; }
-.badge-danger  { background: var(--danger); color: #fff; }
+.badge-warning { background: var(--warn);   color: #fff; }
+.badge-error   { background: var(--danger); color: #fff; }
 .badge-info    { background: var(--info);   color: #fff; }
 .badge-neutral { background: var(--fg-dim); color: #fff; }
 .detail { font-family: "SF Mono", "Fira Code", monospace; font-size: 11px;
@@ -419,7 +419,7 @@ def _render_sleuth_groups() -> str:
         rows.append(
             f"<div class='sr-group'>"
             f"<div class='sr-group-header'>"
-            f"{badge_html(badge_label, variant)}"
+            f"{badge_html(variant, badge_label)}"
             f"<span class='sr-group-name'>{html.escape(g.label)}</span>"
             f"<span class='sr-group-count'>{len(g.reminders)} reminder{'s' if len(g.reminders) != 1 else ''}</span>"
             f"</div>"
@@ -1482,7 +1482,7 @@ def _wn_item(action: dict[str, Any]) -> str:
         head_bits.append(badge_html("neutral", str(project)))
     if action.get("automation"):
         # Candidate for a GitHub issue → coding-agent (Codex / Claude Code) hook.
-        head_bits.append(badge_html("warn", "⚙ automation"))
+        head_bits.append(badge_html("warning", "⚙ automation"))
     head = "<div class='wn-head'>" + "".join(head_bits) + "</div>"
 
     why_html = f"<div class='wn-why'>{html.escape(why)}</div>" if why else ""
@@ -1632,7 +1632,7 @@ _AUTH_LOG_FILTER_JS = """
       switch (_activeFilter) {
         case "auth":   filterMatch = AUTH_SOURCES.has(src); break;
         case "jobs":   filterMatch = (src === "launchd"); break;
-        case "errors": filterMatch = (sev === "danger" || sev === "warn"); break;
+        case "errors": filterMatch = (sev === "error" || sev === "warning"); break;
         default:       filterMatch = true;
       }
       var textMatch = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;

@@ -143,29 +143,25 @@ class WebDefaultsUnchangedTests(unittest.TestCase):
         self.assertEqual("3h ago", format_relative("2026-08-16T09:00:00+00:00", now=NOW))
 
 
-class DeprecatedShimTests(unittest.TestCase):
-    """`rebalance.tz_utils` stays a working re-export shim. Phase 3 migrated its
-    production callers; retiring the shim itself is a separate, announced change,
-    so `tests/test_tz_utils.py` is deliberately left untouched."""
+class RetiredShimTests(unittest.TestCase):
+    """`rebalance.tz_utils` was deleted in GH-5 PR2 — the separately announced
+    removal the old shim-pin test was holding the door open for. Everything it
+    re-exported lives in `rebalance.lib.time_ops`."""
 
-    def test_no_production_code_imports_the_shim(self) -> None:
+    def test_shim_is_gone(self) -> None:
+        with self.assertRaises(ModuleNotFoundError):
+            import rebalance.tz_utils  # noqa: F401
+
+    def test_no_code_references_the_shim(self) -> None:
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[1]
         offenders = []
         for directory in ("src", "scripts"):
             for path in (root / directory).rglob("*.py"):
-                if path.name == "tz_utils.py":
-                    continue
-                if "from rebalance.tz_utils import" in path.read_text(encoding="utf-8"):
+                if "rebalance.tz_utils" in path.read_text(encoding="utf-8"):
                     offenders.append(str(path.relative_to(root)))
         self.assertEqual([], offenders)
-
-    def test_shim_still_re_exports(self) -> None:
-        from rebalance.tz_utils import format_relative as shim_format_relative
-        from rebalance.tz_utils import parse_utc_iso as shim_parse  # noqa: F401
-
-        self.assertEqual("3h ago", shim_format_relative(NOW - timedelta(hours=3), now=NOW))
 
 
 if __name__ == "__main__":

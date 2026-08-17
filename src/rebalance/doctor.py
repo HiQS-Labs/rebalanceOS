@@ -25,9 +25,15 @@ from rebalance.lib.time_ops import now_utc
 from rebalance import three_eyes_bridge
 from rebalance.lib.time_ops import format_timestamp, local_tz, parse_utc_iso
 
+# One status vocabulary (GH-5 PR2): the status axis and the severity axis
+# share their words. A failing check is an "error" whether you meet it in the
+# CLI, the JSON payload, or a dashboard count — never "fail" here and "error"
+# there. The two axes remain distinct FIELDS (status = does this fail the
+# reconciler's verdict; severity = how loudly a surface says it); only the
+# *vocabulary* is unified, so FAIL == ERROR and WARN == WARNING by value.
 OK = "ok"
-WARN = "warn"
-FAIL = "fail"
+WARN = "warning"
+FAIL = "error"
 
 NOTICE = "notice"
 WARNING = "warning"

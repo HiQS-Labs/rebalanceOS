@@ -595,8 +595,8 @@ def _activity_kind_meta(kind: str, sub: str) -> tuple[str, str]:
     if kind == "item" and sub == "pull_request":
         return ("info", "PR")
     if kind == "item":
-        return ("warn", "Issue")
-    return ("danger", "Comment")
+        return ("warning", "Issue")
+    return ("error", "Comment")
 
 
 def _figma_file_link(file_key: str) -> str:
@@ -1932,8 +1932,8 @@ PAGE_CSS = """
   white-space: nowrap;
 }
 .badge-ok      { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
-.badge-warn    { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
-.badge-danger  { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.badge-warning { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.badge-error   { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .badge-info    { background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--info); }
 .badge-neutral { background: color-mix(in srgb, var(--fg-dim) 14%, transparent); color: var(--fg-muted); }
 
