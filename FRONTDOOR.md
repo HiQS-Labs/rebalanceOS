@@ -44,5 +44,8 @@ These were already healthy at the audit and the board keeps them that way:
   audit (0 verified / 0 unverified). That is a separate gate — run the scanner, do not
   approximate it with grep, and never publish raw detector payloads.
 - **Human gates.** Vault path, GitHub PAT, optional Google OAuth, and Apple-Silicon
-  hardware are real requirements, not defects. The board only asserts that each is
-  *named before the step that needs it*.
+  hardware are real requirements, not defects — the board never tries to remove them.
+  It does assert *ordering*: each gate must be named inside the step that needs it
+  (Steps 2-5), and the Apple-Silicon gate must be stated before Step 1's install. That
+  is a real check, bounded per section, and it fires if a gate goes unmentioned where a
+  reader would hit it.

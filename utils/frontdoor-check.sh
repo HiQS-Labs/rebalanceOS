@@ -208,6 +208,31 @@ elif ! grep -q 'AGPL-3.0-only' LICENSE-COMMERCIAL.md; then
   report 0 "LICENSE-COMMERCIAL.md no longer references the AGPL-3.0-only default — dual-license story is inconsistent"
 fi
 
+# Human gates are named in the step that needs them. FRONTDOOR.md claims the board
+# asserts this, so it must actually do so. Each check is bounded to one step section:
+# a gate mentioned only in a distant section would still ambush the reader here.
+check_gate() {  # check_gate <step heading regex> <token regex> <label>
+  body=$(awk -v h="$1" '$0 ~ h {f=1;next} f&&/^### /{exit} f' README.md)
+  if [ -z "$body" ]; then
+    report 0 "cannot locate section '$3' — human-gate ordering not verifiable"
+  elif ! printf '%s' "$body" | grep -qEi "$2"; then
+    report 0 "$3 does not name its prerequisite before the commands that need it"
+  fi
+}
+check_gate '^### Step 2 — Ingest your vault'              'vault'            'Step 2 (vault path)'
+check_gate '^### Step 3 — Connect GitHub'                 'PAT|token'        'Step 3 (GitHub PAT)'
+check_gate '^### Step 4 — Connect Google Calendar'        'OAuth|credential' 'Step 4 (Google OAuth)'
+check_gate '^### Step 5 — Connect Gmail'                  'OAuth|credential' 'Step 5 (Gmail OAuth)'
+
+# The Apple-Silicon hardware gate must be stated before the install that depends on it.
+plat=$(grep -n '^### Supported platform & first-run network' README.md | head -1 | cut -d: -f1)
+s1=$(grep -n '^### Step 1 — Clone and install' README.md | head -1 | cut -d: -f1)
+if [ -z "$plat" ] || [ -z "$s1" ]; then
+  report 0 "cannot locate platform section or Step 1 — hardware-gate ordering not verifiable"
+elif [ "$plat" -gt "$s1" ]; then
+  report 0 "the Apple-Silicon platform gate (line $plat) is stated after Step 1 (line $s1)"
+fi
+
 pyver=$(grep -m1 -E '^version = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
 pkgver=$(grep -m1 -E '^__version__' src/rebalance/__init__.py | sed 's/.*"\(.*\)".*/\1/')
 if [ -z "$pyver" ] || [ -z "$pkgver" ]; then
