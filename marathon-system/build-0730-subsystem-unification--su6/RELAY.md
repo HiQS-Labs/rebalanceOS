@@ -1,6 +1,6 @@
 # Marathon Phase su6
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU6-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -124,3 +124,8 @@ Please update `tests/test_web_badges.py` by:
 1. Deleting `SleuthGroupBadgeTests` entirely.
 2. Removing `"_KIND_BADGE"` from the tuple in `test_badge_tables_emit_only_canonical_variants`.
 
+### Round 3 · Builder · codex
+
+- Re-checked the assigned implementation: `_render_sleuth_groups`, `_KIND_BADGE`, and the unused pulse `CSS` composite are absent; all five legacy retrieval-tool references are now `semantic_query` references.
+- The only remaining work is the reviewer-requested cleanup in `tests/test_web_badges.py`: remove `SleuthGroupBadgeTests` and the retired `_KIND_BADGE` table assertion.
+- Did not edit that test because this turn's explicit top-level containment allowlist permits only this relay plus `src/rebalance/web.py`, `scripts/pulse_web.py`, `ARCHITECTURE.md`, `AGENTS.md`, and `src/rebalance/mcp/tools/index.py`; it conflicts with the relay's broader embedded allowlist. No scoped test was run, because the applicable test is known to require that prohibited edit.
