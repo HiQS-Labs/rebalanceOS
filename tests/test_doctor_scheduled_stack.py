@@ -11,7 +11,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from rebalance import doctor
 from rebalance.doctor import OK, WARN, _check_scheduled_stack_checkout
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +32,22 @@ def _write(agents: Path, name: str, script: str) -> None:
 
 
 class ScheduledStackCheckoutTests(unittest.TestCase):
+    """The undeclared case: no runtime root on file, so this checkout is the
+    expectation.
+
+    The declaration has to be neutralised explicitly. Reading the real one
+    makes these cases pass on a machine that has never been configured and
+    fail on every machine that has — which is backwards, since a declared
+    runtime root is the configuration this feature exists to serve.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        patcher = patch.object(doctor, "RUNTIME_ROOT_FILE", Path(self._tmp.name) / "absent")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_job_in_another_clone_warns_and_names_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             agents = Path(tmp)

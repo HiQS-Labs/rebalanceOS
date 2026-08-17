@@ -10,6 +10,34 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.0] - 2026-08-17
+
+### Changed
+- **Subsystem unification: the collectors now share one implementation of each
+  foundational primitive instead of keeping private copies.** Every timestamp is
+  produced and parsed through the shared time helper, every GitHub API call goes
+  through the one authenticated client, every database write shares the same
+  persistence and connection helpers, and every git subprocess call goes through
+  a single wrapper. The behaviour operators see is unchanged; what changed is
+  that a fix to any of these now lands everywhere at once, rather than in the one
+  copy someone remembered to update.
+- **The GitHub client is now the only place an auth header is built.** Collectors
+  that previously assembled their own request headers, retry handling, and rate
+  limit checks inherit the shared client's behaviour, and a contract test pins
+  that no collector reintroduces a raw request path.
+
+### Fixed
+- **The two test suites no longer leak state into each other.** The HiQS suite
+  ran in the same process as the main suite and left resource accounting behind
+  it, which masked real failures and made results depend on the order the files
+  happened to run in. It is isolated now, so a single run reports the truth.
+
+### Removed
+- **Dead rendering code and stale documentation.** A group-rendering path and a
+  duplicated stylesheet composite that nothing called any more were deleted, and
+  the tool documentation that described behaviour the code no longer has was
+  corrected.
+
 ## [0.69.13] - 2026-08-17
 
 ### Fixed

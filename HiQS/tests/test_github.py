@@ -94,6 +94,9 @@ def test_github_failure_continues_logs_error_and_keeps_watermark(tmp_path, monke
     logged = []
     monkeypatch.setattr(github.hiqs_config, "secret", lambda _name: None)
     monkeypatch.setattr(github, "log_event", lambda *args: logged.append(args))
+    # The process peak can be elevated by work outside this source (including
+    # earlier tests); a real request failure must still be reported as error.
+    monkeypatch.setattr(github, "_peak_rss_mb", lambda: github.RSS_LIMIT_MB + 1)
 
     def fake_urlopen(request, *, timeout):
         assert timeout == github.NETWORK_TIMEOUT_SECONDS

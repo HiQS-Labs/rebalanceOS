@@ -36,14 +36,29 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
     try:
         if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
             conn.enable_load_extension(True)
-            sqlite_vec.load(conn)
-            conn.enable_load_extension(False)
+            try:
+                sqlite_vec.load(conn)
+            finally:
+                # Never leave extension loading enabled if sqlite-vec fails to
+                # load: this connection is otherwise used for the full ingest.
+                conn.enable_load_extension(False)
     except (AttributeError, Exception):
         # sqlite-vec not available on this Python build; continue without it
         pass
 
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    """Return whether *name* is present in the current SQLite database."""
+    return (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (name,),
+        ).fetchone()
+        is not None
+    )
 
 
 @contextmanager
@@ -66,6 +81,23 @@ def db_connection(
     conn = get_connection(database_path)
     if ensure_fn is not None:
         ensure_fn(conn)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def db_connection_readonly(database_path: Path) -> Generator[sqlite3.Connection, None, None]:
+    """Open an existing SQLite database in read-only mode and close it on exit.
+
+    Unlike :func:`get_connection`, this never creates the parent directory or
+    database file and does not set write-oriented pragmas.  Callers that need
+    an optional database should check for its existence before entering the
+    context; SQLite raises ``OperationalError`` for a missing read-only file.
+    """
+    conn = sqlite3.connect(f"{database_path.resolve().as_uri()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
     try:
         yield conn
     finally:

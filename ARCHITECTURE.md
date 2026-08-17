@@ -194,8 +194,8 @@ Project Registry ────▶ registry.py +              MD registry → proj
 | Source | CLI | MCP tool(s) | Daily-sync step |
 |---|---|---|---|
 | GitHub activity | `rebalance github-scan` | `github_balance` | 3 |
-| GitHub artifacts | `rebalance github-sync-artifacts`, `github-embed`, `github-query` | `query_github_context`, `github_release_readiness`, `github_close_candidates` | on demand |
-| Obsidian vault | `rebalance ingest notes`, `ingest embed`, `query`, `search` | `query_notes`, `search_vault` | 1 + 2 |
+| GitHub artifacts | `rebalance github-sync-artifacts`, `github-embed`, `github-query` | `semantic_query`, `github_release_readiness`, `github_close_candidates` | on demand |
+| Obsidian vault | `rebalance ingest notes`, `ingest embed`, `query`, `search` | `semantic_query`, `search_vault` | 1 + 2 |
 | Google Calendar | `rebalance calendar-sync`, `calendar-create-event`, `calendar-snap-edges`, `calendar-daily-report`, `calendar-weekly-report` | `create_calendar_event`, `review_timesheet`, `classify_event`, `snap_calendar_edges` | 4 |
 | Sleuth reminders | `rebalance sleuth-sync` | `sleuth_sync_reminders` | 5 |
 | Email (Gmail) | `rebalance refresh`, `semantic-backfill`, `semantic-query` | `refresh_index`, `semantic_query`, `ingest_gmail_messages` | 6 |
@@ -382,7 +382,6 @@ All consumers read from the same SQLite file. The query layer is source-agnostic
 | `semantic_query()` MCP tool | Unified raw retrieval primitive | `semantic_index.query()` — owns source vocabulary, freshness, hybrid RRF |
 | `chat_with_data()` | Citations-first interactive retrieval | `chat.py` — owns scope aliases (`work`/`code`/`all`), citation shaping; delegates retrieval to `semantic_index` |
 | `ask()` | Broad mixed-context synthesis/orchestration | `querier.py` — owns project/calendar/temporal framing; not the canonical retrieval primitive |
-| `query_notes()`, `query_github_context()` | Legacy per-source lookups | Facades over older per-source indexes; use `semantic_query()` for new work |
 
 ```
 SQLite @ $REBALANCE_DB
@@ -507,13 +506,11 @@ Tools are registered in [src/rebalance/mcp/server.py](src/rebalance/mcp/server.p
 | Category | Tool | Purpose |
 |----------|------|---------|
 | Query | `ask` | Natural language query across all sources (with optional local LLM synthesis) |
-| Query | `query_notes` | Vault semantic search (embedding-based) |
 | Query | `search_vault` | Vault keyword search (TF-IDF) |
-| Query | `query_github_context` | Semantic search over the GitHub artifact corpus (issues, PRs, comments, reviews, commits) |
 | Query | `github_balance` | Per-project GitHub activity summary |
 | Query | `github_release_readiness` | Infer milestone/release readiness from the local GitHub corpus |
 | Query | `github_close_candidates` | Suggest open issues that likely map to merged PRs |
-| Query | `semantic_query` | Unified vector search across vault + GitHub corpus (single ranked result set) |
+| Query | `semantic_query` | Unified vector search across indexed sources (single ranked result set; filter with `sources`) |
 | Diagnostics | `index_status` | Snapshot of every source + semantic index freshness (read-only) |
 | Diagnostics | `refresh_index` | Orchestrated refresh of the local knowledge base (single entry point) |
 | Diagnostics | `list_watched_repos` | Show merged set of repos being monitored (project registry ∪ activity − ignored) |

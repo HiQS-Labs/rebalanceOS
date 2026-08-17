@@ -2,6 +2,14 @@ import re
 import subprocess
 from pathlib import Path
 
+__all__ = [
+    "DEFAULT_PRUNE_DIRS",
+    "git_pull_rebase_safe",
+    "parse_github_remote_url",
+    "run_git",
+    "should_descend",
+]
+
 # remote_url forms mapped to owner/repo:
 #   https://github.com/Owner/Repo.git
 #   git@github.com:Owner/Repo.git
@@ -77,10 +85,52 @@ def should_descend(name: str, *, prune: frozenset[str] = DEFAULT_PRUNE_DIRS) -> 
     return not name.startswith(".")
 
 
+def run_git(
+    repo_path: Path,
+    *args: str,
+    timeout: float = 30.0,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``git`` in *repo_path* without raising for a non-zero exit code.
+
+    This is the single subprocess boundary for Rebalance's git operations.
+    Callers retain ownership of command-specific error handling by inspecting
+    the returned completed process; timeouts and executable failures still
+    raise their standard ``subprocess`` exceptions.
+    """
+    return subprocess.run(
+        ["git", "-C", str(repo_path), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout,
+    )
+
+
+def git_pull_rebase_safe(
+    repo_path: Path,
+    *,
+    timeout: float = 30.0,
+) -> subprocess.CompletedProcess[str]:
+    """Pull with rebase and abort a failed rebase before returning its result.
+
+    The original failed result is always returned, so the caller can report
+    its stderr/stdout.  Aborting is deliberately best-effort: it prevents a
+    conflicted rebase from leaking into a later scheduled run without masking
+    the operation that actually failed.
+    """
+    result = run_git(repo_path, "pull", "--rebase", timeout=timeout)
+    if result.returncode != 0:
+        try:
+            run_git(repo_path, "rebase", "--abort", timeout=timeout)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return result
+
+
 def _git(repo_path: Path, *args: str, timeout: float = 30.0) -> str | None:
-    """Run git in *repo_path* and return stdout. Returns None if it fails."""
+    """Compatibility helper returning stdout, or ``None`` for git failures."""
     try:
-        result = subprocess.run(["git", "-C", str(repo_path), *args], capture_output=True, text=True, timeout=timeout)
+        result = run_git(repo_path, *args, timeout=timeout)
         return result.stdout.strip() if result.returncode == 0 else None
     except subprocess.TimeoutExpired:
         return None

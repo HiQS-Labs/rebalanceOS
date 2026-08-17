@@ -13,11 +13,12 @@ import logging
 import sqlite3
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from rebalance.lib.time_ops import now_utc
+from rebalance.lib import time_ops
+from rebalance.lib.time_ops import parse_utc_iso
 from rebalance.ingest.config import (
     get_figma_file_keys,
     get_figma_token,
@@ -287,12 +288,6 @@ _SIGNAL_HEALTH_TOTAL_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _parse_status_timestamp(raw: Any) -> datetime | None:
-    from rebalance.lib.time_ops import _parse_iso as common_parse_iso
-
-    return common_parse_iso(raw, force_utc=True)
-
-
 def _vault_ingest_lag_minutes(last_modified_in_vault: Any, last_ingested_at: Any) -> float | None:
     """Minutes the ingester is behind the vault writer, clamped to >= 0.
 
@@ -300,8 +295,8 @@ def _vault_ingest_lag_minutes(last_modified_in_vault: Any, last_ingested_at: Any
     already surfaces a missing-timestamp verdict via the freshness check,
     so this stays silent rather than inventing a number.
     """
-    modified = _parse_status_timestamp(last_modified_in_vault)
-    ingested = _parse_status_timestamp(last_ingested_at)
+    modified = parse_utc_iso(last_modified_in_vault)
+    ingested = parse_utc_iso(last_ingested_at)
     if modified is None or ingested is None:
         return None
     lag = (modified - ingested).total_seconds() / 60
@@ -310,7 +305,7 @@ def _vault_ingest_lag_minutes(last_modified_in_vault: Any, last_ingested_at: Any
 
 def _minutes_since(raw_timestamp: Any, now: datetime) -> float | None:
     """Minutes between *now* and *raw_timestamp*, or None if unparseable."""
-    ts = _parse_status_timestamp(raw_timestamp)
+    ts = parse_utc_iso(raw_timestamp)
     if ts is None:
         return None
     return (now - ts).total_seconds() / 60
@@ -350,7 +345,7 @@ def _quiet_filter_description(rule: dict[str, Any]) -> str | None:
 
 
 def _derive_signal_health(sources: dict[str, dict[str, Any]]) -> dict[str, dict[str, str]]:
-    now = now_utc()
+    now = time_ops.now_utc()
     signal_health: dict[str, dict[str, str]] = {}
 
     for source_name, rule in _SIGNAL_HEALTH_RULES.items():
@@ -361,7 +356,7 @@ def _derive_signal_health(sources: dict[str, dict[str, Any]]) -> dict[str, dict[
         recent_rows = int(source_payload.get("recent_row_count_7d") or 0)
         total_rows = _source_total_rows(source_name, source_payload)
         status_entry: dict[str, str] = {"status": "ok"}
-        freshness_value = _parse_status_timestamp(source_payload.get(rule["freshness_key"]))
+        freshness_value = parse_utc_iso(source_payload.get(rule["freshness_key"]))
         stale_after = timedelta(days=int(rule["window_days"]))
 
         if freshness_value is None:
@@ -739,7 +734,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 """
             ).fetchall()
             pending_total = len(pending_rows)
-            now = now_utc()
+            now = time_ops.now_utc()
             oldest_minutes: float | None = None
             stuck_count = 0
             for row in pending_rows:
@@ -913,7 +908,7 @@ def _pushed_repos(database_path: Path, *, since_days: int = 14) -> list[str]:
 
     repos: list[str] = []
     try:
-        cutoff = (now_utc() - timedelta(days=int(since_days))).isoformat()
+        cutoff = (time_ops.now_utc() - timedelta(days=int(since_days))).isoformat()
         with db_connection(database_path) as conn:
             rows = conn.execute(
                 """
@@ -1547,7 +1542,7 @@ def _refresh_dashboard_note(
 
     markdown = build_dashboard_note_content(
         database_path,
-        target_date=date.today(),
+        target_date=time_ops.now_utc().astimezone().date(),
         since_days=since_days,
         config=CalendarConfig.load(),
     )

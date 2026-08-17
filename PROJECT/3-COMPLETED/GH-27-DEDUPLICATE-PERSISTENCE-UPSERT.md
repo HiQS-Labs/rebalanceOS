@@ -2,9 +2,9 @@
 gh_issue: 27
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/27
 title: "GH-27 Deduplicate persistence/upsert paths across collectors"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su4) as PR #40 (0.73.0)"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 doc_type: code-quality
 goal: >

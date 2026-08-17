@@ -36,7 +36,7 @@ from typing import Any, Iterator
 from rebalance.lib.time_ops import now_iso
 from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
-from rebalance.lib.git_ops import parse_github_remote_url, should_descend
+from rebalance.lib.git_ops import parse_github_remote_url, run_git, should_descend
 
 HARNESS_RELPATH = ("ask_self", "ask_self_harness.json")
 DEFAULT_MAX_DEPTH = 6
@@ -101,16 +101,8 @@ def _git_remote_full_name(repo_root: Path) -> str | None:
     block, which is frequently copied from a template repo and left stale.
     Best-effort: any git failure (no remote, not a repo) yields None.
     """
-    import subprocess
-
     try:
-        proc = subprocess.run(
-            ["git", "-C", str(repo_root), "remote", "get-url", "origin"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
+        proc = run_git(repo_root, "remote", "get-url", "origin", timeout=5)
     except Exception:  # noqa: BLE001 — git missing / hung / unreadable repo
         return None
     if proc.returncode != 0:

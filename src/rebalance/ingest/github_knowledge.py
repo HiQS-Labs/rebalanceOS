@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlencode
 import re
 
 from rebalance.lib import time_ops
@@ -25,7 +24,7 @@ from rebalance.ingest.config import get_github_ignored_repos, normalize_github_r
 from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_semantic_schema
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.db import semantic as sem
-from rebalance.ingest._http import GITHUB_API, GitHubClient, GitHubHTTPError
+from rebalance.ingest._http import GITHUB_API, GitHubClient
 from rebalance.ingest.embedder import (
     DEFAULT_MODEL as DEFAULT_EMBED_MODEL,
     EMBEDDING_DIM,
@@ -83,64 +82,6 @@ class GitHubRepoPurgeResult:
     row_counts: dict[str, int]
     total_rows: int
     deleted_rows: int
-
-
-def _github_headers(token: str) -> dict[str, str]:
-    """Delegate to the shared GitHub client.
-
-    Retained as a module-level helper because some external callers (tests,
-    experimental scripts) imported it before the shared client existed.
-    """
-    return GitHubClient(token).headers()
-
-
-def _http_get_json(url: str, token: str) -> Any:
-    """GET ``url`` as JSON; raise on non-2xx.
-
-    Thin wrapper over :class:`GitHubClient` so the legacy ``api_get`` callable
-    seam in :func:`sync_github_repo` keeps working. New code should construct
-    a client once and reuse it.
-    """
-    try:
-        return GitHubClient(token).get_json(url)
-    except GitHubHTTPError as exc:
-        # Preserve legacy RuntimeError type — tests and callers expect it.
-        raise RuntimeError(f"GitHub API request failed: {exc.status} {url}") from exc
-
-
-def _build_url(base_url: str, **params: Any) -> str:
-    cleaned = {key: value for key, value in params.items() if value not in ("", None)}
-    if not cleaned:
-        return base_url
-    return f"{base_url}?{urlencode(cleaned, doseq=True)}"
-
-
-def _paginate_list(
-    base_url: str,
-    api_get: JsonFetcher,
-    *,
-    stop_updated_before: str = "",
-    **params: Any,
-) -> list[dict[str, Any]]:
-    page = 1
-    results: list[dict[str, Any]] = []
-    while True:
-        data = api_get(_build_url(base_url, per_page=100, page=page, **params))
-        if not isinstance(data, list) or not data:
-            break
-
-        stop = False
-        for row in data:
-            updated_at = str(row.get("updated_at") or "")
-            if stop_updated_before and updated_at and updated_at < stop_updated_before:
-                stop = True
-                break
-            results.append(row)
-
-        if stop or len(data) < 100:
-            break
-        page += 1
-    return results
 
 
 def _cutoff_iso(since_days: int) -> str:
@@ -245,6 +186,142 @@ def _insert_document(
         updated_at=updated_at,
         fetched_at=fetched_at,
     )
+
+
+def _build_item_record(
+    repo_full_name: str,
+    item_type: str,
+    item: dict[str, Any],
+    *,
+    fetched_at: str,
+    reviews: list[dict[str, Any]] | None = None,
+    check_runs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Build the shared ``github_items`` record for an issue or pull request."""
+    is_pull_request = item_type == "pull_request"
+    milestone = item.get("milestone") or {}
+    reviews = reviews or []
+    check_runs = check_runs or []
+    return {
+        "repo_full_name": repo_full_name,
+        "item_type": item_type,
+        "number": int(item["number"]),
+        "node_id": item.get("node_id", ""),
+        "github_id": item.get("id"),
+        "title": item.get("title", ""),
+        "body": item.get("body", "") or "",
+        "state": item.get("state", ""),
+        "state_reason": item.get("state_reason", "") if not is_pull_request else "",
+        "author_login": (item.get("user") or {}).get("login", ""),
+        "assignees_json": _json_dumps([assignee.get("login", "") for assignee in item.get("assignees") or []]),
+        "labels_json": _json_dumps([label.get("name", "") for label in item.get("labels") or []]),
+        "milestone_number": milestone.get("number"),
+        "milestone_title": milestone.get("title", ""),
+        "is_draft": 1 if is_pull_request and item.get("draft") else 0,
+        "is_merged": 1 if is_pull_request and item.get("merged_at") else 0,
+        "base_ref": (item.get("base") or {}).get("ref", "") if is_pull_request else "",
+        "head_ref": (item.get("head") or {}).get("ref", "") if is_pull_request else "",
+        "head_sha": (item.get("head") or {}).get("sha", "") if is_pull_request else "",
+        "mergeable_state": item.get("mergeable_state", "") if is_pull_request else "",
+        "review_decision": _review_decision(reviews) if is_pull_request else "",
+        "check_status": _check_rollup(check_runs) if is_pull_request else "",
+        "requested_reviewers_json": _json_dumps(
+            [reviewer.get("login", "") for reviewer in item.get("requested_reviewers") or []]
+        )
+        if is_pull_request
+        else "[]",
+        "comments_count": item.get("comments") or 0,
+        "review_comments_count": item.get("review_comments") or 0 if is_pull_request else 0,
+        "commits_count": item.get("commits") or 0 if is_pull_request else 0,
+        "additions": item.get("additions") or 0 if is_pull_request else 0,
+        "deletions": item.get("deletions") or 0 if is_pull_request else 0,
+        "changed_files": item.get("changed_files") or 0 if is_pull_request else 0,
+        "html_url": item.get("html_url", ""),
+        "created_at": item.get("created_at"),
+        "updated_at": item.get("updated_at"),
+        "closed_at": item.get("closed_at"),
+        "merged_at": item.get("merged_at") if is_pull_request else None,
+        "fetched_at": fetched_at,
+    }
+
+
+def _upsert_item_record(conn: Any, item_record: dict[str, Any]) -> None:
+    """Clear an item's derived rows, then store its current GitHub item record."""
+    gh.delete_item_children(
+        conn,
+        item_record["repo_full_name"],
+        item_record["item_type"],
+        item_record["number"],
+    )
+    gh.upsert_item(conn, item_record)
+
+
+def _upsert_item_links(conn: Any, item_record: dict[str, Any]) -> None:
+    """Store issue references found in an issue or pull request's text."""
+    combined_text = "\n".join(filter(None, [item_record["title"], item_record["body"]]))
+    for link_kind, issue_number in _parse_links(combined_text):
+        gh.upsert_link(
+            conn,
+            (
+                item_record["repo_full_name"],
+                item_record["item_type"],
+                item_record["number"],
+                "issue",
+                issue_number,
+                link_kind,
+            ),
+        )
+
+
+def _persist_issue_comments(
+    conn: Any,
+    *,
+    repo_full_name: str,
+    item_type: str,
+    item_number: int,
+    title: str,
+    comments: list[dict[str, Any]],
+    fetched_at: str,
+) -> tuple[int, int]:
+    """Upsert issue-style comments and their non-empty document records."""
+    comments_synced = docs_built = 0
+    for comment in comments:
+        body = comment.get("body", "") or ""
+        gh.upsert_comment(
+            conn,
+            (
+                repo_full_name,
+                item_type,
+                item_number,
+                "issue_comment",
+                comment.get("id"),
+                (comment.get("user") or {}).get("login", ""),
+                comment.get("author_association", ""),
+                body,
+                "",
+                None,
+                comment.get("html_url", ""),
+                comment.get("created_at"),
+                comment.get("updated_at"),
+                fetched_at,
+            ),
+        )
+        comments_synced += 1
+        if body.strip():
+            _insert_document(
+                conn,
+                repo_full_name=repo_full_name,
+                source_type=item_type,
+                source_number=item_number,
+                doc_type="issue_comment",
+                source_key=f"{repo_full_name}:{item_type}:{item_number}:issue_comment:{comment.get('id')}",
+                title=title,
+                body=_comment_doc_text(item_type, item_number, "issue_comment", body),
+                updated_at=comment.get("updated_at") or fetched_at,
+                fetched_at=fetched_at,
+            )
+            docs_built += 1
+    return comments_synced, docs_built
 
 
 def purge_github_repo_data(
@@ -358,19 +435,26 @@ def sync_github_repo(
     start = time.monotonic()
     fetched_at = time_ops.now_iso()
     cutoff = _cutoff_iso(since_days)
-    api_get = api_get_json or (lambda url: _http_get_json(url, token))
+    client = GitHubClient(token)
+    api_get = api_get_json or client.get_json
     repo_base = f"{GITHUB_API}/repos/{repo_full_name}"
     repo_meta = api_get(repo_base)
 
-    branches = _paginate_list(f"{repo_base}/branches", api_get)
-    labels = _paginate_list(f"{repo_base}/labels", api_get)
-    milestones = _paginate_list(f"{repo_base}/milestones", api_get, state="all", sort="due_on", direction="asc")
-    releases = _paginate_list(f"{repo_base}/releases", api_get)
+    branches = client.paginate(f"{repo_base}/branches", fetch_json=api_get_json)
+    labels = client.paginate(f"{repo_base}/labels", fetch_json=api_get_json)
+    milestones = client.paginate(
+        f"{repo_base}/milestones",
+        fetch_json=api_get_json,
+        state="all",
+        sort="due_on",
+        direction="asc",
+    )
+    releases = client.paginate(f"{repo_base}/releases", fetch_json=api_get_json)
     issues = [
         row
-        for row in _paginate_list(
+        for row in client.paginate(
             f"{repo_base}/issues",
-            api_get,
+            fetch_json=api_get_json,
             state="all",
             sort="updated",
             direction="desc",
@@ -378,9 +462,9 @@ def sync_github_repo(
         )
         if "pull_request" not in row
     ]
-    pull_summaries = _paginate_list(
+    pull_summaries = client.paginate(
         f"{repo_base}/pulls",
-        api_get,
+        fetch_json=api_get_json,
         stop_updated_before=cutoff,
         state="all",
         sort="updated",
@@ -399,7 +483,7 @@ def sync_github_repo(
     issue_payloads: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
     for issue in issues:
         item_number = int(issue["number"])
-        issue_comments = _paginate_list(f"{repo_base}/issues/{item_number}/comments", api_get)
+        issue_comments = client.paginate(f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json)
         issue_payloads.append((issue, issue_comments))
 
     pr_payloads: list[
@@ -418,12 +502,12 @@ def sync_github_repo(
         if not isinstance(pr, dict):
             continue
 
-        pr_issue_comments = _paginate_list(f"{repo_base}/issues/{item_number}/comments", api_get)
-        pr_reviews = _paginate_list(f"{repo_base}/pulls/{item_number}/reviews", api_get)
-        pr_review_comments = _paginate_list(f"{repo_base}/pulls/{item_number}/comments", api_get)
-        pr_commits = _paginate_list(f"{repo_base}/pulls/{item_number}/commits", api_get)
+        pr_issue_comments = client.paginate(f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json)
+        pr_reviews = client.paginate(f"{repo_base}/pulls/{item_number}/reviews", fetch_json=api_get_json)
+        pr_review_comments = client.paginate(f"{repo_base}/pulls/{item_number}/comments", fetch_json=api_get_json)
+        pr_commits = client.paginate(f"{repo_base}/pulls/{item_number}/commits", fetch_json=api_get_json)
         check_runs_resp = api_get(
-            _build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
+            client.build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
         )
         pr_check_runs = check_runs_resp.get("check_runs", []) if isinstance(check_runs_resp, dict) else []
         pr_payloads.append((pr, pr_issue_comments, pr_reviews, pr_review_comments, pr_commits, pr_check_runs))
@@ -526,85 +610,20 @@ def sync_github_repo(
         for issue, issue_comments in issue_payloads:
             item_type = "issue"
             item_number = int(issue["number"])
-            milestone = issue.get("milestone") or {}
-            gh.delete_item_children(conn, repo_full_name, item_type, item_number)
-
-            item_record = {
-                "repo_full_name": repo_full_name,
-                "item_type": item_type,
-                "number": item_number,
-                "node_id": issue.get("node_id", ""),
-                "github_id": issue.get("id"),
-                "title": issue.get("title", ""),
-                "body": issue.get("body", "") or "",
-                "state": issue.get("state", ""),
-                "state_reason": issue.get("state_reason", ""),
-                "author_login": (issue.get("user") or {}).get("login", ""),
-                "assignees_json": _json_dumps([a.get("login", "") for a in issue.get("assignees") or []]),
-                "labels_json": _json_dumps([label.get("name", "") for label in issue.get("labels") or []]),
-                "milestone_number": milestone.get("number"),
-                "milestone_title": milestone.get("title", ""),
-                "is_draft": 0,
-                "is_merged": 0,
-                "base_ref": "",
-                "head_ref": "",
-                "head_sha": "",
-                "mergeable_state": "",
-                "review_decision": "",
-                "check_status": "",
-                "requested_reviewers_json": "[]",
-                "comments_count": issue.get("comments") or 0,
-                "review_comments_count": 0,
-                "commits_count": 0,
-                "additions": 0,
-                "deletions": 0,
-                "changed_files": 0,
-                "html_url": issue.get("html_url", ""),
-                "created_at": issue.get("created_at"),
-                "updated_at": issue.get("updated_at"),
-                "closed_at": issue.get("closed_at"),
-                "merged_at": None,
-                "fetched_at": fetched_at,
-            }
-
-            gh.upsert_item(conn, item_record)
-
-            for comment in issue_comments:
-                body = comment.get("body", "") or ""
-                gh.upsert_comment(
-                    conn,
-                    (
-                        repo_full_name,
-                        item_type,
-                        item_number,
-                        "issue_comment",
-                        comment.get("id"),
-                        (comment.get("user") or {}).get("login", ""),
-                        comment.get("author_association", ""),
-                        body,
-                        "",
-                        None,
-                        comment.get("html_url", ""),
-                        comment.get("created_at"),
-                        comment.get("updated_at"),
-                        fetched_at,
-                    ),
-                )
-                comments_synced += 1
-                if body.strip():
-                    _insert_document(
-                        conn,
-                        repo_full_name=repo_full_name,
-                        source_type=item_type,
-                        source_number=item_number,
-                        doc_type="issue_comment",
-                        source_key=f"{repo_full_name}:{item_type}:{item_number}:issue_comment:{comment.get('id')}",
-                        title=item_record["title"],
-                        body=_comment_doc_text(item_type, item_number, "issue_comment", body),
-                        updated_at=comment.get("updated_at") or fetched_at,
-                        fetched_at=fetched_at,
-                    )
-                    docs_built += 1
+            item_record = _build_item_record(repo_full_name, item_type, issue, fetched_at=fetched_at)
+            _upsert_item_record(conn, item_record)
+            _upsert_item_links(conn, item_record)
+            comment_count, comment_docs = _persist_issue_comments(
+                conn,
+                repo_full_name=repo_full_name,
+                item_type=item_type,
+                item_number=item_number,
+                title=item_record["title"],
+                comments=issue_comments,
+                fetched_at=fetched_at,
+            )
+            comments_synced += comment_count
+            docs_built += comment_docs
 
             if item_record["body"].strip():
                 _insert_document(
@@ -630,94 +649,28 @@ def sync_github_repo(
         for pr, issue_comments, reviews, review_comments, commits, check_runs in pr_payloads:
             item_type = "pull_request"
             item_number = int(pr["number"])
-            milestone = pr.get("milestone") or {}
-            gh.delete_item_children(conn, repo_full_name, item_type, item_number)
+            item_record = _build_item_record(
+                repo_full_name,
+                item_type,
+                pr,
+                fetched_at=fetched_at,
+                reviews=reviews,
+                check_runs=check_runs,
+            )
+            _upsert_item_record(conn, item_record)
+            _upsert_item_links(conn, item_record)
 
-            item_record = {
-                "repo_full_name": repo_full_name,
-                "item_type": item_type,
-                "number": item_number,
-                "node_id": pr.get("node_id", ""),
-                "github_id": pr.get("id"),
-                "title": pr.get("title", ""),
-                "body": pr.get("body", "") or "",
-                "state": pr.get("state", ""),
-                "state_reason": "",
-                "author_login": (pr.get("user") or {}).get("login", ""),
-                "assignees_json": _json_dumps([a.get("login", "") for a in pr.get("assignees") or []]),
-                "labels_json": _json_dumps([label.get("name", "") for label in pr.get("labels") or []]),
-                "milestone_number": milestone.get("number"),
-                "milestone_title": milestone.get("title", ""),
-                "is_draft": 1 if pr.get("draft") else 0,
-                "is_merged": 1 if pr.get("merged_at") else 0,
-                "base_ref": (pr.get("base") or {}).get("ref", ""),
-                "head_ref": (pr.get("head") or {}).get("ref", ""),
-                "head_sha": (pr.get("head") or {}).get("sha", ""),
-                "mergeable_state": pr.get("mergeable_state", ""),
-                "review_decision": _review_decision(reviews),
-                "check_status": _check_rollup(check_runs),
-                "requested_reviewers_json": _json_dumps(
-                    [r.get("login", "") for r in pr.get("requested_reviewers") or []]
-                ),
-                "comments_count": pr.get("comments") or 0,
-                "review_comments_count": pr.get("review_comments") or 0,
-                "commits_count": pr.get("commits") or 0,
-                "additions": pr.get("additions") or 0,
-                "deletions": pr.get("deletions") or 0,
-                "changed_files": pr.get("changed_files") or 0,
-                "html_url": pr.get("html_url", ""),
-                "created_at": pr.get("created_at"),
-                "updated_at": pr.get("updated_at"),
-                "closed_at": pr.get("closed_at"),
-                "merged_at": pr.get("merged_at"),
-                "fetched_at": fetched_at,
-            }
-
-            gh.upsert_item(conn, item_record)
-
-            combined_text = "\n".join(filter(None, [item_record["title"], item_record["body"]]))
-            for link_kind, issue_number in _parse_links(combined_text):
-                gh.upsert_link(
-                    conn,
-                    (repo_full_name, item_type, item_number, "issue", issue_number, link_kind),
-                )
-
-            for comment in issue_comments:
-                body = comment.get("body", "") or ""
-                gh.upsert_comment(
-                    conn,
-                    (
-                        repo_full_name,
-                        item_type,
-                        item_number,
-                        "issue_comment",
-                        comment.get("id"),
-                        (comment.get("user") or {}).get("login", ""),
-                        comment.get("author_association", ""),
-                        body,
-                        "",
-                        None,
-                        comment.get("html_url", ""),
-                        comment.get("created_at"),
-                        comment.get("updated_at"),
-                        fetched_at,
-                    ),
-                )
-                comments_synced += 1
-                if body.strip():
-                    _insert_document(
-                        conn,
-                        repo_full_name=repo_full_name,
-                        source_type=item_type,
-                        source_number=item_number,
-                        doc_type="issue_comment",
-                        source_key=f"{repo_full_name}:{item_type}:{item_number}:issue_comment:{comment.get('id')}",
-                        title=item_record["title"],
-                        body=_comment_doc_text(item_type, item_number, "issue_comment", body),
-                        updated_at=comment.get("updated_at") or fetched_at,
-                        fetched_at=fetched_at,
-                    )
-                    docs_built += 1
+            comment_count, comment_docs = _persist_issue_comments(
+                conn,
+                repo_full_name=repo_full_name,
+                item_type=item_type,
+                item_number=item_number,
+                title=item_record["title"],
+                comments=issue_comments,
+                fetched_at=fetched_at,
+            )
+            comments_synced += comment_count
+            docs_built += comment_docs
 
             for review in reviews:
                 body = review.get("body", "") or ""

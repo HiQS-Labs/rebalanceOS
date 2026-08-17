@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from rebalance.lib.time_ops import now_utc
+from rebalance.lib import time_ops
 from rebalance.lib.time_ops import parse_utc_iso
 
 # Mirror experimental/git-pulse/health-check.py defaults.
@@ -71,10 +71,6 @@ def _yaml_value(path: Path, key: str) -> str:
             value = value[1:-1]
         return value.replace('\\"', '"').replace("\\\\", "\\")
     return ""
-
-
-def _parse_utc(value: str) -> datetime | None:
-    return parse_utc_iso(value)
 
 
 def _int(value: str) -> int:
@@ -180,7 +176,7 @@ def read_collector_health(
     Returns ``[]`` when git-pulse is not configured or has no device YAMLs —
     callers treat that as "nothing to report". Sorted worst-first.
     """
-    now = now or now_utc()
+    now = now or time_ops.now_utc()
     sync_repo_dir = sync_repo_dir or resolve_sync_repo_dir()
     if sync_repo_dir is None:
         return []
@@ -194,7 +190,7 @@ def read_collector_health(
         health = CollectorHealth(
             device_id=device_id,
             device_name=_yaml_value(yaml_path, "device_name") or device_id,
-            last_scan_utc=_parse_utc(_yaml_value(yaml_path, "last_scan_utc")),
+            last_scan_utc=parse_utc_iso(_yaml_value(yaml_path, "last_scan_utc")),
             scan_status=_yaml_value(yaml_path, "scan_status") or "ok",
             repo_scan_failures=_int(_yaml_value(yaml_path, "repo_scan_failures")),
             scan_failure_examples=_yaml_value(yaml_path, "scan_failure_examples"),

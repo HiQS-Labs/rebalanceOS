@@ -2,9 +2,9 @@
 gh_issue: 28
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/28
 title: "GH-28 One git subprocess wrapper (4 private variants, 4 different contracts)"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su5) as PR #40 (0.73.0)"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 doc_type: code-quality
 goal: >

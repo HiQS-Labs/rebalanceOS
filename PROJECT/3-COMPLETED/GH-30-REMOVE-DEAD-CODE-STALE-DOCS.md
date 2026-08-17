@@ -2,9 +2,9 @@
 gh_issue: 30
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/30
 title: "GH-30 Remove dead code and correct stale architecture docs (ghost MCP tools)"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su6) as PR #40 (0.73.0)"
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 owner: noel
 doc_type: hygiene
 goal: >

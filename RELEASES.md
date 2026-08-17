@@ -70,12 +70,12 @@ License file: Yes
 
 Release: 0.73.0
 Iterations: 0.73.0-0.73.9
-Status: Draft
+Status: Shipped 2026-08-17
 Target Date: 2026-12-15
 Codename: Subsystem Unification
 Milestone:
-Description: Foundational test isolation and DRY infrastructure consolidation across collectors and libraries. #7 HiQS test process isolation, #25 time_ops timestamp consolidation, #26 GitHubClient routing, #27 database persistence/upsert deduplication, #28 git_ops subprocess wrapper, #30 dead code and stale doc cleanup.
-Exit: Single-process `pytest tests/ HiQS/tests/` passes with zero state leakage; zero duplicate git subprocess runners, timestamp alias wrappers, or raw GitHub auth headers remain in src/.
+Description: Foundational test isolation and DRY infrastructure consolidation across collectors and libraries. #7 HiQS test process isolation, #25 time_ops timestamp consolidation, #26 GitHubClient routing, #27 database persistence/upsert deduplication, #28 git_ops subprocess wrapper, #30 dead code and stale doc cleanup. Shipped ahead of 0.70.0-0.72.0, which remain unshipped drafts.
+Exit: PARTIALLY MET 2026-08-17 — the two suites run as separate processes with no leakage, no timestamp alias wrappers or private git runners remain in the modules each phase named, and a contract test now pins GitHub auth headers to the shared client. Not met: two collectors still shell out to git directly (coverage probing and commit backfill, the latter keeping a fifth private runner), the contract test that would have caught them was never written, and timestamp bypass sites remain outside the modules the phase scoped. Carried forward on #25 and #28.
 GH_URL:
 Front-door reviewed:
 Shakedown reviewed:

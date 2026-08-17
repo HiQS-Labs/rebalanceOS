@@ -344,10 +344,14 @@ def fetch(connection: Any, config: Mapping[str, Any]) -> SyncReport:
 
     peak_rss_mb = _peak_rss_mb()
     meta = {"api_calls": api_calls[0], "peak_rss_mb": peak_rss_mb}
-    if api_calls[0] > API_CALL_LIMIT or peak_rss_mb > RSS_LIMIT_MB:
-        _record("warn", meta)
-    elif errors:
+    # ``ru_maxrss`` is a process-wide high-water mark, so unrelated prior
+    # work can leave it above the guard for this otherwise small sync.  A
+    # request failure remains the actionable outcome and must not be masked by
+    # that ambient process state.
+    if errors:
         _record("error", {"failed_units": len(errors)})
+    elif api_calls[0] > API_CALL_LIMIT or peak_rss_mb > RSS_LIMIT_MB:
+        _record("warn", meta)
     else:
         _record("ok", meta)
 

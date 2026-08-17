@@ -31,6 +31,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from rebalance.lib import time_ops
 from rebalance.lib.time_ops import parse_date, parse_utc_iso
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,6 @@ def _fetch_raw(token: str, hard_cap: int = 300, timeout: float = 8.0) -> list[di
         if not cursor:
             break
     return out
-
-
-def _parse_ts(ts: str | None) -> dt.datetime | None:
-    return parse_utc_iso(ts)
 
 
 def normalize(s: dict) -> dict[str, Any]:
@@ -203,7 +200,7 @@ def _gh_pr_for_branch(repo: str, branch: str) -> Any:
 
 def sessions_for_day(day: dt.date | None = None, *, with_pr: bool = True) -> list[dict]:
     """Normalized cloud-session rows created on ``day`` (local). [] on any failure."""
-    day = day or dt.date.today()
+    day = day or time_ops.now_utc().astimezone().date()
     token = _get_token()
     if not token:
         logger.info("claude_cloud: no subscription OAuth token; signal unavailable")
@@ -219,7 +216,7 @@ def sessions_for_day(day: dt.date | None = None, *, with_pr: bool = True) -> lis
     rows = []
     for s in raw:
         r = normalize(s)
-        d = _parse_ts(r["created_at"])
+        d = parse_utc_iso(r["created_at"])
         if d and d.astimezone().date() == day:
             rows.append(r)
     if with_pr:

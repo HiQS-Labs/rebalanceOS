@@ -75,8 +75,6 @@ from rebalance.ingest.index_ops import COLLECTORS, get_index_status  # noqa: E40
 from rebalance.ingest import next_actions  # noqa: E402
 from rebalance.ingest.slack_users import compact_sleuth_reminder  # noqa: E402
 from rebalance.web_components import (  # noqa: E402
-    RB_CHROME_CSS,
-    RB_TOKENS_CSS,
     badge_html,
     button_link,
     data_row,
@@ -2401,14 +2399,6 @@ PAGE_CSS = """
 .health-pill.metric:not(.has-issues) .health-dot { background: var(--fg-dim); animation: none; }
 .health-pill.metric:not(.has-issues) { color: var(--fg-dim); }
 """
-
-# Full page stylesheet, single-sourced: shared tokens + shared chrome (incl. the
-# base resets) by reference, then this page's local rules. Same bytes the old
-# inline literal produced; render_shell() composes the live <style> the same way
-# (it appends RB_BUTTON_CSS after page_css), so this constant is the documented
-# whole and the assembler is the live path.
-CSS = RB_TOKENS_CSS + RB_CHROME_CSS + PAGE_CSS
-
 
 PULSE_JS = r"""
 (() => {
