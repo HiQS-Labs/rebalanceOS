@@ -180,13 +180,40 @@ else
 fi
 
 # --- kept-green regression guards --------------------------------------------
-for f in LICENSE LICENSE-COMMERCIAL.md; do
-  [ -f "$f" ] || report 0 "missing $f"
-done
+# FRONTDOOR.md promises these stay true, so each one is asserted here. A promise in
+# the doc with no check behind it is the same silent-pass problem as an unguarded
+# drift check — the board would read green while the contract quietly broke.
+
+# README is the canonical root entry point and points at the tracked /welcome skill.
+if [ ! -f README.md ]; then
+  report 0 "README.md missing — the canonical root entry point is gone"
+else
+  grep -q '/welcome' README.md \
+    || report 0 "README.md no longer points at the /welcome skill"
+  git ls-files --error-unmatch .claude/skills/welcome/SKILL.md >/dev/null 2>&1 \
+    || report 0 "README points at /welcome but .claude/skills/welcome/SKILL.md is not tracked"
+fi
+
+# Both licenses present AND still the licenses they claim to be. Presence alone would
+# let either file be replaced with unrelated content and still produce an empty board.
+if [ ! -f LICENSE ]; then
+  report 0 "missing LICENSE"
+elif ! grep -q 'GNU AFFERO GENERAL PUBLIC LICENSE' LICENSE; then
+  report 0 "LICENSE is no longer the AGPL — README and ARCHITECTURE both declare AGPL-3.0-only"
+fi
+
+if [ ! -f LICENSE-COMMERCIAL.md ]; then
+  report 0 "missing LICENSE-COMMERCIAL.md"
+elif ! grep -q 'AGPL-3.0-only' LICENSE-COMMERCIAL.md; then
+  report 0 "LICENSE-COMMERCIAL.md no longer references the AGPL-3.0-only default — dual-license story is inconsistent"
+fi
 
 pyver=$(grep -m1 -E '^version = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
 pkgver=$(grep -m1 -E '^__version__' src/rebalance/__init__.py | sed 's/.*"\(.*\)".*/\1/')
-[ "$pyver" = "$pkgver" ] \
-  || report 0 "pyproject version ($pyver) != package __version__ ($pkgver)"
+if [ -z "$pyver" ] || [ -z "$pkgver" ]; then
+  report 0 "could not read pyproject version ('$pyver') or package __version__ ('$pkgver') — check not verifiable"
+elif [ "$pyver" != "$pkgver" ]; then
+  report 0 "pyproject version ($pyver) != package __version__ ($pkgver)"
+fi
 
 exit "$fired"
