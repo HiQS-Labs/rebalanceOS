@@ -261,10 +261,15 @@ def embed_chunks(
 
         # Find chunks needing embedding
         if force_reembed:
+            rows = conn.execute("SELECT id, body FROM chunks").fetchall()
+            if rows:
+                # Make sure the model actually loads (GH-42 review: mlx/Metal
+                # unavailability must not destroy existing embeddings) before
+                # clearing them — this call is cheap once cached below.
+                _load_model(model_name)
             # Clear all embeddings and re-embed everything
             conn.execute("DELETE FROM embeddings")
             conn.commit()
-            rows = conn.execute("SELECT id, body FROM chunks").fetchall()
         else:
             # Only embed chunks not already in the embeddings table
             rows = conn.execute("""

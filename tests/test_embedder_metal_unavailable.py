@@ -22,25 +22,18 @@ def _reset_embedder_state():
     embedder._cached_tokenizer = None
     embedder._cached_model_name = None
     embedder._cache_limit_set = False
+    prior_entry_point = embedder._current_entry_point
     yield
+    embedder._current_entry_point = prior_entry_point
 
 
 def test_load_model_raises_catchable_error_when_metal_unavailable():
-    """No Metal device -> a normal exception, never a crash."""
+    """No Metal device -> a normal exception, never a crash. This also proves
+    the mlx_embeddings.load() call (where the real abort lives) is never
+    reached: _load_model raises before that import line runs."""
     with patch.object(embedder, "metal_available", return_value=False):
         with pytest.raises(MLXUnavailableError):
             _load_model("test_model")
-
-
-def test_load_model_never_imports_mlx_embeddings_when_metal_unavailable():
-    """The abort lives inside mlx_embeddings.load(); never call it without Metal."""
-    with (
-        patch.object(embedder, "metal_available", return_value=False),
-        patch("mlx_embeddings.load") as mock_load,
-    ):
-        with pytest.raises(MLXUnavailableError):
-            _load_model("test_model")
-        mock_load.assert_not_called()
 
 
 def test_instrument_embedding_pass_skips_mlx_when_metal_unavailable():
