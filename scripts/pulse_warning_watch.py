@@ -35,6 +35,8 @@ from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+
+import _bootstrap  # noqa: F401 — puts src/ on sys.path for rebalance.* imports
 from rebalance.lib.time_ops import now_utc
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

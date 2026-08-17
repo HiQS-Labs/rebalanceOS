@@ -59,6 +59,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+import _bootstrap  # noqa: F401 — puts src/ on sys.path for rebalance.* imports
 from rebalance.lib.time_ops import now_utc
 
 # Schema version for machine consumers. Bump when the JSON shape changes
