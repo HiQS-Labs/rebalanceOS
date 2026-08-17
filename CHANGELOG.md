@@ -10,6 +10,27 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.3] - 2026-08-16
+
+### Added
+- Health check gains a machine-readable mode that reports the reconciled verdict and,
+  for every check, why it counted, was muted, or was hidden — a binary pass/fail is now
+  fully diagnosable from one command (GH-5).
+- Fresh installs are no longer scolded for integrations they never enabled: an
+  unconfigured optional source is a clean skip, while a configured source with no data
+  is a real error (GH-5).
+
+### Changed
+- The health check's exit code now derives from the same reconciled verdict every
+  dashboard renders, instead of a raw scan that bypassed suppression and demotion —
+  the CLI and the dashboards can no longer disagree about overall health (GH-5).
+- Health is graded device-first: a problem on another machine in the fleet stays
+  visible as a warning but can no longer fail the health check of the machine being
+  looked at; only local problems do (GH-5).
+- Fleet rows are named for their scope (`fleet:<device>`), and a stale upstream
+  export is reported as its own clearly-worded finding that a routine local re-read
+  can no longer hide (GH-5).
+
 ## [0.69.2] - 2026-08-15
 
 ### Changed
