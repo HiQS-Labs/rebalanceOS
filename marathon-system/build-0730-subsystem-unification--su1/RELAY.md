@@ -1,6 +1,6 @@
 # Marathon Phase su1
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU1-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -79,3 +79,10 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Touched `HiQS/hiqs/sources/github.py` and `HiQS/tests/test_github.py`.
+- Diagnosed the cross-suite behavior as the process-wide `ru_maxrss` high-water mark: prior test work can exceed the RSS guard and mask a real fetch failure as `warn`.
+- Made request failures take precedence over resource warnings, and added a regression seam that simulates an elevated ambient peak RSS while a repo request fails.
+- Verified: `pytest HiQS/tests/test_github.py -q` (3 passed).
