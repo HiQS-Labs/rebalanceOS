@@ -78,6 +78,17 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(out["committed_at"], "2026-08-15T10:00:00Z")
         self.assertEqual(out["message_first_line"], "first line")
 
+    def test_commit_probe_survives_an_empty_commit_message(self) -> None:
+        """git allows empty messages; ''.splitlines() is [] and indexing it
+        crashed the probe (agy review Blocker, pre-existing)."""
+        fake = _client_cls(
+            result={"sha": "abc123", "commit": {"message": "", "committer": {}}}
+        )
+        with patch.object(diagnose, "GitHubClient", fake):
+            out = diagnose._live_probe_commit("someone/repo", "abc123", "tok")
+        self.assertTrue(out["exists"])
+        self.assertEqual(out["message_first_line"], "")
+
     def test_pr_probe_shape(self) -> None:
         fake = _client_cls(result={"state": "open", "merged": False, "updated_at": "t", "title": "T"})
         with patch.object(diagnose, "GitHubClient", fake):

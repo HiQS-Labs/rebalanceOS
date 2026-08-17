@@ -77,11 +77,14 @@ def _live_probe_commit(repo: str, sha: str, token: str) -> dict[str, Any]:
         return _probe_failure("exists", exc)
     commit = data.get("commit") or {}
     committer = commit.get("committer") or {}
+    # (... or [""]): an empty commit message is legal in git, and
+    # "".splitlines() is [] — indexing it would crash the probe (agy review,
+    # pre-existing in the hand-rolled version too).
     return {
         "exists": True,
         "sha": data.get("sha"),
         "committed_at": committer.get("date"),
-        "message_first_line": (commit.get("message") or "").splitlines()[0][:200],
+        "message_first_line": ((commit.get("message") or "").splitlines() or [""])[0][:200],
     }
 
 
