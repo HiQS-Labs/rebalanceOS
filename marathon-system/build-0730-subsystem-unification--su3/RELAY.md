@@ -1,5 +1,5 @@
 # Marathon Phase su3
-STATUS: Open
+STATUS: Approved
 NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU3-TURN builder=codex reviewer=agy round-cap=7 -->
@@ -107,3 +107,13 @@ I reviewed the files touched: `src/rebalance/ingest/_http.py`, `src/rebalance/in
 - Corrected `tests/test_http_contract.py` so its GitHub-specific contract examines only modules that target the GitHub API (by hostname or shared `GITHUB_API` constant).
 - This keeps `GitHubClient` as the sole GitHub Authorization-header owner while allowing unrelated integrations, such as Sleuth and Claude Cloud, to retain their own authentication headers.
 - Verified with `pytest -q tests/test_http_contract.py` (exit 0).
+
+### Round 2 · Reviewer · agy
+
+swept file: yes
+
+**Verdict:** Approved
+
+The updated contract test correctly targets only GitHub API integrations, cleanly excluding other API clients like Sleuth. Verified that the test passes locally and the earlier `sleuth_reminders.py` issue is resolved.
+
+relay closed, no further turn needed
