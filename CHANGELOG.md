@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.10] - 2026-08-17
+
+### Changed
+- Operator-facing wording now names the device heartbeat system by what it does —
+  "fleet check-in" — instead of by its transport ("git-pulse"). The transport name
+  remains in code internals, job labels, and paths, and appears in parentheses only
+  where debugging needs the handle. A naming rule in the agent guidelines makes
+  this the standing convention: function over transport, for every subsystem.
+
 ## [0.69.9] - 2026-08-16
 
 ### Added

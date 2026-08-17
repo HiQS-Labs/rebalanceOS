@@ -99,7 +99,9 @@ def reset_cmd(
         + ("" if include_keyring else "  [kept — pass --include-keyring to delete]")
     )
     typer.echo("  vault: untouched (registry markdown and projects.yaml stay where they are)")
-    typer.echo("  note: com.user.* utility agents (git-pulse, stickies) have their own installers and are not touched")
+    typer.echo(
+        "  note: com.user.* utility agents (the fleet check-in collector [git-pulse], stickies) have their own installers and are not touched"
+    )
 
     if not force:
         return

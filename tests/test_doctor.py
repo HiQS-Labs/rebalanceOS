@@ -418,7 +418,7 @@ class DiagnosticsIndexTests(unittest.TestCase):
         checks = _diagnostics_index()
         names = {c.name for c in checks}
         # The map always includes the static surfaces.
-        self.assertIn("diagnostics: git-pulse", names)
+        self.assertIn("diagnostics: fleet check-in", names)
         self.assertIn("diagnostics: repo probes", names)
         self.assertIn("diagnostics: health reporter", names)
         # All informational — never gate exit status.
@@ -431,7 +431,7 @@ class DiagnosticsIndexTests(unittest.TestCase):
         ):
             checks = _diagnostics_index()
         # auth-log row is skipped on error, but the static surfaces remain.
-        self.assertTrue(any(c.name == "diagnostics: git-pulse" for c in checks))
+        self.assertTrue(any(c.name == "diagnostics: fleet check-in" for c in checks))
 
 
 if __name__ == "__main__":

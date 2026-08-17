@@ -86,6 +86,22 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 - General workflow: 1-2 step ad-hoc requests to direct implementation. If 4-5 steps with multiple phases, write project MD file first.
 - Slight pushback OK if security/maintainability/destructive risk ahead.
 
+### Operator-facing naming: function over transport
+
+When naming a subsystem in anything an operator reads (doctor output, dashboard
+text, chat replies, issue titles, docs), use the **functional** name; keep the
+implementation/transport name for code internals, launchd labels, and file
+paths, mentioning it only in parentheses when debugging needs the handle.
+
+| Function (operator-facing) | Transport / implementation (internals only) |
+|---|---|
+| **fleet check-in** — this device scanning its repos and reporting its heartbeat to the fleet | `git-pulse` (`com.user.git-pulse`, `experimental/git-pulse/`, the git-based sync repo) |
+| **fleet rollup** (`fleet:*` doctor checks) — reading every device's check-in health | `pulse_health` / pulse collector YAMLs |
+
+Say "the fleet check-in on this device", not "the git-pulse job" — the transport
+may change; the function won't. New subsystems follow the same rule: pick the
+operator name from what it does, never from how it ships.
+
 ## UI Design
 
 - Layout follows the user's decision sequence, not the system's data structure.
