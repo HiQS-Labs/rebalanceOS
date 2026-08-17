@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 # --- repo imports (canonical read paths, same as MCP server / querier) --------
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.ingest.registry import get_projects
 from rebalance.ingest.github_scan import get_github_balance
@@ -50,7 +51,7 @@ def _resolve_db_path() -> Path:
 
 
 def _now_local() -> datetime:
-    return datetime.now(timezone.utc).astimezone()
+    return now_utc().astimezone()
 
 
 def _parse_iso(value: str | None) -> datetime | None:

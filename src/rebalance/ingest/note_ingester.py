@@ -22,6 +22,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
+from rebalance.lib import time_ops
 from rebalance.ingest.db import db_connection, ensure_schema, ensure_semantic_schema
 from rebalance.ingest.md_parser import parse_note
 from rebalance.ingest.semantic_index import sync_vault_documents
@@ -201,7 +202,7 @@ def ingest_vault(
 
             # Insert file
             stat = file_path.stat()
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = time_ops.now_iso()
             mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
 
             conn.execute(

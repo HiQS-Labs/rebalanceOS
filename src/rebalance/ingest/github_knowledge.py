@@ -14,12 +14,13 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlencode
 import re
 
+from rebalance.lib import time_ops
 from rebalance.ingest.config import get_github_ignored_repos, normalize_github_repo_name
 from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_semantic_schema
 from rebalance.ingest.db import github as gh
@@ -142,7 +143,7 @@ def _paginate_list(
 
 
 def _cutoff_iso(since_days: int) -> str:
-    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    cutoff = time_ops.now_utc() - timedelta(days=since_days)
     return cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -363,7 +364,7 @@ def sync_github_repo(
         raise ValueError(f"GitHub repo is ignored: {normalized_repo}")
 
     start = time.monotonic()
-    fetched_at = datetime.now(timezone.utc).isoformat()
+    fetched_at = time_ops.now_iso()
     cutoff = _cutoff_iso(since_days)
     api_get = api_get_json or (lambda url: _http_get_json(url, token))
     repo_base = f"{GITHUB_API}/repos/{repo_full_name}"
@@ -973,7 +974,7 @@ def embed_github_documents(
                 embedded += 1
             conn.commit()
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = time_ops.now_iso()
         for key, value in [
             ("model_name", model_name),
             ("embedding_dim", str(EMBEDDING_DIM)),

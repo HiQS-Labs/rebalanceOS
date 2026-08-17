@@ -10,6 +10,17 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.6] - 2026-08-16
+
+### Changed
+- All clock reads in the product code now go through the shared time library instead of
+  calling the system clock directly (~100 call sites). Behavior-identical output; the shared
+  reads carry a test-time freeze seam, so time-dependent behavior is now testable everywhere
+  rather than only where a seam already happened to exist. Recovered from the retiring
+  repository's stranded work and re-derived against this tree. A guard test now fails loudly
+  on any new raw clock read; the standalone sub-packages are exempt by design (they must not
+  import the main library).
+
 ## [0.69.5] - 2026-08-16
 
 ### Added

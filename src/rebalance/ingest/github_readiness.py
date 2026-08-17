@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.lib.time_ops import parse_utc_iso
 
@@ -71,7 +71,7 @@ def _days_until(iso_date: str) -> int | None:
     target = parse_utc_iso(iso_date)
     if not target:
         return None
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     return (target.date() - now.date()).days
 
 

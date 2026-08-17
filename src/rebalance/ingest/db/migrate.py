@@ -15,9 +15,9 @@ See ``db/migrations/README.md`` for the authoring discipline.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
 from pathlib import Path
 
+from rebalance.lib.time_ops import now_iso
 from rebalance.ingest.db.schema import (
     BASELINE_SCHEMA_VERSION,
     ensure_baseline_schema,
@@ -55,7 +55,7 @@ def discover_migrations() -> list[tuple[int, Path]]:
 def _stamp(conn: sqlite3.Connection, version: int) -> None:
     conn.execute(
         "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
-        (version, datetime.now(timezone.utc).isoformat()),
+        (version, now_iso()),
     )
 
 

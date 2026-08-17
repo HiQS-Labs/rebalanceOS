@@ -7,10 +7,10 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from rebalance.lib import time_ops
 from rebalance.ingest.config import get_github_ignored_repos, normalize_github_repo_name
 from rebalance.ingest.db import (
     db_connection,
@@ -689,7 +689,7 @@ def embed_pending(
             batch = rows[i:i + batch_size]
             texts = [row["body"][:4000] for row in batch]
             vectors = embed_fn(texts, model_name)
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = time_ops.now_iso()
             for row, vec in zip(batch, vectors):
                 sem.delete_semantic_embedding(conn, row["id"])
                 sem.insert_semantic_embedding(conn, row["id"], _vec_to_bytes(vec))
@@ -699,7 +699,7 @@ def embed_pending(
                 embedded += 1
             conn.commit()
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = time_ops.now_iso()
         for key, value in [
             ("model_name", model_name),
             ("embedding_dim", str(EMBEDDING_DIM)),
