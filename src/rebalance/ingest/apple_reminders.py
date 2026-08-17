@@ -447,7 +447,9 @@ def extract_reminders(
     for row in rows:
         keys = row.keys()
 
-        def col(name: str) -> Any:
+        def col(name: str, *, row=row, keys=keys) -> Any:
+            # Default-bound: the closure is only called within this iteration,
+            # but binding makes that true by construction (ruff B023).
             return row[name] if name in keys else None
 
         if col("ZMARKEDFORDELETION"):

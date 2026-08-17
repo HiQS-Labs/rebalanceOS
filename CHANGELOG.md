@@ -10,6 +10,24 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.5] - 2026-08-16
+
+### Added
+- Lint gate (ruff) in the dev toolchain and CI, recovered from the retiring repository's
+  stranded work and re-baselined against this tree. The rule set favors real-bug classes
+  (undefined names, unused code, error-prone constructs) with the long-line backlog
+  deliberately deferred.
+
+### Fixed
+- **Commit-backfill error path no longer crashes.** When enumerating a repo's history
+  failed, the error handler referenced an undefined name, so instead of recording the
+  repo as uncoverable it raised — turning a reported failure into silence, the exact
+  outcome that module exists to prevent. Surfaced by the new lint baseline; pinned by a
+  regression test.
+- A latent undefined-name annotation in the health check's read-only database helper.
+- Assorted dead assignments, ambiguous single-letter names, and statement-per-line
+  cleanups across the tree — behavior-preserving, verified by the full suite.
+
 ## [0.69.4] - 2026-08-16
 
 ### Fixed
