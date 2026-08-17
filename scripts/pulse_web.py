@@ -61,20 +61,19 @@ from dashboard import (  # type: ignore  # noqa: E402
 )
 from rebalance.doctor import FAIL, WARN, Check, run_doctor  # noqa: E402
 from rebalance.health import HealthStatus, compute_health_status  # noqa: E402
-from rebalance.ingest.apple_reminders import list_apple_reminders  # noqa: E402
 from rebalance.ingest.config import get_figma_file_keys  # noqa: E402
 from rebalance.ingest.goals_file import (  # noqa: E402
-    CHECKBOX_RE,
-    complete_goal_in_file,
+    # complete/undo are re-exports: pulse_server imports them FROM pulse_web
+    # (ruff F401 once deleted them and broke pulse_server's import — GH-5 Phase R).
+    complete_goal_in_file,  # noqa: F401
     goal_completion_still_applied as _goal_completion_still_applied,
     parse_goals,
-    undo_goal_completion_in_file,
+    undo_goal_completion_in_file,  # noqa: F401
 )
 from rebalance.ingest.index_ops import COLLECTORS, get_index_status  # noqa: E402
 from rebalance.ingest import next_actions  # noqa: E402
 from rebalance.ingest.slack_users import compact_sleuth_reminder  # noqa: E402
 from rebalance.web_components import (  # noqa: E402
-    RB_BUTTON_CSS,
     RB_CHROME_CSS,
     RB_TOKENS_CSS,
     badge_html,
@@ -351,7 +350,7 @@ def _health_banner_copy_text(
     activity_text: str,
 ) -> str:
     lines = [
-        f"Attention needed",
+        "Attention needed",
         f"Status: {status_text}",
         f"Last data ingest: {activity_text}",
     ]
@@ -556,7 +555,7 @@ def _linkify(text: str) -> str:
 
 def _join_row_bits(bits: Iterable[str]) -> str:
     parts = [str(bit) for bit in bits if bit]
-    return f' <span class="rb-data-row-sep">·</span> '.join(parts)
+    return ' <span class="rb-data-row-sep">·</span> '.join(parts)
 
 
 def _subsection_label(label: str, *, count: int | None = None, extra_class: str = "") -> str:
@@ -1088,7 +1087,6 @@ def render_open_prs(rows: list[dict[str, Any]], now: datetime) -> str:
 
         title = _truncate(pr["title"], 72)
         url = _esc(pr["html_url"])
-        repo = _esc(pr["repo_full_name"].split("/")[-1])  # short repo name
         num = pr["number"]
         author = _esc(pr["author_login"] or "")
 
@@ -1229,7 +1227,7 @@ def render_recent_emails(
     stored_total: int,
 ) -> str:
     if not rows:
-        return f"""
+        return """
     <section class="card recent-emails">
       <header class="card-head">
         <h2>Recent email</h2>
@@ -1240,7 +1238,7 @@ def render_recent_emails(
     """
 
     items = []
-    for idx, row in enumerate(rows):
+    for _idx, row in enumerate(rows):
         sender = _normalize_html_text(row.get("from_name") or "") or _normalize_html_text(row.get("from_address") or "") or "unknown sender"
         subject = _normalize_html_text(row.get("subject") or "") or "(no subject)"
         snippet = _truncate(_normalize_html_text(row.get("snippet") or ""), 180)

@@ -146,8 +146,8 @@ def _stub_digest(corpus: str) -> dict:
     for weeks was that nothing ever ran it, and a stub that diverges from the real
     thing just relocates that problem.
     """
-    lines = [l for l in corpus.splitlines() if l.startswith("- ")]
-    failing = [l for l in lines if "FAIL" in l]
+    lines = [line for line in corpus.splitlines() if line.startswith("- ")]
+    failing = [line for line in lines if "FAIL" in line]
     severity = "error" if failing else ("warn" if lines else "info")
     head = (failing or lines or ["nothing notable"])[0].lstrip("- ").strip()
     return {

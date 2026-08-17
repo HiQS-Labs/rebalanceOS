@@ -12,6 +12,25 @@ on:
     branches: [main, development]
 
 jobs:
+  # Recovered from the retiring repo's stranded PR queue (GH-5 Phase R, old
+  # PR #302 / GH-298): the same lint gate, with the baseline resolved against
+  # THIS tree. Two real bugs surfaced by the ruff baseline: an F821 NameError
+  # in the commit-backfill error path (the error handler itself crashed) and a
+  # latent F821 annotation in doctor.py.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint
+        run: ruff check .
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10

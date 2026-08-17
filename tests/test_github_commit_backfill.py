@@ -324,6 +324,29 @@ class GitCommitBackfillTests(unittest.TestCase):
         self.assertEqual(result.commits_seen, 1)
         self.assertTrue(any("capped" in w for w in result.warnings))
 
+    # -- the error path must not itself crash --
+
+    def test_failed_git_log_reports_uncoverable_without_crashing(self):
+        """GH-5 Phase R (old-repo #302): the git-log failure branch referenced
+        an undefined name (`ref`), so the error handler raised NameError
+        instead of recording the uncoverable state. Red pre-fix."""
+        from unittest.mock import patch
+
+        from rebalance.ingest import github_commit_backfill as mod
+
+        real_git = mod._git
+
+        def failing_log(path, *args):
+            if args and args[0] == "log":
+                return 1, "", "boom"
+            return real_git(path, *args)
+
+        with patch.object(mod, "_git", side_effect=failing_log):
+            result = self._run()
+        self.assertEqual(result.state, "uncoverable")
+        self.assertIn("git log failed on", result.reason)
+        self.assertIn("boom", result.reason)
+
 
 if __name__ == "__main__":
     unittest.main()

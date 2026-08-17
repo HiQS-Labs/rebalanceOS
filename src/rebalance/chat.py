@@ -25,7 +25,10 @@ SCOPES = ("all", "work", "code")
 
 from rebalance.paths import resolve_project_root
 from rebalance.ingest.semantic_index import (  # noqa: E402
-    WORK_SOURCES,
+    # Re-export contract: test_retrieval_contracts pins chat.WORK_SOURCES IS
+    # semantic_index.WORK_SOURCES (one source-scope definition). ruff F401
+    # once deleted it as unused (GH-5 Phase R).
+    WORK_SOURCES,  # noqa: F401
     scope_to_sources as _semantic_sources_for_scope,
 )
 _REPO_ROOT = resolve_project_root(Path(__file__))
