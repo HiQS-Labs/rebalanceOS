@@ -23,10 +23,14 @@ report() { echo "FRONTDOOR[$1] $2"; fired=1; }
 # historical ledgers. An entry that said `cd rebalance-OS` in 2025 was CORRECT then, and
 # rewriting it would falsify the record to satisfy a linter. Only live instructions —
 # things a reader today would copy and run — are in scope.
+#
+# FRONTDOOR.md is excluded because it documents this very pattern in order to explain
+# the check; a linter does not lint its own ruleset.
 while IFS= read -r hit; do
   [ -n "$hit" ] && report 1 "stale clone dir: $hit"
 done < <(git grep -nE 'cd rebalance-OS|to/rebalance-OS' -- '*.md' \
-           ':(exclude)CHANGELOG.md' ':(exclude)ROADMAP.md' ':(exclude)PROJECT/**' 2>/dev/null)
+           ':(exclude)CHANGELOG.md' ':(exclude)ROADMAP.md' ':(exclude)PROJECT/**' \
+           ':(exclude)FRONTDOOR.md' 2>/dev/null)
 
 # --- 2. Code Intelligence over-promise ---------------------------------------
 # The ask_self index is gitignored and the harness embeds via Gemini, so a fresh clone
@@ -41,8 +45,14 @@ fi
 
 # --- 3. manifest.json drift ---------------------------------------------------
 if [ -f manifest.json ]; then
-  drift=$(python3 - <<'PY' 2>/dev/null
-import json, re, pathlib, sys
+  # NOTE: stderr is deliberately NOT suppressed and the exit status is checked.
+  # An earlier version swallowed both, so a crashed extractor produced empty output
+  # and read as a PASS — a check whose whole job is catching drift silently
+  # certifying that there is none. Extraction problems are now reported failures.
+  drift=$(python3 - <<'PY'
+import ast, json, pathlib, re, sys
+
+fail = []
 
 try:
     man = json.load(open("manifest.json"))
@@ -50,28 +60,65 @@ except Exception as exc:
     print(f"manifest.json does not parse: {exc}")
     sys.exit(0)
 
-pyproject = pathlib.Path("pyproject.toml").read_text()
+try:
+    pyproject = pathlib.Path("pyproject.toml").read_text()
+except OSError as exc:
+    print(f"cannot read pyproject.toml: {exc}")
+    sys.exit(0)
+
 m = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.M)
-want = m.group(1) if m else None
-if want and man.get("version") != want:
-    print(f"version {man.get('version')} != pyproject {want}")
+if not m:
+    print("cannot find version in pyproject.toml — check cannot verify manifest version")
+elif man.get("version") != m.group(1):
+    print(f"version {man.get('version')} != pyproject {m.group(1)}")
 
 url = (man.get("repository") or {}).get("url", "")
 if "HiQS-Suite/rebalanceOS" not in url:
     print(f"repository url is not HiQS-Suite/rebalanceOS: {url}")
 
-pat = re.compile(r'@mcp\.tool\(\)\s*\n\s*(?:async\s+)?def\s+(\w+)\s*\(.*?\)\s*->.*?:', re.S)
-code = set()
-for f in pathlib.Path("src/rebalance/mcp/tools").glob("*.py"):
-    code |= set(pat.findall(f.read_text()))
-listed = {t.get("name") for t in man.get("tools", [])}
-if code:
+
+def is_mcp_tool(dec):
+    """Match a @mcp.tool() / @mcp.tool decorator via the AST, not source formatting."""
+    node = dec.func if isinstance(dec, ast.Call) else dec
+    return isinstance(node, ast.Attribute) and node.attr == "tool"
+
+
+tools_dir = pathlib.Path("src/rebalance/mcp/tools")
+if not tools_dir.is_dir():
+    print(f"tool source dir missing: {tools_dir} — cannot verify the tool surface")
+    sys.exit(0)
+
+code, scanned = set(), 0
+for f in sorted(tools_dir.glob("*.py")):
+    try:
+        tree = ast.parse(f.read_text())
+    except SyntaxError as exc:
+        print(f"cannot parse {f}: {exc} — tool surface not verifiable")
+        continue
+    scanned += 1
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if any(is_mcp_tool(d) for d in node.decorator_list):
+                code.add(node.name)
+
+# An empty extraction is a BROKEN CHECK, never a pass.
+if scanned == 0:
+    print(f"no python files scanned under {tools_dir} — tool surface not verifiable")
+elif not code:
+    print(f"extracted 0 @mcp.tool() registrations from {scanned} file(s) — "
+          "extractor is broken or the registration idiom changed")
+else:
+    listed = {t.get("name") for t in man.get("tools", [])}
     for name in sorted(listed - code):
         print(f"manifest lists unregistered tool: {name}")
     for name in sorted(code - listed):
         print(f"registered tool missing from manifest: {name}")
 PY
 )
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    report 3 "manifest tool-surface check failed to run (python3 exit $rc) — not a pass"
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] && report 3 "$line"
   done <<< "$drift"

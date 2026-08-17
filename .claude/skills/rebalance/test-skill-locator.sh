@@ -31,9 +31,13 @@ pass() { echo "  ok   — $*"; }
 fail() { echo "  FAIL — $*" >&2; fails=$((fails + 1)); }
 
 # --- extract the documented locator ------------------------------------------
+extract_block() {
+  awk -v s="# >>> $1 >>>" -v e="# <<< $1 <<<" \
+    '$0==s{f=1;next} f&&$0==e{exit} f' "$SKILL_DOC"
+}
+
 LOCATOR="$TMP/locator.sh"
-awk '/^# >>> rebalance-skill-locator >>>$/{f=1;next} f&&/^# <<< rebalance-skill-locator <<<$/{exit} f' \
-  "$SKILL_DOC" > "$LOCATOR"
+extract_block rebalance-skill-locator > "$LOCATOR"
 if [ ! -s "$LOCATOR" ]; then
   echo "FAIL: could not extract the rebalance-skill-locator block from $SKILL_DOC" >&2
   echo "      (the marker comments must survive verbatim — this suite tests the documented path)" >&2
@@ -41,6 +45,24 @@ if [ ! -s "$LOCATOR" ]; then
 fi
 grep -q 'rebalance_skill_dir()' "$LOCATOR" \
   || { echo "FAIL: extracted block does not define rebalance_skill_dir()" >&2; exit 1; }
+
+# The locator is only half the documented contract — the reader also copies the
+# invocation that consumes it. Extract that too, so it cannot drift or regress
+# while this suite stays green.
+INVOCATION="$TMP/invocation.sh"
+extract_block rebalance-collect-invocation > "$INVOCATION"
+if [ ! -s "$INVOCATION" ]; then
+  echo "FAIL: could not extract the rebalance-collect-invocation block from $SKILL_DOC" >&2
+  exit 1
+fi
+grep -q 'rebalance_skill_dir' "$INVOCATION" \
+  || { echo "FAIL: documented invocation no longer calls rebalance_skill_dir" >&2; exit 1; }
+grep -q 'collect.sh' "$INVOCATION" \
+  || { echo "FAIL: documented invocation no longer runs collect.sh" >&2; exit 1; }
+
+# The documented command as a reader actually assembles it: locator, then invocation.
+DOCUMENTED="$TMP/documented.sh"
+cat "$LOCATOR" "$INVOCATION" > "$DOCUMENTED"
 
 # --- fixture builders ---------------------------------------------------------
 # Build a fake install at $1 with a REAL collect.sh, deliberately mode 644 so every
@@ -145,6 +167,39 @@ mode=$(ls -l "$PROJ/.claude/skills/rebalance/collect.sh" | cut -c1-10)
 case "$mode" in
   *x*) fail "stripped execute bit: fixture collect.sh is executable ($mode) — scenario is a no-op" ;;
   *)   pass "stripped execute bit (fixtures are $mode; invoked via bash throughout)" ;;
+esac
+
+# --- the FULL documented command, end to end ----------------------------------
+# Everything above tests the locator in isolation. These run the locator and the
+# documented invocation together, exactly as a reader pastes them, so a regression
+# in either half is caught.
+out=$( ( cd "$PROJ" && HOME="$EMPTY_HOME"; bash "$DOCUMENTED" ) 2>/dev/null )
+rc=$?
+if [ "$rc" != "0" ]; then
+  fail "documented command (locator + invocation) exited $rc from a project install"
+elif ! printf '%s' "$out" | grep -q '.'; then
+  fail "documented command produced no collector output"
+else
+  pass "documented command runs end to end (project install)"
+fi
+
+out=$( ( cd "$SPACED/nested dir/deeper" && HOME="$USER_HOME"; bash "$DOCUMENTED" ) 2>/dev/null )
+[ $? = 0 ] && [ -n "$out" ] \
+  && pass "documented command runs end to end (spaces + nested CWD)" \
+  || fail "documented command failed from a spaced, nested CWD"
+
+# Interactive-shell safety: the failure path must NOT terminate the caller's shell.
+# `|| exit 1` would; the documented `else false` must not. Simulate an interactive
+# paste by sourcing the command into a shell that then has to keep running.
+probe=$( ( cd "$BARE" && HOME="$EMPTY_HOME"
+           bash -c '. "$1"; echo "SHELL-SURVIVED:$?"' _ "$DOCUMENTED" ) 2>/dev/null )
+case "$probe" in
+  SHELL-SURVIVED:0)
+    fail "failure path returned 0 — the non-zero status was lost" ;;
+  SHELL-SURVIVED:*)
+    pass "failure path is non-zero (${probe#SHELL-SURVIVED:}) and the shell survived" ;;
+  *)
+    fail "failure path killed the calling shell (no SHELL-SURVIVED marker; got '$probe')" ;;
 esac
 
 # --- fail-loudly contract -----------------------------------------------------

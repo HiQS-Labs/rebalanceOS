@@ -102,14 +102,22 @@ rebalance_skill_dir() {
 Then run the collector:
 
 ```bash
-REBALANCE_SKILL="$(rebalance_skill_dir)" || exit 1
-bash "$REBALANCE_SKILL/collect.sh"
+# >>> rebalance-collect-invocation >>>
+if REBALANCE_SKILL="$(rebalance_skill_dir)"; then
+  bash "$REBALANCE_SKILL/collect.sh"
+else
+  false   # keep the non-zero status without killing an interactive shell
+fi
+# <<< rebalance-collect-invocation <<<
 ```
 
 `cd … && pwd -P` resolves symlinked installs to their real path, both checks are quoted so a
 path with spaces is fine, and requiring **both** `SKILL.md` and `collect.sh` means a partial or
-decoy directory fails loudly instead of silently resolving. The scan itself is still
-CWD-independent — it walks absolute roots. Optional knobs (defaults are the standard):
+decoy directory fails loudly instead of silently resolving. The `else false` is deliberate:
+`|| exit 1` would close the reader's terminal when pasted interactively, so the failure stays
+non-zero and actionable (the locator already explained itself on stderr) without ending the
+session. The scan itself is still CWD-independent — it walks absolute roots. Optional knobs
+(defaults are the standard):
 
 - `LSAG_WINDOW_DAYS=7` — "recent" horizon for commits and warm/active classification.
 - `LSAG_DIRTY_GRACE_DAYS=30` — uncommitted changes only count as activity if the repo was
