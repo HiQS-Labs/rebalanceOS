@@ -157,14 +157,10 @@ def diagnose_repo(
             monitoring_reason = f"{repo_norm} is on github_ignored_repos"
         elif claimed_by_project and project_status and project_status != "active":
             monitoring_reason = (
-                f"claimed by project '{claimed_by_project}' but status="
-                f"{project_status!r} (only active projects sync)"
+                f"claimed by project '{claimed_by_project}' but status={project_status!r} (only active projects sync)"
             )
         elif not in_registry and not in_recent_activity:
-            monitoring_reason = (
-                "not in any active project's repos and no events in github_activity "
-                "in the last 14 days"
-            )
+            monitoring_reason = "not in any active project's repos and no events in github_activity in the last 14 days"
         else:
             monitoring_reason = "not in watched set"
 
@@ -176,8 +172,7 @@ def diagnose_repo(
     try:
         with db_connection(database_path) as conn:
             row = conn.execute(
-                "SELECT default_branch, fetched_at FROM github_repo_meta "
-                "WHERE LOWER(repo_full_name) = ?",
+                "SELECT default_branch, fetched_at FROM github_repo_meta WHERE LOWER(repo_full_name) = ?",
                 (repo_norm,),
             ).fetchone()
             if row:
@@ -191,8 +186,7 @@ def diagnose_repo(
                 ("github_documents", "documents"),
             ):
                 row = conn.execute(
-                    f"SELECT COUNT(*) AS c, MAX(fetched_at) AS m FROM {table} "
-                    f"WHERE LOWER(repo_full_name) = ?",
+                    f"SELECT COUNT(*) AS c, MAX(fetched_at) AS m FROM {table} WHERE LOWER(repo_full_name) = ?",
                     (repo_norm,),
                 ).fetchone()
                 if row:
@@ -251,13 +245,10 @@ def diagnose_repo(
 
         if not commit_block["found_in_db"]:
             if not watched:
-                commit_block["likely_cause"] = (
-                    "repo is not watched, so its commits are never ingested"
-                )
+                commit_block["likely_cause"] = "repo is not watched, so its commits are never ingested"
             elif freshness == "never_synced":
                 commit_block["likely_cause"] = (
-                    "repo is watched but has never been synced — "
-                    "run refresh_index(scope=['github'])"
+                    "repo is watched but has never been synced — run refresh_index(scope=['github'])"
                 )
             else:
                 commit_block["likely_cause"] = (
@@ -304,13 +295,10 @@ def diagnose_repo(
 
             if not pr_block.get("found_in_db"):
                 if not watched:
-                    pr_block["likely_cause"] = (
-                        "repo is not watched, so its PRs are never ingested"
-                    )
+                    pr_block["likely_cause"] = "repo is not watched, so its PRs are never ingested"
                 elif freshness == "never_synced":
                     pr_block["likely_cause"] = (
-                        "repo is watched but has never been synced — "
-                        "run refresh_index(scope=['github'])"
+                        "repo is watched but has never been synced — run refresh_index(scope=['github'])"
                     )
                 else:
                     pr_block["likely_cause"] = (
@@ -353,12 +341,9 @@ def diagnose_repo(
     elif not watched:
         verdict = "not_watched_no_signal"
         summary = (
-            f"{repo_norm} is not watched: not in any active project's repos and no "
-            "events seen in the last 14 days."
+            f"{repo_norm} is not watched: not in any active project's repos and no events seen in the last 14 days."
         )
-        next_actions.append(
-            "add the repo to an active project's repos[] in the registry"
-        )
+        next_actions.append("add the repo to an active project's repos[] in the registry")
     elif freshness == "never_synced":
         verdict = "watched_never_synced"
         summary = f"{repo_norm} is watched but has never been synced."
@@ -366,8 +351,7 @@ def diagnose_repo(
     elif freshness == "stale":
         verdict = "watched_but_stale"
         summary = (
-            f"{repo_norm} is watched; last synced {staleness_days} days ago "
-            f"(> {DEFAULT_SYNC_WINDOW_DAYS}d window)."
+            f"{repo_norm} is watched; last synced {staleness_days} days ago (> {DEFAULT_SYNC_WINDOW_DAYS}d window)."
         )
         next_actions.append(f"refresh_index(scope=['github'], repos=['{repo_norm}'])")
     else:

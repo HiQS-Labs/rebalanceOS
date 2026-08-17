@@ -25,6 +25,7 @@ _current_entry_point = None
 _batch_count = 0
 _last_activity_time = 0.0
 
+
 def _get_caller_identity() -> str:
     if "XPC_SERVICE_NAME" in os.environ and "com.apple" not in os.environ["XPC_SERVICE_NAME"]:
         return f"launchd job ({os.environ['XPC_SERVICE_NAME']})"
@@ -36,6 +37,7 @@ def _get_caller_identity() -> str:
     if sys.stdout.isatty():
         return "interactive shell"
     return f"CLI ({os.path.basename(cmd) if cmd else 'unknown'})"
+
 
 def instrument_embedding_pass(site_name: str) -> None:
     """Produce the run-ID + entry-point + PID record for an embedding pass."""
@@ -56,7 +58,8 @@ def instrument_embedding_pass(site_name: str) -> None:
 
     try:
         import mlx.core as mx
-        if hasattr(mx, 'reset_peak_memory'):
+
+        if hasattr(mx, "reset_peak_memory"):
             mx.reset_peak_memory()
     except Exception:
         pass
@@ -103,6 +106,7 @@ def _load_model(model_name: str) -> tuple:
         return _cached_model, _cached_tokenizer
 
     from mlx_embeddings import load
+
     model, tokenizer = load(model_name)
     _cached_model = model
     _cached_tokenizer = tokenizer
@@ -112,6 +116,7 @@ def _load_model(model_name: str) -> tuple:
         try:
             import os
             import mlx.core as mx
+
             # The model occupies ~1.11 GB active. The project contract is <= 8 GB peak phys_footprint
             # per process. We allocate a 3.0 GB cache limit, leaving real headroom for cache reuse
             # while keeping the total footprint (~4.11 GB) far below the 8 GB ceiling.
@@ -214,9 +219,7 @@ def embed_chunks(
         # Check for model version change
         stored_model = None
         try:
-            row = conn.execute(
-                "SELECT value FROM embedding_meta WHERE key = 'model_name'"
-            ).fetchone()
+            row = conn.execute("SELECT value FROM embedding_meta WHERE key = 'model_name'").fetchone()
             if row:
                 stored_model = row["value"]
         except Exception:
@@ -259,7 +262,7 @@ def embed_chunks(
         # Batch embed
         embedded_count = 0
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             texts = [row["body"][:2000] for row in batch]  # truncate very long chunks
             chunk_ids = [row["id"] for row in batch]
 
@@ -295,5 +298,3 @@ def embed_chunks(
         embedding_dim=EMBEDDING_DIM,
         elapsed_seconds=round(time.monotonic() - start, 2),
     )
-
-

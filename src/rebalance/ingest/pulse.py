@@ -75,9 +75,7 @@ def reconcile_pulse_mirror(target_path: Path) -> None:
         raise PulseReconcileError(f"pulse_target_path is not a git repo: {target_path}")
     # Defer to an operator's in-progress rebase rather than trampling it.
     if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
-        raise PulseReconcileError(
-            f"a git rebase is already in progress in {target_path}; deferring to operator"
-        )
+        raise PulseReconcileError(f"a git rebase is already in progress in {target_path}; deferring to operator")
     proc = subprocess.run(
         ["git", "pull", "--rebase"],
         cwd=str(target_path),
@@ -87,13 +85,9 @@ def reconcile_pulse_mirror(target_path: Path) -> None:
     )
     if proc.returncode != 0:
         # Restore the repo so a conflicted rebase does not linger for the next run.
-        subprocess.run(
-            ["git", "rebase", "--abort"], cwd=str(target_path), capture_output=True
-        )
+        subprocess.run(["git", "rebase", "--abort"], cwd=str(target_path), capture_output=True)
         detail = (proc.stderr or proc.stdout).strip()
-        raise PulseReconcileError(
-            f"git pull --rebase failed (code {proc.returncode}) in {target_path}: {detail}"
-        )
+        raise PulseReconcileError(f"git pull --rebase failed (code {proc.returncode}) in {target_path}: {detail}")
 
 
 def _author_filter_sql(column: str) -> str:
@@ -210,11 +204,13 @@ def _query_day_activity(
     ).fetchall()
     for r in rows:
         if _in_window(r["last_modified"], start, end):
-            activity.vault_edits.append({
-                "rel_path": r["rel_path"],
-                "title": r["title"] or r["rel_path"],
-                "last_modified": r["last_modified"],
-            })
+            activity.vault_edits.append(
+                {
+                    "rel_path": r["rel_path"],
+                    "title": r["title"] or r["rel_path"],
+                    "last_modified": r["last_modified"],
+                }
+            )
 
     commit_filter = _author_filter_sql("c.author_login")
     rows = conn.execute(
@@ -240,16 +236,18 @@ def _query_day_activity(
                 author_login=r["author_login"],
                 commit_message=r["message"],
             )
-            activity.gh_commits.append({
-                "repo": r["repo_full_name"],
-                "sha": r["sha"][:7] if r["sha"] else "",
-                "subject": first_line[:160],
-                "committed_at": r["committed_at"],
-                "html_url": r["html_url"] or "",
-                "author_login": r["author_login"] or "",
-                "source_tag": tag,
-                "source_kind": "pull_request",
-            })
+            activity.gh_commits.append(
+                {
+                    "repo": r["repo_full_name"],
+                    "sha": r["sha"][:7] if r["sha"] else "",
+                    "subject": first_line[:160],
+                    "committed_at": r["committed_at"],
+                    "html_url": r["html_url"] or "",
+                    "author_login": r["author_login"] or "",
+                    "source_tag": tag,
+                    "source_kind": "pull_request",
+                }
+            )
 
     # Direct branch commits are a distinct raw source. The anti-join means a
     # later-discovered PR commit replaces the visible signal without deleting
@@ -276,19 +274,23 @@ def _query_day_activity(
     for r in rows:
         if _in_window(r["committed_at"], start, end):
             message = r["message"] or ""
-            activity.gh_commits.append({
-                "repo": r["repo_full_name"],
-                "sha": r["sha"][:7] if r["sha"] else "",
-                "subject": message.splitlines()[0][:160] if message else "direct commit",
-                "committed_at": r["committed_at"],
-                "html_url": r["html_url"] or "",
-                "author_login": r["author_login"] or "",
-                "paths": (r["paths"] or "").splitlines(),
-                "source_tag": classify_source(
-                    branch=r["ref"], author_login=r["author_login"], commit_message=message,
-                ),
-                "source_kind": "direct_push",
-            })
+            activity.gh_commits.append(
+                {
+                    "repo": r["repo_full_name"],
+                    "sha": r["sha"][:7] if r["sha"] else "",
+                    "subject": message.splitlines()[0][:160] if message else "direct commit",
+                    "committed_at": r["committed_at"],
+                    "html_url": r["html_url"] or "",
+                    "author_login": r["author_login"] or "",
+                    "paths": (r["paths"] or "").splitlines(),
+                    "source_tag": classify_source(
+                        branch=r["ref"],
+                        author_login=r["author_login"],
+                        commit_message=message,
+                    ),
+                    "source_kind": "direct_push",
+                }
+            )
 
     item_filter = _author_filter_sql("author_login")
     rows = conn.execute(
@@ -318,20 +320,22 @@ def _query_day_activity(
             author_login=r["author_login"],
             commit_message=r["body"] or "",
         )
-        activity.gh_items.append({
-            "repo": r["repo_full_name"],
-            "item_type": r["item_type"],
-            "number": r["number"],
-            "title": r["title"] or "",
-            "state": r["state"] or "",
-            "html_url": r["html_url"] or "",
-            "created_at": r["created_at"],
-            "updated_at": r["updated_at"],
-            "author_login": r["author_login"] or "",
-            "head_ref": r["head_ref"] or "",
-            "is_new": created_in,
-            "source_tag": tag,
-        })
+        activity.gh_items.append(
+            {
+                "repo": r["repo_full_name"],
+                "item_type": r["item_type"],
+                "number": r["number"],
+                "title": r["title"] or "",
+                "state": r["state"] or "",
+                "html_url": r["html_url"] or "",
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "author_login": r["author_login"] or "",
+                "head_ref": r["head_ref"] or "",
+                "is_new": created_in,
+                "source_tag": tag,
+            }
+        )
 
     comment_filter = _author_filter_sql("author_login")
     rows = conn.execute(
@@ -353,17 +357,19 @@ def _query_day_activity(
                 author_login=r["author_login"],
                 commit_message=body,
             )
-            activity.gh_comments.append({
-                "repo": r["repo_full_name"],
-                "item_type": r["item_type"],
-                "item_number": r["item_number"],
-                "comment_type": r["comment_type"] or "",
-                "preview": preview,
-                "html_url": r["html_url"] or "",
-                "created_at": r["created_at"],
-                "author_login": r["author_login"] or "",
-                "source_tag": tag,
-            })
+            activity.gh_comments.append(
+                {
+                    "repo": r["repo_full_name"],
+                    "item_type": r["item_type"],
+                    "item_number": r["item_number"],
+                    "comment_type": r["comment_type"] or "",
+                    "preview": preview,
+                    "html_url": r["html_url"] or "",
+                    "created_at": r["created_at"],
+                    "author_login": r["author_login"] or "",
+                    "source_tag": tag,
+                }
+            )
 
     if slack_user_id and _table_exists(conn, "sleuth_reminders"):
         rows = conn.execute(
@@ -380,32 +386,28 @@ def _query_day_activity(
         ).fetchall()
         for r in rows:
             if _in_window(r["last_seen_at"], start, end):
-                msg = compact_sleuth_reminder(
-                    (r["reminder_message_text"] or "").replace("\n", " ").strip()
-                )
-                gh_urls = []
+                msg = compact_sleuth_reminder((r["reminder_message_text"] or "").replace("\n", " ").strip())
+                gh_urls: list[str] = []
                 if r["github_urls_json"]:
                     try:
                         gh_urls = json.loads(r["github_urls_json"]) or []
                     except json.JSONDecodeError:
                         gh_urls = []
-                activity.sleuth_activity.append({
-                    "reminder_id": r["reminder_id"],
-                    "state": r["state"] or "",
-                    "is_active": bool(r["is_active"]),
-                    "message_preview": msg[:200],
-                    "channel": r["original_channel_name"] or "",
-                    "github_urls": gh_urls,
-                    "should_post_on": r["should_post_on"],
-                    "last_seen_at": r["last_seen_at"],
-                    "assignee_id": r["assignee_id"] or "",
-                    "original_sender_id": r["original_sender_id"] or "",
-                    "sleuth_role": (
-                        "assigned_to_me"
-                        if r["assignee_id"] == slack_user_id
-                        else "assigned_by_me"
-                    ),
-                })
+                activity.sleuth_activity.append(
+                    {
+                        "reminder_id": r["reminder_id"],
+                        "state": r["state"] or "",
+                        "is_active": bool(r["is_active"]),
+                        "message_preview": msg[:200],
+                        "channel": r["original_channel_name"] or "",
+                        "github_urls": gh_urls,
+                        "should_post_on": r["should_post_on"],
+                        "last_seen_at": r["last_seen_at"],
+                        "assignee_id": r["assignee_id"] or "",
+                        "original_sender_id": r["original_sender_id"] or "",
+                        "sleuth_role": ("assigned_to_me" if r["assignee_id"] == slack_user_id else "assigned_by_me"),
+                    }
+                )
 
     # Email — Gmail-synced messages received in the window. Mirrors the sleuth
     # block: SQL prefilter on the UTC floor, then a tz-aware [start, end) refine.
@@ -425,13 +427,15 @@ def _query_day_activity(
         ).fetchall()
         for r in rows:
             if _in_window(r["received_at"], start, end):
-                activity.email_activity.append({
-                    "message_id": r["message_id"],
-                    "from_name": r["from_name"] or "",
-                    "from_address": r["from_address"] or "",
-                    "subject": (r["subject"] or "").replace("\r", " ").strip()[:200],
-                    "received_at": r["received_at"],
-                })
+                activity.email_activity.append(
+                    {
+                        "message_id": r["message_id"],
+                        "from_name": r["from_name"] or "",
+                        "from_address": r["from_address"] or "",
+                        "subject": (r["subject"] or "").replace("\r", " ").strip()[:200],
+                        "received_at": r["received_at"],
+                    }
+                )
 
     # Figma — UNRESOLVED comments created in the window (resolved_at IS NULL).
     # Legitimately empty on the operator's machine until a figma_file_keys
@@ -448,13 +452,15 @@ def _query_day_activity(
         ).fetchall()
         for r in rows:
             if _in_window(r["created_at"], start, end):
-                activity.figma_activity.append({
-                    "comment_key": r["comment_key"],
-                    "file_key": r["file_key"],
-                    "message": (r["message"] or "").replace("\r", " ").strip()[:200],
-                    "user_handle": r["user_handle"] or "",
-                    "created_at": r["created_at"],
-                })
+                activity.figma_activity.append(
+                    {
+                        "comment_key": r["comment_key"],
+                        "file_key": r["file_key"],
+                        "message": (r["message"] or "").replace("\r", " ").strip()[:200],
+                        "user_handle": r["user_handle"] or "",
+                        "created_at": r["created_at"],
+                    }
+                )
 
     return activity
 
@@ -499,15 +505,17 @@ def _query_calendar_upcoming(
         if start < now_utc:
             continue
         end = calendar_dt_utc(r["end_time"])
-        upcoming.append({
-            "summary": r["summary"] or "",
-            "start_time": r["start_time"],
-            "end_time": r["end_time"],
-            "location": r["location"] or "",
-            "status": r["status"] or "",
-            "_start_dt": start,
-            "_end_dt": end,
-        })
+        upcoming.append(
+            {
+                "summary": r["summary"] or "",
+                "start_time": r["start_time"],
+                "end_time": r["end_time"],
+                "location": r["location"] or "",
+                "status": r["status"] or "",
+                "_start_dt": start,
+                "_end_dt": end,
+            }
+        )
     return upcoming
 
 
@@ -545,16 +553,18 @@ def fetch_assigned_issues(
     for item in items:
         repo_url = item.get("repository_url") or ""
         repo_full_name = repo_url.replace(f"{GITHUB_API_ROOT}/repos/", "") if repo_url else ""
-        out.append({
-            "repo": repo_full_name,
-            "number": item.get("number"),
-            "title": item.get("title") or "",
-            "state": item.get("state") or "",
-            "html_url": item.get("html_url") or "",
-            "created_at": item.get("created_at"),
-            "updated_at": item.get("updated_at"),
-            "labels": [label.get("name") for label in item.get("labels") or [] if label.get("name")],
-        })
+        out.append(
+            {
+                "repo": repo_full_name,
+                "number": item.get("number"),
+                "title": item.get("title") or "",
+                "state": item.get("state") or "",
+                "html_url": item.get("html_url") or "",
+                "created_at": item.get("created_at"),
+                "updated_at": item.get("updated_at"),
+                "labels": [label.get("name") for label in item.get("labels") or [] if label.get("name")],
+            }
+        )
     return out
 
 
@@ -564,6 +574,7 @@ def _sort_assigned_issues(
     today_start: datetime,
 ) -> list[dict[str, Any]]:
     """Issues created today first, then everything else, each group sorted by updated_at desc."""
+
     def created_today(it: dict[str, Any]) -> bool:
         created = _parse_iso(it.get("created_at"))
         if created is None:
@@ -633,14 +644,16 @@ def _query_watched_activity(
         created_in = _in_window(r["created_at"], start, end)
         if not (created_in or _in_window(r["updated_at"], start, end)):
             continue
-        activity[r["repo_full_name"].lower()]["items"].append({
-            "item_type": r["item_type"],
-            "number": r["number"],
-            "title": r["title"] or "",
-            "state": r["state"] or "",
-            "html_url": r["html_url"] or "",
-            "is_new": created_in,
-        })
+        activity[r["repo_full_name"].lower()]["items"].append(
+            {
+                "item_type": r["item_type"],
+                "number": r["number"],
+                "title": r["title"] or "",
+                "state": r["state"] or "",
+                "html_url": r["html_url"] or "",
+                "is_new": created_in,
+            }
+        )
 
     rows = conn.execute(
         f"""
@@ -682,8 +695,7 @@ def collect_pulse_snapshot(
         from rebalance.ingest.github_watch import watched_repo_is_active_work
 
         external_repos = [
-            r for r in get_external_repos(database_path)
-            if not watched_repo_is_active_work(database_path, r)
+            r for r in get_external_repos(database_path) if not watched_repo_is_active_work(database_path, r)
         ]
     except Exception as exc:  # noqa: BLE001
         external_repos = []
@@ -698,9 +710,7 @@ def collect_pulse_snapshot(
             github_login=github_login,
             slack_user_id=slack_user_id,
         )
-        watched_repos = _query_watched_activity(
-            conn, external_repos, start=today_start, end=tomorrow_start
-        )
+        watched_repos = _query_watched_activity(conn, external_repos, start=today_start, end=tomorrow_start)
         yesterday = _query_day_activity(
             conn,
             label="yesterday",
@@ -812,7 +822,7 @@ def _render_section_today_work(today: DayActivity, tz: ZoneInfo) -> str:
             tag_chip = _tag_chip(it.get("source_tag"))
             lines.append(
                 f"- {tag_chip}{new_marker}`{it['repo']}` [{kind} #{it['number']}]({it['html_url']}) "
-                f"({it.get('state','')}) — {it['title']}"
+                f"({it.get('state', '')}) — {it['title']}"
             )
         if len(today.gh_items) > 20:
             lines.append(f"- _…and {len(today.gh_items) - 20} more_")
@@ -824,10 +834,7 @@ def _render_section_today_work(today: DayActivity, tz: ZoneInfo) -> str:
         for c in today.gh_comments[:15]:
             kind = c.get("comment_type") or "comment"
             tag_chip = _tag_chip(c.get("source_tag"))
-            lines.append(
-                f"- {tag_chip}`{c['repo']}` [{kind} on #{c['item_number']}]({c['html_url']}) — "
-                f"{c['preview']}"
-            )
+            lines.append(f"- {tag_chip}`{c['repo']}` [{kind} on #{c['item_number']}]({c['html_url']}) — {c['preview']}")
         if len(today.gh_comments) > 15:
             lines.append(f"- _…and {len(today.gh_comments) - 15} more_")
         lines.append("")
@@ -867,9 +874,7 @@ def _render_section_yesterday(yesterday: DayActivity, tz: ZoneInfo) -> str:
         parts.append(f"**Issues/PRs touched:** {len(yesterday.gh_items)}")
         for it in yesterday.gh_items[:10]:
             kind = it.get("item_type") or "item"
-            parts.append(
-                f"- `{it['repo']}` [{kind} #{it['number']}]({it['html_url']}) — {it['title']}"
-            )
+            parts.append(f"- `{it['repo']}` [{kind} #{it['number']}]({it['html_url']}) — {it['title']}")
     if yesterday.gh_comments:
         parts.append(f"**Comments posted:** {len(yesterday.gh_comments)}")
     if yesterday.vault_edits:
@@ -917,9 +922,7 @@ def _render_section_assigned_issues(
                 created = created.replace(tzinfo=timezone.utc)
             is_new = created >= today_start
         prefix = "**NEW** " if is_new else ""
-        labels = (
-            " " + " ".join(f"`{label}`" for label in it.get("labels") or [])
-        ) if it.get("labels") else ""
+        labels = (" " + " ".join(f"`{label}`" for label in it.get("labels") or [])) if it.get("labels") else ""
         updated = _fmt_local(it.get("updated_at"), tz)
         lines.append(
             f"- {prefix}`{it['repo']}` [#{it['number']}]({it['html_url']}) "
@@ -1188,8 +1191,7 @@ def publish_pulse(
     if missing:
         return {
             "ok": False,
-            "error": f"pulse config missing keys: {missing}. "
-                     "Set them via rebalance.ingest.config.set_pulse_config().",
+            "error": f"pulse config missing keys: {missing}. Set them via rebalance.ingest.config.set_pulse_config().",
             "config": cfg,
         }
 
@@ -1212,9 +1214,7 @@ def publish_pulse(
 
     git_result: dict[str, Any] = {"skipped_dry_run": True}
     if not dry_run:
-        commit_message = (
-            f"pulse: {snapshot.generated_at.strftime('%Y-%m-%d %H:%M %Z')} update"
-        )
+        commit_message = f"pulse: {snapshot.generated_at.strftime('%Y-%m-%d %H:%M %Z')} update"
         git_result = _commit_and_push_if_changed(
             target_repo=target_path,
             file_rel=cfg.get("pulse_filename") or "live-pulse.md",

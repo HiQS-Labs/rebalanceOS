@@ -309,9 +309,7 @@ def snap_edges(
     days: list[SnapDayResult] = []
     for offset in range(num_days):
         target = start_date + timedelta(days=offset)
-        day_result = snap_day_edges(
-            service, calendar_id, target, timezone_name, gap_minutes=gap_minutes
-        )
+        day_result = snap_day_edges(service, calendar_id, target, timezone_name, gap_minutes=gap_minutes)
         days.append(day_result)
 
     warning = ""

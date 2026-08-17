@@ -203,7 +203,7 @@ def _retry_after_seconds(headers: dict[str, str], attempt: int) -> float:
         except ValueError:
             pass
     # Exponential backoff: 1s, 2s, 4s, capped at 16s; +/- 25% jitter.
-    base = min(2.0 ** attempt, 16.0)
+    base = min(2.0**attempt, 16.0)
     jitter = base * 0.25 * (random.random() * 2 - 1)
     return max(0.5, base + jitter)
 
@@ -291,7 +291,14 @@ class GitHubClient:
                     return last_status, None, last_headers, last_body
 
                 delay = _retry_after_seconds(last_headers, attempt)
-                logger.info("GitHub %s -> %s, retrying in %.1fs (attempt %d/%d)", url, last_status, delay, attempt + 1, self.retries)
+                logger.info(
+                    "GitHub %s -> %s, retrying in %.1fs (attempt %d/%d)",
+                    url,
+                    last_status,
+                    delay,
+                    attempt + 1,
+                    self.retries,
+                )
                 self._sleep(delay)
         return last_status, None, last_headers, last_body
 

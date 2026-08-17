@@ -46,6 +46,7 @@ _RANK_CLASS = 2
 
 # --------------------------------------------------------------------- auth
 
+
 def _get_token() -> str | None:
     """Subscription OAuth access token from keychain, then creds file. None if absent."""
     import os
@@ -53,7 +54,10 @@ def _get_token() -> str | None:
     try:
         raw = subprocess.check_output(
             ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"],
-            stderr=subprocess.DEVNULL, text=True, timeout=10).strip()
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=10,
+        ).strip()
         tok = json.loads(raw).get("claudeAiOauth", {}).get("accessToken")
         if tok:
             return tok
@@ -68,14 +72,15 @@ def _get_token() -> str | None:
 
 # --------------------------------------------------------------------- fetch
 
+
 def _fetch_raw(token: str, hard_cap: int = 300, timeout: float = 8.0) -> list[dict]:
     """Page through /v1/code/sessions (newest first). Raises on HTTP error."""
     out: list[dict] = []
-    cursor: str | None = None
+    cursor: str | int | None = None
     while len(out) < hard_cap:
         params = {"limit": 100}
         if cursor:
-            params["cursor"] = cursor
+            params["cursor"] = cursor  # type: ignore[assignment]
         url = f"{BASE}/v1/code/sessions?" + urllib.parse.urlencode(params)
         req = urllib.request.Request(url)
         req.add_header("Authorization", f"Bearer {token}")
@@ -133,12 +138,13 @@ def normalize(s: dict) -> dict[str, Any]:
         "summary": (pts.get("status_detail") or "").strip() or None,
         "needs_action": (pts.get("needs_action") or "").strip() or None,
         "pr_number": None,
-        "pr_state": None,   # OPEN|MERGED|CLOSED | None(no PR) | "?"(lookup failed)
+        "pr_state": None,  # OPEN|MERGED|CLOSED | None(no PR) | "?"(lookup failed)
         "pr_url": None,
     }
 
 
 # ----------------------------------------------------------------- PR status
+
 
 def enrich_pr_status(rows: list[dict]) -> list[dict]:
     """Best-effort: fill pr_* from each head branch's PR via `gh`. Degrades, never raises."""
@@ -164,9 +170,25 @@ def enrich_pr_status(rows: list[dict]) -> list[dict]:
 def _gh_pr_for_branch(repo: str, branch: str) -> Any:
     try:
         out = subprocess.check_output(
-            ["gh", "pr", "list", "--repo", repo, "--head", branch, "--state", "all",
-             "--json", "number,state,url", "--limit", "5"],
-            stderr=subprocess.DEVNULL, text=True, timeout=20).strip()
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--json",
+                "number,state,url",
+                "--limit",
+                "5",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=20,
+        ).strip()
         prs = json.loads(out) if out else []
         if not prs:
             return None
@@ -177,6 +199,7 @@ def _gh_pr_for_branch(repo: str, branch: str) -> Any:
 
 
 # ----------------------------------------------------------------- high level
+
 
 def sessions_for_day(day: dt.date | None = None, *, with_pr: bool = True) -> list[dict]:
     """Normalized cloud-session rows created on ``day`` (local). [] on any failure."""
@@ -225,8 +248,14 @@ def grade(rows: list[dict]) -> dict[str, Any]:
     """
     n = len(rows)
     if n == 0:
-        return {"n": 0, "overall": None, "letter": "—", "dimensions": {},
-                "counts": {}, "warnings": ["no cloud sessions today"]}
+        return {
+            "n": 0,
+            "overall": None,
+            "letter": "—",
+            "dimensions": {},
+            "counts": {},
+            "warnings": ["no cloud sessions today"],
+        }
 
     def ratio(pred) -> float:
         return round(sum(1 for r in rows if pred(r)) / n, 3)
@@ -272,9 +301,11 @@ def grade(rows: list[dict]) -> dict[str, Any]:
 
 # ---------------------------------------------------- HiQS candidates provider
 
+
 def _signal_enabled() -> bool:
     try:
         from rebalance.ingest.config import get_claude_cloud_config
+
         return bool(get_claude_cloud_config().get("claude_cloud_signal_enabled", False))
     except Exception:
         return False
@@ -306,21 +337,23 @@ def claude_cloud_candidates(bundle: Any) -> list[dict[str, Any]]:
         if r["pr_state"] == "MERGED":
             continue  # done
         if r["pr_state"] == "OPEN":
-            cand = {"title": f"Review PR #{r['pr_number']}: {title}",
-                    "why": "cloud job finished; PR open for your review"}
+            cand = {
+                "title": f"Review PR #{r['pr_number']}: {title}",
+                "why": "cloud job finished; PR open for your review",
+            }
         elif (r["status_bucket"] or "") in ("failed", "error"):
-            cand = {"title": f"Cloud job FAILED: {title}",
-                    "why": "cloud coding job did not finish cleanly"}
+            cand = {"title": f"Cloud job FAILED: {title}", "why": "cloud coding job did not finish cleanly"}
         elif r["status_bucket"] == "review_ready":
-            cand = {"title": f"Triage cloud job: {title}",
-                    "why": "cloud job finished with no PR — review the branch"}
+            cand = {"title": f"Triage cloud job: {title}", "why": "cloud job finished with no PR — review the branch"}
         else:
             continue
-        out.append({
-            "rank_key": (_RANK_CLASS, ts),
-            "source": "claude_cloud",
-            "project": r["repo"],
-            "evidence": ev or [r["id"] or "claude-cloud session"],
-            **cand,
-        })
+        out.append(
+            {
+                "rank_key": (_RANK_CLASS, ts),
+                "source": "claude_cloud",
+                "project": r["repo"],
+                "evidence": ev or [r["id"] or "claude-cloud session"],
+                **cand,
+            }
+        )
     return out

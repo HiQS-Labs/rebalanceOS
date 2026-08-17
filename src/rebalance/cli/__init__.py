@@ -202,9 +202,7 @@ def doctor_cmd(
     # The raw rows above may show a WARN the reconciler suppressed; say so
     # rather than letting the verdict look like it ignored the row.
     suppressed = sum(
-        1
-        for _, disposition in check_dispositions(report.checks, health_status)
-        if disposition == "suppressed"
+        1 for _, disposition in check_dispositions(report.checks, health_status) if disposition == "suppressed"
     )
     if suppressed:
         console.print(
@@ -226,4 +224,3 @@ def version() -> None:
     from rebalance import __version__
 
     typer.echo(__version__)
-

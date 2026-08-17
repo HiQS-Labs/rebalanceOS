@@ -262,10 +262,7 @@ def sync_registry(mode: str, registry_path: Path, projects_yaml_path: Path, data
 
     write_projection(projects_yaml_path=projects_yaml_path, projection=projection)
     upserted = sync_db(database_path=database_path, projection=projection)
-    return (
-        f"Sync pull complete: wrote {projects_yaml_path}, upserted {upserted} rows into "
-        f"{database_path}"
-    )
+    return f"Sync pull complete: wrote {projects_yaml_path}, upserted {upserted} rows into {database_path}"
 
 
 # ---------------------------------------------------------------------------

@@ -19,15 +19,25 @@ from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_pa
 @app.command("dashboard-render")
 def dashboard_render_cmd(
     database: Path | None = DBOption(),
-    date_str: str = typer.Option(None, "--date", help="Date anchoring the dashboard window (YYYY-MM-DD, default: today)"),
+    date_str: str = typer.Option(
+        None, "--date", help="Date anchoring the dashboard window (YYYY-MM-DD, default: today)"
+    ),
     since_days: int = typer.Option(14, "--since-days", min=1, help="Lookback window for recent signals"),
-    vault: Path = typer.Option(None, "--vault", envvar="REBALANCE_VAULT", help="Obsidian vault path for dashboard note write-back"),
-    note_path: str = typer.Option("Dashboards/rebalanceOS Dashboard.md", "--note-path", help="Vault-relative dashboard note path"),
+    vault: Path = typer.Option(
+        None, "--vault", envvar="REBALANCE_VAULT", help="Obsidian vault path for dashboard note write-back"
+    ),
+    note_path: str = typer.Option(
+        "Dashboards/rebalanceOS Dashboard.md", "--note-path", help="Vault-relative dashboard note path"
+    ),
     output: Path = typer.Option(None, "--output", "-o", help="Write dashboard markdown to an explicit path"),
     gemini_synthesis: bool = typer.Option(False, "--gemini-synthesis", help="Add a Gemini-written operator summary"),
     cleanup: bool = typer.Option(False, "--cleanup", help="Tighten the Gemini-written summary to reduce redundancy"),
     gemini_model: str = typer.Option("gemini-3.5-flash", "--gemini-model", help="Gemini model for optional synthesis"),
-    reingest_note: bool = typer.Option(False, "--reingest-note/--no-reingest-note", help="When writing into the vault, re-ingest and embed the updated note"),
+    reingest_note: bool = typer.Option(
+        False,
+        "--reingest-note/--no-reingest-note",
+        help="When writing into the vault, re-ingest and embed the updated note",
+    ),
     changelog_path: Path = typer.Option(Path("CHANGELOG.md"), "--changelog-path", help="Path to the changelog source"),
     goals_path: Path = typer.Option(Path("4X4.md"), "--goals-path", help="Path to the 4X4 source"),
 ) -> None:

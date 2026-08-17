@@ -128,9 +128,7 @@ def dedup_teammate_blocks(
     # different day is NOT treated as a duplicate.
     operator_titles_by_day: dict[str, set[str]] = {}
     for blk in operator_blocks:
-        operator_titles_by_day.setdefault(blk["local_day"], set()).add(
-            _norm_title(blk["summary"])
-        )
+        operator_titles_by_day.setdefault(blk["local_day"], set()).add(_norm_title(blk["summary"]))
 
     kept: list[dict[str, Any]] = []
     dropped = 0
@@ -239,8 +237,7 @@ def assemble_day_bundle(
 
     # Operator calendar arm — OPERATOR_CALENDAR_ID-scoped (never a teammate id).
     cal_rows = conn.execute(
-        "SELECT id, summary, start_time, end_time, person "
-        "FROM calendar_events WHERE calendar_id = ?",
+        "SELECT id, summary, start_time, end_time, person FROM calendar_events WHERE calendar_id = ?",
         (OPERATOR_CALENDAR_ID,),
     ).fetchall()
     calendar_blocks: list[dict[str, Any]] = []
@@ -356,8 +353,7 @@ def build_rank_prompt(
         tomorrow = temporal_context.get("tomorrow", {})
         lines = ["## Schedule Context"]
         lines.append(
-            f"- **Today:** {today.get('day_name', '')} ({today.get('date', '')}) "
-            f"— {today.get('day_type', 'workday')}"
+            f"- **Today:** {today.get('day_name', '')} ({today.get('date', '')}) — {today.get('day_type', 'workday')}"
         )
         lines.append(
             f"- **Tomorrow:** {tomorrow.get('day_name', '')} ({tomorrow.get('date', '')}) "
@@ -404,10 +400,7 @@ def build_rank_prompt(
             dur = blk.get("duration_minutes") or 0
             proj = f" {{{blk['project']}}}" if blk.get("project") else ""
             # Header carries the teammate name → echo it into person=<name>.
-            lines.append(
-                f"- [TEAMMATE: {who}]{proj} {blk['summary']} "
-                f"({blk.get('time', '')}, {dur}m)"
-            )
+            lines.append(f"- [TEAMMATE: {who}]{proj} {blk['summary']} ({blk.get('time', '')}, {dur}m)")
         sections.append("\n".join(lines))
 
     # Calibration levers.
@@ -442,20 +435,15 @@ def build_rank_prompt(
             "time-critical. Down-weight, do not drop — it stays in the list."
         )
     lever_lines.append(
-        f"- A signal that dropped/disappeared moves the ranking "
-        f"(drop_sensitivity={weights.drop_sensitivity})."
+        f"- A signal that dropped/disappeared moves the ranking (drop_sensitivity={weights.drop_sensitivity})."
     )
     lever_lines.append(
         "- DROPPED-BALL CLASS (highest value): a high-evidence teammate item with no "
         "matching operator signal is the most valuable thing to surface — rank it at "
         "or near the top."
     )
-    lever_lines.append(
-        f"- Per-source trust: {json.dumps(weights.per_source)}."
-    )
-    lever_lines.append(
-        f"- Per-person trust: {json.dumps(weights.per_person)}."
-    )
+    lever_lines.append(f"- Per-source trust: {json.dumps(weights.per_source)}.")
+    lever_lines.append(f"- Per-person trust: {json.dumps(weights.per_person)}.")
     sections.append("\n".join(lever_lines))
 
     context_block = "\n\n".join(sections)
@@ -544,13 +532,15 @@ def email_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
         if not subject and not sender:
             dropped += 1
             continue
-        out.append({
-            "rank_key": (1, m.get("received_at") or ""),
-            "title": subject or "(no subject)",
-            "source": "email",
-            "evidence": [f"from {sender or 'unknown sender'}", m.get("received_at") or ""],
-            "why": "email received in the day window",
-        })
+        out.append(
+            {
+                "rank_key": (1, m.get("received_at") or ""),
+                "title": subject or "(no subject)",
+                "source": "email",
+                "evidence": [f"from {sender or 'unknown sender'}", m.get("received_at") or ""],
+                "why": "email received in the day window",
+            }
+        )
     if dropped:
         # NON-SILENT: a dropped row is an INGEST defect, not noise to swallow. Source
         # freshness reports "ok" whenever rows exist, so a collector writing header-less
@@ -568,39 +558,46 @@ def github_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
     """Three candidate classes from the one GitHub source: items, commits, comments."""
     out: list[dict[str, Any]] = []
     for it in bundle.gh_items:
-        out.append({
-            "rank_key": (2, it.get("updated_at") or it.get("created_at") or ""),
-            "title": f"{it.get('item_type', 'item')} #{it.get('number')}: {it.get('title', '')}",
-            "source": "github",
-            "project": it.get("repo"),
-            "evidence": [it.get("html_url") or it.get("repo") or ""],
-            "why": "open GitHub item you authored/own",
-        })
+        out.append(
+            {
+                "rank_key": (2, it.get("updated_at") or it.get("created_at") or ""),
+                "title": f"{it.get('item_type', 'item')} #{it.get('number')}: {it.get('title', '')}",
+                "source": "github",
+                "project": it.get("repo"),
+                "evidence": [it.get("html_url") or it.get("repo") or ""],
+                "why": "open GitHub item you authored/own",
+            }
+        )
     for c in bundle.gh_commits:
         direct_push = c.get("source_kind") == "direct_push"
         paths = [path for path in c.get("paths", []) if path][:5]
         evidence = [c.get("html_url") or (c.get("sha") or "")]
         evidence.extend(paths)
-        out.append({
-            "rank_key": (4, c.get("committed_at") or ""),
-            "title": c.get("subject") or "commit",
-            "source": "github",
-            "project": c.get("repo"),
-            "evidence": evidence,
-            "why": (
-                "unreviewed direct branch push (inspect or continue?)"
-                if direct_push else "recent commit (continue / push?)"
-            ),
-        })
+        out.append(
+            {
+                "rank_key": (4, c.get("committed_at") or ""),
+                "title": c.get("subject") or "commit",
+                "source": "github",
+                "project": c.get("repo"),
+                "evidence": evidence,
+                "why": (
+                    "unreviewed direct branch push (inspect or continue?)"
+                    if direct_push
+                    else "recent commit (continue / push?)"
+                ),
+            }
+        )
     for cm in bundle.gh_comments:
-        out.append({
-            "rank_key": (5, cm.get("created_at") or ""),
-            "title": cm.get("preview") or "comment",
-            "source": "github",
-            "project": cm.get("repo"),
-            "evidence": [cm.get("html_url") or ""],
-            "why": "thread you engaged on",
-        })
+        out.append(
+            {
+                "rank_key": (5, cm.get("created_at") or ""),
+                "title": cm.get("preview") or "comment",
+                "source": "github",
+                "project": cm.get("repo"),
+                "evidence": [cm.get("html_url") or ""],
+                "why": "thread you engaged on",
+            }
+        )
     return out
 
 
@@ -624,14 +621,16 @@ def figma_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for fc in bundle.figma_activity:
         handle = fc.get("user_handle") or "someone"
-        out.append({
-            "rank_key": (6, fc.get("created_at") or ""),
-            "title": fc.get("message") or "Figma comment",
-            "source": "figma",
-            "project": fc.get("file_key"),
-            "evidence": [f"{handle} on figma/{fc.get('file_key', '')}"],
-            "why": "unresolved Figma comment on a watched file",
-        })
+        out.append(
+            {
+                "rank_key": (6, fc.get("created_at") or ""),
+                "title": fc.get("message") or "Figma comment",
+                "source": "figma",
+                "project": fc.get("file_key"),
+                "evidence": [f"{handle} on figma/{fc.get('file_key', '')}"],
+                "why": "unresolved Figma comment on a watched file",
+            }
+        )
     return out
 
 
@@ -643,13 +642,15 @@ def vault_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
         # rank itself (a self-reference feedback loop).
         if _is_generated_next_actions_file(v.get("rel_path") or "", v.get("title") or ""):
             continue
-        out.append({
-            "rank_key": (7, v.get("last_modified") or ""),
-            "title": v.get("title") or v.get("rel_path") or "vault note",
-            "source": "vault",
-            "evidence": [v.get("rel_path") or ""],
-            "why": "recently edited note",
-        })
+        out.append(
+            {
+                "rank_key": (7, v.get("last_modified") or ""),
+                "title": v.get("title") or v.get("rel_path") or "vault note",
+                "source": "vault",
+                "evidence": [v.get("rel_path") or ""],
+                "why": "recently edited note",
+            }
+        )
     return out
 
 
@@ -693,7 +694,7 @@ def _is_generated_next_actions_file(rel_path: str, title: str) -> bool:
     ``VAULT_NEXT_ACTIONS_RELPATH`` is defined later in the module (with the
     render sink); referenced here at call time, which is fine."""
     fname = VAULT_NEXT_ACTIONS_RELPATH.rsplit("/", 1)[-1].lower()  # "what to do next.md"
-    stem = fname.rsplit(".", 1)[0]                                  # "what to do next"
+    stem = fname.rsplit(".", 1)[0]  # "what to do next"
     return (rel_path or "").lower().endswith(fname) or (title or "").strip().lower() == stem
 
 
@@ -865,12 +866,18 @@ def _parse_ranked_synthesis(text: str) -> list[RankedAction]:
         # Model omitted automation= → fall back to the deterministic heuristic.
         if automation is None:
             automation = _infer_automation(source, title, project)
-        actions.append(RankedAction(
-            rank=0,  # re-sequenced below by emit order
-            title=title[:200], person=person, source=source,
-            project=project, evidence=evidence, why=why,
-            automation=automation,
-        ))
+        actions.append(
+            RankedAction(
+                rank=0,  # re-sequenced below by emit order
+                title=title[:200],
+                person=person,
+                source=source,
+                project=project,
+                evidence=evidence,
+                why=why,
+                automation=automation,
+            )
+        )
 
     # Re-sequence ranks 1..N by emit order — never trust model rank integers.
     for i, a in enumerate(actions, 1):
@@ -896,9 +903,7 @@ def _local_day_window(now: datetime | None, tz: Any) -> tuple[str, datetime, dat
     return start.date().isoformat(), start, end
 
 
-def _operator_temporal_context(
-    database_path: Path, now: datetime | None, tz: Any
-) -> dict[str, Any]:
+def _operator_temporal_context(database_path: Path, now: datetime | None, tz: Any) -> dict[str, Any]:
     """A minimal OPERATOR-scoped temporal context for the rank prompt.
 
     Wires the previously-dead Schedule Context branch in :func:`build_rank_prompt`
@@ -908,7 +913,7 @@ def _operator_temporal_context(
     inference. Falls back to a pure day_name + weekday/weekend computation (no DB)
     if that helper is unavailable, so this NEVER raises.
     """
-    current = (now.astimezone(tz) if now is not None else datetime.now(tz))
+    current = now.astimezone(tz) if now is not None else datetime.now(tz)
     tomorrow = current + timedelta(days=1)
     try:
         from rebalance.ingest.querier import _gather_temporal_context
@@ -918,6 +923,7 @@ def _operator_temporal_context(
             "tomorrow": _gather_temporal_context(database_path, tomorrow),
         }
     except Exception:  # noqa: BLE001 — degrade to a DB-free day-type, never raise
+
         def _basic(d: datetime) -> dict[str, Any]:
             weekday = d.weekday()
             return {
@@ -1035,17 +1041,13 @@ def _project_activity_rows_for_day(
         if not in_project(item.get("repo")):
             continue
         kind = "pr" if item.get("item_type") == "pull_request" else (item.get("item_type") or "item")
-        rows.append(
-            f"{item.get('repo')} {kind} #{item.get('number')} {(item.get('title') or '').strip()}".strip()
-        )
+        rows.append(f"{item.get('repo')} {kind} #{item.get('number')} {(item.get('title') or '').strip()}".strip())
 
     for comment in snapshot.today.gh_comments:
         if not in_project(comment.get("repo")):
             continue
         preview = (comment.get("preview") or "").strip()
-        rows.append(
-            f"{comment.get('repo')} comment #{comment.get('item_number')} {preview}".strip()
-        )
+        rows.append(f"{comment.get('repo')} comment #{comment.get('item_number')} {preview}".strip())
 
     for watched in getattr(snapshot, "watched_repos", []) or []:
         if not in_project(watched.get("repo")):
@@ -1072,7 +1074,7 @@ def _open_items_for_projects(
     project_repos: dict[str, list[str]],
 ) -> dict[str, list[dict[str, Any]]]:
     """Read open GitHub items per project from the existing collector tables."""
-    out = {project: [] for project in project_repos}
+    out: dict[str, list[dict[str, Any]]] = {project: [] for project in project_repos}
     repo_to_projects: dict[str, set[str]] = {}
     for project, repos in project_repos.items():
         for repo in repos:
@@ -1138,12 +1140,9 @@ def compute_deep_work_signals(
 
     active_projects = get_projects(database_path, status="active")
     project_repos = {
-        project["name"]: [repo for repo in (project.get("repos") or []) if repo]
-        for project in active_projects
+        project["name"]: [repo for repo in (project.get("repos") or []) if repo] for project in active_projects
     }
-    daily_rows: dict[str, dict[str, list[str]]] = {
-        project["name"]: {} for project in active_projects
-    }
+    daily_rows: dict[str, dict[str, list[str]]] = {project["name"]: {} for project in active_projects}
 
     for offset in range(lookback_days):
         day = anchor_day - timedelta(days=offset)
@@ -1282,20 +1281,13 @@ def rank_next_actions(
     client_by_project, priority_by_project, client_roster = _signal_views(database_path)
 
     # Deterministic candidate objects (operator + additive teammate delta).
-    operator_actions = [
-        _candidate_to_action(c, i)
-        for i, c in enumerate(operator_candidates_raw, 1)
-    ]
+    operator_actions = [_candidate_to_action(c, i) for i, c in enumerate(operator_candidates_raw, 1)]
     # Soft down-weight in the fallback floor: low-priority (periodic) projects sink
     # to the bottom of the operator arm via a STABLE sort (original recency order
     # preserved within each group), so the down-weight holds even when synthesis is
     # skipped or fails. Not a drop — they remain in the list.
-    operator_actions.sort(
-        key=lambda a: 1 if _is_low_priority(a.project, priority_by_project) else 0
-    )
-    teammate_actions = [
-        _candidate_to_action(_teammate_candidate(b), 0) for b in teammate_delta
-    ]
+    operator_actions.sort(key=lambda a: 1 if _is_low_priority(a.project, priority_by_project) else 0)
+    teammate_actions = [_candidate_to_action(_teammate_candidate(b), 0) for b in teammate_delta]
     # The fallback floor: operator candidates, then the additive teammate delta.
     fallback = operator_actions + teammate_actions
     for i, a in enumerate(fallback, 1):
@@ -1323,9 +1315,7 @@ def rank_next_actions(
             # "thinking" and truncated the ranked list to ~2 items at MAX_TOKENS.
             # With thinking off the whole budget goes to the answer (the full
             # ranked list). 2048 caps the answer length.
-            synthesis, model_used = _synthesize_with_fallback(
-                prompt, max_tokens=2048, thinking_budget=0
-            )
+            synthesis, model_used = _synthesize_with_fallback(prompt, max_tokens=2048, thinking_budget=0)
             parsed = _parse_ranked_synthesis(synthesis)
             # STRUCTURED acceptance gate: only trust the parse over the
             # deterministic fallback when it is non-empty AND at least half its
@@ -1336,17 +1326,16 @@ def rank_next_actions(
             if parsed and structured * 2 >= len(parsed):
                 ranked = parsed
             else:
-                note = (
-                    (note + "; " if note else "")
-                    + "synthesis parsed to nothing useful; using deterministic order"
-                )
+                note = (note + "; " if note else "") + "synthesis parsed to nothing useful; using deterministic order"
                 # Synthesis returned text but parsed-to-nothing-useful WHILE
                 # candidates existed → the interesting failure.
                 if (synthesis or "").strip() and fallback:
                     logger.warning(
                         "rank_next_actions: synthesis text did not parse to "
                         "structured items (parsed=%d, structured=%d, candidates=%d)",
-                        len(parsed), structured, len(fallback),
+                        len(parsed),
+                        structured,
+                        len(fallback),
                     )
         except Exception as exc:  # noqa: BLE001 — degrade, don't blow up
             logger.warning("rank_next_actions: synthesis failed: %s", exc)
@@ -1356,15 +1345,16 @@ def rank_next_actions(
         if operator_candidates_raw or teammate_delta:
             # Candidates existed but the ranked list is empty — the interesting case.
             logger.warning(
-                "rank_next_actions: empty ranked output despite candidates "
-                "(blended=%s, local_day=%s)",
-                blended, local_day,
+                "rank_next_actions: empty ranked output despite candidates (blended=%s, local_day=%s)",
+                blended,
+                local_day,
             )
         else:
             # Zero candidates to begin with — expected (a quiet day / empty DB).
             logger.info(
                 "rank_next_actions: no candidates to rank (blended=%s, local_day=%s)",
-                blended, local_day,
+                blended,
+                local_day,
             )
 
     return RankedNextActions(
@@ -1385,9 +1375,7 @@ _TEAMMATE_HORIZON_DAYS = 2
 _ADDITIVITY_HISTORY_DAYS = 30
 
 
-def _operator_blocks_over_horizon(
-    conn: Any, *, local_day: str, days_forward: int, tz: Any
-) -> list[dict[str, Any]]:
+def _operator_blocks_over_horizon(conn: Any, *, local_day: str, days_forward: int, tz: Any) -> list[dict[str, Any]]:
     """Operator OPERATOR_CALENDAR_ID blocks for [local_day .. local_day+days_forward].
 
     The teammate arm reads a multi-day upcoming horizon, so normalized-title dedup
@@ -1399,13 +1387,9 @@ def _operator_blocks_over_horizon(
     start_d = parse_date(local_day)
     if start_d is None:
         start_d = datetime.now(tz).date() if hasattr(tz, "utcoffset") else time_ops.now_utc().date()
-    horizon_days = {
-        (start_d + timedelta(days=i)).isoformat()
-        for i in range(days_forward + 1)
-    }
+    horizon_days = {(start_d + timedelta(days=i)).isoformat() for i in range(days_forward + 1)}
     rows = conn.execute(
-        "SELECT id, summary, start_time, end_time, person "
-        "FROM calendar_events WHERE calendar_id = ?",
+        "SELECT id, summary, start_time, end_time, person FROM calendar_events WHERE calendar_id = ?",
         (OPERATOR_CALENDAR_ID,),
     ).fetchall()
     blocks: list[dict[str, Any]] = []
@@ -1448,9 +1432,7 @@ def _gather_teammate_delta(
     # unbounded future bound would let a single heavily-scheduled week pass a
     # teammate who never logs history.)
     now_iso = time_ops.now_iso()
-    history_floor = (
-        time_ops.now_utc() - timedelta(days=_ADDITIVITY_HISTORY_DAYS)
-    ).isoformat()
+    history_floor = (time_ops.now_utc() - timedelta(days=_ADDITIVITY_HISTORY_DAYS)).isoformat()
     placeholders = ",".join("?" for _ in roster)
     rows = conn.execute(
         f"SELECT person, COUNT(*) AS n FROM calendar_events "
@@ -1468,9 +1450,7 @@ def _gather_teammate_delta(
         return [], False, "no teammate passed the additivity threshold (operator-only)"
 
     # get_team_upcoming_by_person is the ONLY reader that SELECTs `person`.
-    raw = get_team_upcoming_by_person(
-        database_path, passing, days_forward=_TEAMMATE_HORIZON_DAYS
-    )
+    raw = get_team_upcoming_by_person(database_path, passing, days_forward=_TEAMMATE_HORIZON_DAYS)
     teammate_blocks: list[dict[str, Any]] = []
     for ev in raw:
         block = _calendar_block(ev, tz=tz)
@@ -1485,14 +1465,11 @@ def _gather_teammate_delta(
         conn, local_day=local_day, days_forward=_TEAMMATE_HORIZON_DAYS, tz=tz
     )
     shared_ids = _shared_event_ids(conn, operator_blocks=operator_blocks, persons=passing)
-    delta, dropped = dedup_teammate_blocks(
-        teammate_blocks, operator_horizon_blocks, shared_ids=shared_ids
-    )
+    delta, dropped = dedup_teammate_blocks(teammate_blocks, operator_horizon_blocks, shared_ids=shared_ids)
     # blended is True only when the team arm CONTRIBUTED an additive block.
     contributed = bool(delta)
     note = (
-        f"team blended: {len(passing)} person(s) passed additivity, "
-        f"{len(delta)} additive block(s), {dropped} deduped"
+        f"team blended: {len(passing)} person(s) passed additivity, {len(delta)} additive block(s), {dropped} deduped"
         if contributed
         else (
             f"team consulted: {len(passing)} person(s) passed additivity but "
@@ -1558,8 +1535,7 @@ def load_ranked_next_actions(database_path: Path) -> RankedNextActions | None:
     try:
         with db_connection(database_path) as conn:
             row = conn.execute(
-                "SELECT payload_json FROM ranked_next_actions "
-                "ORDER BY computed_at DESC LIMIT 1"
+                "SELECT payload_json FROM ranked_next_actions ORDER BY computed_at DESC LIMIT 1"
             ).fetchone()
     except Exception:  # noqa: BLE001 — table absent on a brand-new DB
         return None
@@ -1602,12 +1578,9 @@ def get_ranked_meta(database_path: Path) -> dict[str, Any]:
     try:
         with db_connection(database_path) as conn:
             row = conn.execute(
-                "SELECT computed_at, blended, model_used FROM ranked_next_actions "
-                "ORDER BY computed_at DESC LIMIT 1"
+                "SELECT computed_at, blended, model_used FROM ranked_next_actions ORDER BY computed_at DESC LIMIT 1"
             ).fetchone()
-            n = conn.execute(
-                "SELECT COUNT(*) FROM ranked_next_actions"
-            ).fetchone()[0]
+            n = conn.execute("SELECT COUNT(*) FROM ranked_next_actions").fetchone()[0]
     except Exception:  # noqa: BLE001 — table absent on a brand-new DB
         return {"computed_at": None, "blended": None, "model_used": None, "row_count": 0}
     return {
@@ -1638,9 +1611,7 @@ def _fmt_local_stamp(iso_utc: str, tz: Any) -> str:
     return format_local(iso_utc, "%Y-%m-%d %H:%M %Z", tz=tz) or (iso_utc or "unknown")
 
 
-def render_next_actions_markdown(
-    result: RankedNextActions, *, now: datetime | None = None
-) -> str:
+def render_next_actions_markdown(result: RankedNextActions, *, now: datetime | None = None) -> str:
     """Render *result* to the fixed-vault-file markdown (single-writer, generated).
 
     Pure string-from-dataclass; no I/O. The banner carries the generated-file

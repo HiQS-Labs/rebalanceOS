@@ -35,10 +35,7 @@ def ingest_preflight(
     if include_github:
         github_token = get_github_token()
         if not github_token:
-            typer.echo(
-                "⚠ GitHub PAT not configured. Set it with:\n"
-                "  rebalance config set-github-token <PAT>"
-            )
+            typer.echo("⚠ GitHub PAT not configured. Set it with:\n  rebalance config set-github-token <PAT>")
             raise typer.Exit(code=1)
 
     result = run_preflight(
@@ -70,7 +67,9 @@ def ingest_sync(
     projects_path = projects_yaml if projects_yaml.is_absolute() else vault / projects_yaml
     database_path = database if database.is_absolute() else vault / database
 
-    summary = sync_registry(mode=mode, registry_path=registry_path, projects_yaml_path=projects_path, database_path=database_path)
+    summary = sync_registry(
+        mode=mode, registry_path=registry_path, projects_yaml_path=projects_path, database_path=database_path
+    )
     typer.echo(summary)
 
 
@@ -105,10 +104,7 @@ def ingest_infer_project_registry(
         )
         for project in projects:
             repo_count = len(project["repos"])
-            typer.echo(
-                f"  {project['name']} [{project['status']}] repos={repo_count} "
-                f"tags={','.join(project['tags'])}"
-            )
+            typer.echo(f"  {project['name']} [{project['status']}] repos={repo_count} tags={','.join(project['tags'])}")
         return
 
     summary = sync_inferred_project_registry(

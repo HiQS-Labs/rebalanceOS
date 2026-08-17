@@ -31,14 +31,14 @@ from rich.text import Text
 # like one product. Standalone (small) copy rather than reaching into
 # scripts/dashboard.py to keep the import graph trivial.
 _PALETTE = {
-    "fg":        "#e8e6e3",
-    "fg_muted":  "#a8a29c",
-    "fg_dim":    "#6c6660",
-    "accent":    "#e8b86a",
-    "ok":        "#7fb069",
-    "warn":      "#e8b86a",
-    "danger":    "#d65f5f",
-    "border":    "#262a31",
+    "fg": "#e8e6e3",
+    "fg_muted": "#a8a29c",
+    "fg_dim": "#6c6660",
+    "accent": "#e8b86a",
+    "ok": "#7fb069",
+    "warn": "#e8b86a",
+    "danger": "#d65f5f",
+    "border": "#262a31",
 }
 
 
@@ -167,9 +167,7 @@ def _format_pct(seconds: float | None, total: float) -> str:
 
 def _format_log_age(log_path: Path) -> str:
     try:
-        mtime = _dt.datetime.fromtimestamp(
-            log_path.stat().st_mtime, tz=_dt.timezone.utc
-        )
+        mtime = _dt.datetime.fromtimestamp(log_path.stat().st_mtime, tz=_dt.timezone.utc)
     except OSError:
         return "?"
     delta = _dt.datetime.now(_dt.timezone.utc) - mtime
@@ -259,7 +257,7 @@ def render_profile_sync(
         timings.append((repo, elapsed, r))
 
     timings.sort(
-        key=lambda t: (t[1] if isinstance(t[1], float) else -1.0),
+        key=lambda t: t[1] if isinstance(t[1], float) else -1.0,
         reverse=True,
     )
     if top_n is not None and top_n > 0:

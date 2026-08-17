@@ -65,6 +65,7 @@ def secret_store_root() -> Path:
 
 # --- permission enforcement -------------------------------------------------
 
+
 def _mode_of(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
 
@@ -106,6 +107,7 @@ def permission_ok(path: Path) -> bool:
 
 
 # --- atomic, permission-enforced writes/reads -------------------------------
+
 
 def write_secret_file(name: str, data: str) -> Path:
     """Atomically write *data* to ``<root>/<name>`` at ``0600`` under a ``0700`` root.
@@ -176,6 +178,7 @@ def secret_path(name: str) -> Path:
 
 # --- source labeling / resolver status --------------------------------------
 
+
 @dataclass(frozen=True)
 class ResolverStatus:
     """The structured per-integration resolver contract from the plan's Target State.
@@ -185,12 +188,12 @@ class ResolverStatus:
     this; Phase 4 extends the same shape to API keys.
     """
 
-    source: str | None             # live value origin: "keyring" | "secret-store" | "config" | "env" | "gh-cli" | None
-    primary_store: str             # intended primary store, e.g. "keyring"
-    fallback_store: str            # durable fallback store, e.g. "secret-store"
-    launchd_safe: bool             # can an unattended (no-shell) job read it?
+    source: str | None  # live value origin: "keyring" | "secret-store" | "config" | "env" | "gh-cli" | None
+    primary_store: str  # intended primary store, e.g. "keyring"
+    fallback_store: str  # durable fallback store, e.g. "secret-store"
+    launchd_safe: bool  # can an unattended (no-shell) job read it?
     last_validated_at: str | None  # ISO-8601 of last successful validation, or None
-    permission_ok: bool            # fallback file/dir modes are 0600/0700 (True when N/A)
+    permission_ok: bool  # fallback file/dir modes are 0600/0700 (True when N/A)
 
     def as_dict(self) -> dict:
         """Flat dict for doctor / JSON diagnostics output."""

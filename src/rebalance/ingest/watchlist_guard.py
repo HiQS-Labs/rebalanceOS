@@ -78,9 +78,7 @@ def _read_latest_snapshot(conn) -> tuple[int | None, dict[str, set[str]]]:
     effect is merely that the next run diffs against the last non-empty snapshot
     and re-alarms. Safe-loud, never silent, so the guard's invariant holds.
     """
-    row = conn.execute(
-        f"SELECT MAX(snapshot_ts) AS ts FROM {_SNAPSHOT_TABLE}"
-    ).fetchone()
+    row = conn.execute(f"SELECT MAX(snapshot_ts) AS ts FROM {_SNAPSHOT_TABLE}").fetchone()
     ts = row["ts"] if row else None
     if ts is None:
         return None, {}
@@ -88,10 +86,7 @@ def _read_latest_snapshot(conn) -> tuple[int | None, dict[str, set[str]]]:
         f"SELECT repo, buckets FROM {_SNAPSHOT_TABLE} WHERE snapshot_ts = ?",
         (ts,),
     ).fetchall()
-    prev = {
-        r["repo"]: {b for b in (r["buckets"] or "").split(",") if b}
-        for r in rows
-    }
+    prev = {r["repo"]: {b for b in (r["buckets"] or "").split(",") if b} for r in rows}
     return ts, prev
 
 
@@ -125,17 +120,13 @@ def snapshot_and_detect(
         ts = int(now_ts if now_ts is not None else time.time())
 
         conn.executemany(
-            f"INSERT OR REPLACE INTO {_SNAPSHOT_TABLE} "
-            "(snapshot_ts, repo, buckets) VALUES (?,?,?)",
-            [(ts, repo, ",".join(sorted(curr_buckets.get(repo, set()))))
-             for repo in sorted(curr)],
+            f"INSERT OR REPLACE INTO {_SNAPSHOT_TABLE} (snapshot_ts, repo, buckets) VALUES (?,?,?)",
+            [(ts, repo, ",".join(sorted(curr_buckets.get(repo, set())))) for repo in sorted(curr)],
         )
 
         # Prune old history (keep ~RETENTION_DAYS).
         cutoff = ts - RETENTION_DAYS * 86400
-        conn.execute(
-            f"DELETE FROM {_SNAPSHOT_TABLE} WHERE snapshot_ts < ?", (cutoff,)
-        )
+        conn.execute(f"DELETE FROM {_SNAPSHOT_TABLE} WHERE snapshot_ts < ?", (cutoff,))
         conn.commit()
 
     # First-ever run: baseline only, never a reduction event.

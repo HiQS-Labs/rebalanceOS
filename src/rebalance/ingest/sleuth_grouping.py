@@ -24,6 +24,7 @@ from typing import Any, Literal
 # Data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class ReminderGroup:
     kind: Literal["github", "client", "channel", "other"]
@@ -35,13 +36,13 @@ class ReminderGroup:
 # Title extraction  (ports ExtractReminderTitle from show-me-projects-command.js)
 # ---------------------------------------------------------------------------
 
-_SLACK_USER_RE  = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
-_SLACK_LINK_RE  = re.compile(r"<([^|>\s]+)\|([^>]+)>")
+_SLACK_USER_RE = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
+_SLACK_LINK_RE = re.compile(r"<([^|>\s]+)\|([^>]+)>")
 _SLACK_TOKEN_RE = re.compile(r"<[^>]+>")
-_MRKDWN_RE      = re.compile(r"[*_`]")
-_KEY_TASK_RE    = re.compile(r"Key task\(s\):\s*\n?\s*[•\-*]?\s*([^\n]+)", re.IGNORECASE)
-_FOLLOW_UP_RE   = re.compile(r"^.*?please follow up on <[^>]*>:?\s*", re.IGNORECASE | re.DOTALL)
-_QUOTE_LEAD_RE  = re.compile(r"^>\s*", re.MULTILINE)
+_MRKDWN_RE = re.compile(r"[*_`]")
+_KEY_TASK_RE = re.compile(r"Key task\(s\):\s*\n?\s*[•\-*]?\s*([^\n]+)", re.IGNORECASE)
+_FOLLOW_UP_RE = re.compile(r"^.*?please follow up on <[^>]*>:?\s*", re.IGNORECASE | re.DOTALL)
+_QUOTE_LEAD_RE = re.compile(r"^>\s*", re.MULTILINE)
 
 
 def _strip_slack_mrkdwn(text: str) -> str:
@@ -81,6 +82,7 @@ def extract_task_text(text: str) -> str:
 # Client mapping  (mirrors client-mapping.js + client-channel-mapping.json)
 # ---------------------------------------------------------------------------
 
+
 def _find_client_mapping_path() -> Path | None:
     """Locate client-channel-mapping.json.
 
@@ -88,16 +90,15 @@ def _find_client_mapping_path() -> Path | None:
     falls back to the canonical sibling sleuth-app checkout heuristic.
     """
     from rebalance.ingest.config import get_sleuth_client_mapping_path
+
     configured = get_sleuth_client_mapping_path()
     if configured:
         p = Path(configured)
         return p if p.exists() else None
     from rebalance.paths import resolve_project_root
+
     repo_root = resolve_project_root(Path(__file__))
-    candidate = (
-        repo_root.parent / "GH Repos" / "sleuth-app"
-        / "data" / "static" / "client-channel-mapping.json"
-    )
+    candidate = repo_root.parent / "GH Repos" / "sleuth-app" / "data" / "static" / "client-channel-mapping.json"
     return candidate if candidate.exists() else None
 
 
@@ -123,26 +124,14 @@ def _does_reminder_match_client(reminder: dict[str, Any], client: dict[str, Any]
         return True
 
     channel_name = (reminder.get("original_channel_name") or "").lower()
-    name_patterns = [
-        p.lower()
-        for p in (client.get("ChannelNamePatterns") or [])
-        if isinstance(p, str) and p
-    ]
+    name_patterns = [p.lower() for p in (client.get("ChannelNamePatterns") or []) if isinstance(p, str) and p]
     if channel_name and any(p in channel_name for p in name_patterns):
         return True
 
     github_urls = reminder.get("github_urls") or []
-    repo_patterns = [
-        p.lower()
-        for p in (client.get("GitHubRepoPatterns") or [])
-        if isinstance(p, str) and p
-    ]
+    repo_patterns = [p.lower() for p in (client.get("GitHubRepoPatterns") or []) if isinstance(p, str) and p]
     if github_urls and repo_patterns:
-        if any(
-            p in (url or "").lower()
-            for url in github_urls
-            for p in repo_patterns
-        ):
+        if any(p in (url or "").lower() for url in github_urls for p in repo_patterns):
             return True
 
     return False
@@ -151,6 +140,7 @@ def _does_reminder_match_client(reminder: dict[str, Any], client: dict[str, Any]
 # ---------------------------------------------------------------------------
 # GitHub URL label  (mirrors GitHubRefFromUrl from reminder-clustering.js)
 # ---------------------------------------------------------------------------
+
 
 def _github_label_from_url(url: str) -> str:
     m = re.search(r"/(issues|pull)/(\d+)", url or "", re.IGNORECASE)
@@ -162,6 +152,7 @@ def _github_label_from_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 # Union-find helpers (for rule 1)
 # ---------------------------------------------------------------------------
+
 
 def _uf_find(parent: list[int], i: int) -> int:
     root = i
@@ -180,6 +171,7 @@ def _uf_union(parent: list[int], a: int, b: int) -> None:
 # Core grouping  (ports ClusterRemindersByRelationship)
 # ---------------------------------------------------------------------------
 
+
 def group_reminders(
     reminders: list[dict[str, Any]],
     clients: list[dict[str, Any]] | None = None,
@@ -196,15 +188,12 @@ def group_reminders(
     clusters: list[ReminderGroup] = []
 
     # Rule 1 — shared GitHub URL (transitive union-find) -------------------
-    github_idxs = [
-        i for i, r in enumerate(reminders)
-        if r.get("github_urls")
-    ]
+    github_idxs = [i for i, r in enumerate(reminders) if r.get("github_urls")]
     if github_idxs:
         parent = list(range(len(reminders)))
         first_seen: dict[str, int] = {}
         for i in github_idxs:
-            for url in (reminders[i].get("github_urls") or []):
+            for url in reminders[i].get("github_urls") or []:
                 if url in first_seen:
                     _uf_union(parent, i, first_seen[url])
                 else:
@@ -218,16 +207,18 @@ def group_reminders(
         for component in by_root.values():
             url_counts: dict[str, int] = {}
             for i in component:
-                for url in (reminders[i].get("github_urls") or []):
+                for url in reminders[i].get("github_urls") or []:
                     url_counts[url] = url_counts.get(url, 0) + 1
             best_url = max(url_counts, key=lambda u: (url_counts[u], -list(url_counts).index(u)))
             for i in component:
                 placed.add(i)
-            clusters.append(ReminderGroup(
-                kind="github",
-                label=_github_label_from_url(best_url),
-                reminders=tuple(reminders[i] for i in sorted(component)),
-            ))
+            clusters.append(
+                ReminderGroup(
+                    kind="github",
+                    label=_github_label_from_url(best_url),
+                    reminders=tuple(reminders[i] for i in sorted(component)),
+                )
+            )
 
     # Rule 2 — same client -------------------------------------------------
     for client in clients:
@@ -236,11 +227,13 @@ def group_reminders(
             continue
         for i in members:
             placed.add(i)
-        clusters.append(ReminderGroup(
-            kind="client",
-            label=str(client.get("ClientName") or "Client"),
-            reminders=tuple(reminders[i] for i in members),
-        ))
+        clusters.append(
+            ReminderGroup(
+                kind="client",
+                label=str(client.get("ClientName") or "Client"),
+                reminders=tuple(reminders[i] for i in members),
+            )
+        )
 
     # Rule 3 — same channel (2+ members) -----------------------------------
     by_channel: dict[str, list[int]] = {}
@@ -255,11 +248,13 @@ def group_reminders(
             continue
         for i in members:
             placed.add(i)
-        clusters.append(ReminderGroup(
-            kind="channel",
-            label=f"#{ch}",
-            reminders=tuple(reminders[i] for i in members),
-        ))
+        clusters.append(
+            ReminderGroup(
+                kind="channel",
+                label=f"#{ch}",
+                reminders=tuple(reminders[i] for i in members),
+            )
+        )
 
     # Sort non-other clusters by size descending (stable)
     clusters.sort(key=lambda g: -len(g.reminders))
@@ -275,6 +270,7 @@ def group_reminders(
 # ---------------------------------------------------------------------------
 # Connection surfacing
 # ---------------------------------------------------------------------------
+
 
 def find_connections(
     reminder: dict[str, Any],
@@ -293,11 +289,7 @@ def find_connections(
     target_channel = reminder.get("original_channel_name")
 
     # Which clients does the target belong to?
-    target_clients = {
-        client.get("ClientName")
-        for client in clients
-        if _does_reminder_match_client(reminder, client)
-    }
+    target_clients = {client.get("ClientName") for client in clients if _does_reminder_match_client(reminder, client)}
 
     related: list[dict[str, Any]] = []
     for r in all_reminders:
@@ -309,11 +301,7 @@ def find_connections(
             continue
         # Same client
         if target_clients:
-            r_clients = {
-                c.get("ClientName")
-                for c in clients
-                if _does_reminder_match_client(r, c)
-            }
+            r_clients = {c.get("ClientName") for c in clients if _does_reminder_match_client(r, c)}
             if target_clients & r_clients:
                 related.append(r)
                 continue
@@ -327,6 +315,7 @@ def find_connections(
 # ---------------------------------------------------------------------------
 # DB readers
 # ---------------------------------------------------------------------------
+
 
 def load_active_reminders(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """Return all active reminders from the DB as plain dicts, ordered by due date."""
@@ -346,17 +335,19 @@ def load_active_reminders(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             github_urls = json.loads(row[4] or "[]")
         except (json.JSONDecodeError, TypeError):
             github_urls = []
-        result.append({
-            "reminder_id":          row[0],
-            "original_channel_name": row[1],
-            "original_channel_id":  row[2],
-            "reminder_message_text": row[3],
-            "github_urls":          github_urls,
-            "state":                row[5],
-            "should_post_on":       row[6],
-            "created_on":           row[7],
-            "task_text":            extract_task_text(row[3]),
-        })
+        result.append(
+            {
+                "reminder_id": row[0],
+                "original_channel_name": row[1],
+                "original_channel_id": row[2],
+                "reminder_message_text": row[3],
+                "github_urls": github_urls,
+                "state": row[5],
+                "should_post_on": row[6],
+                "created_on": row[7],
+                "task_text": extract_task_text(row[3]),
+            }
+        )
     return result
 
 

@@ -30,6 +30,22 @@ jobs:
         run: pip install ruff
       - name: Lint
         run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mypy
+        run: pip install mypy
+      - name: Type check
+        run: mypy src/
 
   test:
     runs-on: ubuntu-latest

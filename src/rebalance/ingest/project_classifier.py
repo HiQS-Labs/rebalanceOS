@@ -96,7 +96,7 @@ def _build_aliases(
     for tag in tags:
         cleaned = tag.strip().lstrip("#")
         if cleaned.startswith("project-"):
-            cleaned = cleaned[len("project-"):]
+            cleaned = cleaned[len("project-") :]
         add_alias(cleaned)
         add_alias(cleaned.replace("-", " "))
 

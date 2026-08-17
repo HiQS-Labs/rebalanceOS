@@ -106,6 +106,7 @@ def _calculate_days_since_activity(last_activity_at: str | None) -> int:
         return 999
     try:
         from rebalance.ingest.calendar_helpers import parse_calendar_dt
+
         activity_dt = parse_calendar_dt(last_activity_at)
         now = now_utc()
         if activity_dt.tzinfo is None:
@@ -402,10 +403,13 @@ def run_preflight(
 
     # Interactive keep/remove
     if not non_interactive:
-        selected_names = questionary.checkbox(
-            "Review candidates: select the projects to keep",
-            choices=[c["name"] for c in all_candidates],
-        ).ask() or []
+        selected_names = (
+            questionary.checkbox(
+                "Review candidates: select the projects to keep",
+                choices=[c["name"] for c in all_candidates],
+            ).ask()
+            or []
+        )
         selected = {name.casefold() for name in selected_names}
         all_candidates = [c for c in all_candidates if c["name"].casefold() in selected]
 

@@ -71,10 +71,7 @@ def walk_repo_candidates(root: Path, max_depth: int = 2) -> list[Path]:
         if depth >= max_depth:
             continue
         try:
-            children = sorted(
-                child for child in current.iterdir()
-                if child.is_dir() and should_descend(child.name)
-            )
+            children = sorted(child for child in current.iterdir() if child.is_dir() and should_descend(child.name))
         except OSError:
             continue
         for child in reversed(children):
@@ -132,7 +129,7 @@ def unpushed_work(repos: list[LocalRepo] | None = None) -> list[LocalRepo]:
     if repos is None:
         repos = scan_local_repos()
     return [
-        r for r in repos
-        if (r.unpushed_commits or 0) > 0
-        or (r.unpushed_commits is None and r.branch not in ("", "HEAD"))
+        r
+        for r in repos
+        if (r.unpushed_commits or 0) > 0 or (r.unpushed_commits is None and r.branch not in ("", "HEAD"))
     ]

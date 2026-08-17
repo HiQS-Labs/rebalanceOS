@@ -34,6 +34,7 @@ def main() -> None:
         database_path = canonical_database_path()
         database_path.parent.mkdir(parents=True, exist_ok=True)
         import sqlite3
+
         sqlite3.connect(database_path).close()
         logger.info("Created empty database at %s", database_path)
     server = create_server(database_path=database_path)

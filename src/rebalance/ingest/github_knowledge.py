@@ -35,6 +35,7 @@ from rebalance.ingest.embedder import (
 )
 from rebalance.ingest.semantic_index import sync_github_documents
 from rebalance.lib.json_ops import _json_dumps
+
 DEFAULT_SYNC_DAYS = 90
 MIN_EMBED_CHARS = 40
 # GH-171: release the single SQLite writer periodically during a long persist
@@ -184,11 +185,7 @@ def _parse_links(text: str) -> list[tuple[str, int]]:
     if not text:
         return []
     closing = {(kind, int(num)) for num in _CLOSES_RE.findall(text) for kind in ["closes"]}
-    mentions = {
-        ("mentions", int(num))
-        for num in _ISSUE_REF_RE.findall(text)
-        if ("closes", int(num)) not in closing
-    }
+    mentions = {("mentions", int(num)) for num in _ISSUE_REF_RE.findall(text) if ("closes", int(num)) not in closing}
     return sorted(closing | mentions, key=lambda item: (item[0], item[1]))
 
 
@@ -278,20 +275,15 @@ def purge_github_repo_data(
         ensure_semantic_schema(conn)
 
         row_counts: dict[str, int] = {
-            table_name: gh.count_repo_rows(conn, table_name, normalized_repo)
-            for table_name in table_names
+            table_name: gh.count_repo_rows(conn, table_name, normalized_repo) for table_name in table_names
         }
 
         github_doc_ids = gh.github_document_ids(conn, normalized_repo)
-        row_counts["github_embeddings"] = gh.count_ids_in(
-            conn, "github_embeddings", "doc_id", github_doc_ids
-        )
+        row_counts["github_embeddings"] = gh.count_ids_in(conn, "github_embeddings", "doc_id", github_doc_ids)
 
         semantic_doc_ids = gh.semantic_doc_ids_for_github_repo(conn, normalized_repo)
         row_counts["semantic_documents"] = len(semantic_doc_ids)
-        row_counts["semantic_embeddings"] = gh.count_ids_in(
-            conn, "semantic_embeddings", "rowid", semantic_doc_ids
-        )
+        row_counts["semantic_embeddings"] = gh.count_ids_in(conn, "semantic_embeddings", "rowid", semantic_doc_ids)
 
         total_rows = sum(row_counts.values())
         if dry_run:
@@ -430,15 +422,11 @@ def sync_github_repo(
         pr_reviews = _paginate_list(f"{repo_base}/pulls/{item_number}/reviews", api_get)
         pr_review_comments = _paginate_list(f"{repo_base}/pulls/{item_number}/comments", api_get)
         pr_commits = _paginate_list(f"{repo_base}/pulls/{item_number}/commits", api_get)
-        check_runs_resp = api_get(_build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100))
-        pr_check_runs = (
-            check_runs_resp.get("check_runs", [])
-            if isinstance(check_runs_resp, dict)
-            else []
+        check_runs_resp = api_get(
+            _build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
         )
-        pr_payloads.append(
-            (pr, pr_issue_comments, pr_reviews, pr_review_comments, pr_commits, pr_check_runs)
-        )
+        pr_check_runs = check_runs_resp.get("check_runs", []) if isinstance(check_runs_resp, dict) else []
+        pr_payloads.append((pr, pr_issue_comments, pr_reviews, pr_review_comments, pr_commits, pr_check_runs))
 
     comments_synced = 0
     commits_synced = 0
@@ -668,7 +656,9 @@ def sync_github_repo(
                 "mergeable_state": pr.get("mergeable_state", ""),
                 "review_decision": _review_decision(reviews),
                 "check_status": _check_rollup(check_runs),
-                "requested_reviewers_json": _json_dumps([r.get("login", "") for r in pr.get("requested_reviewers") or []]),
+                "requested_reviewers_json": _json_dumps(
+                    [r.get("login", "") for r in pr.get("requested_reviewers") or []]
+                ),
                 "comments_count": pr.get("comments") or 0,
                 "review_comments_count": pr.get("review_comments") or 0,
                 "commits_count": pr.get("commits") or 0,
@@ -904,6 +894,7 @@ def sync_github_repo(
 
 def _default_embed_texts(texts: list[str], model_name: str) -> list[list[float]]:
     from rebalance.ingest.embedder import instrument_embedding_pass
+
     instrument_embedding_pass("_default_embed_texts")
     model, tokenizer = _load_model(model_name)
     return _embed_batch(model, tokenizer, texts)
@@ -965,7 +956,7 @@ def embed_github_documents(
 
         embedded = 0
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             texts = [row["body"][:4000] for row in batch]
             vectors = embed_fn(texts, model_name)
             for row, vec in zip(batch, vectors):

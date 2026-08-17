@@ -24,9 +24,9 @@ import yaml
 @dataclass
 class ParsedChunk:
     chunk_index: int
-    heading: str | None          # "Architecture" (text only, no ## prefix)
-    heading_level: int | None    # 1-6, None for preamble
-    body: str                    # raw markdown text of this chunk
+    heading: str | None  # "Architecture" (text only, no ## prefix)
+    heading_level: int | None  # 1-6, None for preamble
+    body: str  # raw markdown text of this chunk
     char_count: int = 0
 
     def __post_init__(self) -> None:
@@ -35,13 +35,13 @@ class ParsedChunk:
 
 @dataclass
 class ParsedNote:
-    rel_path: str                            # relative to vault root
-    title: str                               # from first H1 or filename
+    rel_path: str  # relative to vault root
+    title: str  # from first H1 or filename
     frontmatter: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     wikilinks: list[tuple[str, str]] = field(default_factory=list)  # (target, 'wikilink'|'embed')
     chunks: list[ParsedChunk] = field(default_factory=list)
-    content_hash: str = ""                   # SHA-256 of raw file bytes
+    content_hash: str = ""  # SHA-256 of raw file bytes
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def extract_frontmatter(raw_text: str) -> tuple[dict[str, Any], str]:
     if not match:
         return {}, raw_text
     fm_text = match.group(1)
-    body = raw_text[match.end():]
+    body = raw_text[match.end() :]
     try:
         parsed = yaml.safe_load(fm_text)
         if not isinstance(parsed, dict):
@@ -146,12 +146,14 @@ def chunk_by_headings(body_text: str) -> list[ParsedChunk]:
         end = heading_matches[i + 1].start() if i + 1 < len(heading_matches) else len(body_text)
         body = body_text[start:end].strip()
 
-        chunks.append(ParsedChunk(
-            chunk_index=len(chunks),
-            heading=heading_text,
-            heading_level=level,
-            body=body,
-        ))
+        chunks.append(
+            ParsedChunk(
+                chunk_index=len(chunks),
+                heading=heading_text,
+                heading_level=level,
+                body=body,
+            )
+        )
 
     return chunks
 

@@ -279,8 +279,7 @@ def infer_issue_pr_close_candidates(
                 pr_text = "\n".join(part for part in pr_text_parts if part)
 
                 explicit_links = [
-                    item for item in explicit_by_issue.get(issue_number, [])
-                    if int(item["pr"]["number"]) == pr_number
+                    item for item in explicit_by_issue.get(issue_number, []) if int(item["pr"]["number"]) == pr_number
                 ]
                 explicit_close = any(link["link_kind"] == "closes" for link in explicit_links)
                 explicit_link = bool(explicit_links)
@@ -289,8 +288,7 @@ def infer_issue_pr_close_candidates(
                 commit_mentions_issue = issue_number in _extract_refs("\n".join(pr_commits.get(pr_number, [])))
                 pr_mentions_issue = issue_number in _extract_refs(pr_text)
                 same_milestone = bool(
-                    issue.get("milestone_title")
-                    and issue.get("milestone_title") == pr.get("milestone_title")
+                    issue.get("milestone_title") and issue.get("milestone_title") == pr.get("milestone_title")
                 )
 
                 score = 0.0
@@ -298,25 +296,17 @@ def infer_issue_pr_close_candidates(
 
                 if explicit_close:
                     score = 0.99
-                    evidence.append(
-                        f"PR #{pr_number} explicitly uses a closing keyword for issue #{issue_number}."
-                    )
+                    evidence.append(f"PR #{pr_number} explicitly uses a closing keyword for issue #{issue_number}.")
                 else:
                     if explicit_link:
                         score += 0.35
-                        evidence.append(
-                            f"PR #{pr_number} explicitly references issue #{issue_number}."
-                        )
+                        evidence.append(f"PR #{pr_number} explicitly references issue #{issue_number}.")
                     if issue_mentions_pr:
                         score += 0.3
-                        evidence.append(
-                            f"Issue #{issue_number} text/comments explicitly mention PR #{pr_number}."
-                        )
+                        evidence.append(f"Issue #{issue_number} text/comments explicitly mention PR #{pr_number}.")
                     if branch_issue_match:
                         score += 0.35
-                        evidence.append(
-                            f"PR branch `{pr.get('head_ref', '')}` contains issue number {issue_number}."
-                        )
+                        evidence.append(f"PR branch `{pr.get('head_ref', '')}` contains issue number {issue_number}.")
                     if commit_mentions_issue:
                         score += 0.2
                         evidence.append(
@@ -324,29 +314,19 @@ def infer_issue_pr_close_candidates(
                         )
                     if pr_mentions_issue:
                         score += 0.15
-                        evidence.append(
-                            f"PR #{pr_number} title/body/comments mention issue #{issue_number}."
-                        )
+                        evidence.append(f"PR #{pr_number} title/body/comments mention issue #{issue_number}.")
                     if title_similarity >= 0.6:
                         score += 0.35
-                        evidence.append(
-                            f"Issue and PR titles are highly similar ({title_similarity:.2f})."
-                        )
+                        evidence.append(f"Issue and PR titles are highly similar ({title_similarity:.2f}).")
                     elif title_similarity >= 0.35:
                         score += 0.2
-                        evidence.append(
-                            f"Issue and PR titles have moderate overlap ({title_similarity:.2f})."
-                        )
+                        evidence.append(f"Issue and PR titles have moderate overlap ({title_similarity:.2f}).")
                     elif title_similarity >= 0.2:
                         score += 0.1
-                        evidence.append(
-                            f"Issue and PR titles have some overlap ({title_similarity:.2f})."
-                        )
+                        evidence.append(f"Issue and PR titles have some overlap ({title_similarity:.2f}).")
                     if same_milestone:
                         score += 0.1
-                        evidence.append(
-                            f"Issue and PR share milestone `{issue.get('milestone_title', '')}`."
-                        )
+                        evidence.append(f"Issue and PR share milestone `{issue.get('milestone_title', '')}`.")
                     if issue_mentions_pr and branch_issue_match:
                         score += 0.2
                         evidence.append(
@@ -354,14 +334,10 @@ def infer_issue_pr_close_candidates(
                         )
                     if explicit_link and title_similarity >= 0.2:
                         score += 0.1
-                        evidence.append(
-                            "The explicit PR reference is reinforced by title overlap."
-                        )
+                        evidence.append("The explicit PR reference is reinforced by title overlap.")
                     if branch_issue_match and title_similarity >= 0.2:
                         score += 0.1
-                        evidence.append(
-                            "Branch naming and title overlap point to the same issue/PR pair."
-                        )
+                        evidence.append("Branch naming and title overlap point to the same issue/PR pair.")
 
                 if score < medium_threshold:
                     continue
@@ -369,9 +345,7 @@ def infer_issue_pr_close_candidates(
                 confidence_band = "high" if score >= high_threshold else "medium"
                 recommendation = "manual_review_recommended"
                 if confidence_band == "high":
-                    recommendation = (
-                        "auto_close_recommended" if explicit_close else "close_recommended"
-                    )
+                    recommendation = "auto_close_recommended" if explicit_close else "close_recommended"
 
                 candidates.append(
                     IssuePRRecommendation(

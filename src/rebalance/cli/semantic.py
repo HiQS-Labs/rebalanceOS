@@ -28,9 +28,11 @@ def _normalize_semantic_sources_option(values: list[str]) -> list[str]:
     normalized = [value.strip().lower() for value in values if value.strip()]
     if not normalized or "all" in normalized:
         from rebalance.ingest.index_ops import _all_semantic_sources
+
         return _all_semantic_sources()
     try:
         from rebalance.ingest.semantic_index import normalize_sources
+
         return list(normalize_sources(normalized))
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -95,10 +97,7 @@ def semantic_embed_cmd(
         typer.echo(str(exc))
         raise typer.Exit(2) from exc
     sources = _normalize_semantic_sources_option(source)
-    typer.echo(
-        f"Embedding semantic documents for {', '.join(sources)} with {model} "
-        f"(batch_size={batch_size})..."
-    )
+    typer.echo(f"Embedding semantic documents for {', '.join(sources)} with {model} (batch_size={batch_size})...")
     result = embed_semantic_pending(
         database_path=db_path,
         source_types=sources,
@@ -127,11 +126,13 @@ def semantic_query_cmd(
     top_k: int = typer.Option(10, help="Number of results to return"),
     model: str = typer.Option("Qwen/Qwen3-Embedding-0.6B", help="Embedding model for query"),
     updated_after: str = typer.Option(
-        None, "--updated-after",
+        None,
+        "--updated-after",
         help="ISO-8601 date/datetime — exclude docs updated before this (e.g. 2026-05-01).",
     ),
     repo: str = typer.Option(
-        None, "--repo",
+        None,
+        "--repo",
         help="Restrict GitHub results to one repo in owner/name form.",
     ),
 ) -> None:
@@ -154,10 +155,7 @@ def semantic_query_cmd(
         repo=repo or None,
     )
     if not results:
-        typer.echo(
-            "No semantic results found. Run `rebalance semantic-backfill` and "
-            "`rebalance semantic-embed` first."
-        )
+        typer.echo("No semantic results found. Run `rebalance semantic-backfill` and `rebalance semantic-embed` first.")
         return
     for i, result in enumerate(results, 1):
         metadata = result["metadata"]
@@ -165,9 +163,7 @@ def semantic_query_cmd(
         repo_label = f" {metadata.get('repo_full_name')}" if metadata.get("repo_full_name") else ""
         html_url = metadata.get("html_url") or ""
         updated_local = format_local(result.get("updated_at"), "%Y-%m-%d %H:%M %Z", tz=local_tz())
-        typer.echo(
-            f"{i}. [{result['similarity_score']:.3f}] {result['source_type']}:{result['doc_kind']}{repo_label}"
-        )
+        typer.echo(f"{i}. [{result['similarity_score']:.3f}] {result['source_type']}:{result['doc_kind']}{repo_label}")
         typer.echo(f"   {result['title']}{heading}")
         if updated_local:
             typer.echo(f"   Local Time: {updated_local}")

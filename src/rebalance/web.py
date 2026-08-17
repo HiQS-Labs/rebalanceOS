@@ -30,7 +30,10 @@ from typing import Any, Callable
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
-    HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
 )
 from pydantic import BaseModel
 
@@ -42,6 +45,7 @@ from rebalance.lib.time_ops import format_relative, parse_utc_iso
 from rebalance import three_eyes_bridge
 from rebalance.paths import resolve_db, resolve_secret_path
 from rebalance.web_components import badge_html, button_link, render_shell
+
 logger = logging.getLogger(__name__)
 
 # How long a persisted Focus 5 roster stays authoritative before a visit lazily
@@ -60,6 +64,7 @@ FOCUS5_NOTE_MAX_CHARS = 64 * 1024
 # panel and only mutate the checkbox marker on completion.
 FOCUS5_GOALS_FILENAME = "0. Goals.md"
 FOCUS5_GOALS_MAX_ITEMS = 8
+
 
 @asynccontextmanager
 async def _app_lifespan(web_app: FastAPI):
@@ -106,6 +111,7 @@ def _get_zapier_secret(web_app: FastAPI) -> str | None:
         return _refresh_zapier_secret_state(web_app, log_errors=False)
     return web_app.state.zapier_webhook_secret
 
+
 def _verify_zapier_auth(request: Request, secret: str) -> bool:
     auth = (request.headers.get("authorization") or "").strip()
     if auth.lower().startswith("basic "):
@@ -127,7 +133,8 @@ def _zapier_rate_limit_allows(client_ip: str, *, now: float | None = None) -> bo
     key = client_ip or "unknown"
     with _ZAPIER_RATE_LIMIT_LOCK:
         tokens, updated_at = _ZAPIER_RATE_LIMIT_BUCKETS.get(
-            key, (_ZAPIER_RATE_LIMIT_CAPACITY, current),
+            key,
+            (_ZAPIER_RATE_LIMIT_CAPACITY, current),
         )
         tokens = min(
             _ZAPIER_RATE_LIMIT_CAPACITY,
@@ -142,7 +149,10 @@ def _zapier_rate_limit_allows(client_ip: str, *, now: float | None = None) -> bo
 
 def _zapier_is_dry_run(request: Request) -> bool:
     return (request.query_params.get("dry_run") or "").strip().lower() in {
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     }
 
 
@@ -201,39 +211,39 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 # resolved to a design token by web_components.badge_html — no inline hex.
 _EVENT_BADGE = {
     # calendar
-    "flow_started":         ("info",    "▶ flow started"),
-    "flow_succeeded":       ("ok",      "✓ flow succeeded"),
-    "flow_failed":          ("error",  "✗ flow failed"),
-    "token_missing":        ("warning",    "⚠ token missing"),
-    "token_refreshed":      ("ok",      "↻ token refreshed"),
-    "token_refresh_failed": ("error",  "✗ refresh failed"),
+    "flow_started": ("info", "▶ flow started"),
+    "flow_succeeded": ("ok", "✓ flow succeeded"),
+    "flow_failed": ("error", "✗ flow failed"),
+    "token_missing": ("warning", "⚠ token missing"),
+    "token_refreshed": ("ok", "↻ token refreshed"),
+    "token_refresh_failed": ("error", "✗ refresh failed"),
     # github
-    "token_validated":      ("ok",      "✓ token validated"),
-    "token_set":            ("info",    "↻ token (re)set"),
-    "token_invalid":        ("error",  "✗ token invalid"),
-    "auth_failed":          ("error",  "✗ auth failed (401)"),
-    "gh_fallback":          ("ok",      "✓ healed via gh CLI"),
+    "token_validated": ("ok", "✓ token validated"),
+    "token_set": ("info", "↻ token (re)set"),
+    "token_invalid": ("error", "✗ token invalid"),
+    "auth_failed": ("error", "✗ auth failed (401)"),
+    "gh_fallback": ("ok", "✓ healed via gh CLI"),
     # sleuth
-    "sync_succeeded":       ("ok",      "✓ sync succeeded"),
+    "sync_succeeded": ("ok", "✓ sync succeeded"),
     # gmail
-    "adc_missing":          ("warning",    "⚠ ADC missing"),
-    "scope_insufficient":   ("error",  "✗ scope insufficient"),
+    "adc_missing": ("warning", "⚠ ADC missing"),
+    "scope_insufficient": ("error", "✗ scope insufficient"),
     # launchd jobs
-    "job_started":          ("info",    "▶ started"),
-    "job_completed":        ("ok",      "✓ completed"),
-    "job_failed":           ("error",  "✗ failed"),
+    "job_started": ("info", "▶ started"),
+    "job_completed": ("ok", "✓ completed"),
+    "job_failed": ("error", "✗ failed"),
     # watch-list coverage guard (only emitted on a concerning drop)
-    "watched_repos_reduced": ("warning",   "⚠ watched repos reduced"),
+    "watched_repos_reduced": ("warning", "⚠ watched repos reduced"),
     # GH-124: commit-threshold auto-promotion
-    "project_auto_promoted": ("ok",     "✓ project auto-added"),
+    "project_auto_promoted": ("ok", "✓ project auto-added"),
 }
 
 _SOURCE_BADGE = {
-    "calendar": ("info",    "calendar"),
-    "github":   ("neutral", "github"),
-    "gmail":    ("neutral", "gmail"),
-    "sleuth":   ("neutral", "sleuth"),
-    "launchd":  ("neutral", "launchd"),
+    "calendar": ("info", "calendar"),
+    "github": ("neutral", "github"),
+    "gmail": ("neutral", "gmail"),
+    "sleuth": ("neutral", "sleuth"),
+    "launchd": ("neutral", "launchd"),
     "registry": ("neutral", "registry"),
 }
 
@@ -384,17 +394,23 @@ def _page(title: str, body: str, *, active: str, wide: bool = False, extra_css: 
     The nav/sidebar comes from render_shell (minimal, I/O-free sidebar); ``active``
     marks the current nav item (``'today' | 'focus5' | 'authlog'``).
     """
-    return HTMLResponse(
-        render_shell(title, body, active=active, wide=wide, page_css=_CSS + "\n" + extra_css)
-    )
+    return HTMLResponse(render_shell(title, body, active=active, wide=wide, page_css=_CSS + "\n" + extra_css))
 
 
 _KIND_BADGE = {
-    "github":  ("info",    "GH"),
-    "client":  ("ok",      "client"),
+    "github": ("info", "GH"),
+    "client": ("ok", "client"),
     "channel": ("neutral", "channel"),
-    "other":   ("neutral", "other"),
+    "other": ("neutral", "other"),
 }
+
+
+def _render_task_text(task_text):
+    """Render task text with HTML escaping, or an em-dash placeholder."""
+    escaped = html.escape(task_text)
+    if escaped:
+        return escaped
+    return '<em style="color:var(--fg-dim)">—</em>'
 
 
 def _render_sleuth_groups() -> str:
@@ -412,7 +428,7 @@ def _render_sleuth_groups() -> str:
         variant, badge_label = _KIND_BADGE.get(g.kind, ("neutral", g.kind))
         tasks_html = "".join(
             f"<li class='sr-task' data-text='{html.escape(r['task_text'].lower())}'>"
-            f"{html.escape(r['task_text']) or '<em style=\"color:var(--fg-dim)\">—</em>'}"
+            f"{_render_task_text(r['task_text'])}"
             f"</li>"
             for r in g.reminders
         )
@@ -480,8 +496,10 @@ def _rel_time(iso: str | None) -> str:
 def _f5_health(card: dict[str, Any]) -> str:
     """Working-tree health (re-probed live): dot + counts + branch + drift."""
     if not card.get("health_available", True):
-        return ("<div class='f5-sec'><h4>Tree health · live</h4>"
-                "<span class='f5-muted'>⚠ unavailable (repo not readable)</span></div>")
+        return (
+            "<div class='f5-sec'><h4>Tree health · live</h4>"
+            "<span class='f5-muted'>⚠ unavailable (repo not readable)</span></div>"
+        )
     if card["is_dirty"]:
         dot, parts = "var(--danger)", []
         if card["modified_count"]:
@@ -520,6 +538,7 @@ def _f5_warning_strip(data: dict[str, Any]) -> str:
     # 5"), so it's only rendered on the headline board — the Dirty Five view ranks
     # under dirty_first and would be mislabelled by it. (Codex relay r2.)
     from rebalance.ingest.focus5_scan import explain_recency
+
     explain_on = data.get("ranking_mode") == "recent_activity"
     cutoff = (data.get("summary") or {}).get("rank_cutoff_ts")
     now_ts = int(time_ops.now_utc().timestamp())
@@ -528,13 +547,11 @@ def _f5_warning_strip(data: dict[str, Any]) -> str:
         reason = w.get("warning_reason")
         if not reason:
             from rebalance.ingest.focus5_scan import off_roster_reason
+
             reason = off_roster_reason(w)
         item = f"<b>{html.escape(w['repo_name'])}</b> ({html.escape(reason)})"
         if explain_on:
-            why = html.escape(
-                explain_recency(w.get("recency_basis"), w.get("my_local_commit_ts"),
-                                cutoff, now_ts)
-            )
+            why = html.escape(explain_recency(w.get("recency_basis"), w.get("my_local_commit_ts"), cutoff, now_ts))
             item += f" <span class='f5-muted'>— {why}</span>"
         items.append(item)
     more = f" · +{len(warns) - len(shown)} more" if len(warns) > len(shown) else ""
@@ -560,9 +577,7 @@ def _f5_dirty_banner(data: dict[str, Any]) -> str:
     if not banner:
         return ""
     name = html.escape(banner["repo_name"])
-    when = _rel_time(
-        datetime.fromtimestamp(banner["my_local_commit_ts"], tz=timezone.utc).isoformat()
-    )
+    when = _rel_time(datetime.fromtimestamp(banner["my_local_commit_ts"], tz=timezone.utc).isoformat())
     bits = []
     if banner.get("modified_count"):
         bits.append(f"{banner['modified_count']} modified")
@@ -615,20 +630,21 @@ def _f5_card(card: dict[str, Any]) -> str:
     # GH-81 Phase 2: when a card ranked by a FALLBACK basis (reflog disabled), show
     # it — a degraded basis must never be silent, even for a rostered repo.
     from rebalance.ingest.focus5_scan import basis_badge
+
     badge = basis_badge(card.get("recency_basis"))
     reason_badge = f" <span class='f5-basis'>({html.escape(badge)})</span>" if badge else ""
     # Hide identity: owner/repo when there's a remote, else the device-local path
     # (matches focus5_repo_identity / the focus5_hidden_repos config list).
-    identity = html.escape(
-        card.get("repo_full_name") or card.get("local_path") or "", quote=True
-    )
+    identity = html.escape(card.get("repo_full_name") or card.get("local_path") or "", quote=True)
     # Top-right action cluster: the standard "Open ↗" button (shared helper, so it
     # matches the dashboard home) next to the ✕ hide control. `data-f5-open` carries
     # the repo identity so the click JS can POST it to /api/focus5/open (focus-if-
     # open via the server's `code <folder>`); the vscode:// href stays as the no-JS
     # / failure fallback so the button is never dead.
     open_btn = button_link(
-        "Open", vs_href, title="Open repo in VS Code",
+        "Open",
+        vs_href,
+        title="Open repo in VS Code",
         attrs=f'data-f5-open="{identity}"',
     )
     hide_btn = (
@@ -661,18 +677,20 @@ def _focus5_body(data: dict[str, Any], *, view: str = "focus5") -> str:
     refresh_btn = f"<a class='f5-refresh' href='{refresh_href}' title='Re-rank now'>↻ Refresh</a>"
     # Segmented Focus 5 / Dirty Five toggle (active view highlighted).
     tabs = (("focus5", "/focus-5", "🎯 Focus 5"), ("dirty", "/focus-5?view=dirty", "🧹 Dirty Five"))
-    toggle = "<div class='f5-views'>" + "".join(
-        f"<a class='f5-view{' active' if k == view else ''}' href='{href}'>{label}</a>"
-        for k, href, label in tabs
-    ) + "</div>"
+    toggle = (
+        "<div class='f5-views'>"
+        + "".join(
+            f"<a class='f5-view{' active' if k == view else ''}' href='{href}'>{label}</a>" for k, href, label in tabs
+        )
+        + "</div>"
+    )
     head = f"<h2>{title} {refresh_btn}</h2>{toggle}"
     roster = data.get("roster") or []
     if not roster:
         empty = (
-            "Nothing at risk — no uncommitted or unpushed work outside the top 5. "
-            "Clean desk."
-            if is_dirty_view else
-            "No active repos found yet. The roster builds from your local git "
+            "Nothing at risk — no uncommitted or unpushed work outside the top 5. Clean desk."
+            if is_dirty_view
+            else "No active repos found yet. The roster builds from your local git "
             "activity — make a commit or leave uncommitted work in a repo under "
             "your dev folders, then reload."
         )
@@ -774,7 +792,9 @@ def _roster_stale(computed_at: str | None) -> bool:
 @app.get("/focus-5")
 def focus5_page(refresh: bool = False, view: str = "focus5"):
     from rebalance.ingest.focus5_scan import (
-        get_roster_meta, summarize_focus5, sync_focus5,
+        get_roster_meta,
+        summarize_focus5,
+        sync_focus5,
     )
     from rebalance.paths import DatabaseNotFoundError, resolve_database_path
 
@@ -789,8 +809,10 @@ def focus5_page(refresh: bool = False, view: str = "focus5"):
     try:
         db = resolve_database_path()
     except DatabaseNotFoundError:
-        body = (f"<h2>🎯 {page_title}</h2><div class='empty'>No rebalance database found. "
-                "Run <code>rebalance refresh-index</code> first.</div>")
+        body = (
+            f"<h2>🎯 {page_title}</h2><div class='empty'>No rebalance database found. "
+            "Run <code>rebalance refresh-index</code> first.</div>"
+        )
         return _page(page_title, body, active="focus5", wide=True)
 
     # Recompute the roster only when forced (↻ Refresh) or never built — NOT on a
@@ -881,13 +903,13 @@ def _build_three_eyes_card(report: dict) -> dict:
     now_iso = time_ops.now_iso()
     path = str(_THREE_EYES_DIR)
     return {
-        "position": 0,                      # re-stamped by the caller
+        "position": 0,  # re-stamped by the caller
         "repo_name": title,
         "repo_full_name": None,
-        "local_path": path,                 # unique → stable Identifiable card id
+        "local_path": path,  # unique → stable Identifiable card id
         "remote_url": None,
         "vscode_url": f"vscode://file{path}",
-        "rank_reason": reason,              # commitLine falls back to this → subtitle
+        "rank_reason": reason,  # commitLine falls back to this → subtitle
         "ranking_mode": "three_eyes_health",
         "computed_at": now_iso,
         "branch": None,
@@ -895,12 +917,12 @@ def _build_three_eyes_card(report: dict) -> dict:
         "has_upstream": None,
         "ahead": 0,
         "behind": 0,
-        "modified_count": failing,          # failing count in the "M" slot
+        "modified_count": failing,  # failing count in the "M" slot
         "untracked_count": not_loaded if probe_ok else unknown,
-        "is_dirty": (failing > 0) or not probe_ok,   # red StatusDot: failing OR unreadable
+        "is_dirty": (failing > 0) or not probe_ok,  # red StatusDot: failing OR unreadable
         "health_available": probe_ok,
         "health_probed_at": now_iso,
-        "last_commit_at": None,             # null → commitLine shows rank_reason
+        "last_commit_at": None,  # null → commitLine shows rank_reason
         "last_commit_ts": None,
         "my_last_commit_ts": None,
         "probed_at": now_iso,
@@ -919,7 +941,7 @@ def _three_eyes_health_card(position: int) -> dict | None:
                 report = _three_eyes_health_scan()
                 if report is not None:
                     card = _build_three_eyes_card(report)
-            except Exception:               # never break the roster endpoint
+            except Exception:  # never break the roster endpoint
                 logger.debug("3-Eyes health tile skipped", exc_info=True)
                 card = None
             _te_health_cache["at"] = now
@@ -954,12 +976,16 @@ def focus5_json(view: str = "focus5") -> JSONResponse:
     except DatabaseNotFoundError:
         # Brand-new machine: return the empty contract shape (not a 404) so the
         # polling client always decodes the same structure.
-        return JSONResponse({
-            "roster": [], "off_roster_warnings": [], "dirty_banner": None,
-            "computed_at": None, "ranking_mode": None,
-            "summary": {"discovered": 0, "roster_size": 0,
-                        "off_roster_attention": 0, "rank_cutoff_ts": None},
-        })
+        return JSONResponse(
+            {
+                "roster": [],
+                "off_roster_warnings": [],
+                "dirty_banner": None,
+                "computed_at": None,
+                "ranking_mode": None,
+                "summary": {"discovered": 0, "roster_size": 0, "off_roster_attention": 0, "rank_cutoff_ts": None},
+            }
+        )
 
     data = summarize_focus5(db, mode="dirty_first" if view == "dirty" else None)
     logger.info("focus5.json: view=%s roster=%d", view, data["summary"]["roster_size"])
@@ -1055,7 +1081,9 @@ def _focus5_goals_payload() -> dict[str, Any]:
     ]
     logger.info(
         "focus5.goals: served %d of %d open tasks from %s",
-        len(items), len(all_items), goals,
+        len(items),
+        len(all_items),
+        goals,
     )
     return {
         "exists": True,
@@ -1116,12 +1144,14 @@ def focus5_complete_goal(req: Focus5GoalCompleteRequest, request: Request) -> JS
         )
 
     refreshed = _focus5_goals_payload()
-    return JSONResponse({
-        "ok": True,
-        "title": title,
-        "line_index": completion["line_index"],
-        **refreshed,
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "title": title,
+            "line_index": completion["line_index"],
+            **refreshed,
+        }
+    )
 
 
 class Focus5HideRequest(BaseModel):
@@ -1138,7 +1168,8 @@ def focus5_set_hidden(repo: str, *, hidden: bool) -> dict[str, Any]:
     Never raises: a missing DB or a re-rank hiccup degrades to ``reranked: False``.
     """
     from rebalance.ingest.config import (
-        add_focus5_hidden_repo, remove_focus5_hidden_repo,
+        add_focus5_hidden_repo,
+        remove_focus5_hidden_repo,
     )
     from rebalance.ingest.focus5_scan import rerank_focus5_from_cache
     from rebalance.paths import DatabaseNotFoundError, resolve_database_path
@@ -1146,10 +1177,7 @@ def focus5_set_hidden(repo: str, *, hidden: bool) -> dict[str, Any]:
     identity = (repo or "").strip()
     if not identity:
         return {"ok": False, "error": "empty repo identity"}
-    changed = (
-        add_focus5_hidden_repo(identity) if hidden
-        else remove_focus5_hidden_repo(identity)
-    )
+    changed = add_focus5_hidden_repo(identity) if hidden else remove_focus5_hidden_repo(identity)
     try:
         db = resolve_database_path()
         roster_size = rerank_focus5_from_cache(db)
@@ -1275,7 +1303,10 @@ def focus5_open_repo(repo: str) -> tuple[int, dict[str, Any]]:
 
     logger.info(
         "focus5 open: identity=%r path=%s bin=%s exit=%s",
-        identity, local_path, code_bin, proc.returncode,
+        identity,
+        local_path,
+        code_bin,
+        proc.returncode,
     )
     return 200, {"ok": True, "exit_code": proc.returncode}
 
@@ -1323,10 +1354,12 @@ def focus5_open(req: Focus5HideRequest, request: Request) -> JSONResponse:
 
 @app.get("/api/zapier/health")
 def zapier_health(request: Request) -> JSONResponse:
-    return JSONResponse({
-        "ok": True,
-        "secret_configured": bool(_get_zapier_secret(request.app)),
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "secret_configured": bool(_get_zapier_secret(request.app)),
+        }
+    )
 
 
 @app.post("/api/zapier/ingest")
@@ -1517,10 +1550,7 @@ def _wn_meta(data: dict[str, Any]) -> str:
 
 def _whatsnext_body(data: dict[str, Any]) -> str:
     """Render the What's Next page body from a RankedNextActions dict (pure)."""
-    refresh_btn = (
-        "<a class='wn-refresh' href='/whats-next?refresh=1' "
-        "title='Recompute now'>↻ Refresh</a>"
-    )
+    refresh_btn = "<a class='wn-refresh' href='/whats-next?refresh=1' title='Recompute now'>↻ Refresh</a>"
     ranked = data.get("ranked") or []
     if not ranked:
         note = html.escape(str(data.get("note") or "")) if data.get("note") else ""
@@ -1534,10 +1564,7 @@ def _whatsnext_body(data: dict[str, Any]) -> str:
         )
     meta = _wn_meta(data)
     rows = "".join(_wn_item(a) for a in ranked)
-    return (
-        f"<h2>🧭 What's Next {refresh_btn}</h2>{meta}"
-        f"<ul class='wn-list'>{rows}</ul>"
-    )
+    return f"<h2>🧭 What's Next {refresh_btn}</h2>{meta}<ul class='wn-list'>{rows}</ul>"
 
 
 @app.get("/whats-next")
@@ -1552,16 +1579,20 @@ def whatsnext_page(refresh: bool = False):
     than 500ing.
     """
     from rebalance.ingest.next_actions import (
-        get_ranked_meta, load_ranked_next_actions,
-        persist_ranked_next_actions, rank_next_actions,
+        get_ranked_meta,
+        load_ranked_next_actions,
+        persist_ranked_next_actions,
+        rank_next_actions,
     )
     from rebalance.paths import DatabaseNotFoundError, resolve_database_path
 
     try:
         db = resolve_database_path()
     except DatabaseNotFoundError:
-        body = ("<h2>🧭 What's Next</h2><div class='empty'>No rebalance database found. "
-                "Run <code>rebalance refresh-index</code> first.</div>")
+        body = (
+            "<h2>🧭 What's Next</h2><div class='empty'>No rebalance database found. "
+            "Run <code>rebalance refresh-index</code> first.</div>"
+        )
         return _page("What's Next", body, active="whatsnext", wide=True)
 
     # Recompute live only when forced or never precomputed — this is the
@@ -1582,7 +1613,7 @@ def whatsnext_page(refresh: bool = False):
             # Post/redirect/get: drop ?refresh so a reload doesn't recompute.
             return RedirectResponse("/whats-next", status_code=303)
 
-    result = load_ranked_next_actions(db)
+    result = load_ranked_next_actions(db)  # type: ignore[assignment]
     data = result.as_dict() if result is not None else {"ranked": []}
     return _page("What's Next", _whatsnext_body(data), active="whatsnext", wide=True)
 
@@ -1610,7 +1641,7 @@ _AUTH_LOG_SEARCH = (
     + "<button class='syslog-toggle'         data-filter='errors' onclick='syslogToggle(this)'>Errors &amp; Warnings</button>"
     + "</div>"
     + "<input id='syslogSearch' class='syslog-input' type='search' autocomplete='off' "
-    +   "oninput='syslogFilter()' placeholder='Search…'>"
+    + "oninput='syslogFilter()' placeholder='Search…'>"
     + "<span class='syslog-count' id='syslogCount'></span>"
     + "</div>"
 )
@@ -1682,8 +1713,8 @@ def auth_log_page() -> HTMLResponse:
         detail_str = _auth_detail_html(detail)
         rows.append(
             f"<tr data-severity='{variant}' data-source='{source}'>"
-            f"<td>{html.escape(str(e.get('ts','')[:19].replace('T',' ')))}</td>"
-            f"<td>{html.escape(str(e.get('device','')))}</td>"
+            f"<td>{html.escape(str(e.get('ts', '')[:19].replace('T', ' ')))}</td>"
+            f"<td>{html.escape(str(e.get('device', '')))}</td>"
             f"<td>{source_badge}</td>"
             f"<td>{badge}</td>"
             f"<td class='detail'>{detail_str}</td>"
@@ -1711,10 +1742,10 @@ def auth_log_raw() -> PlainTextResponse:
 # ---------------------------------------------------------------------------
 
 _KIND_COLOR = {
-    "client":  {"bg": "#2f7437", "border": "#1e4d25"},  # green
-    "github":  {"bg": "#1d6fa8", "border": "#134d75"},  # blue
+    "client": {"bg": "#2f7437", "border": "#1e4d25"},  # green
+    "github": {"bg": "#1d6fa8", "border": "#134d75"},  # blue
     "channel": {"bg": "#6f3fa8", "border": "#4d2a75"},  # purple
-    "other":   {"bg": "#8a857c", "border": "#5b5750"},  # muted
+    "other": {"bg": "#8a857c", "border": "#5b5750"},  # muted
 }
 
 
@@ -1739,16 +1770,18 @@ def _build_graph_elements(
     for i, group in enumerate(groups):
         gid = f"g{i}"
         colors = _KIND_COLOR.get(group.kind, _KIND_COLOR["other"])
-        elements.append({
-            "data": {
-                "id": gid,
-                "label": group.label,
-                "kind": group.kind,
-                "count": len(group.reminders),
-                "bg": colors["bg"],
-                "border": colors["border"],
-            },
-        })
+        elements.append(
+            {
+                "data": {
+                    "id": gid,
+                    "label": group.label,
+                    "kind": group.kind,
+                    "count": len(group.reminders),
+                    "bg": colors["bg"],
+                    "border": colors["border"],
+                },
+            }
+        )
         for r in group.reminders:
             reminder_to_group[r["reminder_id"]] = gid
 
@@ -1758,17 +1791,19 @@ def _build_graph_elements(
         for r in group.reminders:
             rid = f"r_{r['reminder_id']}"
             label = r["task_text"][:55] + "…" if len(r["task_text"]) > 55 else r["task_text"]
-            elements.append({
-                "data": {
-                    "id": rid,
-                    "parent": gid,
-                    "label": label,
-                    "full_text": r["task_text"],
-                    "reminder_id": r["reminder_id"],
-                    "channel": r.get("original_channel_name") or "",
-                    "state": r.get("state") or "",
-                },
-            })
+            elements.append(
+                {
+                    "data": {
+                        "id": rid,
+                        "parent": gid,
+                        "label": label,
+                        "full_text": r["task_text"],
+                        "reminder_id": r["reminder_id"],
+                        "channel": r.get("original_channel_name") or "",
+                        "state": r.get("state") or "",
+                    },
+                }
+            )
 
     # Cross-group edges: only GitHub URL connections (to avoid edge clutter)
     seen_pairs: set[frozenset[str]] = set()
@@ -1784,14 +1819,16 @@ def _build_graph_elements(
             if pair in seen_pairs:
                 continue
             seen_pairs.add(pair)
-            elements.append({
-                "data": {
-                    "id": f"e_{'_'.join(sorted(pair))}",
-                    "source": f"r_{r['reminder_id']}",
-                    "target": f"r_{c['reminder_id']}",
-                    "kind": "github",
-                },
-            })
+            elements.append(
+                {
+                    "data": {
+                        "id": f"e_{'_'.join(sorted(pair))}",
+                        "source": f"r_{r['reminder_id']}",
+                        "target": f"r_{c['reminder_id']}",
+                        "kind": "github",
+                    },
+                }
+            )
 
     return elements
 
@@ -1810,6 +1847,7 @@ def sleuth_graph_page() -> HTMLResponse:
         clients = load_client_mapping()
         groups = grouped_reminders_from_db(db, clients=clients)
         import sqlite3 as _sqlite3
+
         conn = _sqlite3.connect(db)
         try:
             all_reminders = load_active_reminders(conn)
@@ -1826,8 +1864,7 @@ def sleuth_graph_page() -> HTMLResponse:
 
     elements_json = _json.dumps(elements, ensure_ascii=False)
 
-    _legend_entries = [("client", "Client"), ("github", "GitHub issue/PR"),
-                        ("channel", "Channel"), ("other", "Other")]
+    _legend_entries = [("client", "Client"), ("github", "GitHub issue/PR"), ("channel", "Channel"), ("other", "Other")]
     legend_items = "".join(
         "<span style='display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12px;color:var(--ink);'>"
         f"<span style='width:10px;height:10px;border-radius:50%;background:{_KIND_COLOR[k]['bg']};display:inline-block;'></span>"
@@ -1836,9 +1873,9 @@ def sleuth_graph_page() -> HTMLResponse:
     )
 
     error_html = (
-        f"<div style='color:var(--danger);padding:16px;font-size:13px;'>"
-        f"Error loading graph: {error_msg}</div>"
-        if error_msg else ""
+        f"<div style='color:var(--danger);padding:16px;font-size:13px;'>Error loading graph: {error_msg}</div>"
+        if error_msg
+        else ""
     )
 
     body = f"""
@@ -1991,6 +2028,7 @@ def sleuth_graph_page() -> HTMLResponse:
 
     return _page("Reminder Graph", body, active="sleuthgraph", wide=True)
 
+
 def settings_page() -> HTMLResponse:
     from rebalance.web_components import data_row
 
@@ -1999,14 +2037,16 @@ def settings_page() -> HTMLResponse:
             marker_html='<span style="width:15px;height:15px;border:1.5px solid var(--muted);border-radius:4px;display:inline-block;opacity:0.6;"></span>',
             title_html=title,
             timestamp=ts,
-            stripe_index=i
+            stripe_index=i,
         )
-        for i, (title, ts) in enumerate([
-            ("Invoice Taiwo", "2026-07-18T09:00:00Z"),
-            ("Rebalance PRs", "2026-07-18T13:45:00Z"),
-            ("Team Call", "2026-07-19T13:45:00Z"),
-            ("Submit Sleuth to Product Hunt", "2026-07-20T09:00:00Z"),
-        ])
+        for i, (title, ts) in enumerate(
+            [
+                ("Invoice Taiwo", "2026-07-18T09:00:00Z"),
+                ("Rebalance PRs", "2026-07-18T13:45:00Z"),
+                ("Team Call", "2026-07-19T13:45:00Z"),
+                ("Submit Sleuth to Product Hunt", "2026-07-20T09:00:00Z"),
+            ]
+        )
     )
 
     page_css = """

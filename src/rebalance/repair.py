@@ -44,11 +44,12 @@ from rebalance.ingest.config import get_gemini_api_key
 # Public types
 # ---------------------------------------------------------------------------
 
+
 class RepairStatus(str, Enum):
-    PENDING   = "pending"
-    REPAIRED  = "repaired"
+    PENDING = "pending"
+    REPAIRED = "repaired"
     ESCALATED = "escalated"
-    DEAD      = "dead"
+    DEAD = "dead"
 
 
 @dataclasses.dataclass
@@ -91,6 +92,7 @@ _UNRECOVERABLE = (
     "invalid credentials",
 )
 
+
 def is_unrecoverable(error: str) -> bool:
     low = error.lower()
     return any(p in low for p in _UNRECOVERABLE)
@@ -100,7 +102,7 @@ def is_unrecoverable(error: str) -> bool:
 # FSM
 # ---------------------------------------------------------------------------
 
-_LLM_MODEL    = "gemini-3.5-flash"
+_LLM_MODEL = "gemini-3.5-flash"
 _LLM_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
@@ -133,9 +135,7 @@ class RepairFSM:
 
         # Circuit breaker: unrecoverable error class — skip immediately to DEAD
         if is_unrecoverable(initial_error):
-            state.log.append(
-                "circuit-breaker: unrecoverable error class — no repair attempted"
-            )
+            state.log.append("circuit-breaker: unrecoverable error class — no repair attempted")
             state.status = RepairStatus.DEAD
             return state
 
@@ -147,9 +147,7 @@ class RepairFSM:
                 state.log.append(f"unknown action '{action_name}' — stopping")
                 break
 
-            state.log.append(
-                f"attempt {state.attempts + 1}/{self.max_deterministic_attempts}: {action_name}"
-            )
+            state.log.append(f"attempt {state.attempts + 1}/{self.max_deterministic_attempts}: {action_name}")
             result = fn()
             state.attempts += 1
 
@@ -193,28 +191,29 @@ class RepairFSM:
 
     def _llm_triage(self, state: RepairState) -> str | None:
         """Call Gemini Flash-Lite with the error context and bounded action menu; return chosen name."""
-        menu = "\n".join(
-            f"  {name}: {self.action_descriptions.get(name, '(no description)')}"
-            for name in self.actions
+        menu = "\n".join(f"  {name}: {self.action_descriptions.get(name, '(no description)')}" for name in self.actions)
+        prompt = "\n".join(
+            [
+                "You are a repair assistant. A deterministic fix failed.",
+                "Pick the single best next repair action from the menu below.",
+                "",
+                f"Context: {self.error_context}",
+                f"Last error: {state.final_error[:300]}",
+                f"Repair log: {'; '.join(state.log[-5:])}",
+                "",
+                "Available actions:",
+                menu,
+                "",
+                "Reply with ONLY the action name — one word, no punctuation, no explanation.",
+            ]
         )
-        prompt = "\n".join([
-            "You are a repair assistant. A deterministic fix failed.",
-            "Pick the single best next repair action from the menu below.",
-            "",
-            f"Context: {self.error_context}",
-            f"Last error: {state.final_error[:300]}",
-            f"Repair log: {'; '.join(state.log[-5:])}",
-            "",
-            "Available actions:",
-            menu,
-            "",
-            "Reply with ONLY the action name — one word, no punctuation, no explanation.",
-        ])
         url = _LLM_ENDPOINT.format(model=_LLM_MODEL) + f"?key={self.llm_api_key}"
-        body = json.dumps({
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": 16},
-        }).encode()
+        body = json.dumps(
+            {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 16},
+            }
+        ).encode()
         req = urllib.request.Request(
             url,
             data=body,

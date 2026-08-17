@@ -5,6 +5,7 @@ static pulse mirror (``scripts/pulse_web.py``) can render identical chrome from
 one place. Import the helper and include :data:`RB_BUTTON_CSS` once inside each
 page's ``<style>``.
 """
+
 from __future__ import annotations
 
 import html
@@ -134,9 +135,7 @@ def button_link(
     title_attr = f' title="{html.escape(title, quote=True)}"' if title else ""
     # `attrs` is emitted verbatim (caller-escaped) — used for data-* hooks.
     extra_attrs = f" {attrs}" if attrs else ""
-    arrow_html = (
-        ' <span class="rb-btn-arrow" aria-hidden="true">↗</span>' if arrow else ""
-    )
+    arrow_html = ' <span class="rb-btn-arrow" aria-hidden="true">↗</span>' if arrow else ""
     klass = ("rb-btn " + cls).strip()
     return (
         f'<a class="{html.escape(klass, quote=True)}" '
@@ -182,7 +181,7 @@ def data_row(
 
     ts_text = ""
     if timestamp is not None:
-        ts_text = format_timestamp(timestamp, relative=relative, tz=tz) or fallback_timestamp
+        ts_text = format_timestamp(str(timestamp), relative=relative, tz=None) or fallback_timestamp
 
     title_cls = _classes("rb-data-row-title", title_class)
     meta_cls = _classes("rb-data-row-meta", meta_class)
@@ -195,8 +194,7 @@ def data_row(
     time_block = f'<div class="{html.escape(time_cls, quote=True)}">{html.escape(ts_text)}</div>' if ts_text else ""
     trailing_bits = "".join(bit for bit in (time_block, trailing_html) if bit)
     trailing_block = (
-        f'<div class="{html.escape(trailing_cls, quote=True)}">{trailing_bits}</div>'
-        if trailing_bits else ""
+        f'<div class="{html.escape(trailing_cls, quote=True)}">{trailing_bits}</div>' if trailing_bits else ""
     )
     content = (
         f'<span class="{html.escape(marker_cls, quote=True)}">{marker_html}</span>'
@@ -220,10 +218,7 @@ def data_row(
     if stripe_index is not None:
         stripe = "even" if stripe_index % 2 == 1 else "odd"
         stripe_attr = f' data-rb-stripe="{stripe}"'
-    return (
-        f'<li class="{html.escape(klass, quote=True)}" data-rb-row="1"{stripe_attr}{extra_attrs}>'
-        f"{content}</li>"
-    )
+    return f'<li class="{html.escape(klass, quote=True)}" data-rb-row="1"{stripe_attr}{extra_attrs}>{content}</li>'
 
 
 # The reusable chrome shared by every full-page surface: the global base resets
@@ -555,18 +550,16 @@ _NAV_LINKS = (
 # configuration, not a data surface, so it should not sit in the same scan path as
 # Today / Focus 5 / What's Next. `.sidebar-foot` already has `margin-top: auto`, so
 # the footer floats to the bottom of the flex column on every page height.
-_FOOTER_NAV_LINKS = (
-    ("settings", "/settings", "Settings"),
-)
+_FOOTER_NAV_LINKS = (("settings", "/settings", "Settings"),)
 
 
 def _render_footer_nav(active: str) -> str:
     """Render the bottom-pinned nav (currently just Settings)."""
-    return "".join(
-        f'<li{" class=\"active\"" if key == active else ""}>'
-        f'<a href="{html.escape(href, quote=True)}">{html.escape(label)}</a></li>'
-        for key, href, label in _FOOTER_NAV_LINKS
-    )
+    out: list[str] = []
+    for key, href, label in _FOOTER_NAV_LINKS:
+        act_cls = ' class="active"' if key == active else ""
+        out.append(f'<li{act_cls}><a href="{html.escape(href, quote=True)}">{html.escape(label)}</a></li>')
+    return "".join(out)
 
 
 def render_sidebar(active: str, nav_data: dict | None = None) -> str:
@@ -595,10 +588,7 @@ def render_sidebar(active: str, nav_data: dict | None = None) -> str:
         links = []
         for key, href, label in _NAV_LINKS:
             cls = ' class="active"' if key == active else ""
-            links.append(
-                f'<li{cls}><a href="{html.escape(href, quote=True)}">'
-                f"{html.escape(label)}</a></li>"
-            )
+            links.append(f'<li{cls}><a href="{html.escape(href, quote=True)}">{html.escape(label)}</a></li>')
         nav_links = "".join(links)
         footer_nav = _render_footer_nav(active)
         return f"""
@@ -666,7 +656,7 @@ def render_sidebar(active: str, nav_data: dict | None = None) -> str:
         <ul class="side-list rb-data-list">{sleuth_html}</ul>
         {notices_html}
         <div class="nav-section-label">Streams</div>
-        <ul class="streams">{''.join(stream_items)}</ul>
+        <ul class="streams">{"".join(stream_items)}</ul>
 
         <div class="nav-section-label">System</div>
         <ul class="nav-list">
@@ -841,12 +831,12 @@ def render_shell(
 # ---------------------------------------------------------------------------
 
 KIND_GLYPHS: dict[str, str] = {
-    "commit":  "●",
-    "item":    "◆",
+    "commit": "●",
+    "item": "◆",
     "comment": "○",
 }
 
 ITEM_SUB_GLYPHS: dict[str, str] = {
-    "issue":        "✦",
+    "issue": "✦",
     "pull_request": "⇡",
 }

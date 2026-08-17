@@ -115,10 +115,7 @@ def _classify_issue(issue: dict[str, Any], linked_prs: list[dict[str, Any]], def
         evidence.append(f"Issue #{issue_number} is closed.")
         return IssueReadiness(issue_number, title, issue_state, "closed", linked_numbers, evidence)
 
-    merged_prs = [
-        pr for pr in linked_prs
-        if pr.get("is_merged") and pr.get("base_ref") in {default_branch, "main"}
-    ]
+    merged_prs = [pr for pr in linked_prs if pr.get("is_merged") and pr.get("base_ref") in {default_branch, "main"}]
     if merged_prs:
         pr_numbers = ", ".join(f"#{pr['number']}" for pr in merged_prs)
         evidence.append(f"Issue #{issue_number} is still open, but linked PR {pr_numbers} is already merged.")
@@ -144,13 +141,20 @@ def _classify_issue(issue: dict[str, Any], linked_prs: list[dict[str, Any]], def
         evidence.append(f"PR #{pr['number']} linked to issue #{issue_number} is still a draft.")
         return IssueReadiness(issue_number, title, issue_state, "draft_pr", linked_numbers, evidence)
 
-    if any(pr.get("review_decision") == "APPROVED" and pr.get("check_status") in {"", "success", "mixed"} for pr in open_prs):
+    if any(
+        pr.get("review_decision") == "APPROVED" and pr.get("check_status") in {"", "success", "mixed"}
+        for pr in open_prs
+    ):
         pr = next(pr for pr in open_prs if pr.get("review_decision") == "APPROVED")
         evidence.append(f"PR #{pr['number']} linked to issue #{issue_number} is approved.")
         return IssueReadiness(issue_number, title, issue_state, "approved_ready_to_merge", linked_numbers, evidence)
 
     if any(pr.get("review_decision") == "REVIEW_REQUIRED" and pr.get("check_status") == "success" for pr in open_prs):
-        pr = next(pr for pr in open_prs if pr.get("review_decision") == "REVIEW_REQUIRED" and pr.get("check_status") == "success")
+        pr = next(
+            pr
+            for pr in open_prs
+            if pr.get("review_decision") == "REVIEW_REQUIRED" and pr.get("check_status") == "success"
+        )
         evidence.append(f"PR #{pr['number']} linked to issue #{issue_number} is green and awaiting review.")
         return IssueReadiness(issue_number, title, issue_state, "awaiting_review", linked_numbers, evidence)
 
@@ -334,10 +338,16 @@ def infer_github_release_readiness(
                 expected_release_branch = matches[0]
                 release_branch_exists = expected_release_branch in release_branches
                 if release_branch_exists:
-                    evidence.append(f"Deployment issue references release branch `{expected_release_branch}`, which exists locally.")
+                    evidence.append(
+                        f"Deployment issue references release branch `{expected_release_branch}`, which exists locally."
+                    )
                 else:
-                    blockers.append(f"Deployment issue expects release branch `{expected_release_branch}`, but that branch is missing.")
-            evidence.append(f"Found deployment issue #{deployment_issue['number']} for milestone `{milestone['title']}`.")
+                    blockers.append(
+                        f"Deployment issue expects release branch `{expected_release_branch}`, but that branch is missing."
+                    )
+            evidence.append(
+                f"Found deployment issue #{deployment_issue['number']} for milestone `{milestone['title']}`."
+            )
 
         if release_branches:
             evidence.append(f"Known release branches: {', '.join(release_branches[:5])}.")
@@ -381,15 +391,24 @@ def infer_github_release_readiness(
         if counts["issues_total"] == 0:
             status = "planning"
             summary = f"{repo_full_name} has milestone `{milestone['title']}`, but no milestone issues are synced yet."
-        elif promotion_pr and unresolved_count == 0 and promotion_pr.get("review_decision") == "APPROVED" and promotion_pr.get("check_status") == "success":
+        elif (
+            promotion_pr
+            and unresolved_count == 0
+            and promotion_pr.get("review_decision") == "APPROVED"
+            and promotion_pr.get("check_status") == "success"
+        ):
             status = "deploy_ready"
             summary = f"{repo_full_name} milestone `{milestone['title']}` looks deploy-ready: milestone work is resolved and the promotion PR to `main` is approved with green checks."
         elif unresolved_count == 0 and not promotion_pr:
             status = "release_candidate"
             summary = f"{repo_full_name} milestone `{milestone['title']}` looks release-candidate ready: milestone work is resolved, but there is no open promotion PR to `main` yet."
         elif blockers:
-            status = "release_blocked" if deployment_issue or (due_in_days is not None and due_in_days <= 7) else "blocked"
-            summary = f"{repo_full_name} milestone `{milestone['title']}` is blocked by explicit review/check/branch issues."
+            status = (
+                "release_blocked" if deployment_issue or (due_in_days is not None and due_in_days <= 7) else "blocked"
+            )
+            summary = (
+                f"{repo_full_name} milestone `{milestone['title']}` is blocked by explicit review/check/branch issues."
+            )
         elif counts["approved_ready_to_merge"] > 0 and unresolved_count == counts["approved_ready_to_merge"]:
             status = "merge_queue"
             summary = f"{repo_full_name} milestone `{milestone['title']}` is in merge queue: remaining open issues all have approved PRs."
@@ -428,11 +447,15 @@ def infer_github_release_readiness(
                 "head_ref": promotion_pr.get("head_ref", ""),
                 "review_decision": promotion_pr.get("review_decision", ""),
                 "check_status": promotion_pr.get("check_status", ""),
-            } if promotion_pr else {},
+            }
+            if promotion_pr
+            else {},
             deployment_issue={
                 "number": deployment_issue.get("number"),
                 "title": deployment_issue.get("title", ""),
-            } if deployment_issue else {},
+            }
+            if deployment_issue
+            else {},
             recent_release=recent_release,
             issue_states=issue_states,
         )

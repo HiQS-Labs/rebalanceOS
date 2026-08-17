@@ -47,8 +47,8 @@ class CollectorHealth:
     repo_scan_failures: int = 0
     scan_failure_examples: str = ""
     # Filled by classify():
-    state: str = ""            # ALIVE | STALE | ALERT | DEGRADED | NO PUSHES
-    priority: int = 3          # lower = worse (sorts first)
+    state: str = ""  # ALIVE | STALE | ALERT | DEGRADED | NO PUSHES
+    priority: int = 3  # lower = worse (sorts first)
     age_hours: float | None = None
 
     @property
@@ -60,12 +60,13 @@ class CollectorHealth:
 # Flat-YAML helpers (ported from health-check.py — no pyyaml dependency)
 # ---------------------------------------------------------------------------
 
+
 def _yaml_value(path: Path, key: str) -> str:
     prefix = f"{key}: "
     for raw_line in path.read_text().splitlines():
         if not raw_line.startswith(prefix):
             continue
-        value = raw_line[len(prefix):].strip()
+        value = raw_line[len(prefix) :].strip()
         if value.startswith('"') and value.endswith('"'):
             value = value[1:-1]
         return value.replace('\\"', '"').replace("\\\\", "\\")
@@ -86,6 +87,7 @@ def _int(value: str) -> int:
 # ---------------------------------------------------------------------------
 # Sync-repo resolution
 # ---------------------------------------------------------------------------
+
 
 def resolve_sync_repo_dir() -> Path | None:
     """Locate the git-pulse sync repo (the dir containing ``devices/``).
@@ -120,9 +122,7 @@ def resolve_sync_repo_dir() -> Path | None:
                 if not match:
                     continue
                 val = match.group(1).strip().strip('"').strip("'")
-                val = val.replace("${CONFIG_DIR}", str(config_dir)).replace(
-                    "$CONFIG_DIR", str(config_dir)
-                )
+                val = val.replace("${CONFIG_DIR}", str(config_dir)).replace("$CONFIG_DIR", str(config_dir))
                 cand = Path(os.path.expanduser(os.path.expandvars(val)))
                 if (cand / "devices").is_dir():
                     return cand
@@ -137,6 +137,7 @@ def resolve_sync_repo_dir() -> Path | None:
 # ---------------------------------------------------------------------------
 # Classification + read
 # ---------------------------------------------------------------------------
+
 
 def classify(
     health: CollectorHealth,

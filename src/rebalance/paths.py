@@ -64,9 +64,7 @@ _PROJECT_MARKERS = (".git", "pyproject.toml")
 _WALK_UP_MAX_DEPTH = 12
 
 # User-level config (XDG-compliant; respects $XDG_CONFIG_HOME).
-USER_CONFIG_DIR: Path = Path(
-    os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-) / "rebalance-os"
+USER_CONFIG_DIR: Path = Path(os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")) / "rebalance-os"
 USER_CONFIG_FILE: Path = USER_CONFIG_DIR / "config.json"
 
 
@@ -97,6 +95,7 @@ def canonical_database_path() -> Path:
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
 
 def _load_user_config() -> dict:
     """Return parsed user config, or {} if missing/invalid. Never raises."""
@@ -148,6 +147,7 @@ def _walk_up_for_project_root(start: Path | None = None) -> Path | None:
 # ---------------------------------------------------------------------------
 # Database resolver
 # ---------------------------------------------------------------------------
+
 
 class DatabaseNotFoundError(FileNotFoundError):
     """Raised when the resolver can't locate rebalance.db.
@@ -228,10 +228,12 @@ def resolve_database_path(explicit: Path | None = None) -> Path:
 
     user_cfg = _load_user_config()
     if isinstance(user_cfg.get("database_path"), str) and user_cfg["database_path"]:
-        candidates.append((
-            Path(user_cfg["database_path"]).expanduser().resolve(),
-            f"user config ({USER_CONFIG_FILE})",
-        ))
+        candidates.append(
+            (
+                Path(user_cfg["database_path"]).expanduser().resolve(),
+                f"user config ({USER_CONFIG_FILE})",
+            )
+        )
 
     project_root = _walk_up_for_project_root()
     if project_root is not None:
@@ -270,6 +272,7 @@ def build_database_help_message(candidates: list[tuple[Path, str]]) -> str:
 # ---------------------------------------------------------------------------
 # Database migration to canonical location
 # ---------------------------------------------------------------------------
+
 
 def migrate_database_to_canonical(*, dry_run: bool = False) -> dict:
     """Move rebalance.db (and its WAL/SHM sidecars) to the canonical app-data
@@ -371,6 +374,7 @@ if __name__ == "__main__":
 # Project root resolver  (replaces scattered parents[N] hacks)
 # ---------------------------------------------------------------------------
 
+
 def find_project_root(start: Path | None = None) -> Path | None:
     """Walk up from *start* looking for a project marker (.git / pyproject.toml).
 
@@ -398,8 +402,7 @@ def resolve_project_root(start: Path | None = None) -> Path:
     root = _walk_up_for_project_root(start)
     if root is None:
         raise RuntimeError(
-            f"No project root (.git or pyproject.toml) found walking up from "
-            f"{(start or Path.cwd()).resolve()}"
+            f"No project root (.git or pyproject.toml) found walking up from {(start or Path.cwd()).resolve()}"
         )
     return root
 
@@ -407,6 +410,7 @@ def resolve_project_root(start: Path | None = None) -> Path:
 # ---------------------------------------------------------------------------
 # OAuth token path resolver  (used by calendar.py + gmail.py)
 # ---------------------------------------------------------------------------
+
 
 def resolve_oauth_token_path(service: str) -> Path:
     """Return the fallback OAuth token file path for a named Google service.
@@ -425,6 +429,7 @@ def resolve_oauth_token_path(service: str) -> Path:
 # ---------------------------------------------------------------------------
 # Secrets resolver
 # ---------------------------------------------------------------------------
+
 
 def resolve_secrets_dir() -> Path:
     """Resolve the directory holding env-style secret files.
@@ -456,6 +461,7 @@ def resolve_secret_path(name: str) -> Path:
 # Setters (used by `rebalance config set-default-database` etc.)
 # ---------------------------------------------------------------------------
 
+
 def set_user_config_value(key: str, value: str) -> Path:
     """Persist key=value to the user-level config and return the file path."""
     cfg = _load_user_config()
@@ -468,10 +474,7 @@ def set_user_config_value(key: str, value: str) -> Path:
 # CLI convenience: shared Typer option for the --database flag
 # ---------------------------------------------------------------------------
 
-_DB_OPTION_HELP = (
-    "SQLite database path (resolves via layered chain — see "
-    "`rebalance config show-defaults`)"
-)
+_DB_OPTION_HELP = "SQLite database path (resolves via layered chain — see `rebalance config show-defaults`)"
 
 
 def DBOption(*flag_names: str, help: str = _DB_OPTION_HELP):  # noqa: N802 — Typer-style factory

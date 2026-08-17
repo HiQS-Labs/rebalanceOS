@@ -115,18 +115,14 @@ def github_sync_artifacts(
             raise typer.BadParameter(
                 "GitHub token not configured. Use --token, GITHUB_TOKEN, or `rebalance config set-github-token`."
             )
-        typer.echo(
-            "GitHub token not configured; attempting unauthenticated sync for explicit public repo targets."
-        )
+        typer.echo("GitHub token not configured; attempting unauthenticated sync for explicit public repo targets.")
 
     sync_github_artifacts(
         db_path,
         target_repos,
         token=resolved_token,
         since_days=days,
-        on_repo_start=lambda repo: typer.echo(
-            f"Syncing GitHub artifacts for {repo} ({days} days)..."
-        ),
+        on_repo_start=lambda repo: typer.echo(f"Syncing GitHub artifacts for {repo} ({days} days)..."),
         on_repo_result=lambda repo, result: typer.echo(
             f"  synced branches={result.branches_synced}, issues={result.issues_synced}, prs={result.prs_synced}, "
             f"comments={result.comments_synced}, commits={result.commits_synced}, "
@@ -193,16 +189,12 @@ def github_query_cmd(
         source_filter=["github"],
     )
     if not results:
-        typer.echo(
-            "No GitHub results found. Run `rebalance refresh` first."
-        )
+        typer.echo("No GitHub results found. Run `rebalance refresh` first.")
         return
     for i, result in enumerate(results, 1):
         metadata = result["metadata"]
         labels = f" [{', '.join(metadata['labels'])}]" if metadata.get("labels") else ""
-        milestone = (
-            f" milestone={metadata['milestone_title']}" if metadata.get("milestone_title") else ""
-        )
+        milestone = f" milestone={metadata['milestone_title']}" if metadata.get("milestone_title") else ""
         state = f" state={metadata['state']}" if metadata.get("state") else ""
         # source_type is "github" for every row here; the issue/pr/commit
         # distinction lives in metadata.item_type, and doc_type is now doc_kind.

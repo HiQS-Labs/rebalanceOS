@@ -34,7 +34,7 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
 
     # Try to load sqlite-vec, but gracefully fall back if unavailable
     try:
-        if sqlite_vec is not None and hasattr(conn, 'enable_load_extension'):
+        if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
             conn.enable_load_extension(True)
             sqlite_vec.load(conn)
             conn.enable_load_extension(False)

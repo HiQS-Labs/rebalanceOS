@@ -36,15 +36,17 @@ DEFAULT_CHAT_MODEL = "Qwen/Qwen3-0.6B"
 @dataclass
 class QueryResult:
     query: str
-    synthesis: str                                     # LLM-generated first-pass answer
-    vault_context: list[dict[str, Any]] = field(default_factory=list)    # semantic search hits
-    github_context: list[dict[str, Any]] = field(default_factory=list)   # per-project activity
+    synthesis: str  # LLM-generated first-pass answer
+    vault_context: list[dict[str, Any]] = field(default_factory=list)  # semantic search hits
+    github_context: list[dict[str, Any]] = field(default_factory=list)  # per-project activity
     github_semantic_context: list[dict[str, Any]] = field(default_factory=list)  # semantic GitHub hits
     project_context: list[dict[str, Any]] = field(default_factory=list)  # registry entries
-    vault_activity: list[dict[str, Any]] = field(default_factory=list)   # recently modified notes
+    vault_activity: list[dict[str, Any]] = field(default_factory=list)  # recently modified notes
     calendar_context: dict[str, list[dict[str, Any]]] = field(default_factory=dict)  # upcoming + recent events
     temporal_context: dict[str, Any] = field(default_factory=dict)  # today/tomorrow day type
-    hiqs: dict[str, Any] = field(default_factory=dict)  # the persisted HiQS ranked verdict (RankedNextActions.as_dict())
+    hiqs: dict[str, Any] = field(
+        default_factory=dict
+    )  # the persisted HiQS ranked verdict (RankedNextActions.as_dict())
     model_used: str = ""
     elapsed_seconds: float = 0.0
 
@@ -52,7 +54,6 @@ class QueryResult:
 # ---------------------------------------------------------------------------
 # Context gathering
 # ---------------------------------------------------------------------------
-
 
 
 def _local_now() -> datetime:
@@ -133,6 +134,7 @@ def _gather_hiqs_context(database_path: Path) -> Any:
         RankedNextActions,
         load_ranked_next_actions,
     )
+
     try:
         ranked = load_ranked_next_actions(database_path)
     except Exception as e:  # noqa: BLE001 — HiQS context must never break ask()
@@ -178,6 +180,7 @@ def _gather_calendar_context(
 ) -> dict[str, list[dict[str, Any]]]:
     """Upcoming + recent calendar events."""
     from rebalance.ingest.calendar import get_upcoming_events, get_recent_events
+
     try:
         return {
             "upcoming": get_upcoming_events(database_path, days_forward),
@@ -195,6 +198,7 @@ def _gather_github_context(
 ) -> list[dict[str, Any]]:
     """Per-project GitHub activity summary."""
     from rebalance.ingest.github_scan import get_github_balance
+
     try:
         return get_github_balance(
             database_path=database_path,
@@ -204,7 +208,6 @@ def _gather_github_context(
     except Exception as e:
         logger.warning("github context unavailable: %s", e)
         return []
-
 
 
 def _gather_project_context(database_path: Path) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
@@ -248,9 +251,7 @@ def _build_prompt(
             ev = "; ".join(e for e in (a.get("evidence") or []) if e)
             ev_part = f" — evidence: {ev}" if ev else ""
             why = f" — {a['why']}" if a.get("why") else ""
-            lines.append(
-                f"{a.get('rank', '?')}. ({src}){proj} {a.get('title', '')}{why}{ev_part}"
-            )
+            lines.append(f"{a.get('rank', '?')}. ({src}){proj} {a.get('title', '')}{why}{ev_part}")
         sections.append("\n".join(lines))
 
     # Temporal context — always first so the LLM knows what kind of day it is
@@ -258,10 +259,14 @@ def _build_prompt(
         today = temporal_context.get("today", {})
         tomorrow = temporal_context.get("tomorrow", {})
         lines = ["## Schedule Context"]
-        lines.append(f"- **Today:** {today.get('day_name', '')} ({today.get('date', '')}) — {today.get('day_type', 'workday')}")
+        lines.append(
+            f"- **Today:** {today.get('day_name', '')} ({today.get('date', '')}) — {today.get('day_type', 'workday')}"
+        )
         if today.get("is_vacation"):
             lines.append(f"  Vacation: {today.get('vacation_event', '')}")
-        lines.append(f"- **Tomorrow:** {tomorrow.get('day_name', '')} ({tomorrow.get('date', '')}) — {tomorrow.get('day_type', 'workday')}")
+        lines.append(
+            f"- **Tomorrow:** {tomorrow.get('day_name', '')} ({tomorrow.get('date', '')}) — {tomorrow.get('day_type', 'workday')}"
+        )
         if tomorrow.get("is_vacation"):
             lines.append(f"  Vacation: {tomorrow.get('vacation_event', '')}")
         if tomorrow.get("day_type") == "off":
@@ -272,7 +277,9 @@ def _build_prompt(
     if project_context:
         lines = ["## Projects (by priority tier)"]
         for p in project_context:
-            lines.append(f"- **{p['name']}** (Tier {p['priority_tier']}, {p['risk_level']} risk): {p['summary'] or 'No summary'}")
+            lines.append(
+                f"- **{p['name']}** (Tier {p['priority_tier']}, {p['risk_level']} risk): {p['summary'] or 'No summary'}"
+            )
         sections.append("\n".join(lines))
 
     # GitHub activity
@@ -293,10 +300,7 @@ def _build_prompt(
         lines = ["## Relevant GitHub Artifacts"]
         for item in github_semantic_context[:5]:
             md = item.get("metadata") or {}
-            meta = (
-                f"{md.get('repo_full_name', '')} {md.get('item_type', '')} "
-                f"#{md.get('source_number', '')}"
-            )
+            meta = f"{md.get('repo_full_name', '')} {md.get('item_type', '')} #{md.get('source_number', '')}"
             if md.get("state"):
                 meta += f" ({md['state']})"
             if md.get("milestone_title"):
@@ -360,9 +364,7 @@ Answer:"""
 # LLM synthesis — Gemini (preferred) with local Qwen fallback
 # ---------------------------------------------------------------------------
 
-_GEMINI_ENDPOINT = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-)
+_GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 # gemini-2.0-flash was retired by Google (the endpoint now 404s "no longer
 # available"), which silently forced every synthesis onto the local Qwen
 # fallback. Standardized on gemini-3.5-flash — current, and already the model
@@ -400,12 +402,15 @@ def _synthesize_gemini(
     gen_config: dict[str, Any] = {"maxOutputTokens": max_tokens}
     if thinking_budget is not None:
         gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
-    body = _json.dumps({
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": gen_config,
-    }).encode()
+    body = _json.dumps(
+        {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": gen_config,
+        }
+    ).encode()
     req = urllib.request.Request(
-        url, data=body,
+        url,
+        data=body,
         headers={"content-type": "application/json"},
         method="POST",
     )
@@ -422,19 +427,13 @@ def _synthesize_gemini(
     candidates = payload.get("candidates") or []
     if not candidates:
         block = (payload.get("promptFeedback") or {}).get("blockReason")
-        raise RuntimeError(
-            "Gemini response had no candidates"
-            + (f" (blockReason={block})" if block else "")
-        )
+        raise RuntimeError("Gemini response had no candidates" + (f" (blockReason={block})" if block else ""))
     content = candidates[0].get("content") or {}
     parts = content.get("parts") or []
     text = "\n".join(p.get("text", "").strip() for p in parts if p.get("text")).strip()
     if not text:
         finish = candidates[0].get("finishReason")
-        raise RuntimeError(
-            "Gemini response had no text"
-            + (f" (finishReason={finish})" if finish else "")
-        )
+        raise RuntimeError("Gemini response had no text" + (f" (finishReason={finish})" if finish else ""))
     return text
 
 
@@ -465,7 +464,9 @@ def _synthesize_with_fallback(
     if gemini_key:
         try:
             synthesis = _synthesize_gemini(
-                prompt, api_key=gemini_key, max_tokens=max_tokens,
+                prompt,
+                api_key=gemini_key,
+                max_tokens=max_tokens,
                 thinking_budget=thinking_budget,
             )
             return synthesis, DEFAULT_GEMINI_MODEL
@@ -505,7 +506,7 @@ def _synthesize(prompt: str, model_name: str = DEFAULT_CHAT_MODEL, max_tokens: i
     text = response.strip()
     for stop in ["</answer>", "</s>", "<|endoftext|>", "<|im_end|>"]:
         if stop in text:
-            text = text[:text.index(stop)].strip()
+            text = text[: text.index(stop)].strip()
             break
     return text
 
@@ -551,9 +552,8 @@ def ask(
     github_context = _gather_github_context(database_path, repos_map, since_days)
     try:
         from rebalance.ingest.semantic_index import query as semantic_query
-        unified_semantic = semantic_query(
-            database_path, query, top_k=top_k * 2, source_filter=["vault", "github"]
-        )
+
+        unified_semantic = semantic_query(database_path, query, top_k=top_k * 2, source_filter=["vault", "github"])
         vault_context = [r for r in unified_semantic if r["source_type"] == "vault"][:top_k]
         github_semantic_context = [r for r in unified_semantic if r["source_type"] != "vault"][:top_k]
     except Exception as e:

@@ -21,6 +21,7 @@ from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_pa
 def _load_sleuth_env(which: str = "production") -> dict[str, str]:
     """Thin CLI wrapper — converts config.get_sleuth_credentials() errors to typer.BadParameter."""
     from rebalance.ingest.config import get_sleuth_credentials
+
     try:
         return get_sleuth_credentials(which)
     except (FileNotFoundError, ValueError) as exc:

@@ -62,21 +62,28 @@ from rebalance.lib.time_ops import now_iso
 
 # Events that mean a collector lost or lacked access. Used by readers (the web
 # dashboard, doctor) to surface the most recent failure per source.
-FAILURE_EVENTS: frozenset[str] = frozenset({
-    # calendar
-    "flow_failed", "token_missing", "token_refresh_failed",
-    # github
-    "token_invalid", "auth_failed",
-    # gmail
-    "adc_missing", "scope_insufficient",
-    # launchd jobs
-    "job_failed",
-})
+FAILURE_EVENTS: frozenset[str] = frozenset(
+    {
+        # calendar
+        "flow_failed",
+        "token_missing",
+        "token_refresh_failed",
+        # github
+        "token_invalid",
+        "auth_failed",
+        # gmail
+        "adc_missing",
+        "scope_insufficient",
+        # launchd jobs
+        "job_failed",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Log paths — resolved relative to this file's project root
 # ---------------------------------------------------------------------------
+
 
 def _log_dir() -> Path:
     """Return the auth-log directory, creating it if needed.
@@ -91,6 +98,7 @@ def _log_dir() -> Path:
         log_dir = Path(override)
     else:
         from rebalance.paths import resolve_project_root
+
         log_dir = resolve_project_root(Path(__file__)) / "temp" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir
@@ -110,6 +118,7 @@ def _legacy_calendar_path() -> Path:
 # ---------------------------------------------------------------------------
 # Core append
 # ---------------------------------------------------------------------------
+
 
 def _append(source: str, event: str, detail: dict[str, Any] | None = None) -> None:
     entry = {
@@ -135,6 +144,7 @@ def log_event(source: str, event: str, detail: dict[str, Any] | None = None) -> 
 # Calendar helpers — one per event type
 # ---------------------------------------------------------------------------
 
+
 def log_flow_started(scopes: list[str], *, source: str = "calendar") -> None:
     _append(source, "flow_started", {"scopes": scopes})
 
@@ -146,11 +156,15 @@ def log_flow_succeeded(
     *,
     source: str = "calendar",
 ) -> None:
-    _append(source, "flow_succeeded", {
-        "expiry": expiry,
-        "scopes": scopes,
-        "token_path": token_path,
-    })
+    _append(
+        source,
+        "flow_succeeded",
+        {
+            "expiry": expiry,
+            "scopes": scopes,
+            "token_path": token_path,
+        },
+    )
 
 
 def log_flow_failed(error: str, *, source: str = "calendar") -> None:
@@ -172,6 +186,7 @@ def log_token_refresh_failed(error: str, token_path: str, source: str = "calenda
 # ---------------------------------------------------------------------------
 # GitHub helpers
 # ---------------------------------------------------------------------------
+
 
 def log_github_token_validated(login: str, scopes: list[str]) -> None:
     _append("github", "token_validated", {"login": login, "scopes": scopes})
@@ -209,6 +224,7 @@ def log_github_gh_fallback(login: str = "") -> None:
 # ---------------------------------------------------------------------------
 # Gmail helpers
 # ---------------------------------------------------------------------------
+
 
 def log_calendar_token_set(source: str = "manual") -> None:
     """Google Calendar OAuth credentials were (re)authorized / stored to keyring.
@@ -279,6 +295,7 @@ def log_gmail_scope_insufficient(error: str = "") -> None:
 # launchd job helpers
 # ---------------------------------------------------------------------------
 
+
 def log_job_started(job: str) -> None:
     """Emit a job_started event for a launchd background job."""
     _append("launchd", "job_started", {"job": job})
@@ -304,6 +321,7 @@ def log_job_failed(job: str, exit_code: int, elapsed: float | None = None) -> No
 # Watch-list coverage guard
 # ---------------------------------------------------------------------------
 
+
 def log_watched_repos_reduced(
     removed: list[dict[str, Any]],
     *,
@@ -316,15 +334,20 @@ def log_watched_repos_reduced(
     that also dropped but were rolling-window-only (expected aging-out, carried as
     context, not alarmed). Emitted by ``watchlist_guard.snapshot_and_detect``.
     """
-    _append("github", "watched_repos_reduced", {
-        "removed": removed,
-        "info_churn": info_churn or [],
-    })
+    _append(
+        "github",
+        "watched_repos_reduced",
+        {
+            "removed": removed,
+            "info_churn": info_churn or [],
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
 # GH-124: commit-threshold auto-promotion
 # ---------------------------------------------------------------------------
+
 
 def log_project_auto_promoted(
     repo_full_name: str,
@@ -337,17 +360,22 @@ def log_project_auto_promoted(
     ``project_registry`` as a machine-owned row. Emitted by
     ``project_inference.sync_commit_threshold_promotions``.
     """
-    _append("registry", "project_auto_promoted", {
-        "repo": repo_full_name,
-        "project_name": project_name,
-        "commit_count": commit_count,
-        "threshold": threshold,
-    })
+    _append(
+        "registry",
+        "project_auto_promoted",
+        {
+            "repo": repo_full_name,
+            "project_name": project_name,
+            "commit_count": commit_count,
+            "threshold": threshold,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
 # Readers
 # ---------------------------------------------------------------------------
+
 
 def _read_file(path: Path, default_source: str | None = None) -> list[dict[str, Any]]:
     if not path.exists():

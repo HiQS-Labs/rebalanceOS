@@ -25,9 +25,7 @@ CODEX_AUTHORS = {"chatgpt-codex-connector[bot]", "codex-bot[bot]"}
 CLAUDE_AUTHORS = {"claude[bot]", "claude-bot[bot]"}
 
 _DEVICE_MARKER_RE = re.compile(r"\[git-pulse:device=[A-Za-z0-9_.-]+\]")
-_COAUTHOR_RE = re.compile(
-    r"Co-authored-by:\s*([^<\n]+?)\s*<", re.IGNORECASE | re.MULTILINE
-)
+_COAUTHOR_RE = re.compile(r"Co-authored-by:\s*([^<\n]+?)\s*<", re.IGNORECASE | re.MULTILINE)
 
 
 def _coauthor_names(message: str) -> list[str]:

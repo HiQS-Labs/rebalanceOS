@@ -117,12 +117,10 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_semantic_docs_source "
-        "ON semantic_documents(source_type, updated_at DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_semantic_docs_source ON semantic_documents(source_type, updated_at DESC)"
     )
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_semantic_docs_source_table "
-        "ON semantic_documents(source_type, source_table)"
+        "CREATE INDEX IF NOT EXISTS idx_semantic_docs_source_table ON semantic_documents(source_type, source_table)"
     )
     try:
         conn.execute("""
@@ -155,16 +153,12 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
     # table that an older code path may have left with rows but an empty index.
     FTS_VERSION = "1"
     try:
-        _row = conn.execute(
-            "SELECT value FROM semantic_embedding_meta WHERE key='fts_version'"
-        ).fetchone()
+        _row = conn.execute("SELECT value FROM semantic_embedding_meta WHERE key='fts_version'").fetchone()
         if (_row[0] if _row else None) != FTS_VERSION:
             conn.execute("DROP TABLE IF EXISTS semantic_documents_fts")
             for _t in ("ai", "ad", "au"):
                 conn.execute(f"DROP TRIGGER IF EXISTS semantic_documents_fts_{_t}")
-        conn.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS semantic_documents_fts USING fts5(title, body)"
-        )
+        conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS semantic_documents_fts USING fts5(title, body)")
         conn.execute("""
             CREATE TRIGGER IF NOT EXISTS semantic_documents_fts_ai
             AFTER INSERT ON semantic_documents BEGIN
@@ -192,8 +186,7 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
         doc_n = conn.execute("SELECT count(*) FROM semantic_documents").fetchone()[0]
         if fts_n == 0 and doc_n > 0:
             conn.execute(
-                "INSERT INTO semantic_documents_fts(rowid, title, body) "
-                "SELECT id, title, body FROM semantic_documents"
+                "INSERT INTO semantic_documents_fts(rowid, title, body) SELECT id, title, body FROM semantic_documents"
             )
         conn.execute(
             "INSERT OR REPLACE INTO semantic_embedding_meta(key, value) VALUES('fts_version', ?)",
@@ -226,9 +219,7 @@ def ensure_calendar_schema(conn: sqlite3.Connection) -> None:
             fetched_at      TEXT NOT NULL
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_time)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_time)")
     conn.commit()
 
 
@@ -257,12 +248,8 @@ def ensure_email_schema(conn: sqlite3.Connection) -> None:
             synced_at       TEXT NOT NULL
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_email_received ON email_messages(received_at)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_email_thread ON email_messages(thread_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_received ON email_messages(received_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_thread ON email_messages(thread_id)")
     conn.commit()
 
 
@@ -337,10 +324,7 @@ def _ensure_github_repo_schema(conn: sqlite3.Connection) -> None:
             last_seen_at    TEXT NOT NULL
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_pushed_repos_pushed "
-        "ON github_pushed_repos(pushed_at DESC)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_github_pushed_repos_pushed ON github_pushed_repos(pushed_at DESC)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS github_branches (
@@ -354,10 +338,7 @@ def _ensure_github_repo_schema(conn: sqlite3.Connection) -> None:
             UNIQUE(repo_full_name, name) ON CONFLICT REPLACE
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_branches_repo "
-        "ON github_branches(repo_full_name)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_github_branches_repo ON github_branches(repo_full_name)")
 
 
 def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
@@ -381,8 +362,7 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_milestones_repo_state "
-        "ON github_milestones(repo_full_name, state)"
+        "CREATE INDEX IF NOT EXISTS idx_github_milestones_repo_state ON github_milestones(repo_full_name, state)"
     )
 
     conn.execute("""
@@ -444,13 +424,9 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
             UNIQUE(repo_full_name, item_type, number) ON CONFLICT REPLACE
         )
     """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_github_items_repo_updated ON github_items(repo_full_name, updated_at)")
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_items_repo_updated "
-        "ON github_items(repo_full_name, updated_at)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_items_milestone "
-        "ON github_items(repo_full_name, milestone_title)"
+        "CREATE INDEX IF NOT EXISTS idx_github_items_milestone ON github_items(repo_full_name, milestone_title)"
     )
 
     conn.execute("""
@@ -474,8 +450,7 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_comments_item "
-        "ON github_comments(repo_full_name, item_type, item_number)"
+        "CREATE INDEX IF NOT EXISTS idx_github_comments_item ON github_comments(repo_full_name, item_type, item_number)"
     )
 
     conn.execute("""
@@ -494,8 +469,7 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_commits_item "
-        "ON github_commits(repo_full_name, item_type, item_number)"
+        "CREATE INDEX IF NOT EXISTS idx_github_commits_item ON github_commits(repo_full_name, item_type, item_number)"
     )
 
     conn.execute("""
@@ -516,8 +490,7 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_checks_item "
-        "ON github_check_runs(repo_full_name, item_type, item_number)"
+        "CREATE INDEX IF NOT EXISTS idx_github_checks_item ON github_check_runs(repo_full_name, item_type, item_number)"
     )
 
     conn.execute("""
@@ -540,8 +513,7 @@ def _ensure_github_artifact_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_links_source "
-        "ON github_links(repo_full_name, source_type, source_number)"
+        "CREATE INDEX IF NOT EXISTS idx_github_links_source ON github_links(repo_full_name, source_type, source_number)"
     )
 
 
@@ -587,9 +559,7 @@ def _ensure_github_knowledge_schema(conn: sqlite3.Connection) -> None:
     """)
 
 
-def _add_column_if_missing(
-    conn: sqlite3.Connection, table: str, column: str, decl: str
-) -> bool:
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
     """Additive migration for an existing table; True when the column was added.
 
     SQLite has no ``ADD COLUMN IF NOT EXISTS``, and ``CREATE TABLE IF NOT
@@ -623,10 +593,7 @@ def _ensure_github_direct_commit_schema(conn: sqlite3.Connection) -> None:
             fetched_at      TEXT NOT NULL
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_push_events_pending "
-        "ON github_push_events(state, observed_at)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_github_push_events_pending ON github_push_events(state, observed_at)")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS github_direct_commits (
             repo_full_name  TEXT NOT NULL,
@@ -645,8 +612,7 @@ def _ensure_github_direct_commit_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_github_direct_commits_time "
-        "ON github_direct_commits(committed_at DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_github_direct_commits_time ON github_direct_commits(committed_at DESC)"
     )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS github_direct_commit_files (
@@ -669,18 +635,14 @@ def _ensure_github_direct_commit_schema(conn: sqlite3.Connection) -> None:
     # Conflating them would force the completeness check to special-case a
     # coverage value that means "complete, but from git" — the kind of overloaded
     # column that made `failure_reason` unusable as a control signal (see Phase 2).
-    _add_column_if_missing(
-        conn, "github_direct_commits", "source", "TEXT NOT NULL DEFAULT 'events'"
-    )
+    _add_column_if_missing(conn, "github_direct_commits", "source", "TEXT NOT NULL DEFAULT 'events'")
     # GH-169 Phase 2: why an event was deferred is a CONTROL signal, so it needs
     # a column of its own. It previously lived only inside `failure_reason`, a
     # human-readable log string — and reading control flow out of prose is how
     # 20 events were evicted for "compare cap reached", which is not a failure
     # at all. 'budget' = the run ran out of its own quota (must not cost an
     # attempt); 'failure' = the fetch genuinely failed (must cost one).
-    _add_column_if_missing(
-        conn, "github_push_events", "deferral_kind", "TEXT"
-    )
+    _add_column_if_missing(conn, "github_push_events", "deferral_kind", "TEXT")
     # GH-169 Phase 1: a watched repo we cannot enumerate locally is a REPORTED
     # state, not an omission. Silence is the failure shape this whole issue is
     # about, so an uncoverable repo gets a durable row with a reason.

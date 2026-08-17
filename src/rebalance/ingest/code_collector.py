@@ -19,27 +19,36 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 DEFAULT_INCLUDE_DIRS = ("src", "scripts")
-SKIP_DIR_NAMES = frozenset({
-    ".venv", "venv", "node_modules", ".git", "__pycache__", "temp",
-    "build", "dist", ".mypy_cache", ".pytest_cache", ".ruff_cache",
-})
+SKIP_DIR_NAMES = frozenset(
+    {
+        ".venv",
+        "venv",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        "temp",
+        "build",
+        "dist",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+    }
+)
 
 
 @dataclass(frozen=True)
 class CodeChunk:
-    path: str          # repo-relative POSIX path
-    symbol: str        # function/class name, or "<module>"
+    path: str  # repo-relative POSIX path
+    symbol: str  # function/class name, or "<module>"
     parent_symbol: str
-    doc_kind: str      # function | class | module
-    language: str      # always "python" for now
-    body: str          # source segment
+    doc_kind: str  # function | class | module
+    language: str  # always "python" for now
+    body: str  # source segment
     start_line: int
-    mtime_iso: str     # source file mtime (stable change key)
+    mtime_iso: str  # source file mtime (stable change key)
 
 
-def iter_python_files(
-    repo_root: Path, include_dirs: Iterable[str] = DEFAULT_INCLUDE_DIRS
-) -> Iterator[Path]:
+def iter_python_files(repo_root: Path, include_dirs: Iterable[str] = DEFAULT_INCLUDE_DIRS) -> Iterator[Path]:
     for d in include_dirs:
         base = repo_root / d
         if not base.is_dir():
@@ -64,29 +73,40 @@ def chunk_python_source(rel_path: str, source: str, mtime_iso: str) -> list[Code
             if not segment.strip():
                 continue
             kind = "class" if isinstance(node, ast.ClassDef) else "function"
-            chunks.append(CodeChunk(
-                path=rel_path, symbol=node.name, parent_symbol="", doc_kind=kind,
-                language="python", body=segment, start_line=node.lineno, mtime_iso=mtime_iso,
-            ))
+            chunks.append(
+                CodeChunk(
+                    path=rel_path,
+                    symbol=node.name,
+                    parent_symbol="",
+                    doc_kind=kind,
+                    language="python",
+                    body=segment,
+                    start_line=node.lineno,
+                    mtime_iso=mtime_iso,
+                )
+            )
 
     # Module header chunk: docstring + import lines — captures "what this file is".
     doc = ast.get_docstring(tree) or ""
-    import_lines = [
-        ln for ln in source.splitlines()[:60]
-        if ln.startswith(("import ", "from "))
-    ]
+    import_lines = [ln for ln in source.splitlines()[:60] if ln.startswith(("import ", "from "))]
     header = "\n".join(filter(None, [doc, "\n".join(import_lines)])).strip()
     if header:
-        chunks.append(CodeChunk(
-            path=rel_path, symbol="<module>", parent_symbol="", doc_kind="module",
-            language="python", body=header, start_line=1, mtime_iso=mtime_iso,
-        ))
+        chunks.append(
+            CodeChunk(
+                path=rel_path,
+                symbol="<module>",
+                parent_symbol="",
+                doc_kind="module",
+                language="python",
+                body=header,
+                start_line=1,
+                mtime_iso=mtime_iso,
+            )
+        )
     return chunks
 
 
-def collect_code_chunks(
-    repo_root: Path, include_dirs: Iterable[str] = DEFAULT_INCLUDE_DIRS
-) -> list[CodeChunk]:
+def collect_code_chunks(repo_root: Path, include_dirs: Iterable[str] = DEFAULT_INCLUDE_DIRS) -> list[CodeChunk]:
     """Walk *repo_root* and return all code chunks under *include_dirs*."""
     out: list[CodeChunk] = []
     for p in iter_python_files(repo_root, include_dirs):

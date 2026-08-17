@@ -123,7 +123,9 @@ def remote_tip(repo_full_name: str, branch: str = "HEAD") -> str:
     try:
         result = subprocess.run(
             ["git", "ls-remote", url, branch],
-            capture_output=True, text=True, timeout=_LS_REMOTE_TIMEOUT_S,
+            capture_output=True,
+            text=True,
+            timeout=_LS_REMOTE_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, OSError):
         return ""
@@ -183,8 +185,7 @@ def check_repo_coverage(
         if code != 0:
             coverage.state = "stale"
             coverage.reason = (
-                f"clone does not contain remote tip {coverage.remote_tip[:8]}; "
-                "fetch before trusting any gap number"
+                f"clone does not contain remote tip {coverage.remote_tip[:8]}; fetch before trusting any gap number"
             )
             return coverage
 
@@ -198,28 +199,30 @@ def check_repo_coverage(
 
     with db_connection(database_path, ensure_github_schema) as conn:
         complete = {
-            r[0] for r in conn.execute(
-                "SELECT sha FROM github_direct_commits "
-                "WHERE repo_full_name = ? AND path_coverage = 'complete'",
+            r[0]
+            for r in conn.execute(
+                "SELECT sha FROM github_direct_commits WHERE repo_full_name = ? AND path_coverage = 'complete'",
                 (repo_full_name,),
             )
         }
         any_direct = {
-            r[0] for r in conn.execute(
+            r[0]
+            for r in conn.execute(
                 "SELECT sha FROM github_direct_commits WHERE repo_full_name = ?",
                 (repo_full_name,),
             )
         }
         pr_shas = {
-            r[0] for r in conn.execute(
+            r[0]
+            for r in conn.execute(
                 "SELECT sha FROM github_commits WHERE repo_full_name = ?",
                 (repo_full_name,),
             )
         }
         projected = {
-            r[0] for r in conn.execute(
-                "SELECT source_key FROM github_documents "
-                "WHERE repo_full_name = ? AND doc_type = 'direct_commit'",
+            r[0]
+            for r in conn.execute(
+                "SELECT source_key FROM github_documents WHERE repo_full_name = ? AND doc_type = 'direct_commit'",
                 (repo_full_name,),
             )
         }
@@ -257,12 +260,7 @@ def check_coverage(
 ) -> CoverageReport:
     """Measure coverage across *repos*; one repo's failure never hides another."""
     return CoverageReport(
-        repos=[
-            check_repo_coverage(
-                database_path, repo, roots=roots, check_remote=check_remote
-            )
-            for repo in repos
-        ],
+        repos=[check_repo_coverage(database_path, repo, roots=roots, check_remote=check_remote) for repo in repos],
         checked_at=_now(),
     )
 

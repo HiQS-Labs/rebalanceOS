@@ -112,9 +112,7 @@ def register_collector(collector: Collector, *, replace: bool = False) -> None:
     built-in. Otherwise duplicate names raise to surface accidental shadowing.
     """
     if not collector.name or collector.name != collector.name.lower():
-        raise ValueError(
-            f"Collector name must be non-empty and lowercase: {collector.name!r}"
-        )
+        raise ValueError(f"Collector name must be non-empty and lowercase: {collector.name!r}")
     if collector.name == "all":
         raise ValueError(f"Reserved collector name: {collector.name!r}")
     if collector.kind not in _COLLECTOR_KINDS:
@@ -123,9 +121,7 @@ def register_collector(collector: Collector, *, replace: bool = False) -> None:
             f"expected one of {sorted(_COLLECTOR_KINDS)}."
         )
     if collector.name in COLLECTORS and not replace:
-        raise ValueError(
-            f"Collector {collector.name!r} already registered; pass replace=True to override."
-        )
+        raise ValueError(f"Collector {collector.name!r} already registered; pass replace=True to override.")
     COLLECTORS[collector.name] = collector
     logger.debug("Registered collector: %s (requires=%s)", collector.name, collector.requires)
 
@@ -269,8 +265,7 @@ _SIGNAL_HEALTH_RULES: dict[str, dict[str, Any]] = {
         # dead rows for 3 weeks (#125). Same table + window email already
         # uses for recent_row_count_7d (email_messages / received_at).
         "content_predicate": (
-            "(from_address IS NOT NULL AND TRIM(from_address) != '') "
-            "OR (subject IS NOT NULL AND TRIM(subject) != '')"
+            "(from_address IS NOT NULL AND TRIM(from_address) != '') OR (subject IS NOT NULL AND TRIM(subject) != '')"
         ),
         "content_table": "email_messages",
         "content_window_column": "received_at",
@@ -294,6 +289,7 @@ _SIGNAL_HEALTH_TOTAL_KEYS: dict[str, tuple[str, ...]] = {
 
 def _parse_status_timestamp(raw: Any) -> datetime | None:
     from rebalance.lib.time_ops import _parse_iso as common_parse_iso
+
     return common_parse_iso(raw, force_utc=True)
 
 
@@ -426,16 +422,14 @@ def _derive_signal_health(sources: dict[str, dict[str, Any]]) -> dict[str, dict[
                     status_entry = {
                         "status": "degraded",
                         "reason": (
-                            f"ingest is {round(lag_minutes)}m behind the vault "
-                            f"writer (threshold {degraded_after}m)"
+                            f"ingest is {round(lag_minutes)}m behind the vault writer (threshold {degraded_after}m)"
                         ),
                     }
                 elif warn_after is not None and lag_minutes > warn_after:
                     status_entry = {
                         "status": "warn",
                         "reason": (
-                            f"ingest is {round(lag_minutes)}m behind the vault "
-                            f"writer (threshold {warn_after}m)"
+                            f"ingest is {round(lag_minutes)}m behind the vault writer (threshold {warn_after}m)"
                         ),
                     }
 
@@ -471,6 +465,7 @@ def _apple_reminders_health_status(database_path: Path) -> str | None:
     status payload. None if the probe itself fails — never crashes status."""
     try:
         from rebalance.ingest.apple_reminders import apple_reminders_health
+
         return apple_reminders_health(database_path).get("status")
     except Exception:
         return None
@@ -535,7 +530,8 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "last_modified_in_vault": _safe_max(conn, "vault_files", "last_modified"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "vault_files", "julianday(last_modified) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
         # GH-166: how far the ingester is behind the vault writer, in minutes.
         # Positive means the newest edit on disk hasn't been ingested yet;
@@ -555,7 +551,8 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "documents_last_updated_at": _safe_max(conn, "github_documents", "updated_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "github_activity", "julianday(scanned_at) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         payload["sources"]["calendar"] = {
@@ -563,8 +560,11 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "last_fetched_at": _safe_max(conn, "calendar_events", "fetched_at"),
             "earliest_event_start": _safe_max(conn, "calendar_events", "start_time"),
             "recent_row_count_7d": _safe_count_where(
-                conn, "calendar_events", "julianday(start_time) >= julianday('now', '-7 days') AND julianday(start_time) <= julianday('now', '+7 days')"
-            ) or 0,
+                conn,
+                "calendar_events",
+                "julianday(start_time) >= julianday('now', '-7 days') AND julianday(start_time) <= julianday('now', '+7 days')",
+            )
+            or 0,
         }
 
         payload["sources"]["sleuth"] = {
@@ -572,19 +572,19 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "last_synced_at": _safe_max(conn, "sleuth_reminders", "last_synced_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "sleuth_reminders", "julianday(created_on) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         payload["sources"]["apple_reminders"] = {
             "reminders": _safe_count(conn, "apple_reminders"),
-            "active": _safe_count_where(
-                conn, "apple_reminders", "is_active=1 AND is_completed=0"
-            ),
+            "active": _safe_count_where(conn, "apple_reminders", "is_active=1 AND is_completed=0"),
             "last_synced_at": _safe_max(conn, "apple_reminders", "last_synced_at"),
             "health": _apple_reminders_health_status(database_path),
             "recent_row_count_7d": _safe_count_where(
                 conn, "apple_reminders", "julianday(last_synced_at) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         payload["sources"]["email"] = {
@@ -593,7 +593,8 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "newest_received_at": _safe_max(conn, "email_messages", "received_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "email_messages", "julianday(received_at) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         payload["sources"]["figma"] = {
@@ -602,13 +603,12 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "newest_comment_at": _safe_max(conn, "figma_comments", "created_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "figma_comments", "julianday(created_at) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         try:
-            built = conn.execute(
-                "SELECT COUNT(*) FROM ask_self_indexes WHERE index_built = 1"
-            ).fetchone()[0]
+            built = conn.execute("SELECT COUNT(*) FROM ask_self_indexes WHERE index_built = 1").fetchone()[0]
         except Exception:
             built = None
         payload["sources"]["ask_self"] = {
@@ -617,7 +617,8 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "last_scanned_at": _safe_max(conn, "ask_self_indexes", "scanned_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "ask_self_indexes", "julianday(scanned_at) >= julianday('now', '-7 days')"
-            ) or 0,
+            )
+            or 0,
         }
 
         # GH-127 content-quality check. Registry-driven off
@@ -636,12 +637,10 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             if source_payload is None:
                 continue
             window_clause = f"julianday({window_column}) >= julianday('now', '-7 days')"
-            source_payload["content_total_count_7d"] = _safe_count_where(
-                conn, content_table, window_clause
-            ) or 0
-            source_payload["content_fail_count_7d"] = _safe_count_where(
-                conn, content_table, f"{window_clause} AND NOT ({predicate})"
-            ) or 0
+            source_payload["content_total_count_7d"] = _safe_count_where(conn, content_table, window_clause) or 0
+            source_payload["content_fail_count_7d"] = (
+                _safe_count_where(conn, content_table, f"{window_clause} AND NOT ({predicate})") or 0
+            )
 
         # Semantic index
         sem_total = _safe_count(conn, "semantic_documents")
@@ -669,9 +668,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             pass
 
         try:
-            embeddings_rows = conn.execute(
-                "SELECT COUNT(*) FROM semantic_embeddings"
-            ).fetchone()[0]
+            embeddings_rows = conn.execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0]
         except Exception:
             embeddings_rows = None
 
@@ -784,7 +781,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         try:
             from rebalance.ingest.github_coverage import check_coverage, coverage_health
 
-            repos = _resolve_repos_for_refresh(database_path, None)
+            repos = _resolve_repos_for_refresh(database_path, [])
             report = check_coverage(database_path, repos)
             drift["commit_coverage"] = {
                 "checked_at": report.checked_at,
@@ -793,9 +790,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 "projection_gap": sum(r.projection_gap for r in report.repos),
                 "orphan_count": sum(r.orphan_count for r in report.repos),
                 "incomplete": sum(r.incomplete for r in report.repos),
-                "uncoverable": [
-                    r.repo for r in report.repos if r.state == "uncoverable"
-                ],
+                "uncoverable": [r.repo for r in report.repos if r.state == "uncoverable"],
                 "stale": [r.repo for r in report.repos if r.state == "stale"],
                 "health": coverage_health(report),
             }
@@ -918,9 +913,7 @@ def _pushed_repos(database_path: Path, *, since_days: int = 14) -> list[str]:
 
     repos: list[str] = []
     try:
-        cutoff = (
-            now_utc() - timedelta(days=int(since_days))
-        ).isoformat()
+        cutoff = (now_utc() - timedelta(days=int(since_days))).isoformat()
         with db_connection(database_path) as conn:
             rows = conn.execute(
                 """
@@ -993,8 +986,7 @@ def get_watched_repos(
             watched.append(repo)
 
     auto_discovered = sorted(
-        repo for repo in (activity_set | pushed_set) - project_set
-        if repo.lower() not in ignored_lower
+        repo for repo in (activity_set | pushed_set) - project_set if repo.lower() not in ignored_lower
     )
 
     return {
@@ -1005,7 +997,6 @@ def get_watched_repos(
         "external_repos": external,
         "auto_discovered": auto_discovered,
         "ignored": ignored,
-        "since_days": since_days,
     }
 
 
@@ -1090,17 +1081,19 @@ def _refresh_github(
                 token=token,
                 since_days=since_days,
             )
-            repo_results.append({
-                "repo": repo,
-                "branches": r.branches_synced,
-                "issues": r.issues_synced,
-                "prs": r.prs_synced,
-                "comments": r.comments_synced,
-                "commits": r.commits_synced,
-                "checks": r.checks_synced,
-                "docs_built": r.docs_built,
-                "elapsed_seconds": r.elapsed_seconds,
-            })
+            repo_results.append(
+                {
+                    "repo": repo,
+                    "branches": r.branches_synced,
+                    "issues": r.issues_synced,
+                    "prs": r.prs_synced,
+                    "comments": r.comments_synced,
+                    "commits": r.commits_synced,
+                    "checks": r.checks_synced,
+                    "docs_built": r.docs_built,
+                    "elapsed_seconds": r.elapsed_seconds,
+                }
+            )
         except Exception as e:
             repo_results.append({"repo": repo, "error": str(e)})
 
@@ -1117,11 +1110,7 @@ def _refresh_github(
         if repo.lower() not in external_set:
             continue
         try:
-            watched_activity.append(
-                reconcile_watched_repo(
-                    database_path, repo, token, since_days=since_days
-                )
-            )
+            watched_activity.append(reconcile_watched_repo(database_path, repo, token, since_days=since_days))
         except Exception as e:  # noqa: BLE001 — one repo must not abort the run
             watched_activity.append({"repo": repo, "error": str(e)})
 
@@ -1167,8 +1156,7 @@ def _refresh_github(
             "candidates_evaluated": auto_promote_summary.candidates_evaluated,
             "promoted_count": auto_promote_summary.promoted_count,
             "promoted_repos": [
-                row["custom_fields"]["inference"]["repo_full_name"]
-                for row in auto_promote_summary.promoted
+                row["custom_fields"]["inference"]["repo_full_name"] for row in auto_promote_summary.promoted
             ],
         }
     except Exception as e:  # noqa: BLE001
@@ -1203,14 +1191,8 @@ def _refresh_github(
             "inserted": sum(r.commits_inserted for r in backfill_results),
             "updated": sum(r.commits_updated for r in backfill_results),
             "merge_commits": sum(r.merge_commits for r in backfill_results),
-            "uncoverable": [
-                {"repo": r.repo, "reason": r.reason}
-                for r in backfill_results if r.state == "uncoverable"
-            ],
-            "warnings": [
-                {"repo": r.repo, "warning": w}
-                for r in backfill_results for w in r.warnings
-            ],
+            "uncoverable": [{"repo": r.repo, "reason": r.reason} for r in backfill_results if r.state == "uncoverable"],
+            "warnings": [{"repo": r.repo, "warning": w} for r in backfill_results for w in r.warnings],
         },
         "artifact_sync": repo_results,
         "watched_activity": watched_activity,
@@ -1232,10 +1214,7 @@ def _refresh_calendar(database_path: Path, *, since_days: int, dry_run: bool) ->
     if dry_run:
         steps = [f"sync_calendar(calendar_id={OPERATOR_CALENDAR_ID!r}, days_back={since_days}) [operator]"]
         for tc in config.team_calendars:
-            steps.append(
-                f"sync_calendar(calendar_id={tc.calendar_id!r},"
-                f" person={tc.person!r}, days_back={since_days})"
-            )
+            steps.append(f"sync_calendar(calendar_id={tc.calendar_id!r}, person={tc.person!r}, days_back={since_days})")
         return {"scope": "calendar", "dry_run": True, "steps": steps}
 
     # Operator's own calendar: always stored under OPERATOR_CALENDAR_ID (canonical)
@@ -1253,14 +1232,17 @@ def _refresh_calendar(database_path: Path, *, since_days: int, dry_run: bool) ->
     )
     logger.info(
         "calendar sync done: operator fetched=%d stored=%d",
-        result.events_fetched, result.events_stored,
+        result.events_fetched,
+        result.events_stored,
     )
 
     team_results: list[dict[str, Any]] = []
     for tc in config.team_calendars:
         logger.info(
             "calendar sync: person=%s calendar_id=%s days_back=%d",
-            tc.person, tc.calendar_id, since_days,
+            tc.person,
+            tc.calendar_id,
+            since_days,
         )
         try:
             tr = sync_calendar(
@@ -1278,24 +1260,32 @@ def _refresh_calendar(database_path: Path, *, since_days: int, dry_run: bool) ->
             # Mirror _refresh_github's per-repo isolation.
             logger.warning(
                 "calendar sync failed: person=%s calendar_id=%s error=%s",
-                tc.person, tc.calendar_id, e,
+                tc.person,
+                tc.calendar_id,
+                e,
             )
-            team_results.append({
-                "person": tc.person,
-                "calendar_id": tc.calendar_id,
-                "error": str(e),
-            })
+            team_results.append(
+                {
+                    "person": tc.person,
+                    "calendar_id": tc.calendar_id,
+                    "error": str(e),
+                }
+            )
             continue
         logger.info(
             "calendar sync done: person=%s fetched=%d stored=%d",
-            tc.person, tr.events_fetched, tr.events_stored,
+            tc.person,
+            tr.events_fetched,
+            tr.events_stored,
         )
-        team_results.append({
-            "person": tc.person,
-            "calendar_id": tc.calendar_id,
-            "events_fetched": tr.events_fetched,
-            "events_stored": tr.events_stored,
-        })
+        team_results.append(
+            {
+                "person": tc.person,
+                "calendar_id": tc.calendar_id,
+                "events_fetched": tr.events_fetched,
+                "events_stored": tr.events_stored,
+            }
+        )
 
     return {
         "scope": "calendar",
@@ -1498,6 +1488,7 @@ def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, A
         backfill_semantic_documents,
         embed_pending,
     )
+
     backfill = backfill_semantic_documents(
         database_path,
         source_types=sources,
@@ -1630,32 +1621,37 @@ def refresh_index(
         if candidate:
             resolved_vault = Path(candidate).expanduser().resolve()
         if resolved_vault is None or not resolved_vault.exists():
-            errors.append({
-                "scope": "vault",
-                "error": (
-                    "vault path not configured or missing. Pass vault_path or run "
-                    "`rebalance config set-vault-path`."
-                ),
-            })
+            errors.append(
+                {
+                    "scope": "vault",
+                    "error": (
+                        "vault path not configured or missing. Pass vault_path or run "
+                        "`rebalance config set-vault-path`."
+                    ),
+                }
+            )
             requested_scopes = [s for s in requested_scopes if s != "vault"]
 
     resolved_token = ""
     if "github" in requested_scopes:
         resolved_token = (get_github_token() or "").strip()
         if not resolved_token:
-            errors.append({
-                "scope": "github",
-                "error": (
-                    "GitHub token not configured. Use setup_github_token MCP tool "
-                    "or `rebalance config set-github-token`."
-                ),
-            })
+            errors.append(
+                {
+                    "scope": "github",
+                    "error": (
+                        "GitHub token not configured. Use setup_github_token MCP tool "
+                        "or `rebalance config set-github-token`."
+                    ),
+                }
+            )
             requested_scopes = [s for s in requested_scopes if s != "github"]
         elif not dry_run:
             # If the stored PAT is deauthorized (401), fall back to the gh CLI
             # token and persist it so this and the launchd jobs recover. No-op
             # when the PAT is valid or gh is unavailable (e.g. under launchd).
             from rebalance.ingest.github_scan import resolve_working_token
+
             resolved_token = resolve_working_token(resolved_token)
 
     repos_list = list(repos or [])
@@ -1695,12 +1691,14 @@ def refresh_index(
         # calls. Record each scope as skipped behind the single migrations error
         # rather than letting collectors write to a half-migrated schema.
         if not migrations_ok:
-            results.append({
-                "scope": s,
-                "dry_run": False,
-                "skipped": True,
-                "reason": "schema migration failed",
-            })
+            results.append(
+                {
+                    "scope": s,
+                    "dry_run": False,
+                    "skipped": True,
+                    "reason": "schema migration failed",
+                }
+            )
             continue
         collector = COLLECTORS.get(s)
         if collector is None:
@@ -1714,11 +1712,7 @@ def refresh_index(
             missing_reqs.append("github_token")
         # Skip the figma_token precondition on dry runs so the planned-steps
         # preview (which needs no PAT) still renders; live runs require it.
-        if (
-            "figma_token" in collector.requires
-            and not dry_run
-            and not collector_opts.get("figma_token")
-        ):
+        if "figma_token" in collector.requires and not dry_run and not collector_opts.get("figma_token"):
             missing_reqs.append("figma_token")
         if missing_reqs:
             errors.append({"scope": s, "error": f"missing required options: {missing_reqs}"})
@@ -1735,18 +1729,11 @@ def refresh_index(
     # scope, or a half-migrated schema. run_migrations already ran at the
     # chokepoint above, so the ranked_next_actions table (migration 0006) exists
     # before persist. A synthesis/network failure NEVER breaks refresh_index.
-    if (
-        precompute_next_actions
-        and full_refresh_requested
-        and not dry_run
-        and migrations_ok
-    ):
+    if precompute_next_actions and full_refresh_requested and not dry_run and migrations_ok:
         try:
             from rebalance.ingest import next_actions
 
-            ranked = next_actions.rank_next_actions(
-                db_path, blend_team=True, synthesize=True
-            )
+            ranked = next_actions.rank_next_actions(db_path, blend_team=True, synthesize=True)
             next_actions.persist_ranked_next_actions(db_path, ranked)
             # Render the SAME ranked output to the fixed vault file so the vault
             # is the calm daily surface (P1-SIGNAL). Gated like the dashboard-note
@@ -1756,53 +1743,61 @@ def refresh_index(
             vault_file = None
             if update_dashboard_note and resolved_vault is not None:
                 try:
-                    written = next_actions.write_next_actions_to_vault(
-                        ranked, vault_path=resolved_vault
-                    )
+                    written = next_actions.write_next_actions_to_vault(ranked, vault_path=resolved_vault)
                     vault_file = str(written) if written else None
                 except Exception as ve:  # noqa: BLE001 — vault write must never break refresh
                     logger.warning("next_actions vault write failed: %s", ve)
             logger.info(
                 "next_actions precompute: model_used=%s blended=%s count=%d vault=%s",
-                ranked.model_used or "(none)", ranked.blended, len(ranked.ranked),
+                ranked.model_used or "(none)",
+                ranked.blended,
+                len(ranked.ranked),
                 vault_file or "(skipped)",
             )
-            results.append({
-                "scope": "next_actions",
-                "dry_run": False,
-                "model_used": ranked.model_used,
-                "blended": ranked.blended,
-                "count": len(ranked.ranked),
-                "vault_file": vault_file,
-            })
+            results.append(
+                {
+                    "scope": "next_actions",
+                    "dry_run": False,
+                    "model_used": ranked.model_used,
+                    "blended": ranked.blended,
+                    "count": len(ranked.ranked),
+                    "vault_file": vault_file,
+                }
+            )
         except Exception as e:  # noqa: BLE001 — precompute must never break refresh
             logger.warning("next_actions precompute failed: %s", e)
             # Deliberately NOT appended to `errors`: a non-essential precompute
             # failure must not cascade into skipping the dashboard-note write-back
             # below (which gates on `errors`). Recorded as a non-fatal result note.
-            results.append({
-                "scope": "next_actions",
-                "dry_run": False,
-                "skipped": True,
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "scope": "next_actions",
+                    "dry_run": False,
+                    "skipped": True,
+                    "error": str(e),
+                }
+            )
 
     if update_dashboard_note and full_refresh_requested and resolved_vault is not None:
         if errors and not dry_run:
-            results.append({
-                "scope": "dashboard",
-                "dry_run": False,
-                "skipped": True,
-                "reason": "upstream refresh errors",
-            })
+            results.append(
+                {
+                    "scope": "dashboard",
+                    "dry_run": False,
+                    "skipped": True,
+                    "reason": "upstream refresh errors",
+                }
+            )
         else:
             try:
-                results.append(_refresh_dashboard_note(
-                    db_path,
-                    vault_path=resolved_vault,
-                    since_days=since_days,
-                    dry_run=dry_run,
-                ))
+                results.append(
+                    _refresh_dashboard_note(
+                        db_path,
+                        vault_path=resolved_vault,
+                        since_days=since_days,
+                        dry_run=dry_run,
+                    )
+                )
             except Exception as e:
                 errors.append({"scope": "dashboard", "error": str(e)})
 
@@ -1826,6 +1821,7 @@ def refresh_index(
 # single source of truth for the ingest pipelines — these adapters are 3-line
 # shims.
 
+
 def _dry_run_adapter(refresh_fn: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
     """Adapter for a refresh fn whose only option is ``dry_run``.
 
@@ -1833,8 +1829,10 @@ def _dry_run_adapter(refresh_fn: Callable[..., dict[str, Any]]) -> Callable[...,
     this replaces a separate near-identical two-line adapter for each of them.
     Sources with bespoke option mapping (vault, github, calendar) keep their own.
     """
+
     def adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
         return refresh_fn(db_path, dry_run=opts["dry_run"])
+
     return adapter
 
 
@@ -1849,9 +1847,7 @@ def _vault_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # Safe to retry: ingest_vault deletes then re-inserts per file (CASCADE covers
     # chunks/keywords/links), so a rerun replaces rather than duplicates, and
     # embed_chunks only embeds rows with no existing embedding.
-    return _retry_on_db_locked(lambda: _refresh_vault(
-        db_path, vault_path, dry_run=opts["dry_run"]
-    ))
+    return _retry_on_db_locked(lambda: _refresh_vault(db_path, vault_path, dry_run=opts["dry_run"]))
 
 
 def _retry_on_db_locked(
@@ -1885,13 +1881,15 @@ def _github_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # "database is locked". _refresh_github is idempotent (upserts), so
     # retrying the whole scope survives the transient collision instead of
     # failing the run and cascading into a skipped dashboard note.
-    return _retry_on_db_locked(lambda: _refresh_github(
-        db_path,
-        token=opts["token"],
-        since_days=opts["since_days"],
-        repos=opts.get("repos") or [],
-        dry_run=opts["dry_run"],
-    ))
+    return _retry_on_db_locked(
+        lambda: _refresh_github(
+            db_path,
+            token=opts["token"],
+            since_days=opts["since_days"],
+            repos=opts.get("repos") or [],
+            dry_run=opts["dry_run"],
+        )
+    )
 
 
 def _calendar_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
@@ -1903,13 +1901,13 @@ _apple_reminders_adapter = _dry_run_adapter(_refresh_apple_reminders)
 _email_adapter = _dry_run_adapter(_refresh_email)
 _code_adapter = _dry_run_adapter(_refresh_code)
 _figma_adapter = _dry_run_adapter(_refresh_figma)
+
+
 def _semantic_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # GH-131 (extended 2026-07-27) — see _vault_adapter. Safe to retry: the semantic
     # embed is content-hash keyed, so a rerun re-skips unchanged rows rather than
     # re-embedding them (2026-07-27 run: 29,099 of 29,956 skipped unchanged).
-    return _retry_on_db_locked(lambda: _refresh_semantic_only(
-        db_path, dry_run=opts["dry_run"]
-    ))
+    return _retry_on_db_locked(lambda: _refresh_semantic_only(db_path, dry_run=opts["dry_run"]))
 
 
 def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
@@ -1948,15 +1946,15 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         }
 
     import time
+
     started = time.monotonic()
     cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
     email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
 
     import json as _json
+
     generated_at = _json.loads(cal_path.read_text(encoding="utf-8"))["generated_at"]
-    git_result = commit_and_push_sync(
-        target_repo, sync_subdir, device_id=device_id, generated_at=generated_at
-    )
+    git_result = commit_and_push_sync(target_repo, sync_subdir, device_id=device_id, generated_at=generated_at)
 
     return {
         "scope": "sync",
@@ -2052,13 +2050,18 @@ def _refresh_claude_cloud(database_path: Path, *, dry_run: bool) -> dict[str, An
     signal while it is being watched.
     """
     if dry_run:
-        return {"scope": "claude_cloud", "dry_run": True,
-                "note": "would fetch today's Claude Code Cloud sessions"}
+        return {"scope": "claude_cloud", "dry_run": True, "note": "would fetch today's Claude Code Cloud sessions"}
     from rebalance.ingest.claude_cloud import grade, sessions_for_day
 
     g = grade(sessions_for_day())
-    return {"scope": "claude_cloud", "dry_run": False, "sessions": g["n"],
-            "grade": g["letter"], "overall": g["overall"], "counts": g.get("counts", {})}
+    return {
+        "scope": "claude_cloud",
+        "dry_run": False,
+        "sessions": g["n"],
+        "grade": g["letter"],
+        "overall": g["overall"],
+        "counts": g.get("counts", {}),
+    }
 
 
 _claude_cloud_adapter = _dry_run_adapter(_refresh_claude_cloud)
@@ -2078,12 +2081,22 @@ from rebalance.ingest.next_actions import (  # noqa: E402
     vault_candidates,
 )
 
-register_collector(Collector(
-    "vault", _vault_adapter, requires=("vault_path",), candidates=vault_candidates,
-))
-register_collector(Collector(
-    "github", _github_adapter, requires=("github_token",), candidates=github_candidates,
-))
+register_collector(
+    Collector(
+        "vault",
+        _vault_adapter,
+        requires=("vault_path",),
+        candidates=vault_candidates,
+    )
+)
+register_collector(
+    Collector(
+        "github",
+        _github_adapter,
+        requires=("github_token",),
+        candidates=github_candidates,
+    )
+)
 register_collector(Collector("calendar", _calendar_adapter, candidates=calendar_candidates))
 register_collector(Collector("sleuth", _sleuth_adapter, candidates=sleuth_candidates))
 # Apple Reminders — local macOS read-only source. Opt-in (included_in_all=False):

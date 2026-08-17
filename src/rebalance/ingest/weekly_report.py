@@ -230,10 +230,7 @@ def generate_weekly_report(
         md += "| Project | Events | Hours |\n"
         md += "|---------|-------:|------:|\n"
         for group_key, group in sorted_groups:
-            md += (
-                f"| {group_key} | {group.count} | "
-                f"{_format_duration(group.total_minutes, fmt)} |\n"
-            )
+            md += f"| {group_key} | {group.count} | {_format_duration(group.total_minutes, fmt)} |\n"
         md += "\n"
 
     md += _build_end_of_week_summary(

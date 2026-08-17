@@ -87,13 +87,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
 @dataclass
 class TeamCalendarEntry:
     """A single teammate's calendar to ingest alongside the operator's own."""
-    person: str      # short label stored in the DB ``person`` column (e.g. "matthew")
-    calendar_id: str # Google Calendar ID (e.g. "matthew@group.calendar.google.com")
+
+    person: str  # short label stored in the DB ``person`` column (e.g. "matthew")
+    calendar_id: str  # Google Calendar ID (e.g. "matthew@group.calendar.google.com")
 
 
 @dataclass
 class CalendarProject:
     """Canonical project label and optional calendar aliases."""
+
     name: str
     aliases: list[str]
 
@@ -101,6 +103,7 @@ class CalendarProject:
 @dataclass
 class CalendarConfig:
     """Validated calendar configuration."""
+
     calendar_id: str
     exclude_titles: list[str]
     aggregator_skip_words: list[str]
@@ -140,7 +143,8 @@ class CalendarConfig:
                     "ignoring team_calendars entry for person=%r: calendar_id "
                     "%r is reserved for the operator's own calendar and would "
                     "leak teammate events to the pulse repo",
-                    person, cal_id,
+                    person,
+                    cal_id,
                 )
                 continue
             entries.append(TeamCalendarEntry(person=person, calendar_id=cal_id))
@@ -162,11 +166,11 @@ class CalendarConfig:
                 continue
 
             aliases_raw = item.get("aliases", [])
-            aliases = [
-                str(alias).strip()
-                for alias in aliases_raw
-                if str(alias).strip()
-            ] if isinstance(aliases_raw, list) else []
+            aliases = (
+                [str(alias).strip() for alias in aliases_raw if str(alias).strip()]
+                if isinstance(aliases_raw, list)
+                else []
+            )
 
             projects.append(CalendarProject(name=name, aliases=aliases))
 
@@ -225,8 +229,7 @@ class CalendarConfig:
                 {
                     "calendar_id": self.calendar_id,
                     "team_calendars": [
-                        {"person": tc.person, "calendar_id": tc.calendar_id}
-                        for tc in self.team_calendars
+                        {"person": tc.person, "calendar_id": tc.calendar_id} for tc in self.team_calendars
                     ],
                     "exclude_titles": self.exclude_titles,
                     "aggregator_skip_words": self.aggregator_skip_words,
@@ -272,8 +275,8 @@ class SignalWeights:
     per_person: dict[str, float] = field(
         default_factory=lambda: {
             "matthew": 1.0,  # Phase-0 seed: rich history, full trust
-            "jose": 0.5,     # Phase-0 seed: sparse, halved
-            "jinhui": 0.5,   # Phase-0 seed: sparse, halved
+            "jose": 0.5,  # Phase-0 seed: sparse, halved
+            "jinhui": 0.5,  # Phase-0 seed: sparse, halved
         }
     )
 
@@ -283,10 +286,10 @@ class SignalWeights:
     per_source: dict[str, float] = field(
         default_factory=lambda: {
             "calendar": 1.0,  # Phase-0 seed
-            "github": 1.0,    # Phase-0 seed
-            "sleuth": 1.0,    # Phase-0 seed
-            "vault": 0.7,     # Phase-0 seed: noisier free-text
-            "email": 0.8,     # Phase-0 seed
+            "github": 1.0,  # Phase-0 seed
+            "sleuth": 1.0,  # Phase-0 seed
+            "vault": 0.7,  # Phase-0 seed: noisier free-text
+            "email": 0.8,  # Phase-0 seed
         }
     )
 
@@ -381,11 +384,7 @@ def team_persons_passing_additivity(
     counts; this is a pure filter that preserves the roster order of the input
     mapping.
     """
-    return [
-        person
-        for person, count in event_counts.items()
-        if count >= min_events
-    ]
+    return [person for person, count in event_counts.items() if count >= min_events]
 
 
 def should_exclude_event(event_summary: str, exclude_titles: list[str]) -> bool:
@@ -406,10 +405,7 @@ def filter_events(
     exclude_titles: list[str],
 ) -> list[dict[str, Any]]:
     """Filter out events whose title exactly matches an exclude entry."""
-    return [
-        event for event in events
-        if not should_exclude_event(event.get("summary", ""), exclude_titles)
-    ]
+    return [event for event in events if not should_exclude_event(event.get("summary", ""), exclude_titles)]
 
 
 # ── Review decisions persistence ─────────────────────────────────────────────
@@ -442,9 +438,7 @@ def save_review_decision(summary: str, decision: str, path: Path | None = None) 
     ``"include"``, ``"exclude"``, or ``"project:<Name>"``.
     """
     if not any(decision.startswith(p) for p in VALID_DECISION_PREFIXES):
-        raise InvalidDecisionError(
-            f"Invalid decision '{decision}'. Must be 'include', 'exclude', or 'project:<Name>'."
-        )
+        raise InvalidDecisionError(f"Invalid decision '{decision}'. Must be 'include', 'exclude', or 'project:<Name>'.")
     p = path or REVIEW_DECISIONS_PATH
     p.parent.mkdir(parents=True, exist_ok=True)
     decisions = load_review_decisions(p)
