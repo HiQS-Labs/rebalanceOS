@@ -10,6 +10,17 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.13] - 2026-08-17
+
+### Fixed
+- **Restored the agent skill and command set that was dropped in the repository
+  consolidation.** The morning-brief, onboarding-walkthrough, cross-repo triage,
+  daily-activity-synthesis, and Git Pulse recap skills — plus the two RAG query
+  and refresh commands — are tracked product content again, and the blanket
+  ignore rule that silently excluded them now targets only the machine-local
+  settings files. The skills inventory is complete again (three previously
+  unlisted entries added), and one demo transcript had an operator identifier
+  replaced with a placeholder before recovery.
 ## [0.69.12] - 2026-08-17
 
 ### Changed

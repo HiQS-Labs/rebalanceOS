@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rebalance-os"
-version = "0.69.12"
+version = "0.69.13"
 description = "Local-first workday operating system with MCP tools and Obsidian ingest"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -65,6 +65,9 @@ target-version = "py312"
 # against THIS repo when the old repo's stranded lint PR was recovered —
 # entries that only existed there were dropped.)
 extend-exclude = [
+  # .claude skills are prose documentation whose embedded code snippets are
+  # illustrative, not product code the formatter should gate (GH-34).
+  ".claude",
   "macOS",
   "vscode-extensions",
   "temp",
