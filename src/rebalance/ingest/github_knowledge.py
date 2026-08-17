@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlencode
 import re
 
 from rebalance.lib import time_ops
@@ -25,7 +24,7 @@ from rebalance.ingest.config import get_github_ignored_repos, normalize_github_r
 from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_semantic_schema
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.db import semantic as sem
-from rebalance.ingest._http import GITHUB_API, GitHubClient, GitHubHTTPError
+from rebalance.ingest._http import GITHUB_API, GitHubClient
 from rebalance.ingest.embedder import (
     DEFAULT_MODEL as DEFAULT_EMBED_MODEL,
     EMBEDDING_DIM,
@@ -83,64 +82,6 @@ class GitHubRepoPurgeResult:
     row_counts: dict[str, int]
     total_rows: int
     deleted_rows: int
-
-
-def _github_headers(token: str) -> dict[str, str]:
-    """Delegate to the shared GitHub client.
-
-    Retained as a module-level helper because some external callers (tests,
-    experimental scripts) imported it before the shared client existed.
-    """
-    return GitHubClient(token).headers()
-
-
-def _http_get_json(url: str, token: str) -> Any:
-    """GET ``url`` as JSON; raise on non-2xx.
-
-    Thin wrapper over :class:`GitHubClient` so the legacy ``api_get`` callable
-    seam in :func:`sync_github_repo` keeps working. New code should construct
-    a client once and reuse it.
-    """
-    try:
-        return GitHubClient(token).get_json(url)
-    except GitHubHTTPError as exc:
-        # Preserve legacy RuntimeError type — tests and callers expect it.
-        raise RuntimeError(f"GitHub API request failed: {exc.status} {url}") from exc
-
-
-def _build_url(base_url: str, **params: Any) -> str:
-    cleaned = {key: value for key, value in params.items() if value not in ("", None)}
-    if not cleaned:
-        return base_url
-    return f"{base_url}?{urlencode(cleaned, doseq=True)}"
-
-
-def _paginate_list(
-    base_url: str,
-    api_get: JsonFetcher,
-    *,
-    stop_updated_before: str = "",
-    **params: Any,
-) -> list[dict[str, Any]]:
-    page = 1
-    results: list[dict[str, Any]] = []
-    while True:
-        data = api_get(_build_url(base_url, per_page=100, page=page, **params))
-        if not isinstance(data, list) or not data:
-            break
-
-        stop = False
-        for row in data:
-            updated_at = str(row.get("updated_at") or "")
-            if stop_updated_before and updated_at and updated_at < stop_updated_before:
-                stop = True
-                break
-            results.append(row)
-
-        if stop or len(data) < 100:
-            break
-        page += 1
-    return results
 
 
 def _cutoff_iso(since_days: int) -> str:
@@ -358,19 +299,26 @@ def sync_github_repo(
     start = time.monotonic()
     fetched_at = time_ops.now_iso()
     cutoff = _cutoff_iso(since_days)
-    api_get = api_get_json or (lambda url: _http_get_json(url, token))
+    client = GitHubClient(token)
+    api_get = api_get_json or client.get_json
     repo_base = f"{GITHUB_API}/repos/{repo_full_name}"
     repo_meta = api_get(repo_base)
 
-    branches = _paginate_list(f"{repo_base}/branches", api_get)
-    labels = _paginate_list(f"{repo_base}/labels", api_get)
-    milestones = _paginate_list(f"{repo_base}/milestones", api_get, state="all", sort="due_on", direction="asc")
-    releases = _paginate_list(f"{repo_base}/releases", api_get)
+    branches = client.paginate(f"{repo_base}/branches", fetch_json=api_get_json)
+    labels = client.paginate(f"{repo_base}/labels", fetch_json=api_get_json)
+    milestones = client.paginate(
+        f"{repo_base}/milestones",
+        fetch_json=api_get_json,
+        state="all",
+        sort="due_on",
+        direction="asc",
+    )
+    releases = client.paginate(f"{repo_base}/releases", fetch_json=api_get_json)
     issues = [
         row
-        for row in _paginate_list(
+        for row in client.paginate(
             f"{repo_base}/issues",
-            api_get,
+            fetch_json=api_get_json,
             state="all",
             sort="updated",
             direction="desc",
@@ -378,9 +326,9 @@ def sync_github_repo(
         )
         if "pull_request" not in row
     ]
-    pull_summaries = _paginate_list(
+    pull_summaries = client.paginate(
         f"{repo_base}/pulls",
-        api_get,
+        fetch_json=api_get_json,
         stop_updated_before=cutoff,
         state="all",
         sort="updated",
@@ -399,7 +347,9 @@ def sync_github_repo(
     issue_payloads: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
     for issue in issues:
         item_number = int(issue["number"])
-        issue_comments = _paginate_list(f"{repo_base}/issues/{item_number}/comments", api_get)
+        issue_comments = client.paginate(
+            f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json
+        )
         issue_payloads.append((issue, issue_comments))
 
     pr_payloads: list[
@@ -418,12 +368,16 @@ def sync_github_repo(
         if not isinstance(pr, dict):
             continue
 
-        pr_issue_comments = _paginate_list(f"{repo_base}/issues/{item_number}/comments", api_get)
-        pr_reviews = _paginate_list(f"{repo_base}/pulls/{item_number}/reviews", api_get)
-        pr_review_comments = _paginate_list(f"{repo_base}/pulls/{item_number}/comments", api_get)
-        pr_commits = _paginate_list(f"{repo_base}/pulls/{item_number}/commits", api_get)
+        pr_issue_comments = client.paginate(
+            f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json
+        )
+        pr_reviews = client.paginate(f"{repo_base}/pulls/{item_number}/reviews", fetch_json=api_get_json)
+        pr_review_comments = client.paginate(
+            f"{repo_base}/pulls/{item_number}/comments", fetch_json=api_get_json
+        )
+        pr_commits = client.paginate(f"{repo_base}/pulls/{item_number}/commits", fetch_json=api_get_json)
         check_runs_resp = api_get(
-            _build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
+            client.build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
         )
         pr_check_runs = check_runs_resp.get("check_runs", []) if isinstance(check_runs_resp, dict) else []
         pr_payloads.append((pr, pr_issue_comments, pr_reviews, pr_review_comments, pr_commits, pr_check_runs))

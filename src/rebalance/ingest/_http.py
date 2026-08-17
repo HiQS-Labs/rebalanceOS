@@ -5,11 +5,9 @@ Replaces three near-duplicate helpers that grew up in parallel:
 
 * ``github_scan._headers`` + ``github_scan._get``
   — used "Authorization: token X" (v3 syntax), returned ``(status, data | None)``.
-* ``github_knowledge._github_headers`` + ``github_knowledge._http_get_json``
+* the GitHub knowledge sync's former header, GET, and pagination helpers
   — used "Authorization: Bearer X" (GitHub's current syntax), raised
-    RuntimeError on HTTP error.
-* ``github_knowledge._paginate_list``
-  — paginated list endpoints with optional ``stop_updated_before`` cutoff.
+    RuntimeError on HTTP error, and supported an optional updated-at cutoff.
 
 The two header forms are interchangeable at the API level (GitHub accepts both),
 but the duplication meant a fix to one path (rate-limit handling, retry logic,
@@ -43,7 +41,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlencode, urlsplit
 
 GITHUB_API = "https://api.github.com"
@@ -329,7 +327,7 @@ class GitHubClient:
     def get_json(self, path_or_url: str) -> Any:
         """Return parsed JSON or raise :class:`GitHubHTTPError`.
 
-        Mirrors github_knowledge._http_get_json.
+        Provides the GitHub knowledge sync's former JSON GET behavior.
         """
         url = path_or_url if path_or_url.startswith("http") else f"{GITHUB_API}{path_or_url}"
         status, data, headers, body = self._request(url)
@@ -357,19 +355,22 @@ class GitHubClient:
         *,
         stop_updated_before: str = "",
         per_page: int = 100,
+        fetch_json: Callable[[str], Any] | None = None,
         **params: Any,
     ) -> list[dict[str, Any]]:
         """Walk a paginated list endpoint, accumulating items.
 
-        Mirrors github_knowledge._paginate_list. Stops at first page with
+        Stops at the first page with
         ``updated_at < stop_updated_before`` (per row, when the param is set)
-        or when a page is short of ``per_page`` items.
+        or when a page is short of ``per_page`` items. ``fetch_json`` is an
+        injectable test seam; production callers use this client's
+        :meth:`get_json` path.
         """
         page = 1
         results: list[dict[str, Any]] = []
         while True:
             url = self.build_url(base_url, per_page=per_page, page=page, **params)
-            data = self.get_json(url)
+            data = (fetch_json or self.get_json)(url)
             if not isinstance(data, list) or not data:
                 break
             stop = False

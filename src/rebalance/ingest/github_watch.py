@@ -37,12 +37,10 @@ from typing import Any
 from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.config import normalize_github_repo_name
 from rebalance.ingest.db import db_connection, ensure_github_schema
-from rebalance.ingest._http import GITHUB_API
+from rebalance.ingest._http import GITHUB_API, GitHubClient
 from rebalance.ingest.github_knowledge import (
     JsonFetcher,
-    _build_url,
     _cutoff_iso,
-    _http_get_json,
 )
 
 # Sentinel login under which whole-repo (all-author) rollups are written to
@@ -91,30 +89,22 @@ def _fetch_repo_commit_activity(
     paginated ``/repos/{repo}/commits?since=`` call, reusing the shared helpers.
     Tolerant: an empty/disabled repo (409/404) yields ``(0, None)``.
     """
-    api_get = api_get_json or (lambda url: _http_get_json(url, token))
     cutoff = _cutoff_iso(since_days)
     base = f"{GITHUB_API}/repos/{repo_full_name}/commits"
 
-    count = 0
+    client = GitHubClient(token)
     last_iso: str | None = None
-    page = 1
-    while True:
-        try:
-            data = api_get(_build_url(base, since=cutoff, per_page=100, page=page))
-        except Exception:  # noqa: BLE001 — empty repo, no access, transient error
-            break
-        if not isinstance(data, list) or not data:
-            break
-        for row in data:
-            count += 1
-            commit = row.get("commit") or {}
-            stamp = (commit.get("committer") or {}).get("date") or (commit.get("author") or {}).get("date")
-            if stamp and (last_iso is None or stamp > last_iso):
-                last_iso = stamp
-        if len(data) < 100:
-            break
-        page += 1
-    return count, last_iso
+    try:
+        commits = client.paginate(base, since=cutoff, fetch_json=api_get_json)
+    except Exception:  # noqa: BLE001 — empty repo, no access, transient error
+        return 0, None
+
+    for row in commits:
+        commit = row.get("commit") or {}
+        stamp = (commit.get("committer") or {}).get("date") or (commit.get("author") or {}).get("date")
+        if stamp and (last_iso is None or stamp > last_iso):
+            last_iso = stamp
+    return len(commits), last_iso
 
 
 def derive_watched_repo_activity(

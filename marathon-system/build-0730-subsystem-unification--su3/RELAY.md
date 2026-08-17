@@ -1,6 +1,6 @@
 # Marathon Phase su3
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU3-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -59,6 +59,16 @@ You are the BUILDER for this phase. Read the phase brief above and implement it.
    not just the first. ALSO, you MUST update the `NEXT:` line at the top of this file to exactly: `NEXT: agy (Reviewer)`
 
 ---
+
+### Round 1 · Builder · codex
+
+Implemented the shared-client migration.
+
+- Removed the duplicate URL and pagination helpers from `github_knowledge.py`; the sync now constructs one `GitHubClient` and uses its `build_url` / `paginate` methods.
+- Replaced watched-repo commit pagination with `GitHubClient.paginate` while retaining the injectable fetcher strictly as a test seam.
+- Added the fetcher seam to `GitHubClient.paginate` so production requests still use the shared client path.
+- Added `test_http_contract.py`, which AST-checks that only `_http.py` constructs a GitHub `Authorization` header.
+- Verified with `pytest -q tests/test_http_contract.py tests/test_http_client.py tests/test_github_knowledge.py tests/test_external_watch.py` (exit 0).
 
 ▶ TAKE YOUR TURN (agy — REVIEWER role)
 
