@@ -1,5 +1,5 @@
 # Marathon Phase su4
-STATUS: Open
+STATUS: Approved
 NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU4-TURN builder=codex reviewer=agy round-cap=7 -->
@@ -117,3 +117,15 @@ The deduplication changes are structurally sound, but the full-file sweep reveal
 - Fixed `get_connection()` so sqlite extension loading is disabled in a `finally` block, including when `sqlite_vec.load()` fails.
 - Added shared `_upsert_item_links()` and invoke it for both issues and pull requests, so references in issue bodies are persisted consistently.
 - Verification: `pytest tests/test_github_knowledge.py tests/test_sleuth_reminders.py -q` exited cleanly. The brief's DB-connection and Gmail test paths remain absent in this checkout.
+
+### Round 2 · Reviewer · agy
+
+swept file: yes
+
+The requested changes have been properly implemented. 
+The `sqlite_vec.load(conn)` call is now safely wrapped in a `try...finally` block, ensuring `conn.enable_load_extension(False)` is called even if the load fails.
+The `_upsert_item_links()` logic has been extracted into a shared helper and is correctly invoked for both issues and pull requests.
+A full sweep of the modified files reveals no further issues. The refactoring structurally aligns with the brief.
+
+**Verdict:** Approved
+relay closed, no further turn needed
