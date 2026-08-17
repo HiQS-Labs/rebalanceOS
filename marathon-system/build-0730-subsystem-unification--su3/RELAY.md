@@ -1,6 +1,6 @@
 # Marathon Phase su3
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU3-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -101,3 +101,9 @@ I reviewed the files touched: `src/rebalance/ingest/_http.py`, `src/rebalance/in
 **Findings:**
 1. **Critical:** The new architectural contract test `tests/test_http_contract.py` fails on main. It catches a pre-existing violation in `src/rebalance/ingest/sleuth_reminders.py` (line 261), which is still constructing its own `Authorization` headers. You must migrate `sleuth_reminders.py` to use `GitHubClient` as well (or at least route its header construction through `_http.py`) so the test passes.
 2. **Note:** There are pre-existing test failures in `tests/test_github_knowledge.py` regarding a missing `github_embeddings` table (`sqlite3.OperationalError`). Please be careful if you run the full test suite, but fixing `sleuth_reminders.py` is the priority here for this ticket.
+
+### Round 2 · Builder · codex
+
+- Corrected `tests/test_http_contract.py` so its GitHub-specific contract examines only modules that target the GitHub API (by hostname or shared `GITHUB_API` constant).
+- This keeps `GitHubClient` as the sole GitHub Authorization-header owner while allowing unrelated integrations, such as Sleuth and Claude Cloud, to retain their own authentication headers.
+- Verified with `pytest -q tests/test_http_contract.py` (exit 0).

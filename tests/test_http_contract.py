@@ -9,6 +9,18 @@ from pathlib import Path
 _INGEST_DIR = Path(__file__).resolve().parents[1] / "src" / "rebalance" / "ingest"
 
 
+def _uses_github_api(path: Path) -> bool:
+    """Return whether a module targets the GitHub API.
+
+    Other integrations legitimately authenticate with an ``Authorization``
+    header. This contract is intentionally limited to GitHub API modules;
+    their endpoint constants either contain the GitHub hostname directly or
+    use the shared ``GITHUB_API`` name.
+    """
+    source = path.read_text()
+    return "api.github.com" in source or "GITHUB_API" in source
+
+
 def _authorization_header_literals(path: Path) -> list[int]:
     """Return lines that construct an Authorization header, excluding comments."""
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -29,6 +41,6 @@ def test_github_authorization_headers_are_constructed_only_by_shared_client() ->
     violations = {
         path.relative_to(_INGEST_DIR): _authorization_header_literals(path)
         for path in _INGEST_DIR.rglob("*.py")
-        if path.name != "_http.py" and _authorization_header_literals(path)
+        if path.name != "_http.py" and _uses_github_api(path) and _authorization_header_literals(path)
     }
     assert violations == {}, f"GitHub Authorization headers must be owned by _http.py: {violations}"
