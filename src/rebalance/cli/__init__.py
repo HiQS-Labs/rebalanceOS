@@ -111,7 +111,15 @@ def dashboard_cmd() -> None:
 
 
 @app.command("doctor")
-def doctor_cmd(database: Path | None = DBOption()) -> None:
+def doctor_cmd(
+    database: Path | None = DBOption(),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the reconciled verdict and every check's disposition "
+        "(problem / notice / suppressed / ok) as JSON on stdout.",
+    ),
+) -> None:
     """Health check — database, token, schema, projects, GitHub data, scheduled jobs.
 
     Read-only. Surfaces the class of problem a test suite cannot: which database
@@ -121,13 +129,60 @@ def doctor_cmd(database: Path | None = DBOption()) -> None:
     log) and a diagnostics index pointing at every other observability surface —
     making this the single entry point into the project's diagnostics.
     """
-    from rich.console import Console
+    from datetime import timezone
 
     from rebalance.doctor import FAIL, OK, WARN, run_doctor
+    from rebalance.health import check_dispositions, compute_health_status
     from rebalance.ingest.index_ops import get_index_status
 
-    console = Console()
     report = run_doctor(database)
+    try:
+        status = get_index_status(resolve_database_path(database))
+    except DatabaseNotFoundError:
+        status = {}
+
+    degraded = {
+        name: health.get("reason", "degraded")
+        for name, health in status.get("freshness", {}).get("signal_health", {}).items()
+        if health.get("status") == "degraded"
+    }
+
+    # One producer (run_doctor), one reconciler (compute_health_status), N
+    # renderers — the exit code is a renderer, same as the dashboard pills.
+    # Same status snapshot and clock as pulse_web: a different `now` or a
+    # missing status dict would make suppression evaluate differently and the
+    # two surfaces disagree again through a new door (GH-5 Phase 4.3).
+    now = datetime.now(timezone.utc)
+    health_status = compute_health_status(report.checks, status, now)
+    exit_code = 1 if health_status.verdict == FAIL else 0
+
+    if json_output:
+        payload = {
+            "generated_at": now.isoformat(timespec="seconds"),
+            "verdict": health_status.verdict,
+            "exit_code": exit_code,
+            "summary": health_status.bucket_text or "healthy",
+            "checks": [
+                {
+                    "name": c.name,
+                    "status": c.status,
+                    "severity": c.severity,
+                    "disposition": disposition,
+                    "detail": c.detail,
+                    "hint": c.hint,
+                }
+                for c, disposition in check_dispositions(report.checks, health_status)
+            ],
+            "signal_health_degraded": degraded,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if exit_code:
+            raise typer.Exit(exit_code)
+        return
+
+    from rich.console import Console
+
+    console = Console()
     label = {
         OK: "[green] OK [/green]",
         WARN: "[yellow]WARN[/yellow]",
@@ -139,24 +194,26 @@ def doctor_cmd(database: Path | None = DBOption()) -> None:
         if c.hint and c.status != OK:
             console.print(f"         [dim]{c.hint}[/dim]")
 
-    try:
-        status = get_index_status(resolve_database_path(database))
-    except DatabaseNotFoundError:
-        status = {}
-
-    degraded = {
-        name: health.get("reason", "degraded")
-        for name, health in status.get("freshness", {}).get("signal_health", {}).items()
-        if health.get("status") == "degraded"
-    }
     if degraded:
         detail = "; ".join(f"{name}: {reason}" for name, reason in degraded.items())
         console.print(f"  {label[WARN]}  [bold]signal health[/bold] — {detail}")
     console.print()
-    if report.failed:
+    # The raw rows above may show a WARN the reconciler suppressed; say so
+    # rather than letting the verdict look like it ignored the row.
+    suppressed = sum(
+        1
+        for _, disposition in check_dispositions(report.checks, health_status)
+        if disposition == "suppressed"
+    )
+    if suppressed:
+        console.print(
+            f"[dim]{suppressed} warning{'' if suppressed == 1 else 's'} suppressed "
+            "by a recent successful sync — `rebalance doctor --json` for detail.[/dim]"
+        )
+    if health_status.verdict == FAIL:
         console.print("[red]Health check found failures.[/red]")
         raise typer.Exit(1)
-    if report.warned:
+    if health_status.verdict == WARN:
         console.print("[yellow]Health check passed with warnings.[/yellow]")
     else:
         console.print("[green]All checks passed.[/green]")

@@ -63,12 +63,16 @@ class CollectorHealthPredicateTests(unittest.TestCase):
         self.assertIn("in:inbox is:starred is:important", check.detail)
 
     def test_empty_collector_is_not_claimed_healthy_without_run_evidence(self) -> None:
+        # configured=True: since the GH-5 Phase 4 onboarding gate, an
+        # *unconfigured* empty source is a clean skip — this test pins the
+        # configured case, where emptiness is still a real failure.
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "rebalance.db"
             with db_connection(db_path, ensure_email_schema):
                 pass
 
-            check = _check_collector_freshness(db_path, **_collector("email data"))
+            spec = {**_collector("email data"), "configured": lambda: True}
+            check = _check_collector_freshness(db_path, **spec)
 
         self.assertEqual(check.status, WARN)
         self.assertIn("no email data ingested", check.detail)

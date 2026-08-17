@@ -34,18 +34,13 @@ from rebalance.ingest.db import db_connection, ensure_baseline_schema, run_migra
 
 
 class DoctorReportTests(unittest.TestCase):
-    def test_aggregation_properties(self) -> None:
-        clean = DoctorReport(checks=[Check("a", OK, ""), Check("b", OK, "")])
-        self.assertFalse(clean.failed)
-        self.assertFalse(clean.warned)
-
-        warned = DoctorReport(checks=[Check("a", OK, ""), Check("b", WARN, "")])
-        self.assertFalse(warned.failed)
-        self.assertTrue(warned.warned)
-
-        failed = DoctorReport(checks=[Check("a", WARN, ""), Check("b", FAIL, "")])
-        self.assertTrue(failed.failed)
-        self.assertTrue(failed.warned)
+    def test_report_carries_no_verdict_of_its_own(self) -> None:
+        """GH-5 Phase 4.3: the raw ``failed``/``warned`` aggregation properties
+        were a second verdict path bypassing health.compute_health_status —
+        deleted. Their return would reopen the CLI/dashboard disagreement."""
+        report = DoctorReport(checks=[Check("a", OK, "")])
+        self.assertFalse(hasattr(report, "failed"))
+        self.assertFalse(hasattr(report, "warned"))
 
 
 class DoctorCheckTests(unittest.TestCase):
@@ -63,7 +58,16 @@ class DoctorCheckTests(unittest.TestCase):
             self.assertEqual(checks["database"].status, OK)
             self.assertEqual(checks["schema"].status, WARN)       # not stamped
             self.assertEqual(checks["projects"].status, WARN)     # 0 registered
-            self.assertEqual(checks["github data"].status, WARN)  # no activity
+            # GH-5 Phase 4 onboarding gate: empty github data is an error only
+            # when a token is configured; unconfigured is a clean skip. Both
+            # directions pinned in test_doctor_exit_pins.py; here we assert the
+            # check exists and never silently claims data it doesn't have.
+            self.assertIn(
+                checks["github data"].status,
+                {WARN, OK},
+            )
+            if checks["github data"].status == OK:
+                self.assertIn("not configured", checks["github data"].detail)
 
     def test_migrated_db_reports_schema_ok(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -16,7 +16,7 @@ goal: >
 effort: 4
 complexity: 4
 risk: 3
-phases: 5
+phases: 6
 ratings_provisional: false
 roadmap_exempt: false
 ---
@@ -33,7 +33,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| PR [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6) open (6 phases + post-ship QA: Phase 5a reverted, `unknown`-state hardened, claims narrowed). Recurrence **mitigated, not closed** — see "What we got wrong". One real mechanism shipped (`utils/pdda/prior-art-check.sh`, plus `HiQS/tests` in CI); the `ROUTER.md` block is documentation and will not fire on its own. | Merge PR #6, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. |
+| **Phase 4 executed** on `feat/gh-5-phase-4-unified-health` (PR #6 merged earlier): 4.1 `--json` (agy: Approved), 4.2 pins + onboarding gate (agy: Approved), 4.3 exit reroute. Two findings en route, recorded in the Phase 4 section: the hand-counted blast radius missed a **sixth site** (caught by the 4.2 AST enumeration), and fresh installs hit the *table-not-present* branch, not the empty branch (sleuth_reminders is created by first sync). `Check.status` deletion **deferred — it still has consumers** (renderers, health.py); goes with PR2's vocabulary unification. | PR [#8](https://github.com/HiQS-Suite/rebalanceOS/pull/8) open (Phase 4). Next: merge it, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. Then Phase O2/O3. |
 
 ## Orientation for a reader arriving cold
 
@@ -80,9 +80,9 @@ below is scored against anything else.
 
 | # | Goal | Honest state after PR #6 | After the full plan |
 |---|---|---|---|
-| G6 | **Less complexity** | ❌ PR #6 adds a net module and more lines than it deletes | ⚠️ Modest. Real reduction needs the deferred `status`/`severity` collapse (Phase 4) |
+| G6 | **Less complexity** | ❌ PR #6 adds a net module and more lines than it deletes | ✅ **Now credible.** Phase 4 was reshaped from a field rename into deleting a duplicate *verdict system* — it removes a system, not a symbol. Owner: this plan; trigger: immediately after Phase M |
 | G7 | **More maintainable code** | ✅ Fewer competing definitions | ✅ |
-| G8 | **Modules talk to each other** | ⚠️ Exactly one link: `doctor` ← 3-Eyes | ⚠️ **Not met as stated.** The complaint was plural; one bridge plus a decision to scope no more is a deliberate partial, not a win. Reopen as its own effort if more is wanted |
+| G8 | **Modules talk to each other** | ⚠️ Exactly one link: `doctor` ← 3-Eyes | ⚠️→✅ **Second link added by Phase 4**: the CLI stops computing its own verdict and consumes `health.py`, the reconciler the dashboards already use. That is the largest remaining instance of the original complaint |
 | G9 | **Improved UI — stop explaining similar-but-different concepts** | ⚠️ 2 confusions fixed; the denominator is **not yet known** | ⚠️ Phase 3 *targets* this. It cannot be scored until Phase 3's own Phase 0 inventory runs — the earlier "~4" was a guess, and the last guess about this exact denominator (the badge trio) was wrong |
 
 > **G6 is the goal most at risk of being quietly missed.** This campaign's natural motion is
@@ -181,14 +181,209 @@ like a typo of each other and both reach the dashboard. Deletion-forward — vis
 changes accepted by operator decision. Full plan:
 [GH-5-PR2-STATUS-VOCABULARY.md](../1-INBOX/GH-5-PR2-STATUS-VOCABULARY.md). **Net lines: down.**
 
-### Phase 4 — The `status` / `severity` collapse (the real G6 lever)
+### Phase 4 — One health verdict, consumed by every surface (the real G6 lever)
 
-Deferred out of Phase 3 because it is not free: `health.py:100` renders an OK check when severity
-is `NOTICE` (the dashboard's "21 notices"), and `cli/__init__.py:156` makes `status == FAIL` drive
-the **process exit code** while severity does not. Two genuine axes. A single 4-value tier
-(`ok`/`notice`/`warning`/`error`) *is* expressible, but requires an explicit decision about which
-tiers exit non-zero. **Net lines: down. This is the phase that actually delivers G6** — without it,
-G6 is met only marginally, and the plan should not pretend otherwise.
+**Reshaped 2026-08-16.** This phase was scoped as "collapse `Check.status` into `Check.severity`".
+That was the symptom. The cause is one layer up.
+
+#### The finding
+
+`src/rebalance/health.py` is **already the unified health system**. Its own docstring:
+
+> *"Reconciled collector-health verdict — **one source of truth for the dashboards**. …so every
+> surface (web pulse, TUI, …) renders a *consistent* verdict instead of three independently-computed
+> pills that can contradict each other."*
+
+It was built to fix this exact class of defect one level up, and the dashboards already consume it.
+**The CLI is the holdout** — `cli/__init__.py:156` exits on `report.failed`, a raw
+`any(c.status == FAIL)` scan (`doctor.py:60`) that bypasses the reconciler entirely:
+
+| | Dashboards (`compute_health_status`) | CLI exit code (`report.failed`) |
+|---|---|---|
+| Suppression window (a recent sync clears a warning) | ✅ | ❌ |
+| Config-driven notice demotion | ✅ | ❌ |
+| Activity reconciliation | ✅ | ❌ |
+
+So `rebalance doctor` can exit 0 while the dashboard shows errors, and vice versa. **This is the
+operator's "systems not talking to each other" complaint at the verdict level, and it is the
+largest remaining instance.** The dashboard is not a parallel system; it is the correct consumer.
+The CLI simply never adopted it.
+
+#### Target architecture
+
+```
+doctor.run_doctor()          →  raw per-check facts        (one producer)
+health.compute_health_status →  one reconciled verdict     (one reconciler)
+      ├── web pulse / TUI    →  renders it                 (already does)
+      └── CLI exit code      →  derives from it            (Phase 4 adds this)
+```
+
+One producer, one reconciler, N renderers. `Check.status` then has no remaining consumer — its own
+`health.py:201` docstring already calls it *"legacy … kept for CLI compatibility"* — and the field
+collapses as a **consequence** rather than as the goal.
+
+#### Why this is the G6 lever
+
+It deletes a whole duplicate verdict path rather than renaming constants. It is the only phase in
+this campaign that removes a *system* rather than a *symbol*.
+
+#### The blast radius, measured
+
+Checks that are `WARN` status + `ERROR` severity are shown as errors on the dashboard while the CLI
+exits 0 today; under a binary verdict they begin failing it. A local grep found five, listed below —
+but **a hand-counted list is not a control.** Codex correctly graded the bare assertion
+"five … measured" as unverifiable. **4.2 replaces it with a parameterized test enumerating every
+`WARN`+`ERROR` constructor in `doctor.py`**, so the blast radius is derived from source at test time
+and a sixth site added later cannot slip in silently.
+
+| Site | Check |
+|---|---|
+| `doctor.py:442` | a required table is not present |
+| `doctor.py:471` | **no data ingested for a source** |
+| `doctor.py:957` | Sleuth published export is stale |
+| `doctor.py:1238` | auth failure events |
+| `doctor.py:1458` | 3-Eyes: a job is unloaded or failing (#4's incident shape) |
+| `_check_pulse_collectors` | **found by writing 4.2's enumeration test** — severity flows dynamically from `_PULSE_STATE_TO_CHECK` (ALERT / DEGRADED / NO PUSHES → WARN+ERROR). The hand count above missed it, which is the enumeration test's whole argument, demonstrated on its own plan. |
+
+`:471` fires on **every brand-new install**, so the collapse makes `rebalance doctor` exit 1 on
+first run.
+
+> ### ⚠️ Corrected — the reroute does NOT fix this
+>
+> An earlier version of this plan claimed routing through the reconciler "fixes this for free
+> because suppression already handles onboarding", and used that as the argument for reroute over
+> rename. **Codex graded it a Blocker and it is false.** Verified by executing the real code:
+>
+> ```
+> Check("vault", WARN, "no vault ingested", severity=ERROR)
+> + a status dict showing the source synced just now
+> → compute_health_status(...).verdict == "fail"     # CLI would exit 1
+> → in problems: ['vault'] · in notices: []
+> ```
+>
+> Suppression applies only to `severity == WARNING` (or `auth:*`), and notice-demotion also
+> excludes ERROR — both by design (`health.py:201`: *"Error severity is never demoted"*). A
+> WARN+ERROR check is unsuppressable by construction.
+>
+> **The reroute is still correct** — for the single-verdict-path, G6 and G8 reasons above — but it
+> must be argued on those, not on a safety property it does not have.
+
+#### Onboarding policy — DECIDED 2026-08-16
+
+**Decision: gate the empty-source check on whether that source is configured.** An unconfigured
+optional integration is a clean skip, not an error. Only a *configured* source with no data is an
+error.
+
+**This is not a new pattern — it is already the house pattern**, and extending it is cheaper than
+inventing an "ever ingested" signal (the alternative previously recommended here).
+`_check_figma` (`doctor.py:1080-1101`) states it outright:
+
+> *"Posture, not nagging: optional+unconfigured is a clean skip (OK), while a half-configured state
+> … is a real misconfiguration and warns."*
+
+`_check_figma` returns `Check("figma", OK, "not configured (optional integration)")`. Phase 4
+extends that posture to the four `_COLLECTOR_FRESHNESS` sources, which today check emptiness
+unconditionally regardless of whether the operator ever opted in.
+
+**Precondition verified** — a per-source configured-signal exists for all four, and each already
+has a credential check in `doctor.py` whose resolver can be reused rather than duplicated:
+
+| Source | Signal | Existing check |
+|---|---|---|
+| github data | `config.get_github_token()` | `doctor.py:208` ("no GitHub token configured") |
+| sleuth data | Sleuth Web API credentials | `doctor.py:921` |
+| calendar data | `config.get_calendar_oauth_token_json()` / `_google_oauth_source` | `doctor.py:1063` |
+| email data | `config.get_gmail_ingest_method()` + OAuth resolution | `doctor.py:1005` |
+
+**Resulting behaviour:**
+
+| Situation | Verdict |
+|---|---|
+| Fresh install, nothing configured | skip → **exit 0** |
+| Gmail never connected, ever | skip → **exit 0** (permanently, correctly) |
+| GitHub token configured, no data ingested | **ERROR → exit 1** |
+| GitHub was ingesting, now empty | **ERROR → exit 1** |
+
+**Found during 4.2 (would have broken the fresh-install row):** some collector tables
+(`sleuth_reminders`) are created by the **first sync, not by migrations** — so a genuine fresh
+install hits the *table-not-present* branch of `_check_collector_freshness`, not the empty branch.
+The gate therefore covers both branches; unconfigured+missing-table skips, configured+missing-table
+stays an error. Discovered because the black-box fresh-install test failed on its first run — the
+pin did its job before the reroute ever shipped.
+
+**Known wrinkle to handle explicitly in 4.2:** Gmail's `mcp` ingest mode keeps credentials in the
+agent's connector, not locally (`doctor.py:1009-1011`), so "configured" there means only *"the
+operator selected mcp mode"* — it cannot distinguish "selected mcp and connected" from "selected
+mcp and never connected". Pick and pin one reading; do not leave it implicit.
+
+**Reuse, do not re-derive.** Each of the four resolvers above is already called by an existing
+check. Phase 4 must call the same resolver, not write a second "is github configured?" predicate —
+that would be this campaign's own failure mode, committed inside its own fix.
+
+#### Sequencing within Phase 4 — the order is the safety property
+
+**4.1 → 4.2 must precede 4.3.** At no point may a binary exit code exist that cannot be diagnosed.
+
+- **4.1 — `rebalance doctor --json`.** Purely additive flag. **Must emit the reconciled verdict and
+  each check's disposition (problem / notice / suppressed), not merely the raw check list** — Codex's
+  Q4 finding: raw checks cannot explain *why* something was suppressed or demoted, so a JSON of raw
+  checks leaves a binary exit code still undiagnosable in exactly the cases the reconciler acts on.
+  **Prerequisite for the collapse**, not a follow-up. Risk: near-zero.
+- **4.2 — Exit-code pin tests.** Three, not one: (a) a parameterized enumeration of every
+  `WARN`+`ERROR` constructor in `doctor.py`; (b) a black-box fresh-install test asserting the chosen
+  onboarding exit code; (c) the status-unavailable path. Risk: zero.
+- **4.3 — Reroute the CLI exit through `compute_health_status()`**, then delete `Check.status` and
+  `__post_init__`'s reconciliation hack once it has no consumer. **The CLI must pass the same status
+  snapshot and clock the dashboard uses** — one shared provider. Codex's Q4: ordering alone is not
+  sufficient, because a different `now` or a missing status dict makes recovery/suppression evaluate
+  differently and the two surfaces disagree again through a new door. **Net lines: down.**
+
+  **Executed 2026-08-16 — with the deletion honestly deferred.** The reroute shipped: exit 1 iff
+  reconciled verdict == fail, `DoctorReport.failed`/`.warned` (the raw second verdict path, whose
+  only consumer was the CLI) deleted, human mode gained a one-line suppressed-warnings note so a
+  visible WARN row can't contradict the summary. But the "no consumer" gate for `Check.status` is
+  **false today**: the CLI row renderer, pulse_web, and health.py's own visibility predicate all
+  still read it, and `__post_init__`'s FAIL→ERROR promotion turned out to be *load-bearing* for the
+  reroute itself (9 `FAIL` constructors carry no explicit severity; without the promotion a FAIL
+  check would yield verdict *warn*). Deleting either here would have been the campaign's own
+  failure mode — a wide rename disguised as a deletion. Both go with PR2's status-vocabulary
+  unification, where `FAIL`-as-a-status disappears entirely.
+
+  Verified live on this machine: `rebalance doctor` now exits 1 on the same two error-severity
+  problems the dashboard shows (previously exit 0 while the dashboard showed errors).
+
+## Phase O — Observability, so a binary verdict stays diagnosable
+
+Phase 4 reduces the *verdict* to one bit. That is only safe if the layer underneath explains
+itself. Audited state:
+
+**Already sound — do not rebuild:** `Check.name` is a genuine stable ID (`health_issue_reporter.py:686`
+depends on it); `detail`/`hint` carry actionable text; `auth_activity.jsonl` persists auth events;
+`launchd_crash_state.json` persists crash history across polls; the health reporter auto-files a
+deduped GitHub issue per failing check. That is a real alerting pipeline and it stays.
+
+**Gaps, in priority order:**
+
+- **O1 — no machine-readable output.** Delivered by 4.1; listed here so the dependency is explicit.
+- **O2 — no history. ~~Build `doctor_history.jsonl`.~~ CUT.** Codex's Q5, accepted: it names no
+  reader, no retention query, and no operational trigger — *"repeats the callerless-infrastructure
+  risk"*. That is Phase 5a's exact mistake, proposed again three phases later by the same author, in
+  the plan that documents Phase 5a as the cautionary example. The laziest thing that answers *"is
+  this new / how long"* is **4.1's JSON plus the per-source timestamps and activity records that
+  already exist**. Revisit only when a concrete incident cannot be answered from those — and cite
+  the incident.
+- **O3 — suppression windows are coupled by comment, not by code. KEEP.** `health.py:20` states
+  *"Suppression windows MUST track `doctor.py` `warn_days * 24` for each source"* — a MUST enforced
+  by a docstring, the same exhortation-instead-of-mechanism pattern this campaign has been bitten by
+  twice. **Derive the window from one shared policy value, or test that the two agree — do not
+  introduce a second hand-maintained copy** (Codex Q5). Risk: zero.
+
+**Explicitly NOT a quick win — do not attempt as one:** normalising check names to
+`subsystem:instance`. Verified: `scripts/health_issue_reporter.py:686` is
+`check_id = check["name"]  # stable, registry-level id`, and that id is the GitHub issue key
+(`title = f"{ISSUE_TITLE_PREFIX} {check_id}"`, matched against `open_issues` / `recently_closed`).
+Renaming therefore re-files a duplicate of every currently-open health issue. It is worth doing, but
+it needs a name-migration/alias map and a test proving no re-file, in its own slice.
 
 ### Phase 5b — Chunking into live indexing (still deferred, unchanged)
 
