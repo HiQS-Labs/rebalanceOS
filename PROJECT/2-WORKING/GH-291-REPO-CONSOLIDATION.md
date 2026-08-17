@@ -83,13 +83,32 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
 
 **Gate:** ✅ old remote holds everything; local old clone is now expendable-after-buffer.
 
-## Phase 1 — Prepare the new clone (Day 0, ~30 min)
+## Phase 1 — Prepare the new clone (Day 0, ~30 min) — gitignore audit ✅, tests pending
 
-- [ ] In `/Users/noelsaw/Documents/GH Repos/rebalanceOS`, extend `.gitignore` with
-      the private entries the public repo currently lacks (audit found gaps):
-      `PARKED/`, `relay-system/`, `MEMORY.md`, `.venv*/`, `phases/`, `test.db`,
-      `git-pulse-sync`, `reports`, `DIAGRAM.md`, `rebalance.db.orphan-*` — and
-      re-check every row of the carry-over list in Phase 2 against it.
+- [x] In `/Users/noelsaw/Documents/GH Repos/rebalanceOS`, extend `.gitignore` with
+      the private entries the public repo currently lacks. **Measured 2026-08-17**
+      with `git check-ignore` over every carry-over row: `PARKED/`, `.venv/`,
+      `test.db` (via `*.db`), `git-pulse-sync`, `reports`, `rebalance.db.*.bak`,
+      `logs/`, `scratch/`, `graphify-out/`, `xyz-tick/`, `.tick/`, `.aider/`,
+      `.gemini/`, `.xyz/`, `build/`, `dist/`, `snapshot.md`, `ASK_SELF.md`,
+      `REPO_MAP.md`, `.pdda-gh-state.tsv`, and the OAuth patterns were **already
+      covered**. Only three were missing — `MEMORY.md`, `phases/`, `DIAGRAM.md` —
+      added in PR #48 (HiQS-Suite/rebalanceOS).
+- [ ] 🛑 **BLOCKER — `relay-system/` is tracked in the new repo (16 files).** The new
+      repo actively commits marathon transcripts (`relay-system/2026-08-17/*`);
+      issue #33 there wants that stopped. Carrying the retiring folder's
+      `relay-system/2026-08-14..16/` into a tree where the directory is tracked
+      leaves untracked-but-not-ignored files and **breaks the Phase 2
+      empty-porcelain gate**. Gitignoring a tracked path to make the gate pass is
+      explicitly forbidden by this plan. Operator decision required, two options:
+      - **(recommended)** drop `relay-system/` from the Phase 2 carry-over list and
+        park the old transcripts outside the tree
+        (`~/Documents/rebalance-OS-relay-archive-2026-08/`). They are historical
+        agent logs; nothing at runtime reads them.
+      - land #33 first (untrack + ignore `relay-system/`), then carry over normally.
+- [ ] ⚠️ `.ona/` — `.ona/automations.yaml` is tracked on purpose in the new repo. Carry
+      over only the local state files under `.ona/`, never the whole directory, or the
+      tree proof will flag a modified tracked file.
 - [ ] Prove already-covered entries are ignored — don't assume; the swap is
       precisely when a `.gitignore` gets reconciled by hand. For each of
       `logs/`, `rebalance.db*`, `snapshot.md`, `ASK_SELF.md`, `REPO_MAP.md`,
@@ -138,8 +157,10 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
       don't move — the retired folder must stay intact as the rollback):
       - Databases: `rebalance.db`, `rebalance.db-shm`, `rebalance.db-wal`,
         `rebalance.db.orphan-*.bak`, `test.db`
-      - Working/private dirs: `PARKED/`, `relay-system/`, `logs/`, `scratch/`,
+      - Working/private dirs: `PARKED/`, `logs/`, `scratch/`,
         `graphify-out/`, `xyz-tick/`, `phases/`, `web/`
+        *(`relay-system/` removed pending the Phase 1 blocker — it is tracked in the
+        new repo; see Phase 1. Do not carry it until that decision is made.)*
       - Private docs: `MEMORY.md`, `REPO_MAP.md`, `snapshot.md`, `ASK_SELF.md`,
         `DIAGRAM.md`, `APACHE-LICENSE-2.0.txt` (superseded by `LICENSE` — skip)
       - Tool state: `.tick/`, `.aider/`, `.gemini/`, `.xyz/`, `.ona/`,
