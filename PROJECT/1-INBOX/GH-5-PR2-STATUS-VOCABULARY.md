@@ -2,7 +2,7 @@
 gh_issue: 5
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/5
 title: "GH-5 PR2 — one status vocabulary across every user-facing surface"
-status: "Inbox — plan drafted after PR1's post-ship QA; needs review before execution"
+status: "Executed — shipped as PR #18 (0.69.8); Phase 1b field collapse deliberately deferred"
 created: 2026-08-16
 updated: 2026-08-16
 owner: noel
@@ -33,7 +33,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| PR1 shipped as [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6). Post-ship QA reverted Phase 5a, hardened the unknown-state boundary, and narrowed PR1's claims. This plan drafted against a fresh inventory of the actual user-facing surfaces. | Review/sharpen this plan, then execute Phases 0–3. |
+| Executed as [#18](https://github.com/HiQS-Suite/rebalanceOS/pull/18) (0.69.8): Phases 0–3 shipped; Phase 0's DB query found zero stored old literals (no migration); tz_utils deletion required repointing four consumers the plan predates; a pre-existing swapped-argument badge bug was found and fixed en route. Net −124 lines. | Phase 1b (status/severity field collapse) remains deferred — its own scoped change with its own plan. |
 
 ## The finding this is built on
 
