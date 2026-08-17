@@ -113,3 +113,12 @@ REPO_MAP.md
 # *.example.json template is committed deliberately and stays tracked).
 google_oauth_client.json
 client_secret*.json
+
+# --- GH-291 consolidation: private runtime content carried over from the
+# retiring Hypercart-Dev-Tools/rebalance-OS folder. These live in the working
+# tree on the operator's machine and must never reach this public remote.
+# Audited 2026-08-17 with `git check-ignore` against the runbook's carry-over
+# list; only the entries that were genuinely missing are added here.
+MEMORY.md
+phases/
+DIAGRAM.md
