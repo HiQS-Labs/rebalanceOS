@@ -2,7 +2,7 @@
 gh_issue: 16
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/16
 title: "Add type checking (mypy) and formatting (ruff format) — the remaining two-thirds of the lint gap"
-status: "Working — initialized 2026-08-16 with Phase 0 spike & full project plan"
+status: "Completed — shipped as PR #21 (0.69.9): mypy + ruff format + CI typecheck job; issue #16 closed"
 created: 2026-08-16
 updated: 2026-08-16
 owner: noel

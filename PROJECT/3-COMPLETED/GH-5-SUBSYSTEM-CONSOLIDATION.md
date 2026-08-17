@@ -2,7 +2,7 @@
 gh_issue: 5
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/5
 title: "GH-5 subsystem consolidation — finish the campaign, don't restart it"
-status: "Working — rewritten 2026-08-16 after discovering this is the resumption of an unfinished campaign, not a new one"
+status: "Completed — campaign closed 2026-08-16 at 0.69.9: Phases 4/F/M/R/O3/PR2 all shipped, GH-291 archival gate clear, issue #5 closed. Deferred work has successor homes: pulse-stack consolidation #23, scheduler jobs #22, PR2 Phase 1b + 5b chunking + name normalisation stay documented herein"
 created: 2026-08-16
 updated: 2026-08-16
 owner: noel
