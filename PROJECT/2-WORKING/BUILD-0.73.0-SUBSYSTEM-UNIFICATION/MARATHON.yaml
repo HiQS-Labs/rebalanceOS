@@ -1,0 +1,54 @@
+name: build-0730-subsystem-unification
+phases:
+  - id: su1
+    name: HiQS test process isolation (#7)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p1-hiqs-test-isolation.md
+    artifact: HiQS/tests/test_github.py,HiQS/hiqs/sources/github.py,tests/
+    turn_timeout_s: 900
+    max_review_rounds: 3
+
+  - id: su2
+    name: Timestamp handling consolidation through lib/time_ops (#25)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p2-timestamp-consolidation.md
+    artifact: src/rebalance/lib/time_ops.py,src/rebalance/ingest/sleuth_reminders.py,src/rebalance/ingest/pulse_health.py,src/rebalance/ingest/claude_cloud.py,src/rebalance/ingest/index_ops.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: su1
+
+  - id: su3
+    name: Route every GitHub API call through shared client (#26)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p3-github-client-routing.md
+    artifact: src/rebalance/ingest/_http.py,src/rebalance/ingest/github_knowledge.py,src/rebalance/ingest/github_watch.py,tests/test_http_contract.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: su2
+
+  - id: su4
+    name: Deduplicate persistence and upsert paths across collectors (#27)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p4-persistence-deduplication.md
+    artifact: src/rebalance/ingest/db/connection.py,src/rebalance/ingest/gmail.py,src/rebalance/ingest/github_knowledge.py,src/rebalance/ingest/sleuth_reminders.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: su3
+
+  - id: su5
+    name: One git subprocess wrapper across collectors (#28)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p5-git-ops-consolidation.md
+    artifact: src/rebalance/lib/git_ops.py,src/rebalance/ingest/pulse.py,src/rebalance/ingest/sync_snapshot.py,src/rebalance/ingest/sleuth_reminders.py,src/rebalance/ingest/ask_self_scan.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: su4
+
+  - id: su6
+    name: Dead code removal and stale doc reconciliation (#30)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.73.0-SUBSYSTEM-UNIFICATION/phases-briefs/p6-dead-code-doc-cleanup.md
+    artifact: src/rebalance/web.py,scripts/pulse_web.py,ARCHITECTURE.md,AGENTS.md,src/rebalance/mcp/tools/index.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: su5

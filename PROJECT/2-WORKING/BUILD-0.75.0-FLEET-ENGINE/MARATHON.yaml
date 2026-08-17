@@ -1,0 +1,45 @@
+name: build-0750-fleet-engine
+phases:
+  - id: fe1
+    name: Shared SQL read layer and web app mount (#29)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p1-shared-read-layer.md
+    artifact: src/rebalance/ingest/db/queries.py,scripts/pulse_server.py,scripts/dashboard.py,src/rebalance/ingest/pulse.py,src/rebalance/ingest/note_builder.py,src/rebalance/web_components.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+
+  - id: fe2
+    name: Consolidate pulse and fleet collector stack (#23)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p2-pulse-collector-consolidation.md
+    artifact: src/rebalance/ingest/pulse_collector.py,src/rebalance/ingest/pulse_health.py,scripts/install_scheduler.sh,scripts/lib/scheduler_common.sh,src/rebalance/doctor.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: fe1
+
+  - id: fe3
+    name: Reconcile and reload watchdog scheduler jobs (#22)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p3-scheduler-jobs-reload.md
+    artifact: scripts/install_health_check_scheduler.sh,scripts/install_health_check_triage_scheduler.sh,scripts/install_pulse_warning_watch_scheduler.sh,src/rebalance/doctor.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: fe2
+
+  - id: fe4
+    name: Mac Studio pulse collector conflict recovery (#4)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p4-mac-studio-recovery.md
+    artifact: src/rebalance/ingest/pulse_health.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: fe3
+
+  - id: fe5
+    name: Sustained-activity multi-signal auto-promotion (#1)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p5-sustained-auto-promotion.md
+    artifact: src/rebalance/ingest/project_inference.py,src/rebalance/ingest/config.py,src/rebalance/ingest/auth_log.py,tests/test_auto_promote.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: fe4

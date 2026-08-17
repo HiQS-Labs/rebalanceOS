@@ -1,0 +1,27 @@
+name: build-0740-hardened-core
+phases:
+  - id: hc1
+    name: Close coverage gaps across core modules (#31)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.74.0-HARDENED-CORE/phases-briefs/p1-coverage-gaps.md
+    artifact: tests/test_md_parser.py,tests/test_note_ingester.py,tests/test_slack_users.py,tests/test_mcp_tools.py,tests/test_querier_synthesis.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+
+  - id: hc2
+    name: Secret redaction regression suite and chunk purge (#32)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.74.0-HARDENED-CORE/phases-briefs/p2-secret-redaction-reindex.md
+    artifact: src/rebalance/ingest/note_ingester.py,src/rebalance/ingest/semantic_index.py,tests/test_secret_redaction.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: hc1
+
+  - id: hc3
+    name: Transcript suppression and repo hygiene enforcement (#33)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.74.0-HARDENED-CORE/phases-briefs/p3-transcript-suppression-hygiene.md
+    artifact: .gitignore,tests/test_repo_hygiene.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: hc2

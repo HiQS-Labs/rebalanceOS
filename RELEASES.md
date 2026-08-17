@@ -67,3 +67,43 @@ GH_URL: https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/266
 Front-door reviewed:
 Shakedown reviewed:
 License file: Yes
+
+Release: 0.73.0
+Iterations: 0.73.0-0.73.9
+Status: Draft
+Target Date: 2026-12-15
+Codename: Subsystem Unification
+Milestone:
+Description: Foundational test isolation and DRY infrastructure consolidation across collectors and libraries. #7 HiQS test process isolation, #25 time_ops timestamp consolidation, #26 GitHubClient routing, #27 database persistence/upsert deduplication, #28 git_ops subprocess wrapper, #30 dead code and stale doc cleanup.
+Exit: Single-process `pytest tests/ HiQS/tests/` passes with zero state leakage; zero duplicate git subprocess runners, timestamp alias wrappers, or raw GitHub auth headers remain in src/.
+GH_URL:
+Front-door reviewed:
+Shakedown reviewed:
+License file: Yes
+
+Release: 0.74.0
+Iterations: 0.74.0-0.74.9
+Status: Draft
+Target Date: 2027-01-15
+Codename: Hardened Core
+Milestone:
+Description: Security invariant hardening, core parser test coverage, and repo hygiene enforcement. #31 close coverage gaps (md_parser, note_ingester, slack_users, MCP tools), #32 pre-embed secret redaction regression tests and chunk purge/re-index, #33 transcript suppression and clean repo hygiene.
+Exit: Secret redaction regression suite green with zero key leaks in semantic queries; md_parser and note_ingester direct unit tests pass; relay-system/ transcripts strictly uncommitted.
+GH_URL:
+Front-door reviewed:
+Shakedown reviewed:
+License file: Yes
+
+Release: 0.75.0
+Iterations: 0.75.0-0.75.9
+Status: Draft
+Target Date: 2027-02-15
+Codename: Fleet Engine
+Milestone:
+Description: Unified fleet collection, streamlined scheduler topology, shared presentation layer, and multi-signal auto-promotion. #29 shared SQL read layer and web app mount, #23 pulse/fleet collector stack consolidation, #22 Mac Studio scheduler jobs reload, #4 Mac Studio pulse collector conflict recovery, #1 sustained-activity auto-promotion engine.
+Exit: Pulse collection consolidated into 3 supervised launchd jobs; Mac Studio device heartbeat fresh (<1h) with zero doctor alerts; multi-signal 5-action auto-promotion operational with 20h burst guard.
+GH_URL:
+Front-door reviewed:
+Shakedown reviewed:
+License file: Yes
+

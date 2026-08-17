@@ -1,12 +1,22 @@
-# 2-WORKING — empty by design
+---
+title: "Blank Working Doc Template"
+status: "Draft"
+created: 2026-08-16
+updated: 2026-08-16
+owner: noel
+goal: "Template for new working documents"
+roadmap_exempt: true
+pdda_hold: true
+---
 
-This stage of the PDDA scaffold ships empty. The project's own working documents are
-internal and are not published; the directory is kept so the four-stage structure is
-visible and usable from a fresh clone.
+# Blank Template
 
-See [`PROJECT/PDDA.md`](../PDDA.md) for what belongs here, and
-[`PROJECT/3-COMPLETED/GH-250-VECTOR-BLOAT/`](../3-COMPLETED/GH-250-VECTOR-BLOAT/) for a
-complete worked example — scope, phase briefs, marathon plans and the operational runbook
-from one real release.
+## Status
 
-Delete this file once you add your own.
+| What was just completed | What's next |
+|---|---|
+| Blank template created. | Ready for duplication into new work. |
+
+## Why
+
+Template placeholder.
