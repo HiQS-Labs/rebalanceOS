@@ -69,6 +69,17 @@ class SuppressionWindowDerivationTests(unittest.TestCase):
             CREDENTIAL_SUPPRESSION_HOURS,
             {"vault": 48, "calendar": 72, "gmail": 168, "sleuth": 48},
         )
+        # AUTH_RECOVERY needs its own absolute pin: "github data" appears only
+        # here, so without it a registry warn_days change would move that
+        # window with no test flagging the decision (agy review, r1).
+        self.assertEqual(
+            AUTH_RECOVERY,
+            {
+                "auth:github": ("github data", 48),
+                "auth:gmail": ("gmail", 168),
+                "auth:calendar": ("calendar", 72),
+            },
+        )
 
 
 if __name__ == "__main__":
