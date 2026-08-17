@@ -22,16 +22,20 @@ _UNUSED_DB = Path("/nonexistent/should-not-be-opened.db")
 
 class FigmaGatingTests(unittest.TestCase):
     def test_missing_token_returns_clean_error_envelope(self) -> None:
-        with patch.object(index_ops, "get_figma_token", return_value=""), \
-             patch.object(index_ops, "get_figma_file_keys", return_value=["abc"]):
+        with (
+            patch.object(index_ops, "get_figma_token", return_value=""),
+            patch.object(index_ops, "get_figma_file_keys", return_value=["abc"]),
+        ):
             result = index_ops._refresh_figma(_UNUSED_DB, dry_run=False)
         self.assertEqual(result["scope"], "figma")
         self.assertIn("token", result["error"].lower())
         self.assertNotIn("skipped", result)  # an error, not a silent skip
 
     def test_token_without_file_keys_skips_with_reason(self) -> None:
-        with patch.object(index_ops, "get_figma_token", return_value="figd_fake"), \
-             patch.object(index_ops, "get_figma_file_keys", return_value=[]):
+        with (
+            patch.object(index_ops, "get_figma_token", return_value="figd_fake"),
+            patch.object(index_ops, "get_figma_file_keys", return_value=[]),
+        ):
             result = index_ops._refresh_figma(_UNUSED_DB, dry_run=False)
         self.assertTrue(result["skipped"])
         self.assertIn("file key", result["reason"].lower())

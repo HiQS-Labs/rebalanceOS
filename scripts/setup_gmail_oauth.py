@@ -68,7 +68,7 @@ def authorize_gmail(scopes: list[str]):
 
     token_json = creds.to_json()
     config.set_gmail_oauth_token_json(token_json, source="manual", record=True)  # keyring
-    token_path = resolve_oauth_token_path("gmail")                                # JSON fallback
+    token_path = resolve_oauth_token_path("gmail")  # JSON fallback
     token_path.parent.mkdir(parents=True, exist_ok=True)
     token_path.write_text(token_json, encoding="utf-8")
     token_path.chmod(0o600)
@@ -87,9 +87,7 @@ def authorize_gmail(scopes: list[str]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Authorize this device for Gmail ingest (one-time setup)"
-    )
+    parser = argparse.ArgumentParser(description="Authorize this device for Gmail ingest (one-time setup)")
     parser.add_argument(
         "--test",
         action="store_true",
@@ -105,6 +103,7 @@ if __name__ == "__main__":
             print("\n🧪 Reading your Gmail profile...\n")
             from googleapiclient.discovery import build
             from google.auth.transport.requests import Request
+
             if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             service = build("gmail", "v1", credentials=creds, cache_discovery=False)
@@ -126,5 +125,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         exit(1)

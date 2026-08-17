@@ -38,6 +38,7 @@ class CollectorRegistryTests(unittest.TestCase):
     def test_default_refresh_recipe_includes_follow_on_stages(self) -> None:
         # The no-scope default still runs raw sources + code/semantic/sync.
         from rebalance.ingest.index_ops import _default_refresh_scopes
+
         self.assertEqual(
             sorted(_default_refresh_scopes()),
             sorted(["vault", "github", "calendar", "sleuth", "email", "code", "semantic", "sync"]),
@@ -88,9 +89,7 @@ class CollectorRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "test.db"
             try:
-                register_collector(
-                    Collector("smoke_test", _mock_refresh, included_in_all=False)
-                )
+                register_collector(Collector("smoke_test", _mock_refresh, included_in_all=False))
                 result = refresh_index(
                     db_path,
                     scope=["smoke_test"],

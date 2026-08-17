@@ -13,12 +13,7 @@ def test_connection_configures_required_pragmas_and_full_schema(tmp_path):
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 30000
 
-        tables = {
-            row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            )
-        }
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         assert {
             "vault_files",
             "github_activity",
@@ -39,13 +34,9 @@ def test_connection_configures_required_pragmas_and_full_schema(tmp_path):
 def test_project_affinity_enforces_one_canonical_row_per_edge(tmp_path):
     connection = db_connection(tmp_path / "hiqs.db")
     try:
-        connection.execute(
-            "INSERT INTO project_affinity VALUES (?, ?, ?, ?)", ("alpha", "beta", "same_org", 1.0)
-        )
+        connection.execute("INSERT INTO project_affinity VALUES (?, ?, ?, ?)", ("alpha", "beta", "same_org", 1.0))
         with pytest.raises(sqlite3.IntegrityError):
-            connection.execute(
-                "INSERT INTO project_affinity VALUES (?, ?, ?, ?)", ("beta", "alpha", "same_org", 1.0)
-            )
+            connection.execute("INSERT INTO project_affinity VALUES (?, ?, ?, ?)", ("beta", "alpha", "same_org", 1.0))
     finally:
         connection.close()
 
@@ -56,16 +47,17 @@ def test_schema_creation_is_idempotent_and_fts_tracks_docs(tmp_path):
     first_connection.close()
     connection = db_connection(path)
     try:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'docs_ai'"
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'docs_ai'"
+            ).fetchone()[0]
+            == 1
+        )
         connection.execute(
             "INSERT INTO docs VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             ("vault", "note-1", "A title", "searchable body", "", "2026-08-03T12:00:00Z", "", ""),
         )
-        assert connection.execute(
-            "SELECT rowid FROM docs_fts WHERE docs_fts MATCH 'searchable'"
-        ).fetchone() is not None
+        assert connection.execute("SELECT rowid FROM docs_fts WHERE docs_fts MATCH 'searchable'").fetchone() is not None
     finally:
         connection.close()
 

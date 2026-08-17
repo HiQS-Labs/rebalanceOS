@@ -94,9 +94,7 @@ POLICY = {
         # :08/:38, not :00/:30 (GH-175). This is a derived read-only stage over
         # what pulse-sync writes at :00 — sharing that minute risked rendering
         # from half-written state, so the offset is correctness, not tidiness.
-        "calendar": [
-            {"Hour": h, "Minute": m} for h in WORKDAY_HOURS for m in (8, 38)
-        ],
+        "calendar": [{"Hour": h, "Minute": m} for h in WORKDAY_HOURS for m in (8, 38)],
         "run_at_load": False,
         "keep_alive": False,
         "wrapper": "scripts/pulse_web_sync.sh",
@@ -221,9 +219,7 @@ def _render(job):
     """Render a template the way install_common.sh does, with dummy paths."""
     text = (SCRIPTS / f"{_label(job)}.plist.template").read_text()
     return (
-        text.replace("{{REBALANCE_DIR}}", FAKE_ROOT)
-        .replace("{{PYTHON}}", FAKE_PYTHON)
-        .replace("{{HOME}}", FAKE_HOME)
+        text.replace("{{REBALANCE_DIR}}", FAKE_ROOT).replace("{{PYTHON}}", FAKE_PYTHON).replace("{{HOME}}", FAKE_HOME)
     )
 
 
@@ -259,7 +255,8 @@ class TestPlistTemplates(unittest.TestCase):
         for job, spec in POLICY.items():
             got = _intervals(_parse(job))
             self.assertEqual(
-                got, spec["calendar"],
+                got,
+                spec["calendar"],
                 f"{job}: StartCalendarInterval diverged from SCHEDULER.md policy",
             )
 
@@ -267,11 +264,13 @@ class TestPlistTemplates(unittest.TestCase):
         for job, spec in POLICY.items():
             plist = _parse(job)
             self.assertEqual(
-                bool(plist.get("RunAtLoad", False)), spec["run_at_load"],
+                bool(plist.get("RunAtLoad", False)),
+                spec["run_at_load"],
                 f"{job}: RunAtLoad",
             )
             self.assertEqual(
-                bool(plist.get("KeepAlive", False)), spec["keep_alive"],
+                bool(plist.get("KeepAlive", False)),
+                spec["keep_alive"],
                 f"{job}: KeepAlive",
             )
 
@@ -280,7 +279,7 @@ class TestPlistTemplates(unittest.TestCase):
             for arg in _parse(job)["ProgramArguments"]:
                 if not arg.startswith(FAKE_ROOT + "/"):
                     continue
-                rel = arg[len(FAKE_ROOT) + 1:]
+                rel = arg[len(FAKE_ROOT) + 1 :]
                 # Only executables must exist in the repo. Runtime artifacts
                 # (temp/ logs, state files) are created on first run and are
                 # gitignored — asserting them broke CI on clean checkouts.
@@ -317,9 +316,7 @@ class TestWrapperScripts(unittest.TestCase):
         shell += [SCRIPTS / name for name in INSTALLERS.values()]
         for path in shell:
             self.assertTrue(path.is_file(), f"missing {path}")
-            proc = subprocess.run(
-                ["bash", "-n", str(path)], capture_output=True, text=True
-            )
+            proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, f"{path}: {proc.stderr}")
 
     def test_scheduled_wrappers_use_shared_runtime(self):
@@ -330,7 +327,8 @@ class TestWrapperScripts(unittest.TestCase):
                 continue
             text = (REPO / spec["wrapper"]).read_text()
             self.assertIn(
-                "lib/scheduler_common.sh", text,
+                "lib/scheduler_common.sh",
+                text,
                 f"{job}: wrapper does not source scheduler_common.sh",
             )
 
@@ -362,9 +360,7 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
         )
         wrapper = repo / "scripts" / "job.sh"
         wrapper.write_text(
-            "#!/bin/bash\nset -euo pipefail\n"
-            'source "$(cd "$(dirname "$0")" && pwd)/lib/scheduler_common.sh"\n'
-            + body
+            '#!/bin/bash\nset -euo pipefail\nsource "$(cd "$(dirname "$0")" && pwd)/lib/scheduler_common.sh"\n' + body
         )
         wrapper.chmod(0o755)
         return repo, wrapper
@@ -373,9 +369,7 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
-            repo, wrapper = self._make_tree(
-                tmp, 'rb_job_init "fake-job" 14\nlog "hello"\nrb_trim_logs\n'
-            )
+            repo, wrapper = self._make_tree(tmp, 'rb_job_init "fake-job" 14\nlog "hello"\nrb_trim_logs\n')
             proc = subprocess.run([str(wrapper)], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             logs = list((repo / "temp" / "logs").glob("fake_job_*.log"))
@@ -386,9 +380,7 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
-            _, wrapper = self._make_tree(
-                tmp, 'rb_job_init "fake-job" 14\nexit 3\n'
-            )
+            _, wrapper = self._make_tree(tmp, 'rb_job_init "fake-job" 14\nexit 3\n')
             proc = subprocess.run([str(wrapper)], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 3)
 
@@ -400,25 +392,25 @@ class TestInstallers(unittest.TestCase):
             self.assertTrue(path.is_file(), f"{job}: missing installer {name}")
             text = path.read_text()
             self.assertIn(
-                "lib/install_common.sh", text,
+                "lib/install_common.sh",
+                text,
                 f"{job}: installer does not source install_common.sh",
             )
             self.assertIn(
-                f'rb_install_launchd_job "{_label(job)}"', text,
+                f'rb_install_launchd_job "{_label(job)}"',
+                text,
                 f"{job}: installer does not install label {_label(job)}",
             )
 
     def test_installers_have_no_inline_render_or_racy_unload(self):
         for job, name in INSTALLERS.items():
             text = (SCRIPTS / name).read_text()
+            self.assertNotIn("s/{{", text, f"{job}: inline sed render belongs in install_common.sh")
             self.assertNotIn(
-                's/{{', text, f"{job}: inline sed render belongs in install_common.sh"
-            )
-            self.assertNotIn(
-                "if launchctl list", text,
+                "if launchctl list",
+                text,
                 f"{job}: racy grep-conditional unload; install_common always unloads",
             )
-
 
     def test_installers_are_executable_in_git(self):
         """Every installer must be mode 100755 in the index, not just on disk.
@@ -429,19 +421,24 @@ class TestInstallers(unittest.TestCase):
         ``chmod`` does not fix it for other people; the mode has to be in git,
         which is what this asserts.
         """
-        out = subprocess.run(
-            ["git", "ls-files", "-s", "--", "scripts/install_*.sh"],
-            cwd=REPO, capture_output=True, text=True, check=True,
-        ).stdout.strip().splitlines()
+        out = (
+            subprocess.run(
+                ["git", "ls-files", "-s", "--", "scripts/install_*.sh"],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            .stdout.strip()
+            .splitlines()
+        )
         self.assertTrue(out, "no installers found in the git index")
 
-        not_exec = [
-            line.split("\t")[-1] for line in out if not line.startswith("100755")
-        ]
+        not_exec = [line.split("\t")[-1] for line in out if not line.startswith("100755")]
         self.assertEqual(
-            not_exec, [],
-            "installer(s) not executable in git — `git update-index --chmod=+x` "
-            f"is required for: {not_exec}",
+            not_exec,
+            [],
+            f"installer(s) not executable in git — `git update-index --chmod=+x` is required for: {not_exec}",
         )
 
 
@@ -452,9 +449,7 @@ class TestSchedulerDoc(unittest.TestCase):
         for job, spec in POLICY.items():
             self.assertIn(f"`{job}`", doc, f"SCHEDULER.md missing job {job}")
             for token in spec["doc_tokens"]:
-                self.assertIn(
-                    token, doc, f"SCHEDULER.md: job {job} missing token {token!r}"
-                )
+                self.assertIn(token, doc, f"SCHEDULER.md: job {job} missing token {token!r}")
 
 
 if __name__ == "__main__":

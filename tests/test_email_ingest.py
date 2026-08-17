@@ -116,8 +116,15 @@ class EmailSchemaTests(unittest.TestCase):
             with db_connection(db_path, ensure_email_schema) as conn:
                 cols = {row[1] for row in conn.execute("PRAGMA table_info(email_messages)").fetchall()}
         expected = {
-            "message_id", "thread_id", "from_address", "from_name",
-            "subject", "snippet", "received_at", "labels_json", "synced_at",
+            "message_id",
+            "thread_id",
+            "from_address",
+            "from_name",
+            "subject",
+            "snippet",
+            "received_at",
+            "labels_json",
+            "synced_at",
         }
         self.assertTrue(expected.issubset(cols), f"Missing columns: {expected - cols}")
 
@@ -205,9 +212,7 @@ class SyncGmailTests(unittest.TestCase):
             self.assertEqual(r2.messages_updated, 1)
 
             with db_connection(db_path) as conn:
-                row = conn.execute(
-                    "SELECT labels_json FROM email_messages WHERE message_id = 'm1'"
-                ).fetchone()
+                row = conn.execute("SELECT labels_json FROM email_messages WHERE message_id = 'm1'").fetchone()
             self.assertEqual(json.loads(row["labels_json"]), ["INBOX"])
 
     def test_query_filter_is_passed_through_to_list(self) -> None:
@@ -222,8 +227,10 @@ class SyncGmailTests(unittest.TestCase):
 
     def test_default_filter_used_when_caller_passes_none_and_no_config(self) -> None:
         service = _FakeService(list_payload={"messages": []}, message_map={})
-        with tempfile.TemporaryDirectory() as tmpdir, \
-             patch("rebalance.ingest.config.get_gmail_query_filter", return_value=None):
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch("rebalance.ingest.config.get_gmail_query_filter", return_value=None),
+        ):
             db_path = Path(tmpdir) / "rebalance.db"
             result = sync_gmail(db_path, service=service)
         self.assertEqual(result.query_filter, DEFAULT_QUERY_FILTER)
@@ -234,13 +241,16 @@ class SyncGmailTests(unittest.TestCase):
 
         class _Http403Error(Exception):
             resp = _FakeResp()
-            content = b'{"error":{"message":"Request had insufficient authentication scopes.","status":"PERMISSION_DENIED"}}'
+            content = (
+                b'{"error":{"message":"Request had insufficient authentication scopes.","status":"PERMISSION_DENIED"}}'
+            )
 
         class _FailingMessages:
             def list(self, **_kwargs):
                 class _Req:
                     def execute(self_inner):
                         raise _Http403Error("insufficient scopes")
+
                 return _Req()
 
         class _FailingUsers:
@@ -272,6 +282,7 @@ class SyncGmailTests(unittest.TestCase):
                 class _Req:
                     def execute(self_inner):
                         raise _Http403Error("api disabled")
+
                 return _Req()
 
         class _FailingUsers:
@@ -439,10 +450,13 @@ class PushIngestContentlessRejectionTests(unittest.TestCase):
 
         # EXACTLY the shape that caused the real corruption: the caller used a
         # foreign key vocabulary, so only message_id/snippet/labels landed.
-        result = ingest_email_messages(self._db, [
-            {"message_id": "shell1", "snippet": "hi there", "labels": ["INBOX"]},
-            {"message_id": "shell2", "snippet": "another", "labels": ["INBOX"]},
-        ])
+        result = ingest_email_messages(
+            self._db,
+            [
+                {"message_id": "shell1", "snippet": "hi there", "labels": ["INBOX"]},
+                {"message_id": "shell2", "snippet": "another", "labels": ["INBOX"]},
+            ],
+        )
 
         self.assertEqual(result.messages_skipped, 2)
         self.assertEqual(result.messages_stored, 0)
@@ -452,11 +466,14 @@ class PushIngestContentlessRejectionTests(unittest.TestCase):
         """The guard rejects only TOTAL emptiness — one real field earns a row."""
         from rebalance.ingest.gmail import ingest_email_messages
 
-        result = ingest_email_messages(self._db, [
-            {"message_id": "subj-only", "subject": "Deploy checklist"},
-            {"message_id": "from-only", "from_address": "boss@acme.test"},
-            {"message_id": "date-only", "received_at": "2026-07-14T12:00:00+00:00"},
-        ])
+        result = ingest_email_messages(
+            self._db,
+            [
+                {"message_id": "subj-only", "subject": "Deploy checklist"},
+                {"message_id": "from-only", "from_address": "boss@acme.test"},
+                {"message_id": "date-only", "received_at": "2026-07-14T12:00:00+00:00"},
+            ],
+        )
 
         self.assertEqual(result.messages_skipped, 0)
         self.assertEqual(result.messages_stored, 3)
@@ -465,12 +482,18 @@ class PushIngestContentlessRejectionTests(unittest.TestCase):
     def test_good_and_bad_rows_in_one_push_partition_correctly(self) -> None:
         from rebalance.ingest.gmail import ingest_email_messages
 
-        result = ingest_email_messages(self._db, [
-            {"message_id": "shell", "snippet": "no headers", "labels": ["INBOX"]},
-            {"message_id": "real", "subject": "Rental reports",
-             "from_address": "taiwo@example.test",
-             "received_at": "2026-07-14T12:00:00+00:00"},
-        ])
+        result = ingest_email_messages(
+            self._db,
+            [
+                {"message_id": "shell", "snippet": "no headers", "labels": ["INBOX"]},
+                {
+                    "message_id": "real",
+                    "subject": "Rental reports",
+                    "from_address": "taiwo@example.test",
+                    "received_at": "2026-07-14T12:00:00+00:00",
+                },
+            ],
+        )
 
         self.assertEqual(result.messages_skipped, 1)
         self.assertEqual(result.messages_stored, 1)

@@ -10,9 +10,9 @@ from three_eyes import breakers, relief
 def test_failure_breaker_trips_after_n_consecutive():
     b = breakers.FailureBreaker()
     assert b.is_open("job") is False
-    assert b.record("job", ok=False, trip_after=3) is False   # 1
-    assert b.record("job", ok=False, trip_after=3) is False   # 2
-    assert b.record("job", ok=False, trip_after=3) is True    # 3 -> OPENS
+    assert b.record("job", ok=False, trip_after=3) is False  # 1
+    assert b.record("job", ok=False, trip_after=3) is False  # 2
+    assert b.record("job", ok=False, trip_after=3) is True  # 3 -> OPENS
     assert b.is_open("job") is True
 
 
@@ -20,8 +20,8 @@ def test_success_resets_the_counter():
     b = breakers.FailureBreaker()
     b.record("job", ok=False, trip_after=3)
     b.record("job", ok=False, trip_after=3)
-    b.record("job", ok=True, trip_after=3)     # reset
-    assert b.record("job", ok=False, trip_after=3) is False   # count restarted at 1
+    b.record("job", ok=True, trip_after=3)  # reset
+    assert b.record("job", ok=False, trip_after=3) is False  # count restarted at 1
     assert b.is_open("job") is False
 
 
@@ -53,7 +53,7 @@ def test_quiet_hours_same_day_window():
 
 
 def test_quiet_hours_wraps_past_midnight():
-    spec = "22:00-07:00 PT"   # trailing tz label tolerated
+    spec = "22:00-07:00 PT"  # trailing tz label tolerated
     assert relief.in_quiet_hours(spec, dt.datetime(2026, 7, 22, 23, 30)) is True
     assert relief.in_quiet_hours(spec, dt.datetime(2026, 7, 22, 3, 0)) is True
     assert relief.in_quiet_hours(spec, dt.datetime(2026, 7, 22, 12, 0)) is False
@@ -69,7 +69,7 @@ def test_budget_per_run_cap():
     assert b.can_spend() is True
     b.spend()
     b.spend()
-    assert b.can_spend() is False   # hit per-run cap
+    assert b.can_spend() is False  # hit per-run cap
 
 
 def test_budget_daily_cap_persists():

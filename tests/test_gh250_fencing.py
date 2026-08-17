@@ -9,6 +9,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = str(REPO_ROOT / "utils" / "gh250" / "fence-writers.sh")
 
+
 @pytest.fixture
 def run_env(tmp_path):
     stub_bin = tmp_path / "bin"
@@ -106,18 +107,17 @@ if [ -f {tmp_path}/sqlite_fail ]; then exit 1; else exit 0; fi
     )
     # Notice daily-sync is missing here to force bootout/bootstrap logic
     (tmp_path / "3eyes_list.txt").write_text(
-        "github-sync launchd ...\n"
-        "pulse-sync launchd ...\n"
-        "collector-health launchd ...\n"
-        "vault-sync launchd ...\n"
+        "github-sync launchd ...\npulse-sync launchd ...\ncollector-health launchd ...\nvault-sync launchd ...\n"
     )
     (tmp_path / "3eyes_paused.txt").touch()
     (tmp_path / "events.log").touch()
 
     return env, tmp_path
 
+
 def run_script(cmd, env, check=True):
     return subprocess.run([SCRIPT_PATH, cmd], env=env, text=True, capture_output=True, check=check)
+
 
 def test_fence_records_pre_state(run_env):
     env, tmp = run_env
@@ -134,16 +134,14 @@ def test_fence_records_pre_state(run_env):
     assert "WITH_STATE: python" in events_log
     assert "WITH_STATE: launchctl bootout" in events_log
 
+
 def test_fence_twice_no_clobber(run_env):
     env, tmp = run_env
     (tmp / "launchctl_list.txt").write_text("123 0 com.rebalance-os.github-sync\n")
     run_script("fence", env)
     state1 = (tmp / "state.txt").read_text()
 
-    (tmp / "launchctl_list.txt").write_text(
-        "123 0 com.rebalance-os.github-sync\n"
-        "124 0 com.rebalance-os.pulse-sync\n"
-    )
+    (tmp / "launchctl_list.txt").write_text("123 0 com.rebalance-os.github-sync\n124 0 com.rebalance-os.pulse-sync\n")
     res = run_script("fence", env)
     assert "A fence is already active. Doing nothing." in res.stdout
     state2 = (tmp / "state.txt").read_text()
@@ -151,6 +149,7 @@ def test_fence_twice_no_clobber(run_env):
 
     py_log = (tmp / "python.log").read_text()
     assert "pause pulse-sync" not in py_log
+
 
 def test_unfence_restores_recorded(run_env):
     env, tmp = run_env
@@ -167,6 +166,7 @@ def test_unfence_restores_recorded(run_env):
     assert "bootstrap" in launch_log
     assert "com.rebalance-os.daily-sync.plist" in launch_log
 
+
 def test_unfence_no_state_file_fails(run_env):
     env, tmp = run_env
     if (tmp / "state.txt").exists():
@@ -175,6 +175,7 @@ def test_unfence_no_state_file_fails(run_env):
     res = run_script("unfence", env, check=False)
     assert res.returncode != 0
     assert "Error: No state file found" in res.stdout
+
 
 def test_verify_fails_when_writer_loaded(run_env):
     env, tmp = run_env
@@ -195,6 +196,7 @@ def test_verify_fails_when_writer_loaded(run_env):
     res = run_script("verify", env, check=True)
     assert res.returncode == 0
 
+
 def test_verify_fails_on_unknown_rebalance_job(run_env):
     env, tmp = run_env
     # Add an unknown job that matches com.rebalance-os.* but isn't a known writer
@@ -205,9 +207,10 @@ def test_verify_fails_on_unknown_rebalance_job(run_env):
     assert res.returncode != 0
     assert "Unknown writer loaded: com.rebalance-os.mysterious-writer" in res.stdout
 
+
 def test_fence_interrupt_restores_and_idempotent(run_env):
     env, tmp = run_env
-    (tmp / "fail_bootout").touch() # daily-sync will fail on bootout
+    (tmp / "fail_bootout").touch()  # daily-sync will fail on bootout
 
     res = run_script("fence", env, check=False)
     assert res.returncode != 0
@@ -233,6 +236,7 @@ def test_fence_interrupt_restores_and_idempotent(run_env):
     launchctl_log = (tmp / "launchctl.log").read_text()
     assert "bootstrap" not in launchctl_log
 
+
 def test_unfence_failures_continue_and_retain_state(run_env):
     env, tmp = run_env
     state_content = "com.rebalance-os.github-sync:3eyes:github-sync\ncom.rebalance-os.daily-sync:launchctl:none\ncom.rebalance-os.pulse-sync:3eyes:pulse-sync\n"
@@ -254,6 +258,7 @@ def test_unfence_failures_continue_and_retain_state(run_env):
     assert "com.rebalance-os.daily-sync.plist" in launch_log
 
     assert (tmp / "state.txt").exists()
+
 
 def test_already_paused_writer_gets_neither_pause_nor_resume(run_env):
     env, tmp = run_env
@@ -279,4 +284,3 @@ def test_already_paused_writer_gets_neither_pause_nor_resume(run_env):
     py_log_after = (tmp / "python.log").read_text()
     # It shouldn't resume github-sync because it wasn't in state
     assert "-m three_eyes resume github-sync" not in py_log_after
-

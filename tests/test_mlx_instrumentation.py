@@ -55,9 +55,7 @@ class MockMLXCore:
 class MockGenerateOutput:
     def __init__(self, n: int) -> None:
         self.text_embeds = MagicMock()
-        self.text_embeds.tolist.return_value = [
-            [0.0] * embedder.EMBEDDING_DIM for _ in range(n)
-        ]
+        self.text_embeds.tolist.return_value = [[0.0] * embedder.EMBEDDING_DIM for _ in range(n)]
 
 
 def mock_generate(_model, _tokenizer, texts):
@@ -99,8 +97,9 @@ def mock_mlx():
     mock_embeddings = MagicMock()
     mock_embeddings.generate = mock_generate
 
-    with patch.object(mlx, "core", mock_core), patch.dict(
-        sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}
+    with (
+        patch.object(mlx, "core", mock_core),
+        patch.dict(sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}),
     ):
         yield mock_core
 

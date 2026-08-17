@@ -8,12 +8,24 @@ from rebalance.chat import _rrf_merge, chat_with_data
 
 def _fake_rows(_db, _query, top_k, _sources=None):
     rows = [
-        {"source_type": "github", "title": "PR #12", "doc_kind": "pr",
-         "body_preview": "fix the thing", "source_pk": "owner/repo#12",
-         "metadata": {"url": "https://github.com/o/r/pull/12"}, "similarity_score": 0.91},
-        {"source_type": "vault", "title": "Note A", "doc_kind": "note",
-         "body_preview": "some note body", "source_pk": "vault/a.md",
-         "metadata": {"path": "a.md"}, "similarity_score": 0.42},
+        {
+            "source_type": "github",
+            "title": "PR #12",
+            "doc_kind": "pr",
+            "body_preview": "fix the thing",
+            "source_pk": "owner/repo#12",
+            "metadata": {"url": "https://github.com/o/r/pull/12"},
+            "similarity_score": 0.91,
+        },
+        {
+            "source_type": "vault",
+            "title": "Note A",
+            "doc_kind": "note",
+            "body_preview": "some note body",
+            "source_pk": "vault/a.md",
+            "metadata": {"path": "a.md"},
+            "similarity_score": 0.42,
+        },
     ]
     return rows[:top_k]
 
@@ -47,18 +59,25 @@ class ChatWithDataTests(unittest.TestCase):
 
     def test_preview_truncated(self) -> None:
         def big(_db, _q, k, _sources=None):
-            return [{"source_type": "vault", "title": "t", "body_preview": "x" * 500,
-                     "source_pk": "p", "metadata": {}, "similarity_score": 0.5}]
+            return [
+                {
+                    "source_type": "vault",
+                    "title": "t",
+                    "body_preview": "x" * 500,
+                    "source_pk": "p",
+                    "metadata": {},
+                    "similarity_score": 0.5,
+                }
+            ]
+
         out = chat_with_data(self.DB, "q", work_query_fn=big)
         self.assertLessEqual(len(out["citations"][0]["preview"]), 280)
 
 
 class RrfMergeTests(unittest.TestCase):
     def test_fuses_shared_result_to_top_and_dedupes(self) -> None:
-        a = [{"source": "code", "path": "x.py", "title": "x"},
-             {"source": "code", "path": "y.py", "title": "y"}]
-        b = [{"source": "code", "path": "y.py", "title": "y"},
-             {"source": "work", "path": "z", "title": "z"}]
+        a = [{"source": "code", "path": "x.py", "title": "x"}, {"source": "code", "path": "y.py", "title": "y"}]
+        b = [{"source": "code", "path": "y.py", "title": "y"}, {"source": "work", "path": "z", "title": "z"}]
         out = _rrf_merge([a, b], top_k=10)
         # y.py appears in both lists → fused to the top; deduped to one entry.
         self.assertEqual(len(out), 3)

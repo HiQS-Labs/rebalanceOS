@@ -52,8 +52,7 @@ def _enable_guard(monkeypatch, tmp_path):
 def test_job_guard_module_is_locatable():
     """The path bridge resolves to a real file in a normal checkout."""
     assert _job_guard.module_path().is_file(), (
-        f"utils/job_guard.py not found at {_job_guard.module_path()}; "
-        "the package bridge cannot guard anything"
+        f"utils/job_guard.py not found at {_job_guard.module_path()}; the package bridge cannot guard anything"
     )
     assert _job_guard.available() is True
 
@@ -67,9 +66,7 @@ def test_embed_leaves_are_decorated():
     from rebalance.ingest.semantic_index import embed_pending
 
     for fn in (embed_chunks, embed_pending):
-        assert hasattr(fn, "__wrapped__"), (
-            f"{fn.__name__} is not guarded — GH-172 crash path is open again"
-        )
+        assert hasattr(fn, "__wrapped__"), f"{fn.__name__} is not guarded — GH-172 crash path is open again"
 
 
 def test_facades_delegate_and_are_not_double_guarded():
@@ -83,8 +80,7 @@ def test_facades_delegate_and_are_not_double_guarded():
 
     for fn in (embed_vault_chunks, embed_semantic_pending):
         assert not hasattr(fn, "__wrapped__"), (
-            f"{fn.__name__} is double-guarded; it delegates to a guarded leaf "
-            "and would deadlock on the shared flock"
+            f"{fn.__name__} is double-guarded; it delegates to a guarded leaf and would deadlock on the shared flock"
         )
 
 

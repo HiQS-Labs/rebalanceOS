@@ -64,12 +64,13 @@ def _is_terminal(marker_text: str) -> bool:
     """True when a banner means "this run ended", whatever the outcome word is."""
     return not marker_text.strip().endswith("starting")
 
+
 #: A run's trailing JSON summary. Non-greedy, anchored on the outcome key so we do not
 #: match the many nested objects inside the per-scope results.
 OUTCOME_RE = re.compile(r'"sync_outcome":\s*"(\w+)"')
 
 #: How stale a completed run may be before freshness itself is the finding.
-STALE_HOURS = 26          # daily job + a 2h grace, so a normal late run is not an alert
+STALE_HOURS = 26  # daily job + a 2h grace, so a normal late run is not an alert
 
 #: How long a run may plausibly still be "in flight" before we call it dead.
 #:
@@ -101,7 +102,7 @@ def last_run_block(text: str) -> str:
     resolved `degraded` run from being reported as current.
     """
     starts = list(START_RE.finditer(text))
-    return text[starts[-1].start():] if starts else text
+    return text[starts[-1].start() :] if starts else text
 
 
 def parse_sync_log(path: Path) -> dict[str, Any]:
@@ -120,12 +121,21 @@ def parse_sync_log(path: Path) -> dict[str, Any]:
 
     if not finished:
         # Rule 2 — in flight, not broken.
-        return {"state": "running", "detail": "no terminal marker; run still in flight",
-                "errors": [], "path": str(path), "outcome": outcomes[-1] if outcomes else None}
+        return {
+            "state": "running",
+            "detail": "no terminal marker; run still in flight",
+            "errors": [],
+            "path": str(path),
+            "outcome": outcomes[-1] if outcomes else None,
+        }
 
     if not outcomes:
-        return {"state": "no-outcome", "detail": "run finished but wrote no sync_outcome",
-                "errors": [], "path": str(path)}
+        return {
+            "state": "no-outcome",
+            "detail": "run finished but wrote no sync_outcome",
+            "errors": [],
+            "path": str(path),
+        }
 
     # NO LENGTH CAP on the captured error (agy review, P7 QA finding 4). This was
     # `[^"]{0,200}`, which does not truncate a long error — it fails to match it at
@@ -136,7 +146,7 @@ def parse_sync_log(path: Path) -> dict[str, Any]:
     errors = [e[:400] for e in re.findall(r'"error":\s*"([^"]*)"', block)]
     scopes = re.findall(r'"scope":\s*"(\w+)"', block)
     return {
-        "state": outcomes[-1],              # the LAST run's outcome, not the first
+        "state": outcomes[-1],  # the LAST run's outcome, not the first
         "detail": "",
         "errors": errors,
         "scopes": sorted(set(scopes)),
@@ -168,7 +178,7 @@ def observe(now: datetime | None = None, prefix: str = "daily_sync_") -> dict[st
             "title": "collector telemetry missing",
             "severity": "warn",
             "summary": f"no {prefix}*.log found in {_log_dir()} — cannot tell whether "
-                       "collectors ran. This is NOT a clean bill of health.",
+            "collectors ran. This is NOT a clean bill of health.",
             "text": f"searched: {_log_dir()}/{prefix}*.log",
         }
 
@@ -178,20 +188,20 @@ def observe(now: datetime | None = None, prefix: str = "daily_sync_") -> dict[st
 
     if state == "running":
         if age <= IN_FLIGHT_MAX_HOURS:
-            return None                      # genuinely in flight; say nothing
+            return None  # genuinely in flight; say nothing
         return {
             "source": "collector-health",
             "title": f"collector sync never finished ({age:.0f}h)",
             "severity": "error",
             "summary": f"{path.name} started but wrote no terminal marker and has not "
-                       f"been touched for {age:.0f}h — the run died mid-flight.",
-            "text": f"log: {path}\nage_hours: {age:.1f}\n"
-                    f"in-flight ceiling: {IN_FLIGHT_MAX_HOURS}h",
+            f"been touched for {age:.0f}h — the run died mid-flight.",
+            "text": f"log: {path}\nage_hours: {age:.1f}\nin-flight ceiling: {IN_FLIGHT_MAX_HOURS}h",
         }
 
     if state == "unreadable":
         return {
-            "source": "collector-health", "title": "collector log unreadable",
+            "source": "collector-health",
+            "title": "collector log unreadable",
             "severity": "warn",
             "summary": f"{path.name} could not be read: {parsed['detail']}",
             "text": json.dumps(parsed, indent=2),
@@ -199,7 +209,8 @@ def observe(now: datetime | None = None, prefix: str = "daily_sync_") -> dict[st
 
     if state == "no-outcome":
         return {
-            "source": "collector-health", "title": "collector run wrote no outcome",
+            "source": "collector-health",
+            "title": "collector run wrote no outcome",
             "severity": "warn",
             "summary": f"{path.name} finished but recorded no sync_outcome",
             "text": json.dumps(parsed, indent=2),
@@ -239,15 +250,17 @@ def observe(now: datetime | None = None, prefix: str = "daily_sync_") -> dict[st
 
         head = (unknown or errs or ["no error detail recorded"])[0]
         qualifier = "" if state == "degraded" else " (outcome said complete)"
-        body = "\n".join([
-            f"log: {path}",
-            f"sync_outcome: {state}",
-            f"scopes: {', '.join(parsed.get('scopes', [])) or 'unknown'}",
-            f"errors: {len(errs)} recorded, {suppressed} matched a known-issue rule",
-            "",
-            "unsuppressed errors:",
-            *([f"  - {e}" for e in unknown] or ["  (none — all matched known issues)"]),
-        ])
+        body = "\n".join(
+            [
+                f"log: {path}",
+                f"sync_outcome: {state}",
+                f"scopes: {', '.join(parsed.get('scopes', [])) or 'unknown'}",
+                f"errors: {len(errs)} recorded, {suppressed} matched a known-issue rule",
+                "",
+                "unsuppressed errors:",
+                *([f"  - {e}" for e in unknown] or ["  (none — all matched known issues)"]),
+            ]
+        )
         finding = {
             "source": "collector-health",
             "title": f"collector sync {state} ({len(unknown)} unexplained error(s)){qualifier}",
@@ -259,7 +272,7 @@ def observe(now: datetime | None = None, prefix: str = "daily_sync_") -> dict[st
         # reason that path had never once executed.
         return finding
 
-    return None                              # complete, fresh, nothing unexplained
+    return None  # complete, fresh, nothing unexplained
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -275,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     path = emit / "collector-health.json"
 
     if finding is None:
-        path.unlink(missing_ok=True)         # stale finding must not be re-routed
+        path.unlink(missing_ok=True)  # stale finding must not be re-routed
         print("collector-observe: collectors healthy — no finding emitted")
         return 0
 
@@ -283,12 +296,12 @@ def main(argv: list[str] | None = None) -> int:
     # absent is the documented signal that run._process_emit should classify it.
     payload = {k: finding[k] for k in ("source", "title", "summary", "text")}
     if finding.get("severity") in ("warn",):
-        payload["severity"] = finding["severity"]   # low-stakes states need no model
+        payload["severity"] = finding["severity"]  # low-stakes states need no model
     path.write_text(json.dumps(payload), encoding="utf-8")
     print(f"collector-observe: {finding['title']}")
     print(f"collector-observe: {finding['summary']}")
     return 0
 
 
-if __name__ == "__main__":                   # pragma: no cover - launchd entry point
+if __name__ == "__main__":  # pragma: no cover - launchd entry point
     raise SystemExit(main(sys.argv[1:]))

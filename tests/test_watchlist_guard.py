@@ -79,22 +79,20 @@ class SnapshotAndDetectTests(unittest.TestCase):
                 "(login, repo_full_name, scan_date, commits, pushes, prs_opened, "
                 " prs_merged, issues_opened, issue_comments, reviews, last_active_at, "
                 " scanned_at) VALUES (?,?,date('now'),?,?,?,?,?,?,?,?,?)",
-                ("collaborator", repo, 1, 1, 0, 0, 0, 0, 0,
-                 "2026-06-20T12:00:00Z", "2026-06-20T12:05:00Z"),
+                ("collaborator", repo, 1, 1, 0, 0, 0, 0, 0, "2026-06-20T12:00:00Z", "2026-06-20T12:05:00Z"),
             )
             conn.commit()
 
     def _remove_activity_repo(self, repo: str) -> None:
         with db_connection(self.db_path) as conn:
-            conn.execute(
-                "DELETE FROM github_activity WHERE repo_full_name=?", (repo,)
-            )
+            conn.execute("DELETE FROM github_activity WHERE repo_full_name=?", (repo,))
             conn.commit()
 
     def _snapshot_rows(self, ts: int) -> list[str]:
         with db_connection(self.db_path) as conn:
             return [
-                r["repo"] for r in conn.execute(
+                r["repo"]
+                for r in conn.execute(
                     "SELECT repo FROM watched_repos_snapshot WHERE snapshot_ts=?",
                     (ts,),
                 ).fetchall()
@@ -104,9 +102,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
 
     def test_first_run_is_baseline_no_event(self) -> None:
         self._add_project_repo("example/owned")
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_watched_repos_reduced"
-        ) as emit:
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
             res = snapshot_and_detect(self.db_path, now_ts=1_000_000)
         emit.assert_not_called()
         self.assertTrue(res["baseline"])
@@ -118,9 +114,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
         snapshot_and_detect(self.db_path, now_ts=2_000_000)  # baseline
 
         self._remove_project_repo()  # durable-intent repo drops off
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_watched_repos_reduced"
-        ) as emit:
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
             res = snapshot_and_detect(self.db_path, now_ts=2_000_100)
 
         emit.assert_called_once()
@@ -138,9 +132,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
         snapshot_and_detect(self.db_path, now_ts=3_000_000)  # baseline
 
         self._remove_activity_repo("example/window")  # rolling-window aging out
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_watched_repos_reduced"
-        ) as emit:
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
             res = snapshot_and_detect(self.db_path, now_ts=3_000_100)
 
         emit.assert_not_called()  # info-only churn does not alarm
@@ -154,9 +146,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
         # Operator intentionally ignores it, then it leaves the watched set.
         config_module.add_github_ignored_repo("example/owned")
         self._remove_project_repo()
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_watched_repos_reduced"
-        ) as emit:
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
             res = snapshot_and_detect(self.db_path, now_ts=4_000_100)
 
         emit.assert_not_called()  # an intentional opt-out is not a coverage loss
@@ -171,9 +161,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
             snapshot_and_detect(self.db_path, now_ts=5_000_100)  # removal (warn)
 
         self._add_project_repo("example/owned")  # comes back
-        with mock.patch(
-            "rebalance.ingest.auth_log.log_watched_repos_reduced"
-        ) as emit:
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
             res = snapshot_and_detect(self.db_path, now_ts=5_000_200)
 
         emit.assert_not_called()
@@ -187,9 +175,7 @@ class SnapshotAndDetectTests(unittest.TestCase):
         snapshot_and_detect(self.db_path, now_ts=6_000_000 + 31 * _DAY)
 
         self.assertEqual(self._snapshot_rows(6_000_000), [])  # pruned
-        self.assertEqual(
-            self._snapshot_rows(6_000_000 + 31 * _DAY), ["example/owned"]
-        )
+        self.assertEqual(self._snapshot_rows(6_000_000 + 31 * _DAY), ["example/owned"])
 
 
 if __name__ == "__main__":

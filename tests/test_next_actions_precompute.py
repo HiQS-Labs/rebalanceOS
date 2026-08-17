@@ -65,9 +65,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
         def _noop(db: Path, **opts: Any) -> dict[str, Any]:
             return {"scope": "precompute_probe", "synced": 0}
 
-        register_collector(
-            Collector("precompute_probe", _noop, included_in_all=False)
-        )
+        register_collector(Collector("precompute_probe", _noop, included_in_all=False))
 
     def test_full_refresh_persists_ranked_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -100,9 +98,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                 self.assertTrue(kwargs.get("synthesize"))
 
                 # A success result is recorded with the structured fields.
-                na = next(
-                    r for r in result["results"] if r.get("scope") == "next_actions"
-                )
+                na = next(r for r in result["results"] if r.get("scope") == "next_actions")
                 self.assertEqual(na["model_used"], "gemini-test")
                 self.assertTrue(na["blended"])
                 self.assertEqual(na["count"], 1)
@@ -113,9 +109,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                 assert loaded is not None
                 self.assertEqual(loaded.model_used, "gemini-test")
                 self.assertEqual(len(loaded.ranked), 1)
-                self.assertEqual(
-                    loaded.ranked[0].title, "Ship the ranked-next-actions cache"
-                )
+                self.assertEqual(loaded.ranked[0].title, "Ship the ranked-next-actions cache")
             finally:
                 COLLECTORS.pop("precompute_probe", None)
 
@@ -149,9 +143,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
 
                 # The failure is recorded as a non-fatal skipped result, NOT a
                 # top-level error (so it never cascades into the dashboard gate).
-                na = next(
-                    r for r in result["results"] if r.get("scope") == "next_actions"
-                )
+                na = next(r for r in result["results"] if r.get("scope") == "next_actions")
                 self.assertTrue(na.get("skipped"))
                 self.assertIn("network down", na.get("error", ""))
                 self.assertNotIn(
@@ -184,7 +176,8 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                         return_value=str(vault),
                     ),
                     patch.object(
-                        next_actions, "rank_next_actions",
+                        next_actions,
+                        "rank_next_actions",
                         return_value=_deterministic_ranked(),
                     ),
                 ):
@@ -196,8 +189,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                     )
                 target = vault / next_actions.VAULT_NEXT_ACTIONS_RELPATH
                 self.assertTrue(target.exists())
-                self.assertIn("Ship the ranked-next-actions cache",
-                              target.read_text(encoding="utf-8"))
+                self.assertIn("Ship the ranked-next-actions cache", target.read_text(encoding="utf-8"))
                 na = next(r for r in result["results"] if r.get("scope") == "next_actions")
                 self.assertIsNotNone(na.get("vault_file"))
                 # resolved_vault is .resolve()'d (/tmp -> /private/tmp on macOS).
@@ -224,7 +216,8 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                         return_value=str(vault),
                     ),
                     patch.object(
-                        next_actions, "rank_next_actions",
+                        next_actions,
+                        "rank_next_actions",
                         return_value=_deterministic_ranked(),
                     ),
                 ):
@@ -250,9 +243,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
                         "rebalance.ingest.index_ops._all_scope_names",
                         return_value=["precompute_probe"],
                     ),
-                    patch.object(
-                        next_actions, "rank_next_actions"
-                    ) as mock_rank,
+                    patch.object(next_actions, "rank_next_actions") as mock_rank,
                 ):
                     refresh_index(
                         db_path,
@@ -270,9 +261,7 @@ class NextActionsPrecomputeTests(unittest.TestCase):
             db_path = Path(tmp) / "test.db"
             try:
                 self._register_noop_full_refresh_collector()
-                with patch.object(
-                    next_actions, "rank_next_actions"
-                ) as mock_rank:
+                with patch.object(next_actions, "rank_next_actions") as mock_rank:
                     refresh_index(
                         db_path,
                         scope=["precompute_probe"],

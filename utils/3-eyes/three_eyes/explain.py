@@ -35,9 +35,9 @@ from typing import Any
 from . import classify, config, digest, relief
 
 #: Verdicts an explanation can carry.
-KNOWN = "known"          # matched a suppression rule — do not escalate
-NEW = "new"              # nothing matched and the model thinks it is real
-UNJUDGED = "unjudged"    # nothing matched but no model was available/affordable
+KNOWN = "known"  # matched a suppression rule — do not escalate
+NEW = "new"  # nothing matched and the model thinks it is real
+UNJUDGED = "unjudged"  # nothing matched but no model was available/affordable
 
 
 def _rules_path() -> Path:
@@ -78,12 +78,12 @@ def match_known_issue(
                 if today > date.fromisoformat(str(expires)):
                     continue
             except ValueError:
-                pass                       # unparseable date => treat as non-expiring
+                pass  # unparseable date => treat as non-expiring
         try:
             if re.search(str(rule["pattern"]), text, re.IGNORECASE | re.DOTALL):
                 return rule
         except re.error:
-            continue                       # a broken regex suppresses nothing
+            continue  # a broken regex suppresses nothing
     return None
 
 
@@ -148,7 +148,7 @@ def explain(job, code: int, evidence: str | None = None, today: date | None = No
 
     try:
         result = classify.explain_failure(text)
-    except Exception as exc:                        # never take the job down
+    except Exception as exc:  # never take the job down
         result = {"refused": True, "reason": f"explainer error: {exc}"}
 
     if result.get("refused"):

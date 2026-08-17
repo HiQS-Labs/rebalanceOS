@@ -235,12 +235,15 @@ class HiqsFieldContractTests(unittest.TestCase):
             blended=True,
             note="from-cache",
         )
-        with patch(
-            "rebalance.ingest.next_actions.load_ranked_next_actions",
-            return_value=cached,
-        ) as mock_load, patch(
-            "rebalance.ingest.next_actions.rank_next_actions",
-        ) as mock_rank:
+        with (
+            patch(
+                "rebalance.ingest.next_actions.load_ranked_next_actions",
+                return_value=cached,
+            ) as mock_load,
+            patch(
+                "rebalance.ingest.next_actions.rank_next_actions",
+            ) as mock_rank,
+        ):
             result = ask("status", self._db, skip_synthesis=True)
 
         mock_load.assert_called_once()

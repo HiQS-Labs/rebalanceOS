@@ -50,13 +50,8 @@ def _health(
 
 
 def _checks_for(devices: list[CollectorHealth], current_device_id: str | None = None):
-    with patch(
-        "rebalance.ingest.pulse_health.read_collector_health", return_value=devices
-    ):
-        return {
-            c.name: c
-            for c in _check_pulse_collectors(current_device_id=current_device_id)
-        }
+    with patch("rebalance.ingest.pulse_health.read_collector_health", return_value=devices):
+        return {c.name: c for c in _check_pulse_collectors(current_device_id=current_device_id)}
 
 
 class RawStateWordDoesNotLeakTests(unittest.TestCase):
@@ -121,17 +116,13 @@ class DeviceFirstSeverityTests(unittest.TestCase):
     def test_other_device_error_is_capped_at_warning(self) -> None:
         for state in ("ALERT", "DEGRADED", "NO PUSHES"):
             with self.subTest(state=state):
-                by = _checks_for(
-                    [_health("Studio", state)], current_device_id="this-machine"
-                )
+                by = _checks_for([_health("Studio", state)], current_device_id="this-machine")
                 check = by["fleet:Studio"]
                 self.assertEqual(WARN, check.status)  # still a visible problem
                 self.assertEqual(WARNING, check.severity)  # but never fails exit
 
     def test_local_device_keeps_error(self) -> None:
-        by = _checks_for(
-            [_health("this-machine", "ALERT")], current_device_id="this-machine"
-        )
+        by = _checks_for([_health("this-machine", "ALERT")], current_device_id="this-machine")
         self.assertEqual(ERROR, by["fleet:this-machine"].severity)
 
     def test_cap_does_not_touch_non_error_severities(self) -> None:

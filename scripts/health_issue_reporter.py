@@ -90,6 +90,7 @@ QUOTA_FILE = _REPO_ROOT / "temp" / "health-reporter-llm-quota.json"
 # Run log — one JSONL record per invocation
 # ---------------------------------------------------------------------------
 
+
 class RunLog:
     """Accumulates data for this run; flushed to JSONL at exit."""
 
@@ -104,16 +105,19 @@ class RunLog:
     def add_check(self, check: dict) -> None:
         self.checks.append({k: check[k] for k in ("name", "status", "detail", "source")})
 
-    def add_llm_call(self, check_name: str, model: str, provider: str,
-                     decision: str, reason: str, skipped_reason: str = "") -> None:
-        self.llm_calls.append({
-            "check": check_name,
-            "provider": provider,
-            "model": model,
-            "decision": decision,
-            "reason": reason,
-            "skipped_reason": skipped_reason,
-        })
+    def add_llm_call(
+        self, check_name: str, model: str, provider: str, decision: str, reason: str, skipped_reason: str = ""
+    ) -> None:
+        self.llm_calls.append(
+            {
+                "check": check_name,
+                "provider": provider,
+                "model": model,
+                "decision": decision,
+                "reason": reason,
+                "skipped_reason": skipped_reason,
+            }
+        )
 
     def add_action(self, action: str, check_name: str, issue_number: int | None = None) -> None:
         entry: dict = {"action": action, "check": check_name}
@@ -145,6 +149,7 @@ class RunLog:
 # ---------------------------------------------------------------------------
 # LLM daily quota — CB-2
 # ---------------------------------------------------------------------------
+
 
 def _today_utc() -> str:
     return now_utc().strftime("%Y-%m-%d")
@@ -190,7 +195,9 @@ def _request(method: str, path: str, token: str, payload: dict | None = None) ->
     url = f"{GITHUB_API}{path}"
     body = json.dumps(payload).encode() if payload else None
     req = urllib.request.Request(
-        url, data=body, method=method,
+        url,
+        data=body,
+        method=method,
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -216,20 +223,22 @@ def ensure_label(token: str, repo: str, dry_run: bool) -> None:
     if dry_run:
         print(f"[dry-run] would create label '{LABEL}' on {repo}")
         return
-    _request("POST", f"/repos/{repo}/labels", token,
-              {"name": LABEL, "color": "d93f0b",
-               "description": "Auto-filed by health_issue_reporter"})
+    _request(
+        "POST",
+        f"/repos/{repo}/labels",
+        token,
+        {"name": LABEL, "color": "d93f0b", "description": "Auto-filed by health_issue_reporter"},
+    )
     print(f"  created label '{LABEL}'")
 
 
-def list_health_issues(token: str, repo: str, state: str = "open",
-                       since_days: int = 30) -> dict[str, dict]:
+def list_health_issues(token: str, repo: str, state: str = "open", since_days: int = 30) -> dict[str, dict]:
     from datetime import timedelta
+
     issues: dict[str, dict] = {}
     since_param = ""
     if state == "closed":
-        cutoff = (now_utc() - timedelta(days=since_days)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ")
+        cutoff = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
         since_param = f"&since={cutoff}"
     page = 1
     while True:
@@ -250,8 +259,7 @@ def file_issue(token: str, repo: str, title: str, body: str, dry_run: bool) -> i
     if dry_run:
         print(f"  [dry-run] would file: {title!r}")
         return None
-    result = _request("POST", f"/repos/{repo}/issues", token,
-                      {"title": title, "body": body, "labels": [LABEL]})
+    result = _request("POST", f"/repos/{repo}/issues", token, {"title": title, "body": body, "labels": [LABEL]})
     return result["number"]
 
 
@@ -267,8 +275,7 @@ def close_issue(token: str, repo: str, number: int, comment: str, dry_run: bool)
         print(f"  [dry-run] would close issue #{number}")
         return
     _request("POST", f"/repos/{repo}/issues/{number}/comments", token, {"body": comment})
-    _request("PATCH", f"/repos/{repo}/issues/{number}", token,
-              {"state": "closed", "state_reason": "completed"})
+    _request("PATCH", f"/repos/{repo}/issues/{number}", token, {"state": "closed", "state_reason": "completed"})
 
 
 # ---------------------------------------------------------------------------
@@ -281,9 +288,7 @@ def close_issue(token: str, repo: str, number: int, comment: str, dry_run: bool)
 # The body text below the counter line is never touched.
 # ---------------------------------------------------------------------------
 
-_OCCURRENCE_RE = re.compile(
-    r"^> \*\*Seen:\*\* (\d+)× · Last: [^\n]*\n?", re.MULTILINE
-)
+_OCCURRENCE_RE = re.compile(r"^> \*\*Seen:\*\* (\d+)× · Last: [^\n]*\n?", re.MULTILINE)
 
 
 def parse_occurrence_count(body: str) -> int:
@@ -291,8 +296,7 @@ def parse_occurrence_count(body: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def set_occurrence_count(body: str, count: int, last_seen: str,
-                         device: str = "") -> str:
+def set_occurrence_count(body: str, count: int, last_seen: str, device: str = "") -> str:
     device_part = f" · Device: {device}" if device else ""
     new_line = f"> **Seen:** {count}× · Last: {last_seen}{device_part}\n"
     if _OCCURRENCE_RE.search(body or ""):
@@ -369,12 +373,10 @@ def dedup_key_for_issue(issue: dict) -> str:
         return check_id
     title = issue.get("title") or ""
     prefix = f"{ISSUE_TITLE_PREFIX} "
-    return title[len(prefix):] if title.startswith(prefix) else title
+    return title[len(prefix) :] if title.startswith(prefix) else title
 
 
-def update_issue_body(
-    token: str, repo: str, number: int, new_body: str, dry_run: bool
-) -> None:
+def update_issue_body(token: str, repo: str, number: int, new_body: str, dry_run: bool) -> None:
     if dry_run:
         print(f"  [dry-run] would update body of issue #{number}")
         return
@@ -384,6 +386,7 @@ def update_issue_body(
 # ---------------------------------------------------------------------------
 # Issue body builder
 # ---------------------------------------------------------------------------
+
 
 def _issue_body(check_name: str, status: str, detail: str, hint: str, source: str) -> str:
     now = now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -411,12 +414,13 @@ def _issue_body(check_name: str, status: str, detail: str, hint: str, source: st
 # Collector checks
 # ---------------------------------------------------------------------------
 
+
 def run_doctor_checks() -> list[dict]:
     from rebalance.doctor import run_doctor  # noqa: PLC0415
+
     report = run_doctor()
     return [
-        {"name": c.name, "status": c.status, "detail": c.detail,
-         "hint": c.hint, "source": "rebalance-doctor"}
+        {"name": c.name, "status": c.status, "detail": c.detail, "hint": c.hint, "source": "rebalance-doctor"}
         for c in report.checks
     ]
 
@@ -479,14 +483,17 @@ def _triage_gemini(user_msg: str, model: str, api_key: str | None) -> dict:
     model = model or "gemini-3.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
-    body = _json.dumps({
-        "systemInstruction": {"parts": [{"text": _TRIAGE_SYSTEM}]},
-        "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
-        "generationConfig": {"maxOutputTokens": 256, "responseMimeType": "application/json"}
-    }).encode()
+    body = _json.dumps(
+        {
+            "systemInstruction": {"parts": [{"text": _TRIAGE_SYSTEM}]},
+            "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
+            "generationConfig": {"maxOutputTokens": 256, "responseMimeType": "application/json"},
+        }
+    ).encode()
 
     req = urllib.request.Request(
-        url, data=body,
+        url,
+        data=body,
         headers={"content-type": "application/json"},
         method="POST",
     )
@@ -525,7 +532,8 @@ def _triage_openai_compat(user_msg: str, base_url: str, model: str, api_key: str
         return {}
     client = openai.OpenAI(base_url=base_url, api_key=api_key or "local")
     resp = client.chat.completions.create(
-        model=model, max_tokens=256,
+        model=model,
+        max_tokens=256,
         messages=[
             {"role": "system", "content": _TRIAGE_SYSTEM},
             {"role": "user", "content": user_msg},
@@ -548,8 +556,10 @@ def llm_triage(
 ) -> tuple[str, str]:
     """Call the LLM and return (decision, reason). Fail-open on any error (CB-4)."""
     user_msg = _TRIAGE_USER.format(
-        name=check["name"], status=check["status"].upper(),
-        detail=check["detail"], hint=check["hint"],
+        name=check["name"],
+        status=check["status"].upper(),
+        detail=check["detail"],
+        hint=check["hint"],
     )
     try:
         if provider == "openai-compat":
@@ -557,12 +567,12 @@ def llm_triage(
             resolved_model = model or os.environ.get("HEALTH_LLM_MODEL", "")
             resolved_key = api_key or os.environ.get("HEALTH_LLM_API_KEY", "local")
             if not resolved_url or not resolved_model:
-                print("  [llm-triage] openai-compat requires HEALTH_LLM_BASE_URL + HEALTH_LLM_MODEL",
-                      file=sys.stderr)
+                print("  [llm-triage] openai-compat requires HEALTH_LLM_BASE_URL + HEALTH_LLM_MODEL", file=sys.stderr)
                 return _FALLBACK
             result = _triage_openai_compat(user_msg, resolved_url, resolved_model, resolved_key)
         else:
             from rebalance.ingest.config import get_gemini_api_key
+
             resolved_model = model or os.environ.get("HEALTH_LLM_MODEL", "")
             resolved_key = api_key or get_gemini_api_key()
             result = _triage_gemini(user_msg, resolved_model, resolved_key)
@@ -579,14 +589,15 @@ def llm_triage(
 # GitHub token resolver
 # ---------------------------------------------------------------------------
 
+
 def _resolve_token() -> str:
     from rebalance.ingest.config import get_github_token_with_source  # noqa: PLC0415
+
     token, source = get_github_token_with_source()
     if not token:
         sys.exit("No GitHub token found. Run `rebalance config set-github-token` first.")
     if source != "config":
-        print(f"  Warning: GitHub token via '{source}' (not config — launchd jobs may fail)",
-              file=sys.stderr)
+        print(f"  Warning: GitHub token via '{source}' (not config — launchd jobs may fail)", file=sys.stderr)
     return token
 
 
@@ -594,41 +605,50 @@ def _resolve_token() -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
-        "--also-pulse", action="store_true",
+        "--also-pulse",
+        action="store_true",
         help="Deprecated; rebalance doctor already includes collector checks.",
     )
-    parser.add_argument("--warn", action="store_true",
-                        help="File issues for WARN findings too (default: FAIL only)")
-    parser.add_argument("--close", action="store_true",
-                        help="Close issues whose checks have recovered")
-    parser.add_argument("--llm-triage", action="store_true",
-                        help="Ask an LLM whether each finding is worth filing")
-    parser.add_argument("--llm-provider", default="gemini",
-                        choices=["gemini", "openai-compat"])
+    parser.add_argument("--warn", action="store_true", help="File issues for WARN findings too (default: FAIL only)")
+    parser.add_argument("--close", action="store_true", help="Close issues whose checks have recovered")
+    parser.add_argument("--llm-triage", action="store_true", help="Ask an LLM whether each finding is worth filing")
+    parser.add_argument("--llm-provider", default="gemini", choices=["gemini", "openai-compat"])
     parser.add_argument("--llm-model", default="", metavar="MODEL")
     parser.add_argument("--llm-base-url", default="", metavar="URL")
-    parser.add_argument("--llm-daily-limit", type=int, default=8, metavar="N",
-                        help="Max LLM API calls per UTC day (default: 8). CB-2.")
-    parser.add_argument("--llm-max-per-run", type=int, default=5, metavar="N",
-                        help="Max LLM calls in this invocation (default: 5). CB-3.")
+    parser.add_argument(
+        "--llm-daily-limit", type=int, default=8, metavar="N", help="Max LLM API calls per UTC day (default: 8). CB-2."
+    )
+    parser.add_argument(
+        "--llm-max-per-run",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Max LLM calls in this invocation (default: 5). CB-3.",
+    )
     parser.add_argument("--dedup-days", type=int, default=30, metavar="N")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--repo", default=REPO, metavar="OWNER/REPO")
     args = parser.parse_args()
 
     now_str = now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
-    run_log = RunLog(now_str, {
-        "repo": args.repo, "warn": args.warn, "close": args.close,
-        "llm_triage": args.llm_triage, "llm_provider": args.llm_provider,
-        "llm_model": args.llm_model or os.environ.get("HEALTH_LLM_MODEL", ""),
-        "llm_daily_limit": args.llm_daily_limit,
-        "llm_max_per_run": args.llm_max_per_run,
-        "dry_run": args.dry_run,
-    })
+    run_log = RunLog(
+        now_str,
+        {
+            "repo": args.repo,
+            "warn": args.warn,
+            "close": args.close,
+            "llm_triage": args.llm_triage,
+            "llm_provider": args.llm_provider,
+            "llm_model": args.llm_model or os.environ.get("HEALTH_LLM_MODEL", ""),
+            "llm_daily_limit": args.llm_daily_limit,
+            "llm_max_per_run": args.llm_max_per_run,
+            "dry_run": args.dry_run,
+        },
+    )
 
     print(f"rebalance health issue reporter — {now_str}")
     print(f"  repo:             {args.repo}")
@@ -637,8 +657,10 @@ def main() -> int:
     if args.llm_triage:
         remaining = quota_remaining(args.llm_daily_limit)
         disabled = bool(os.environ.get("HEALTH_LLM_DISABLE"))
-        print(f"  llm quota today:  {remaining}/{args.llm_daily_limit} remaining"
-              + (" [CB-1: DISABLED via env]" if disabled else ""))
+        print(
+            f"  llm quota today:  {remaining}/{args.llm_daily_limit} remaining"
+            + (" [CB-1: DISABLED via env]" if disabled else "")
+        )
         print(f"  llm max/run:      {args.llm_max_per_run}  [CB-3]")
         # CB-1 check: hard kill switch
         if disabled:
@@ -646,6 +668,7 @@ def main() -> int:
             print("  [CB-1] HEALTH_LLM_DISABLE=1 — LLM triage will be skipped")
         # Gemini key check (fail early with a clear message)
         from rebalance.ingest.config import get_gemini_api_key
+
         if args.llm_provider == "gemini" and not get_gemini_api_key():
             print("\n  Warning: GEMINI_API_KEY is not set.")
             print("  Set it with:  export GEMINI_API_KEY=<your-key>")
@@ -673,8 +696,7 @@ def main() -> int:
         recently_closed: dict[str, dict] = {}
     else:
         open_issues = list_health_issues(token, args.repo, state="open")
-        recently_closed = list_health_issues(token, args.repo, state="closed",
-                                             since_days=args.dedup_days)
+        recently_closed = list_health_issues(token, args.repo, state="closed", since_days=args.dedup_days)
     print(f"  {len(open_issues)} open, {len(recently_closed)} recently closed")
     print()
 
@@ -697,11 +719,12 @@ def main() -> int:
                 current_body = already_open.get("body") or ""
                 refreshed_body = set_detail(current_body, check["detail"])
                 new_count = parse_occurrence_count(refreshed_body) + 1
-                new_body = set_occurrence_count(refreshed_body, new_count, now_str,
-                                                device=DEVICE_NAME)
+                new_body = set_occurrence_count(refreshed_body, new_count, now_str, device=DEVICE_NAME)
                 update_issue_body(token, args.repo, already_open["number"], new_body, args.dry_run)
-                print(f"  SEEN×{new_count:<3} {check['status'].upper():4}  {check['name']}  "
-                      f"(#{already_open['number']} open, counter updated)")
+                print(
+                    f"  SEEN×{new_count:<3} {check['status'].upper():4}  {check['name']}  "
+                    f"(#{already_open['number']} open, counter updated)"
+                )
                 run_log.add_action("seen-increment", check["name"], already_open["number"])
                 skipped += 1
                 continue
@@ -712,8 +735,8 @@ def main() -> int:
 
             if args.llm_triage and not args.dry_run:
                 cb1 = bool(os.environ.get("HEALTH_LLM_DISABLE"))  # CB-1
-                cb2 = quota_remaining(args.llm_daily_limit) <= 0   # CB-2
-                cb3 = llm_calls_this_run >= args.llm_max_per_run   # CB-3
+                cb2 = quota_remaining(args.llm_daily_limit) <= 0  # CB-2
+                cb3 = llm_calls_this_run >= args.llm_max_per_run  # CB-3
 
                 if cb1:
                     triage_reason = "CB-1: HEALTH_LLM_DISABLE set"
@@ -721,13 +744,17 @@ def main() -> int:
                 elif cb2:
                     triage_reason = f"CB-2: daily quota exhausted ({args.llm_daily_limit}/day)"
                     run_log.add_cb("CB-2: daily quota")
-                    print(f"  [CB-2] daily LLM quota exhausted ({args.llm_daily_limit}/day) "
-                          "— filing remaining checks without triage")
+                    print(
+                        f"  [CB-2] daily LLM quota exhausted ({args.llm_daily_limit}/day) "
+                        "— filing remaining checks without triage"
+                    )
                 elif cb3:
                     triage_reason = f"CB-3: per-run cap reached ({args.llm_max_per_run}/run)"
                     run_log.add_cb("CB-3: per-run cap")
-                    print(f"  [CB-3] per-run LLM cap reached ({args.llm_max_per_run}) "
-                          "— filing remaining checks without triage")
+                    print(
+                        f"  [CB-3] per-run LLM cap reached ({args.llm_max_per_run}) "
+                        "— filing remaining checks without triage"
+                    )
                 else:
                     triage_decision, triage_reason = llm_triage(
                         check,
@@ -747,8 +774,9 @@ def main() -> int:
                     reason=triage_reason,
                 )
                 icon = {"file": "→", "skip": "✗", "downgrade": "↓"}.get(triage_decision, "→")
-                print(f"  TRIAGE {check['status'].upper():4}  {check['name']}  "
-                      f"{icon} {triage_decision}: {triage_reason}")
+                print(
+                    f"  TRIAGE {check['status'].upper():4}  {check['name']}  {icon} {triage_decision}: {triage_reason}"
+                )
                 if triage_decision == "skip":
                     run_log.add_action("triage-skip", check["name"])
                     triaged_skip += 1
@@ -760,18 +788,15 @@ def main() -> int:
                 recur_comment = (
                     f"**Recurrence detected** ({now_str}) · Device: `{DEVICE_NAME}`\n\n"
                     f"This check is failing again after being closed.\n\n"
-                    f"**Detail:** {check['detail']}\n"
-                    + (f"**Hint:** {check['hint']}" if check["hint"] else "")
+                    f"**Detail:** {check['detail']}\n" + (f"**Hint:** {check['hint']}" if check["hint"] else "")
                 )
                 comment_on_issue(token, args.repo, number, recur_comment, args.dry_run)
                 action_str = "[dry-run] would comment" if args.dry_run else f"commented on #{number}"
-                print(f"  RECUR  {check['status'].upper():4}  {check['name']}  "
-                      f"(closed #{number}, {action_str})")
+                print(f"  RECUR  {check['status'].upper():4}  {check['name']}  (closed #{number}, {action_str})")
                 run_log.add_action("recurrence-comment", check["name"], number)
                 filed += 1
             else:
-                body = _issue_body(check["name"], check["status"],
-                                   check["detail"], check["hint"], check["source"])
+                body = _issue_body(check["name"], check["status"], check["detail"], check["hint"], check["source"])
                 number = file_issue(token, args.repo, title, body, args.dry_run)
                 num_str = f"#{number}" if number else "(dry-run)"
                 print(f"  FILED  {check['status'].upper():4}  {check['name']}  → {num_str}")
@@ -779,8 +804,7 @@ def main() -> int:
                 filed += 1
 
         elif check["status"] == "ok" and already_open and args.close:
-            comment = (f"This check now reports **OK** as of {now_str}. Auto-closing.\n\n"
-                       f"Detail: {check['detail']}")
+            comment = f"This check now reports **OK** as of {now_str}. Auto-closing.\n\nDetail: {check['detail']}"
             close_issue(token, args.repo, already_open["number"], comment, args.dry_run)
             print(f"  CLOSED ok    {check['name']}  (was #{already_open['number']})")
             run_log.add_action("closed", check["name"], already_open["number"])
@@ -788,8 +812,7 @@ def main() -> int:
 
     print()
     triage_note = f", {triaged_skip} triage-skipped" if args.llm_triage else ""
-    print(f"Done — {filed} filed/actioned, {closed} closed, "
-          f"{skipped} counter-incremented{triage_note}")
+    print(f"Done — {filed} filed/actioned, {closed} closed, {skipped} counter-incremented{triage_note}")
     if args.llm_triage and not args.dry_run:
         remaining = quota_remaining(args.llm_daily_limit)
         print(f"LLM quota remaining today: {remaining}/{args.llm_daily_limit}")

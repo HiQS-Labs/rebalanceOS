@@ -75,9 +75,7 @@ class ExactMatchFilterTests(unittest.TestCase):
 
     def test_exact_match_does_not_match_setup_in_task(self) -> None:
         """'setup' should NOT exclude 'Setup rebalance local Google Timesheet app'."""
-        self.assertFalse(
-            should_exclude_event("Setup rebalance local Google Timesheet app", ["setup"])
-        )
+        self.assertFalse(should_exclude_event("Setup rebalance local Google Timesheet app", ["setup"]))
 
     def test_exact_match_strips_whitespace(self) -> None:
         self.assertTrue(should_exclude_event("  Lunch  ", ["Lunch"]))

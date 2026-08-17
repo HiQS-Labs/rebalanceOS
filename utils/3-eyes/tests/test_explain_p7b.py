@@ -28,6 +28,7 @@ NOVEL_LOG = "Traceback: ValueError: unexpected column 'widget_id' in projection"
 # Stage 1 — deterministic suppression
 # --------------------------------------------------------------------------- #
 
+
 def test_a_known_issue_is_suppressed_without_any_model_call(activate, monkeypatch):
     """The cost argument: recurring failures must cost nothing.
 
@@ -50,7 +51,7 @@ def test_a_known_issue_is_suppressed_without_any_model_call(activate, monkeypatc
 
 def test_a_suppressed_issue_gets_no_banner_and_no_github_issue():
     """Suppression converts noise into a quiet record — that is the entire point."""
-    job = registry.load_job("collector-health")     # routes: pdda-inbox, notify
+    job = registry.load_job("collector-health")  # routes: pdda-inbox, notify
     assert explain.routes_for(job, explain.KNOWN) == ["log-only"]
 
 
@@ -62,10 +63,16 @@ def test_a_novel_failure_keeps_the_jobs_real_routes():
 
 def test_an_unmatched_failure_reaches_the_model(activate, monkeypatch):
     activate()
-    monkeypatch.setattr(classify, "explain_failure", lambda *a, **k: {
-        "severity": "error", "headline": "schema drift", "summary": "unexpected column",
-        "next_step": "check the projection",
-    })
+    monkeypatch.setattr(
+        classify,
+        "explain_failure",
+        lambda *a, **k: {
+            "severity": "error",
+            "headline": "schema drift",
+            "summary": "unexpected column",
+            "next_step": "check the projection",
+        },
+    )
 
     result = explain.explain(registry.load_job("selfcheck"), code=1, evidence=NOVEL_LOG)
 
@@ -78,6 +85,7 @@ def test_an_unmatched_failure_reaches_the_model(activate, monkeypatch):
 # --------------------------------------------------------------------------- #
 # Suppression must fail OPEN — every way a rule can be wrong
 # --------------------------------------------------------------------------- #
+
 
 def test_an_unreadable_rules_file_suppresses_nothing(tmp_path):
     """Failing closed here would silence real failures. Worse than a false alarm."""
@@ -126,9 +134,7 @@ def test_database_is_locked_is_NOT_suppressed():
     for 30+ continuous seconds — a real defect (#222 / #171). A rule for it would
     have kept a genuine bug invisible for as long as the rule stood.
     """
-    got = explain.match_known_issue(
-        "vault-sync", "sqlite3.OperationalError: database is locked"
-    )
+    got = explain.match_known_issue("vault-sync", "sqlite3.OperationalError: database is locked")
     assert got is None, "a real ingest defect is being suppressed as a known issue"
 
 
@@ -141,6 +147,7 @@ def test_the_shipped_rules_all_carry_a_tracking_issue_or_an_expiry():
 # --------------------------------------------------------------------------- #
 # Budget + availability
 # --------------------------------------------------------------------------- #
+
 
 def test_no_model_call_when_inert(monkeypatch):
     called = []
@@ -169,8 +176,10 @@ def test_budget_exhaustion_leaves_the_failure_UNJUDGED_not_benign(activate, monk
 def test_a_throwing_classifier_does_not_take_the_job_down(activate, monkeypatch):
     """An explainer that raises would turn one broken job into two."""
     activate()
+
     def _boom(*a, **k):
         raise RuntimeError("ollama exploded")
+
     monkeypatch.setattr(classify, "explain_failure", _boom)
 
     result = explain.explain(registry.load_job("selfcheck"), code=1, evidence=NOVEL_LOG)
@@ -182,10 +191,10 @@ def test_a_throwing_classifier_does_not_take_the_job_down(activate, monkeypatch)
 # The run.py hook
 # --------------------------------------------------------------------------- #
 
+
 def _trip(job_id: str, monkeypatch, seen: list):
     monkeypatch.setattr(breakers, "run_job_command", lambda job: 1)
-    monkeypatch.setattr(routes, "route",
-                        lambda finding, rts, **k: seen.append((finding, list(rts))) or [])
+    monkeypatch.setattr(routes, "route", lambda finding, rts, **k: seen.append((finding, list(rts))) or [])
     for _ in range(3):
         run.run_job(job_id)
 
@@ -193,8 +202,7 @@ def _trip(job_id: str, monkeypatch, seen: list):
 def test_a_trip_from_a_known_issue_is_suppressed_end_to_end(activate, monkeypatch):
     activate()
     monkeypatch.setattr(explain, "gather_evidence", lambda *a, **k: KNOWN_LOG)
-    monkeypatch.setattr(classify, "explain_failure",
-                        lambda *a, **k: pytest.fail("a known issue reached the model"))
+    monkeypatch.setattr(classify, "explain_failure", lambda *a, **k: pytest.fail("a known issue reached the model"))
     seen: list = []
     _trip("selfcheck", monkeypatch, seen)
 
@@ -207,10 +215,16 @@ def test_a_trip_from_a_known_issue_is_suppressed_end_to_end(activate, monkeypatc
 def test_a_trip_from_a_NOVEL_failure_is_announced_with_the_explanation(activate, monkeypatch):
     activate()
     monkeypatch.setattr(explain, "gather_evidence", lambda *a, **k: NOVEL_LOG)
-    monkeypatch.setattr(classify, "explain_failure", lambda *a, **k: {
-        "severity": "error", "headline": "schema drift",
-        "summary": "unexpected column in projection", "next_step": "check the projection",
-    })
+    monkeypatch.setattr(
+        classify,
+        "explain_failure",
+        lambda *a, **k: {
+            "severity": "error",
+            "headline": "schema drift",
+            "summary": "unexpected column in projection",
+            "next_step": "check the projection",
+        },
+    )
     seen: list = []
     _trip("selfcheck", monkeypatch, seen)
 
@@ -224,8 +238,10 @@ def test_a_trip_from_a_NOVEL_failure_is_announced_with_the_explanation(activate,
 def test_an_explainer_crash_still_announces_the_trip(activate, monkeypatch):
     """The reporter must survive its own analysis failing."""
     activate()
+
     def _boom(*a, **k):
         raise RuntimeError("explainer died")
+
     monkeypatch.setattr(explain, "explain", _boom)
     seen: list = []
     _trip("selfcheck", monkeypatch, seen)
@@ -238,6 +254,7 @@ def test_an_explainer_crash_still_announces_the_trip(activate, monkeypatch):
 # --------------------------------------------------------------------------- #
 # Defects found by the agy QA relay (2026-07-28)
 # --------------------------------------------------------------------------- #
+
 
 def test_suppression_rules_are_scoped_to_jobs(monkeypatch):
     """QA finding 5: an unscoped rule silences failures it was never meant to cover.
@@ -253,9 +270,7 @@ def test_suppression_rules_are_scoped_to_jobs(monkeypatch):
 
 def test_a_generic_EINTR_elsewhere_is_not_suppressed():
     """The concrete scenario: EINTR during a DB write, not interpreter bootstrap."""
-    got = explain.match_known_issue(
-        "some-other-job", "sqlite3.OperationalError: interrupted system call during commit"
-    )
+    got = explain.match_known_issue("some-other-job", "sqlite3.OperationalError: interrupted system call during commit")
     assert got is None, "a generic EINTR was suppressed by the bootstrap rule"
 
 

@@ -36,9 +36,7 @@ def _load_classify():
     """
     if str(_THREE_EYES) not in sys.path:
         sys.path.insert(0, str(_THREE_EYES))
-    spec = importlib.util.spec_from_file_location(
-        "three_eyes.classify", _THREE_EYES / "three_eyes" / "classify.py"
-    )
+    spec = importlib.util.spec_from_file_location("three_eyes.classify", _THREE_EYES / "three_eyes" / "classify.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -56,13 +54,13 @@ GOLDEN_CASES: list[tuple[str, str]] = [
     ("brace inside a string literal", '{"note": "a } inside a string", "ok": true}'),
     ("explicit null value", '{"severity": null, "action": "file"}'),
     ("nested object", '{"outer": {"inner": [1, 2, 3]}}'),
-    ("non-object json array", '[1, 2, 3]'),
+    ("non-object json array", "[1, 2, 3]"),
     ("non-object json scalar", '"just a string"'),
     ("malformed json", '{"severity": '),
-    ("empty string", ''),
-    ("whitespace only", '   \n  '),
-    ("fence with nothing inside", '```json\n```'),
-    ("prose only, no json at all", 'I could not classify this.'),
+    ("empty string", ""),
+    ("whitespace only", "   \n  "),
+    ("fence with nothing inside", "```json\n```"),
+    ("prose only, no json at all", "I could not classify this."),
     ("unicode content", '{"msg": "café — naïve"}'),
 ]
 
@@ -174,9 +172,9 @@ class DeadCodeRemovedTests(unittest.TestCase):
     def test_reporter_dead_fence_helper_is_gone(self) -> None:
         """`_strip_code_fence` was defined and never called — deleted, not
         migrated. Pinned so it does not get resurrected alongside the shared one."""
-        source = (
-            Path(__file__).resolve().parents[1] / "scripts" / "health_issue_reporter.py"
-        ).read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "health_issue_reporter.py").read_text(
+            encoding="utf-8"
+        )
         self.assertNotIn("def _strip_code_fence", source)
 
 

@@ -464,9 +464,7 @@ def test_load_query_set_canonical_shape(tmp_path):
             "shape": "asymmetric",
         }
     ]
-    sidecar_data = {
-        "q-canon-001": {"query": "canonical query text"}
-    }
+    sidecar_data = {"q-canon-001": {"query": "canonical query text"}}
 
     committed_file.write_text(json.dumps(committed_data), encoding="utf-8")
     sidecar_file.write_text(json.dumps(sidecar_data), encoding="utf-8")
@@ -485,7 +483,9 @@ def test_load_query_set_canonical_shape(tmp_path):
 
     # Rejection 2: missing or empty shape tag (§19.2)
     invalid_shape_file = tmp_path / "eval_no_shape.json"
-    invalid_shape_file.write_text(json.dumps([{"id": "q-canon-001", "doc_id": "doc-canon-001", "shape": ""}]), encoding="utf-8")
+    invalid_shape_file.write_text(
+        json.dumps([{"id": "q-canon-001", "doc_id": "doc-canon-001", "shape": ""}]), encoding="utf-8"
+    )
     with pytest.raises(ValueError, match=r"canonical shape tag"):
         load_query_set(invalid_shape_file, sidecar_file)
 

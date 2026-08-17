@@ -24,16 +24,24 @@ DAY = datetime(2026, 6, 15)
 
 def _vacation_row(id_: str, cal: str) -> tuple:
     # Spans the whole target day so the querier's range check matches.
-    return (id_, "Vacation - out of office", "2026-06-15T00:00:00",
-            "2026-06-15T23:59:59", None, None, cal, "confirmed", None,
-            "2026-06-01T00:00:00Z")
+    return (
+        id_,
+        "Vacation - out of office",
+        "2026-06-15T00:00:00",
+        "2026-06-15T23:59:59",
+        None,
+        None,
+        cal,
+        "confirmed",
+        None,
+        "2026-06-01T00:00:00Z",
+    )
 
 
 def _seed(db: Path, rows: list[tuple]) -> None:
     conn = sqlite3.connect(db)
     conn.execute(_TABLE)
-    conn.executemany(
-        "INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+    conn.executemany("INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
     conn.commit()
     conn.close()
 

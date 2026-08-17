@@ -1,17 +1,17 @@
 """3-Eyes CLI — talk to your jobs from the shell (GH-195).
 
-    python -m three_eyes list                # jobs in the registry
-    python -m three_eyes status              # active/inert + registry ⋈ live launchctl + breakers
-    python -m three_eyes validate            # registry integrity (exit 1 on problems)
-    python -m three_eyes dry-run <job>       # what would run + a preview of each route (no egress)
-    python -m three_eyes why <job>           # explain a job's config + breaker state
-    python -m three_eyes pause <job>         # quarantine a job (operator pause)
-    python -m three_eyes resume <job>        # clear the breaker / un-pause
-    python -m three_eyes run <job>           # trigger a run now (still gated: inert clones no-op)
-    python -m three_eyes observe             # read-only inventory of ALL user LaunchAgents
-    python -m three_eyes sync-dashboard      # regenerate DASHBOARD.md from the registry
-    python -m three_eyes install <job>       # write+load the job's launchd agent (GATED)
-    python -m three_eyes uninstall <job>     # unload+remove it (GATED)
+python -m three_eyes list                # jobs in the registry
+python -m three_eyes status              # active/inert + registry ⋈ live launchctl + breakers
+python -m three_eyes validate            # registry integrity (exit 1 on problems)
+python -m three_eyes dry-run <job>       # what would run + a preview of each route (no egress)
+python -m three_eyes why <job>           # explain a job's config + breaker state
+python -m three_eyes pause <job>         # quarantine a job (operator pause)
+python -m three_eyes resume <job>        # clear the breaker / un-pause
+python -m three_eyes run <job>           # trigger a run now (still gated: inert clones no-op)
+python -m three_eyes observe             # read-only inventory of ALL user LaunchAgents
+python -m three_eyes sync-dashboard      # regenerate DASHBOARD.md from the registry
+python -m three_eyes install <job>       # write+load the job's launchd agent (GATED)
+python -m three_eyes uninstall <job>     # unload+remove it (GATED)
 """
 
 from __future__ import annotations
@@ -92,14 +92,23 @@ def _cmd_dry_run(args) -> int:
     spec = allow.get(job.command)
     print(f"job:      {job.id}")
     print(f"schedule: {job.schedule_summary()}")
-    print(f"command:  {job.command} -> {spec['exec'] if spec else '??? NOT IN ALLOWLIST'}"
-          + (f" {' '.join(spec['args'])}" if spec else ""))
+    print(
+        f"command:  {job.command} -> {spec['exec'] if spec else '??? NOT IN ALLOWLIST'}"
+        + (f" {' '.join(spec['args'])}" if spec else "")
+    )
     print(f"quiet:    {job.quiet_hours or '—'}  (now in quiet? {relief.in_quiet_hours(job.quiet_hours)})")
-    print(f"breakers: single_instance={job.single_instance} max_rss_gb={job.max_rss_gb} "
-          f"trip_after={job.trip_after_failures}")
+    print(
+        f"breakers: single_instance={job.single_instance} max_rss_gb={job.max_rss_gb} "
+        f"trip_after={job.trip_after_failures}"
+    )
     print(f"routes:   {', '.join(job.routes) or '—'}")
-    sample = {"source": job.id, "title": f"sample finding from {job.id}",
-              "severity": "warn", "summary": "dry-run sample", "text": "sample text"}
+    sample = {
+        "source": job.id,
+        "title": f"sample finding from {job.id}",
+        "severity": "warn",
+        "summary": "dry-run sample",
+        "text": "sample text",
+    }
     print("\nroute preview (dry-run, no egress):")
     for res in routes.route(sample, job.routes, dry_run=True):
         line = f"  - {res['route']}: {res['status']}"
@@ -120,8 +129,10 @@ def _cmd_why(args) -> int:
     print(f"  fires:    {job.schedule_summary()}")
     print(f"  when:     {job.rules.get('fire_when', '—')}")
     print(f"  quiet:    {job.quiet_hours or '—'}")
-    print(f"  breaker:  {'OPEN/quarantined' if st.get('quarantined') else 'closed'} "
-          f"(consecutive failures: {st.get('consecutive_failures', 0)}, last: {st.get('last')})")
+    print(
+        f"  breaker:  {'OPEN/quarantined' if st.get('quarantined') else 'closed'} "
+        f"(consecutive failures: {st.get('consecutive_failures', 0)}, last: {st.get('last')})"
+    )
     if st.get("reason"):
         print(f"  reason:   {st['reason']}")
     return 0

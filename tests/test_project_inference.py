@@ -264,7 +264,13 @@ class CuratedRowProtectionTests(unittest.TestCase):
                     "tester",
                     "Hypercart-Dev-Tools/rebalance-OS",
                     "2026-04-28",
-                    10, 10, 0, 0, 0, 0, 0,
+                    10,
+                    10,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
                     "2026-04-27T19:11:32Z",
                     "2026-04-28T14:47:36Z",
                 ),
@@ -303,9 +309,7 @@ class CuratedRowProtectionTests(unittest.TestCase):
         self.assertEqual(summary.deleted_stale_inferred_count, 0)
 
         with db_connection(db_path, ensure_project_schema) as conn:
-            row = conn.execute(
-                "SELECT * FROM project_registry WHERE name = ?", ("Rebalance OS",)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM project_registry WHERE name = ?", ("Rebalance OS",)).fetchone()
         self.assertEqual(row["summary"], "CURATED - operator owned")
         self.assertEqual(row["priority_tier"], 1)
         self.assertEqual(row["value_level"], "high")

@@ -87,10 +87,7 @@ CONFIG_PATH = PROJECT_ROOT / "temp" / "rbos.config"
 DEFAULT_OUT = PROJECT_ROOT / "web" / "pulse.html"
 GOAL_HISTORY_PATH = PROJECT_ROOT / "temp" / "pulse_goal_history.json"
 HEALTH_LOG_PATH = PROJECT_ROOT / "temp" / "health-reporter.log.jsonl"
-HEALTH_ISSUES_URL = (
-    "https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues"
-    "?labels=rebalance-health&state=open"
-)
+HEALTH_ISSUES_URL = "https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues?labels=rebalance-health&state=open"
 MAX_GOAL_HISTORY = 3
 PRIMARY_GOAL_LIMIT = 3
 SECONDARY_TODO_LIMIT = 6
@@ -145,27 +142,27 @@ def _read_json_list(path: Path) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
-def load_goal_history(*, goals_path: Path | None = None, history_path: Path = GOAL_HISTORY_PATH) -> list[dict[str, Any]]:
+def load_goal_history(
+    *, goals_path: Path | None = None, history_path: Path = GOAL_HISTORY_PATH
+) -> list[dict[str, Any]]:
     entries = _read_json_list(history_path)
     if goals_path is None:
         return entries[:MAX_GOAL_HISTORY]
     wanted = str(goals_path.expanduser().resolve())
-    kept = [
-        entry for entry in entries
-        if isinstance(entry, dict) and entry.get("goals_path") == wanted
-    ]
+    kept = [entry for entry in entries if isinstance(entry, dict) and entry.get("goals_path") == wanted]
     fresh = [entry for entry in kept if _goal_completion_still_applied(goals_path, entry)]
     stale_ids = {str(entry.get("id") or "") for entry in kept if entry not in fresh}
     if stale_ids:
         remaining = [
-            entry for entry in entries
-            if isinstance(entry, dict) and str(entry.get("id") or "") not in stale_ids
+            entry for entry in entries if isinstance(entry, dict) and str(entry.get("id") or "") not in stale_ids
         ]
         _write_goal_history(remaining, history_path=history_path)
     return fresh[:MAX_GOAL_HISTORY]
 
 
-def _write_goal_history(entries: Iterable[dict[str, Any]], *, history_path: Path = GOAL_HISTORY_PATH) -> list[dict[str, Any]]:
+def _write_goal_history(
+    entries: Iterable[dict[str, Any]], *, history_path: Path = GOAL_HISTORY_PATH
+) -> list[dict[str, Any]]:
     compact = list(entries)[:MAX_GOAL_HISTORY]
     history_path.parent.mkdir(parents=True, exist_ok=True)
     history_path.write_text(json.dumps(compact, indent=2), encoding="utf-8")
@@ -179,20 +176,14 @@ def remember_goal_completion(entry: dict[str, Any], *, history_path: Path = GOAL
             continue
         if existing.get("id") == entry.get("id"):
             continue
-        if (
-            existing.get("goals_path") == entry.get("goals_path")
-            and existing.get("title") == entry.get("title")
-        ):
+        if existing.get("goals_path") == entry.get("goals_path") and existing.get("title") == entry.get("title"):
             continue
         entries.append(existing)
     return _write_goal_history(entries, history_path=history_path)
 
 
 def forget_goal_completion(entry_id: str, *, history_path: Path = GOAL_HISTORY_PATH) -> list[dict[str, Any]]:
-    kept = [
-        entry for entry in _read_json_list(history_path)
-        if isinstance(entry, dict) and entry.get("id") != entry_id
-    ]
+    kept = [entry for entry in _read_json_list(history_path) if isinstance(entry, dict) and entry.get("id") != entry_id]
     return _write_goal_history(kept, history_path=history_path)
 
 
@@ -253,10 +244,7 @@ def build_stream_rows(
     badges stay aligned with the visible feed lengths.
     """
     sources = status.get("sources") or {}
-    names = [
-        name for name in COLLECTORS
-        if name not in STREAM_SOURCE_EXCLUDE and name in sources
-    ]
+    names = [name for name in COLLECTORS if name not in STREAM_SOURCE_EXCLUDE and name in sources]
     names.sort(key=_stream_sort_key)
     return [
         {
@@ -273,6 +261,7 @@ def build_stream_rows(
 # Health report counter — reads local JSONL log, no GitHub API call
 # ---------------------------------------------------------------------------
 
+
 def fetch_health_filed_count(days: int = 30) -> int:
     """Count distinct checks that had a 'filed' action in the last *days* days.
 
@@ -280,6 +269,7 @@ def fetch_health_filed_count(days: int = 30) -> int:
     a live API call. Returns 0 if the log doesn't exist yet.
     """
     from datetime import timedelta  # noqa: PLC0415
+
     if not HEALTH_LOG_PATH.exists():
         return 0
     cutoff = now_utc() - timedelta(days=days)
@@ -312,6 +302,7 @@ def fetch_health_filed_count(days: int = 30) -> int:
 # ---------------------------------------------------------------------------
 # Render helpers
 # ---------------------------------------------------------------------------
+
 
 def _esc(value: Any) -> str:
     return html.escape("" if value is None else str(value))
@@ -428,11 +419,7 @@ def render_health_banner(
 
     items = []
     for check in problems[:4]:
-        fix = (
-            f'<span class="health-banner-fix">→ {_esc(_short_text(check.hint, 120))}</span>'
-            if check.hint
-            else ""
-        )
+        fix = f'<span class="health-banner-fix">→ {_esc(_short_text(check.hint, 120))}</span>' if check.hint else ""
         items.append(
             f'<span class="health-banner-item">'
             f'<span class="health-banner-name">{_esc(check.name)}</span>'
@@ -441,9 +428,7 @@ def render_health_banner(
             f"</span>"
         )
     if len(problems) > 4:
-        items.append(
-            f'<span class="health-banner-item more">+{len(problems) - 4} more</span>'
-        )
+        items.append(f'<span class="health-banner-item more">+{len(problems) - 4} more</span>')
 
     return f"""
     <section class="health-banner health-banner-{tone}" aria-live="polite">
@@ -459,7 +444,7 @@ def render_health_banner(
           title="Copy health summary"
         >{_clipboard_icon_svg()}<span class="visually-hidden">Copy health summary</span></button>
       </div>
-      <div class="health-banner-items">{''.join(items)}</div>
+      <div class="health-banner-items">{"".join(items)}</div>
     </section>
     """
 
@@ -479,11 +464,7 @@ def render_sync_chip(
     else:
         tone = "ok"
         label = f"Last ingest {activity_text}"
-    return (
-        f'<span class="synced synced-{tone}">'
-        f'<span class="ok-dot"></span>{_esc(label)}'
-        f"</span>"
-    )
+    return f'<span class="synced synced-{tone}"><span class="ok-dot"></span>{_esc(label)}</span>'
 
 
 def build_obsidian_url(vault_path: Path | None, file_path: Path) -> str | None:
@@ -560,11 +541,7 @@ def _join_row_bits(bits: Iterable[str]) -> str:
 
 
 def _subsection_label(label: str, *, count: int | None = None, extra_class: str = "") -> str:
-    count_html = (
-        f'<span class="section-label-count"> · {_esc(count)}</span>'
-        if count is not None
-        else ""
-    )
+    count_html = f'<span class="section-label-count"> · {_esc(count)}</span>' if count is not None else ""
     cls = "section-label"
     if extra_class:
         cls += f" {extra_class}"
@@ -640,10 +617,7 @@ def _render_recent_completion_row(item: dict[str, Any], *, stripe_index: int = 0
             "#",
             arrow=False,
             cls="goal-undo-btn",
-            attrs=(
-                f'data-goal-undo-id="{_esc(item_id)}" '
-                'role="button"'
-            ),
+            attrs=(f'data-goal-undo-id="{_esc(item_id)}" role="button"'),
         ),
     )
 
@@ -655,8 +629,8 @@ def _render_goal_rows(goals: list[dict[str, Any]], *, empty_html: str, compact: 
         if compact:
             cls = f"{cls} goal-compact".strip()
         check = "checked" if g["done"] else ""
-        title_html = _linkify(g['title'])
-        desc_html = _linkify(g['description'])
+        title_html = _linkify(g["title"])
+        desc_html = _linkify(g["description"])
         rows.append(
             data_row(
                 marker_html=(
@@ -678,9 +652,7 @@ def _render_goal_rows(goals: list[dict[str, Any]], *, empty_html: str, compact: 
     return "".join(rows)
 
 
-def _render_reminder_rows(
-    reminders: list[dict[str, Any]], *, tz: ZoneInfo, empty_html: str
-) -> str:
+def _render_reminder_rows(reminders: list[dict[str, Any]], *, tz: ZoneInfo, empty_html: str) -> str:
     """Rows for the Apple Reminders column. Each row with a `reminder_id` gets a
     clickable complete check that POSTs to `/api/apple-reminders/complete`
     (Phase 6 dashboard write-back). The write itself routes through the Phase 5.1
@@ -693,14 +665,10 @@ def _render_reminder_rows(
         due = r.get("due_at")
         if rid:
             marker_html = (
-                f'<span class="check" role="checkbox" tabindex="0" '
-                f'aria-label="Complete: {_esc(title)}"></span>'
+                f'<span class="check" role="checkbox" tabindex="0" aria-label="Complete: {_esc(title)}"></span>'
             )
             row_class = "goal goal-compact goal-reminder"
-            attrs = (
-                f'data-reminder-id="{_esc(rid)}" '
-                f'data-reminder-title="{_esc(title)}"'
-            )
+            attrs = f'data-reminder-id="{_esc(rid)}" data-reminder-title="{_esc(title)}"'
         else:
             marker_html = _badge_marker("R")
             row_class = "goal goal-compact goal-readonly"
@@ -754,10 +722,7 @@ def render_hero(
         empty_html='<li class="goal empty goal-compact goal-readonly"><div class="goal-body"><div class="goal-title">No active reminders</div><div class="goal-desc">Apple Reminders.</div></div></li>',
     )
     date_str = now.strftime("%A, %B %-d")
-    open_link = (
-        button_link("Open in Obsidian", obsidian_url, cls="hero-open")
-        if obsidian_url else ""
-    )
+    open_link = button_link("Open in Obsidian", obsidian_url, cls="hero-open") if obsidian_url else ""
     undo_html = ""
     if recent_completions:
         undo_rows = [
@@ -767,7 +732,7 @@ def render_hero(
         undo_html = f"""
         <div id="goal-undo-tray" class="goal-undo-tray">
           {_subsection_label("Recently completed", count=len(undo_rows), extra_class="goal-undo-label")}
-          <ul class="goal-undo-list rb-data-list">{''.join(undo_rows)}</ul>
+          <ul class="goal-undo-list rb-data-list">{"".join(undo_rows)}</ul>
         </div>
         """
     else:
@@ -823,7 +788,7 @@ def render_recent_activity(
         who = r.get("who") or ""
         ago = format_timestamp(r.get("ts"), relative=True, tz=TZ) or "—"
         if kind == "commit":
-            ref = (str(num)[:7] if num else "")
+            ref = str(num)[:7] if num else ""
             label = f"commit {ref}" if ref else "commit"
         elif kind == "item":
             label = f"{'PR' if sub == 'pull_request' else 'Issue'} #{num}" if num else (sub or "item")
@@ -832,17 +797,13 @@ def render_recent_activity(
         html_url = r.get("html_url") or ""
         if html_url:
             label_html = (
-                f'<a class="label" href="{_esc(html_url)}" '
-                f'target="_blank" rel="noopener noreferrer">{_esc(label)}</a>'
+                f'<a class="label" href="{_esc(html_url)}" target="_blank" rel="noopener noreferrer">{_esc(label)}</a>'
             )
         else:
             label_html = f'<span class="label">{_esc(label)}</span>'
         meta_html = _join_row_bits(
             [
-                (
-                    f'<span class="repo" title="{_esc(repo)}">{_esc(repo_short)}</span>'
-                    if repo else ""
-                ),
+                (f'<span class="repo" title="{_esc(repo)}">{_esc(repo_short)}</span>' if repo else ""),
                 f'<span class="who">{("@" + _esc(who)) if who else ""}</span>' if who else "",
                 f'<span class="detail">{_esc(detail)}</span>' if detail else "",
             ]
@@ -871,8 +832,8 @@ def render_recent_activity(
         foot = (
             f'<footer class="card-foot subtle">'
             f'Last vault edit · <span class="strong">{title}</span> · {ago}'
-            f'{f" · {vault_recent_count} recent" if vault_recent_count else ""}'
-            f'</footer>'
+            f"{f' · {vault_recent_count} recent' if vault_recent_count else ''}"
+            f"</footer>"
         )
     return f"""
     <section class="card activity">
@@ -900,12 +861,16 @@ def render_work_next(
     ``person`` labels are LOCAL-DISPLAY-ONLY (local dashboard, never the pushed
     pulse); all untrusted text is ``_esc``-ed.
     """
-    link = button_link(
-        f"Open What's Next → {len(ranked_rows)} ranked",
-        "/whats-next",
-        arrow=False,
-        cls="wn-open",
-    ) if ranked_rows else button_link("Open What's Next", "/whats-next", arrow=False, cls="wn-open")
+    link = (
+        button_link(
+            f"Open What's Next → {len(ranked_rows)} ranked",
+            "/whats-next",
+            arrow=False,
+            cls="wn-open",
+        )
+        if ranked_rows
+        else button_link("Open What's Next", "/whats-next", arrow=False, cls="wn-open")
+    )
     if not ranked_rows:
         return f"""
     <section class="card work-next work-next-teaser">
@@ -927,23 +892,20 @@ def render_work_next(
     for idx, top in enumerate(ranked_rows[:3]):
         top_title = _esc(top.get("title") or "")
         top_person = top.get("person")
-        person_html = (
-            f'<span class="wn-person">{_esc(top_person)}</span>' if top_person else ""
-        )
-        top_auto = (
-            '<span class="wn-auto" aria-label="automation ready">&#9881;</span>'
-            if top.get("automation") else ""
-        )
+        person_html = f'<span class="wn-person">{_esc(top_person)}</span>' if top_person else ""
+        top_auto = '<span class="wn-auto" aria-label="automation ready">&#9881;</span>' if top.get("automation") else ""
         meta_html = _join_row_bits(
             [
-                f'<span class="wn-source">{_esc((top.get("source") or "").upper())}</span>' if top.get("source") else "",
+                f'<span class="wn-source">{_esc((top.get("source") or "").upper())}</span>'
+                if top.get("source")
+                else "",
                 f'<span class="wn-project">{_esc(top.get("project") or "")}</span>' if top.get("project") else "",
             ]
         )
         teaser_rows.append(
             data_row(
                 marker_html=f'<span class="rb-data-marker-rank">{idx + 1}</span>',
-                title_html=f'{top_title} {person_html} {top_auto}'.strip(),
+                title_html=f"{top_title} {person_html} {top_auto}".strip(),
                 meta_html=meta_html,
                 timestamp=computed_at,
                 tz=TZ,
@@ -959,9 +921,9 @@ def render_work_next(
     <section class="card work-next work-next-teaser">
       <header class="card-head">
         <h2>What&#39;s next</h2>
-        <span class="card-head-meta">{' · '.join(meta_bits)}</span>
+        <span class="card-head-meta">{" · ".join(meta_bits)}</span>
       </header>
-      <ol class="wn-list rb-data-list">{''.join(teaser_rows)}</ol>
+      <ol class="wn-list rb-data-list">{"".join(teaser_rows)}</ol>
       <div class="wn-teaser-foot">{link}</div>
     </section>
     """
@@ -1009,9 +971,18 @@ def render_org_activity(by_org: dict[str, list[dict[str, Any]]], *, days: int) -
 
 # Stable, accessible palette — repeats if there are more repos than colors.
 PIE_PALETTE = [
-    "#7cc4ff", "#b388ff", "#ffb86b", "#7be08a", "#ff8aa1",
-    "#ffd166", "#06d6a0", "#118ab2", "#ef476f", "#8d99ae",
-    "#f4a261", "#c77dff",
+    "#7cc4ff",
+    "#b388ff",
+    "#ffb86b",
+    "#7be08a",
+    "#ff8aa1",
+    "#ffd166",
+    "#06d6a0",
+    "#118ab2",
+    "#ef476f",
+    "#8d99ae",
+    "#f4a261",
+    "#c77dff",
 ]
 
 
@@ -1024,15 +995,10 @@ def _render_repo_pie_new_badge(recent_promotion: dict[str, Any] | None) -> str:
     project_name = recent_promotion.get("project_name") or recent_promotion.get("repo") or ""
     if not project_name:
         return ""
-    return (
-        '<div class="repo-pie-new-badge">New repo added: '
-        f"{_esc(project_name)}</div>"
-    )
+    return f'<div class="repo-pie-new-badge">New repo added: {_esc(project_name)}</div>'
 
 
-def render_repo_pie(
-    rows: list[dict[str, Any]], *, days: int, recent_promotion: dict[str, Any] | None = None
-) -> str:
+def render_repo_pie(rows: list[dict[str, Any]], *, days: int, recent_promotion: dict[str, Any] | None = None) -> str:
     """Doughnut chart of per-repo event counts over the last N days."""
     new_badge = _render_repo_pie_new_badge(recent_promotion)
 
@@ -1110,11 +1076,11 @@ def render_open_prs(rows: list[dict[str, Any]], now: datetime) -> str:
         badge_html = " ".join(badges)
         title_html = f'<a href="{url}" target="_blank" rel="noopener noreferrer">#{num} {_esc(title)}</a>'
 
-        row_attrs = ''
+        row_attrs = ""
         if not pr["is_stale"]:
-            row_attrs += ' data-fresh'
+            row_attrs += " data-fresh"
         if pr.get("ci_failing"):
-            row_attrs += ' data-ci-fail'
+            row_attrs += " data-ci-fail"
         items.append(f"""
         <li class="pr-row"{row_attrs}>
           <span class="pr-age {age_cls}">{age_label}</span>
@@ -1128,16 +1094,12 @@ def render_open_prs(rows: list[dict[str, Any]], now: datetime) -> str:
         """)
 
     stale_count = sum(1 for pr in rows if pr["is_stale"])
-    fail_count  = sum(1 for pr in rows if pr.get("ci_failing"))
+    fail_count = sum(1 for pr in rows if pr.get("ci_failing"))
     stale_btn = (
-        f' · <button class="pr-filter-btn" data-pr-filter-stale>'
-        f'{stale_count} stale</button>'
-        if stale_count else ""
+        f' · <button class="pr-filter-btn" data-pr-filter-stale>{stale_count} stale</button>' if stale_count else ""
     )
     fail_btn = (
-        f' · <button class="pr-filter-btn ci" data-pr-filter-ci>'
-        f'{fail_count} failing CI</button>'
-        if fail_count else ""
+        f' · <button class="pr-filter-btn ci" data-pr-filter-ci>{fail_count} failing CI</button>' if fail_count else ""
     )
     return f"""
     <section class="card open-prs" id="open-prs-card">
@@ -1145,7 +1107,7 @@ def render_open_prs(rows: list[dict[str, Any]], now: datetime) -> str:
         <h2>Open PRs</h2>
         <span class="card-head-meta">{len(rows)} open{stale_btn}{fail_btn}</span>
       </header>
-      <ol class="open-prs-list">{''.join(items)}</ol>
+      <ol class="open-prs-list">{"".join(items)}</ol>
     </section>
     """
 
@@ -1153,20 +1115,22 @@ def render_open_prs(rows: list[dict[str, Any]], now: datetime) -> str:
 def render_watched(summary: dict[str, Any], now: datetime) -> str:
     last_html = _timestamp_html(summary.get("last_synced"), tz=TZ, relative=True, fallback="—")
     rows = [
-        ("Watched",          summary.get("total", 0),         "neutral"),
-        ("Fresh",            summary.get("fresh", 0),         "ok"),
-        ("Stale",            summary.get("stale", 0),         "neutral"),
-        ("Never synced",     summary.get("never", 0),         "danger" if summary.get("never") else "neutral"),
-        ("Auto-discovered",  summary.get("auto_discovered", 0),"neutral"),
-        ("Ignored",          summary.get("ignored", 0),       "muted"),
+        ("Watched", summary.get("total", 0), "neutral"),
+        ("Fresh", summary.get("fresh", 0), "ok"),
+        ("Stale", summary.get("stale", 0), "neutral"),
+        ("Never synced", summary.get("never", 0), "danger" if summary.get("never") else "neutral"),
+        ("Auto-discovered", summary.get("auto_discovered", 0), "neutral"),
+        ("Ignored", summary.get("ignored", 0), "muted"),
     ]
     items = []
     for label, value, tone in rows:
-        items.append(f'<li><span class="row-label">{_esc(label)}</span><span class="row-value {tone}">{_esc(value)}</span></li>')
+        items.append(
+            f'<li><span class="row-label">{_esc(label)}</span><span class="row-value {tone}">{_esc(value)}</span></li>'
+        )
     return f"""
     <section class="card watched">
       <header class="card-head"><h2>Watched repos</h2></header>
-      <ul class="kv-list">{''.join(items)}</ul>
+      <ul class="kv-list">{"".join(items)}</ul>
       <footer class="card-foot subtle">Last sync activity · {last_html}</footer>
     </section>
     """
@@ -1178,14 +1142,49 @@ def render_index_health(status: dict[str, Any], now: datetime) -> str:
     freshness = status.get("freshness") or {}
     drift_total = sum(int(v) for v in freshness.values() if isinstance(v, int))
     rows = [
-        ("Vault chunks",     (sources.get("vault")    or {}).get("chunks"),                (sources.get("vault")    or {}).get("last_ingested_at"),         "ok"),
-        ("GitHub items",     (sources.get("github")   or {}).get("items"),                 (sources.get("github")   or {}).get("documents_last_fetched_at"), "warn"),
-        ("GitHub docs",      (sources.get("github")   or {}).get("documents"),             (sources.get("github")   or {}).get("documents_last_updated_at"), "warn"),
-        ("Calendar events",  (sources.get("calendar") or {}).get("events"),                (sources.get("calendar") or {}).get("last_fetched_at"),           "info"),
-        ("Sleuth reminders", (sources.get("sleuth")   or {}).get("reminders"),             (sources.get("sleuth")   or {}).get("last_synced_at"),            "info"),
-        ("Email messages",   (sources.get("email")    or {}).get("messages"),              (sources.get("email")    or {}).get("last_synced_at"),            "info"),
-        ("Figma comments",   (sources.get("figma")    or {}).get("comments"),              (sources.get("figma")    or {}).get("last_synced_at"),            "info"),
-        ("Semantic docs",    semantic.get("total_documents"),                              semantic.get("last_embedded_at"),                                  "ok"),
+        (
+            "Vault chunks",
+            (sources.get("vault") or {}).get("chunks"),
+            (sources.get("vault") or {}).get("last_ingested_at"),
+            "ok",
+        ),
+        (
+            "GitHub items",
+            (sources.get("github") or {}).get("items"),
+            (sources.get("github") or {}).get("documents_last_fetched_at"),
+            "warn",
+        ),
+        (
+            "GitHub docs",
+            (sources.get("github") or {}).get("documents"),
+            (sources.get("github") or {}).get("documents_last_updated_at"),
+            "warn",
+        ),
+        (
+            "Calendar events",
+            (sources.get("calendar") or {}).get("events"),
+            (sources.get("calendar") or {}).get("last_fetched_at"),
+            "info",
+        ),
+        (
+            "Sleuth reminders",
+            (sources.get("sleuth") or {}).get("reminders"),
+            (sources.get("sleuth") or {}).get("last_synced_at"),
+            "info",
+        ),
+        (
+            "Email messages",
+            (sources.get("email") or {}).get("messages"),
+            (sources.get("email") or {}).get("last_synced_at"),
+            "info",
+        ),
+        (
+            "Figma comments",
+            (sources.get("figma") or {}).get("comments"),
+            (sources.get("figma") or {}).get("last_synced_at"),
+            "info",
+        ),
+        ("Semantic docs", semantic.get("total_documents"), semantic.get("last_embedded_at"), "ok"),
     ]
     items = []
     for label, count, last, tone in rows:
@@ -1198,7 +1197,7 @@ def render_index_health(status: dict[str, Any], now: datetime) -> str:
         items.append(f"""
         <li>
           <span class="row-label">{_esc(label)}</span>
-          <span class="row-value {tone}">{_esc(count if count is not None else '—')}</span>
+          <span class="row-value {tone}">{_esc(count if count is not None else "—")}</span>
           {ago_html}
         </li>
         """)
@@ -1214,7 +1213,7 @@ def render_index_health(status: dict[str, Any], now: datetime) -> str:
     return f"""
     <section class="card health">
       <header class="card-head"><h2>Index health</h2></header>
-      <ul class="kv-list">{''.join(items)}</ul>
+      <ul class="kv-list">{"".join(items)}</ul>
     </section>
     """
 
@@ -1240,7 +1239,11 @@ def render_recent_emails(
 
     items = []
     for _idx, row in enumerate(rows):
-        sender = _normalize_html_text(row.get("from_name") or "") or _normalize_html_text(row.get("from_address") or "") or "unknown sender"
+        sender = (
+            _normalize_html_text(row.get("from_name") or "")
+            or _normalize_html_text(row.get("from_address") or "")
+            or "unknown sender"
+        )
         subject = _normalize_html_text(row.get("subject") or "") or "(no subject)"
         snippet = _truncate(_normalize_html_text(row.get("snippet") or ""), 180)
         when = format_timestamp(row.get("received_at"), relative=True, tz=tz) or "—"
@@ -1259,13 +1262,15 @@ def render_recent_emails(
 
         subject_html = (
             f'<a class="email-row-link" href="{_esc(gmail_url)}" target="_blank" rel="noopener noreferrer">{_esc(subject)}</a>'
-            if gmail_url else _esc(subject)
+            if gmail_url
+            else _esc(subject)
         )
         reply_html = (
             f'<a class="email-row-open" href="{_esc(gmail_url)}" target="_blank" rel="noopener noreferrer" aria-label="Open email thread in Gmail" title="Open in Gmail">'
             f'<span class="gmail-icon" aria-hidden="true">✉</span>'
-            f'</a>'
-            if gmail_url else ""
+            f"</a>"
+            if gmail_url
+            else ""
         )
 
         items.append(f"""
@@ -1293,7 +1298,7 @@ def render_recent_emails(
         <h2>Recent email</h2>
         <span class="card-head-meta">latest {min(len(rows), limit)} shown · {stored_total} stored</span>
       </header>
-      <ol class="email-list">{''.join(items)}</ol>
+      <ol class="email-list">{"".join(items)}</ol>
     </section>
     """
 
@@ -1310,10 +1315,10 @@ def render_recent_figma(
 ) -> str:
     configured_total = len(configured_keys)
     sync_html = _timestamp_html(last_synced_at, tz=tz, relative=True, fallback="never synced")
-    chips = "".join(
-        f'<span class="figma-key-chip" title="{_esc(key)}">{_esc(key)}</span>'
-        for key in configured_keys
-    ) or '<span class="figma-key-empty">No Figma project IDs configured yet.</span>'
+    chips = (
+        "".join(f'<span class="figma-key-chip" title="{_esc(key)}">{_esc(key)}</span>' for key in configured_keys)
+        or '<span class="figma-key-empty">No Figma project IDs configured yet.</span>'
+    )
 
     form = f"""
       <form id="figma-project-form" class="figma-config-form">
@@ -1331,7 +1336,7 @@ def render_recent_figma(
           <button id="figma-project-submit" class="figma-project-btn" type="submit">Add + sync</button>
         </div>
         <div id="figma-project-status" class="figma-project-status subtle">
-          Tracking {configured_total} project ID{'s' if configured_total != 1 else ''} · last sync {sync_html}
+          Tracking {configured_total} project ID{"s" if configured_total != 1 else ""} · last sync {sync_html}
         </div>
         <div class="figma-key-list">{chips}</div>
       </form>
@@ -1342,7 +1347,7 @@ def render_recent_figma(
     <section class="card figma-comments">
       <header class="card-head">
         <h2>Recent Figma comments</h2>
-        <span class="card-head-meta">{stored_total} stored · {configured_total} project{'s' if configured_total != 1 else ''}</span>
+        <span class="card-head-meta">{stored_total} stored · {configured_total} project{"s" if configured_total != 1 else ""}</span>
       </header>
       <div class="empty">No stored Figma comments yet.</div>
       <footer class="card-foot">{form}</footer>
@@ -1351,14 +1356,19 @@ def render_recent_figma(
 
     sorted_rows = sorted(
         rows,
-        key=lambda row: _parse_iso(row.get("created_at") or row.get("synced_at"))
-        or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda row: (
+            _parse_iso(row.get("created_at") or row.get("synced_at")) or datetime.min.replace(tzinfo=timezone.utc)
+        ),
         reverse=True,
     )
 
     items = []
     for idx, row in enumerate(sorted_rows):
-        author = _normalize_html_text(row.get("user_handle") or "") or _normalize_html_text(row.get("user_id") or "") or "Figma user"
+        author = (
+            _normalize_html_text(row.get("user_handle") or "")
+            or _normalize_html_text(row.get("user_id") or "")
+            or "Figma user"
+        )
         message = _truncate(_normalize_html_text(row.get("message") or ""), 220) or "(empty comment)"
         stamp_value = row.get("created_at") or row.get("synced_at")
         resolved = bool(row.get("resolved_at"))
@@ -1399,7 +1409,7 @@ def render_recent_figma(
         <h2>Recent Figma comments</h2>
         <span class="card-head-meta">latest {min(len(rows), limit)} shown · {stored_total} stored</span>
       </header>
-      <ol class="figma-list rb-data-list">{''.join(items)}</ol>
+      <ol class="figma-list rb-data-list">{"".join(items)}</ol>
       <footer class="card-foot">{form}</footer>
     </section>
     """
@@ -1530,7 +1540,7 @@ def render_calendar_module(
         )
     upcoming_html = (
         f'<div class="cal-upcoming">'
-        f'{_subsection_label("Upcoming", count=len(later[:CAL_UPCOMING_LIMIT]))}'
+        f"{_subsection_label('Upcoming', count=len(later[:CAL_UPCOMING_LIMIT]))}"
         f'<div class="cal-up-list">{"".join(up_rows)}</div></div>'
         if up_rows
         else ""
@@ -1544,9 +1554,9 @@ def render_calendar_module(
         f'<div class="cal-grid" style="height:{grid_height:.0f}px"'
         f' data-cal-start="{CAL_START_HOUR}" data-cal-end="{CAL_END_HOUR}"'
         f' data-cal-hour-px="{CAL_HOUR_PX}">'
-        f'{"".join(hour_rows)}'
+        f"{''.join(hour_rows)}"
         f'<div class="cal-gutter-rule"></div>'
-        f'{"".join(blocks)}{now_html}'
+        f"{''.join(blocks)}{now_html}"
         f"</div>{upcoming_html}</div>"
     )
 
@@ -1590,13 +1600,13 @@ def build_nav_data(
             reminder_count = len(section.get("reminders") or [])
             sleuth_items.append(
                 f'<li class="section-label nav-list-section-label">'
-                f'{_esc(section_label)}'
+                f"{_esc(section_label)}"
                 f'<span class="section-label-count"> · {_esc(reminder_count)}</span>'
-                f'</li>'
+                f"</li>"
             )
             for r in section.get("reminders") or []:
-                label    = r.get("label", "")
-                summary  = _truncate(r.get("summary", ""), 90)
+                label = r.get("label", "")
+                summary = _truncate(r.get("summary", ""), 90)
                 age_days = int(r.get("ageDays") or 0)
                 assignee = r.get("assigneeName", "")
                 permalink = r.get("permalink", "")
@@ -1651,21 +1661,17 @@ def build_nav_data(
     if not sleuth_items:
         if sleuth_synced:
             # Genuinely empty — Sleuth synced and there is nothing pending.
-            sleuth_items.append(
-                '<li class="side-row empty"><div class="side-row-meta">Inbox clear.</div></li>'
-            )
+            sleuth_items.append('<li class="side-row empty"><div class="side-row-meta">Inbox clear.</div></li>')
         else:
             # Sleuth has never synced — do not pass this off as "all clear".
             sleuth_items.append(
-                '<li class="side-row empty">'
-                '<div class="side-row-meta warn">Not configured 🛠️</div>'
-                '</li>'
+                '<li class="side-row empty"><div class="side-row-meta warn">Not configured 🛠️</div></li>'
             )
 
     # Notices — intentional / non-actionable WARNs, demoted off the verdict but
     # kept visible in a scrollable module.
     notice_items = []
-    for c in (notices or []):
+    for c in notices or []:
         detail = _truncate(_compact_whitespace(c.detail), 140)
         hint = _truncate(_compact_whitespace(c.hint), 140) if c.hint else ""
         hint_html = f'<div class="side-row-hint">→ {_esc(hint)}</div>' if hint else ""
@@ -1680,7 +1686,7 @@ def build_nav_data(
     if notice_items:
         notices_section = f"""
         {_subsection_label("Notices", count=len(notice_items), extra_class="nav-section-label")}
-        <ul class="side-list notices-scroll">{''.join(notice_items)}</ul>
+        <ul class="side-list notices-scroll">{"".join(notice_items)}</ul>
         """
 
     return {
@@ -3063,9 +3069,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
     # Sleuth has synced at least once iff sources.sleuth.last_synced_at is set.
     # Lets the sidebar tell a genuinely empty inbox apart from a sync that has
     # never run (e.g. missing Sleuth credentials) — no false "Inbox clear".
-    sleuth_synced = bool(
-        ((status.get("sources") or {}).get("sleuth") or {}).get("last_synced_at")
-    )
+    sleuth_synced = bool(((status.get("sources") or {}).get("sleuth") or {}).get("last_synced_at"))
 
     in_progress = sum(1 for g in goals if not g["done"])
     _sleuth_count = sleuth_total if sleuth_sections else len(sleuth_rows)
@@ -3131,24 +3135,44 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
                 <input id="pulse-filter" class="pulse-filter" type="search" placeholder="Filter visible rows…" autocomplete="off" spellcheck="false">
                 <div id="chat-results" class="chat-results" hidden></div>
               </div>
-              <span class="{system_now_class}" title="{_esc(system_now_title)}">System: {_esc(system_now_str)} <span class="tz-key">{_esc(system_now_tz)} · {_esc(TZ.key)}</span></span>
+              <span class="{system_now_class}" title="{_esc(system_now_title)}">System: {
+        _esc(system_now_str)
+    } <span class="tz-key">{_esc(system_now_tz)} · {_esc(TZ.key)}</span></span>
             </div>
             <div class="topbar-row">
               {render_sync_chip(health_status, last_ingest, now)}
               <a href="{_esc(HEALTH_ISSUES_URL)}" target="_blank" rel="noopener noreferrer"
-                 class="health-pill metric{' has-issues' if health_filed_30d else ''}"
+                 class="health-pill metric{" has-issues" if health_filed_30d else ""}"
                  title="GitHub issues the health reporter auto-filed in the last day — click to view on GitHub">
                 <span class="health-dot"></span>
-                Auto-filed: {health_filed_30d} issue{'s' if health_filed_30d != 1 else ''} (1d)
+                Auto-filed: {health_filed_30d} issue{"s" if health_filed_30d != 1 else ""} (1d)
               </a>
               <button id="pulse-refresh" class="refresh-btn">Refresh</button>
             </div>
           </div>
         </div>
         {render_health_banner(health_status, now, last_ingest)}
-        {render_hero(goals, pulled_from, local_now, obsidian_url, recent_completions, secondary_todos=secondary_todos, apple_reminders=apple_reminders)}
+        {
+        render_hero(
+            goals,
+            pulled_from,
+            local_now,
+            obsidian_url,
+            recent_completions,
+            secondary_todos=secondary_todos,
+            apple_reminders=apple_reminders,
+        )
+    }
         <div class="full-row">
-          {render_work_next(work_next_rows, now, computed_at=work_next_computed_at, blended=work_next_blended, model_used=work_next_model)}
+          {
+        render_work_next(
+            work_next_rows,
+            now,
+            computed_at=work_next_computed_at,
+            blended=work_next_blended,
+            model_used=work_next_model,
+        )
+    }
         </div>
         <div class="grid">
           <div class="col">
@@ -3156,15 +3180,17 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
           </div>
           <div class="col">
             {render_watched(watched, now)}
-            {render_recent_figma(
-                figma_rows,
-                now,
-                tz=TZ,
-                limit=12,
-                stored_total=figma_total,
-                configured_keys=figma_keys,
-                last_synced_at=figma_source.get("last_synced_at"),
-            )}
+            {
+        render_recent_figma(
+            figma_rows,
+            now,
+            tz=TZ,
+            limit=12,
+            stored_total=figma_total,
+            configured_keys=figma_keys,
+            last_synced_at=figma_source.get("last_synced_at"),
+        )
+    }
             {render_repo_pie(repo_pie_rows, days=repo_pie_days, recent_promotion=repo_pie_recent_promotion)}
           </div>
         </div>
@@ -3181,9 +3207,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
           {render_index_health(status, now)}
         </div>
       """
-    head_extra = (
-        '\n  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>'
-    )
+    head_extra = '\n  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>'
     body_extra = f"\n<!-- generated {now.isoformat()} -->\n<script>{PULSE_JS}</script>\n"
     return render_shell(
         "rebalance pulse · Today",

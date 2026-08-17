@@ -305,10 +305,7 @@ def classify(text: str, model: str | None = None, timeout: float = DEFAULT_TIMEO
         {
             "model": model or config.config_value("THREE_EYES_MODEL", MODEL) or MODEL,
             "system": system_instructions,
-            "prompt": (
-                "Classify this supplied finding according to the system instructions. "
-                f"Finding:\n{text[:4000]}"
-            ),
+            "prompt": (f"Classify this supplied finding according to the system instructions. Finding:\n{text[:4000]}"),
             "stream": False,
             "format": "json",
         }

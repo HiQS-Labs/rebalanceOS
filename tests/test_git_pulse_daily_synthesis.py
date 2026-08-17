@@ -113,6 +113,7 @@ def test_synthesize_with_rows(mock_synthesize, mock_get_key):
 
 # --- CLIO block logic ----------------------------------------------------
 
+
 def test_upsert_clio_block_new_file():
     dt = datetime(2026, 7, 9, 18, 30)
     new_content = upsert_clio_block("", "Did some work", dt)
@@ -146,6 +147,7 @@ def test_upsert_clio_block_rerun_same_day_replaces_only_that_day():
 
 
 # --- sync_to_clio ----------------------------------------------------------
+
 
 @patch("rebalance.ingest.config.get_pulse_config")
 def test_sync_to_clio_disabled_is_noop(mock_get_cfg):
@@ -203,6 +205,7 @@ def test_sync_to_clio_dry_run_writes_nothing(mock_get_cfg, tmp_path):
 
 # --- run() decoupling -------------------------------------------------------
 
+
 @patch("utils.git_pulse_daily_synthesis.sync_to_clio")
 @patch("utils.git_pulse_daily_synthesis.synthesize")
 @patch("utils.git_pulse_daily_synthesis.collect_today_activity")
@@ -228,9 +231,7 @@ def test_run_writes_to_clio_when_vault_not_ready(
 @patch("utils.git_pulse_daily_synthesis.collect_today_activity")
 @patch("rebalance.ingest.config.get_pulse_config")
 @patch("utils.git_pulse_daily_synthesis.vault_ready")
-def test_run_skips_entirely_with_no_destination(
-    mock_vault_ready, mock_get_cfg, mock_collect, mock_synthesize
-):
+def test_run_skips_entirely_with_no_destination(mock_vault_ready, mock_get_cfg, mock_collect, mock_synthesize):
     mock_vault_ready.return_value = False
     mock_get_cfg.return_value = {"git_pulse_clio_enabled": False}
 
@@ -244,6 +245,7 @@ def test_run_skips_entirely_with_no_destination(
 # --- no-clobber guard (GH-129 follow-up #3) ----------------------------------
 # A later, transient zero-row rerun on the same day must not overwrite an
 # earlier successful run's real summary with the empty-activity fallback.
+
 
 def test_extract_block_text_present():
     content = f"Prefix\n{MARKER_START}\nBlock body\n{MARKER_END}\nSuffix"
@@ -284,6 +286,7 @@ def test_would_clobber_real_summary_false_when_new_summary_is_real():
 
 
 # --- run(): vault-write no-clobber guard -------------------------------------
+
 
 @patch("utils.git_pulse_daily_synthesis.synthesize")
 @patch("utils.git_pulse_daily_synthesis.collect_today_activity")
@@ -366,6 +369,7 @@ def test_run_rerun_over_existing_fallback_block_still_writes(
 
 
 # --- sync_to_clio(): CLIO-write no-clobber guard -----------------------------
+
 
 @patch("rebalance.ingest.pulse._commit_and_push_if_changed")
 @patch("rebalance.ingest.config.get_pulse_config")

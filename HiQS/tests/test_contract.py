@@ -29,9 +29,7 @@ def _fetched_unit(*, timeout):
 def _sql_writers(module, table: str) -> set[str]:
     tree = ast.parse(inspect.getsource(module))
     writers = set()
-    for function in (
-        node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    ):
+    for function in (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
         for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
             for argument in call.args + [keyword.value for keyword in call.keywords]:
                 if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
@@ -105,9 +103,7 @@ def test_fake_reconciliation_is_limited_to_the_successfully_fetched_unit(tmp_pat
             [("alpha", "obsolete", "Old", "Old body"), ("beta", "keep", "Keep", "Keep body")],
         )
         report = SOURCE.fetch(connection, {"fetch_unit": _fetched_unit, "watermark": {}})
-        rows = connection.execute(
-            "SELECT unit, id FROM fake_source_records ORDER BY unit, id"
-        ).fetchall()
+        rows = connection.execute("SELECT unit, id FROM fake_source_records ORDER BY unit, id").fetchall()
     finally:
         connection.close()
 

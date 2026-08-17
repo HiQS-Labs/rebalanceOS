@@ -89,13 +89,11 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-GIB = 1024 ** 3
+GIB = 1024**3
 
 #: Where lockfiles live. Kept out of the repo so worktrees share one namespace —
 #: two clones of rebalance-OS running the same job must still collide.
-LOCK_DIR = Path(
-    os.environ.get("JOB_GUARD_LOCK_DIR", Path.home() / ".cache" / "rebalance-os" / "locks")
-)
+LOCK_DIR = Path(os.environ.get("JOB_GUARD_LOCK_DIR", Path.home() / ".cache" / "rebalance-os" / "locks"))
 
 #: Fraction of physical RAM a single guarded job may hold before it is aborted.
 #: The project contract specifies <= 8 GB peak phys_footprint per process, and
@@ -141,7 +139,7 @@ ENV_MAX_COMPRESSOR_GB = "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB"
 #: its budget). Conflating the two is GH-195 P6's root cause.
 EXIT_INSTANCE_CONFLICT = 3
 EXIT_CEILING_TRIPPED = 4
-EXIT_REFUSED_TO_START = 75          # EX_TEMPFAIL
+EXIT_REFUSED_TO_START = 75  # EX_TEMPFAIL
 
 #: The codes that mean "did not run; not the job's fault". Supervisors should
 #: leave their failure counters untouched for these.
@@ -179,12 +177,10 @@ def env_max_footprint_gb(warn=None) -> float | None:
             warn(f"ignoring non-numeric {name}={raw!r}")
             continue
         if deprecated:
-            warn(
-                f"{name} is deprecated (the guard measures phys_footprint, not RSS); "
-                f"use {ENV_MAX_FOOTPRINT_GB}"
-            )
+            warn(f"{name} is deprecated (the guard measures phys_footprint, not RSS); use {ENV_MAX_FOOTPRINT_GB}")
         return value
     return None
+
 
 DEFAULT_POLL_SECONDS = 5.0
 DEFAULT_GRACE_SECONDS = 20.0
@@ -225,11 +221,10 @@ class _Evicted(BaseException):
 # Memory probing
 # --------------------------------------------------------------------------- #
 
+
 def _sysctl(name: str) -> str | None:
     try:
-        out = subprocess.run(
-            ["sysctl", "-n", name], capture_output=True, text=True, timeout=5
-        )
+        out = subprocess.run(["sysctl", "-n", name], capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     return out.stdout.strip() if out.returncode == 0 else None
@@ -262,9 +257,7 @@ def available_memory_bytes() -> int:
     """
     if sys.platform == "darwin":
         try:
-            out = subprocess.run(
-                ["vm_stat"], capture_output=True, text=True, timeout=5
-            )
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5)
         except (OSError, subprocess.SubprocessError):
             return 0
         if out.returncode != 0:
@@ -316,7 +309,6 @@ def available_memory_bytes() -> int:
     return 0
 
 
-
 class _RusageInfoV2(ctypes.Structure):
     _fields_ = [
         ("ri_uuid", ctypes.c_uint8 * 16),
@@ -339,6 +331,7 @@ class _RusageInfoV2(ctypes.Structure):
         ("ri_diskio_bytesread", ctypes.c_uint64),
         ("ri_diskio_byteswritten", ctypes.c_uint64),
     ]
+
 
 def compressor_bytes() -> int:
     """Bytes held by the macOS memory compressor. 0 when undeterminable.
@@ -372,9 +365,7 @@ def tree_footprint_bytes(pid: int) -> tuple[int, bool, int]:
     Returns: (total_bytes, is_fallback, unreadable_count)
     """
     try:
-        out = subprocess.run(
-            ["ps", "-eo", "pid=,ppid=,rss="], capture_output=True, text=True, timeout=10
-        )
+        out = subprocess.run(["ps", "-eo", "pid=,ppid=,rss="], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return 0, True, 0
     if out.returncode != 0:
@@ -440,6 +431,7 @@ def _fmt_gb(value: int) -> str:
 # --------------------------------------------------------------------------- #
 # Single-instance lock
 # --------------------------------------------------------------------------- #
+
 
 def _pid_alive(pid: int) -> bool:
     try:
@@ -510,9 +502,7 @@ class SingleInstanceLock:
         pid = self.holder_pid()
         self.release()
         raise InstanceConflict(
-            f"job {self.name!r} is already running"
-            + (f" (pid {pid})" if pid else "")
-            + f"; lock: {self.path}"
+            f"job {self.name!r} is already running" + (f" (pid {pid})" if pid else "") + f"; lock: {self.path}"
         )
 
     def _try_flock(self) -> bool:
@@ -630,6 +620,7 @@ def _terminate_group(pgid: int, grace: float) -> None:
 # Memory ceiling
 # --------------------------------------------------------------------------- #
 
+
 class MemoryCeiling:
     """Background watchdog that aborts a process tree before the machine dies.
 
@@ -662,15 +653,15 @@ class MemoryCeiling:
 
         ceiling = max_footprint_bytes or max_rss_bytes
         self.max_footprint = ceiling or int(total * DEFAULT_MAX_FOOTPRINT_FRACTION) or None
-        self.min_available = min_available_bytes or max(
-            int(total * DEFAULT_MIN_AVAILABLE_FRACTION), MIN_AVAILABLE_FLOOR if total else 0
-        ) or None
+        self.min_available = (
+            min_available_bytes
+            or max(int(total * DEFAULT_MIN_AVAILABLE_FRACTION), MIN_AVAILABLE_FLOOR if total else 0)
+            or None
+        )
         env_comp = os.environ.get(ENV_MAX_COMPRESSOR_GB, "").strip()
         try:
             self.max_compressor = (
-                int(float(env_comp) * GIB)
-                if env_comp
-                else int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
+                int(float(env_comp) * GIB) if env_comp else int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
             )
         except ValueError:
             self.max_compressor = int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
@@ -704,8 +695,7 @@ class MemoryCeiling:
         available = available_memory_bytes()
         if available and available < self.min_available:
             raise MemoryCeilingExceeded(
-                f"refusing to start: only {_fmt_gb(available)} available, "
-                f"floor is {_fmt_gb(self.min_available)}"
+                f"refusing to start: only {_fmt_gb(available)} available, floor is {_fmt_gb(self.min_available)}"
             )
 
     def start(self) -> None:
@@ -763,6 +753,7 @@ class MemoryCeiling:
 # --------------------------------------------------------------------------- #
 # In-process entry point
 # --------------------------------------------------------------------------- #
+
 
 def record_peak_footprint(
     name: str,
@@ -860,6 +851,7 @@ def guard(
 # --------------------------------------------------------------------------- #
 # Wrapper CLI
 # --------------------------------------------------------------------------- #
+
 
 def run_guarded(
     name: str,
@@ -986,33 +978,41 @@ def _reap_child_tree(child: subprocess.Popen, grace: float, log) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="job_guard",
-        description="Run a long-running local job under a single-instance lock "
-                    "and a memory ceiling (GH-172).",
+        description="Run a long-running local job under a single-instance lock and a memory ceiling (GH-172).",
     )
     parser.add_argument("--name", required=True, help="lock identity; same name = same lock")
     parser.add_argument(
-        "--max-footprint-gb", type=float, default=None,
-        help=f"abort above this tree footprint "
-             f"(default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.0%} of RAM)".replace("%", "%%"),
+        "--max-footprint-gb",
+        type=float,
+        default=None,
+        help=f"abort above this tree footprint (default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.0%} of RAM)".replace(
+            "%", "%%"
+        ),
     )
     parser.add_argument(
-        "--max-rss-gb", type=float, default=None,
+        "--max-rss-gb",
+        type=float,
+        default=None,
         help="DEPRECATED alias for --max-footprint-gb",
     )
     parser.add_argument(
-        "--min-available-gb", type=float, default=None,
+        "--min-available-gb",
+        type=float,
+        default=None,
         help=f"abort below this system-available memory "
-             f"(default: max({DEFAULT_MIN_AVAILABLE_FRACTION:.0%} of RAM, 4 GB))"
-             .replace("%", "%%"),
+        f"(default: max({DEFAULT_MIN_AVAILABLE_FRACTION:.0%} of RAM, 4 GB))".replace("%", "%%"),
     )
     parser.add_argument(
-        "--on-conflict", choices=("refuse", "replace"), default="refuse",
+        "--on-conflict",
+        choices=("refuse", "replace"),
+        default="refuse",
         help="what to do when another instance holds the lock (default: refuse)",
     )
     parser.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
     parser.add_argument("--grace-seconds", type=float, default=DEFAULT_GRACE_SECONDS)
     parser.add_argument(
-        "--status", action="store_true",
+        "--status",
+        action="store_true",
         help="report memory and lock state for --name, then exit",
     )
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- command to run")
@@ -1043,7 +1043,8 @@ def main(argv: list[str] | None = None) -> int:
     return run_guarded(
         args.name,
         command,
-        max_footprint_gb=args.max_footprint_gb, max_rss_gb=args.max_rss_gb,
+        max_footprint_gb=args.max_footprint_gb,
+        max_rss_gb=args.max_rss_gb,
         min_available_gb=args.min_available_gb,
         on_conflict=args.on_conflict,
         poll_seconds=args.poll_seconds,

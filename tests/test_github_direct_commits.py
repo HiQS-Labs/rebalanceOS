@@ -71,7 +71,11 @@ class DirectCommitCaptureTests(unittest.TestCase):
             return 404, {}
 
         result = capture_direct_commits(
-            self.db_path, token="unused", events=[_event()], watched_repos=[REPO], api_get=fetch,
+            self.db_path,
+            token="unused",
+            events=[_event()],
+            watched_repos=[REPO],
+            api_get=fetch,
         )
         self.assertEqual(result.events_new, 1)
         self.assertEqual(result.commits_captured, 1)
@@ -80,9 +84,12 @@ class DirectCommitCaptureTests(unittest.TestCase):
             row = conn.execute(
                 "SELECT message, path_coverage FROM github_direct_commits WHERE sha = ?", (SHA,)
             ).fetchone()
-            paths = [r["path"] for r in conn.execute(
-                "SELECT path FROM github_direct_commit_files WHERE sha = ? ORDER BY path", (SHA,)
-            ).fetchall()]
+            paths = [
+                r["path"]
+                for r in conn.execute(
+                    "SELECT path FROM github_direct_commit_files WHERE sha = ? ORDER BY path", (SHA,)
+                ).fetchall()
+            ]
             event = conn.execute("SELECT state FROM github_push_events WHERE event_id = 'push-155'").fetchone()
         self.assertEqual(row["path_coverage"], "complete")
         self.assertIn("CLIO", row["message"])
@@ -91,7 +98,11 @@ class DirectCommitCaptureTests(unittest.TestCase):
 
         calls.clear()
         again = capture_direct_commits(
-            self.db_path, token="unused", events=[_event()], watched_repos=[REPO], api_get=fetch,
+            self.db_path,
+            token="unused",
+            events=[_event()],
+            watched_repos=[REPO],
+            api_get=fetch,
         )
         self.assertEqual(again.events_new, 0)
         self.assertEqual(again.api_calls_used, 0)
@@ -99,8 +110,12 @@ class DirectCommitCaptureTests(unittest.TestCase):
 
     def test_compare_cap_leaves_durable_deferred_receipt(self) -> None:
         result = capture_direct_commits(
-            self.db_path, token="unused", events=[_event()], watched_repos=[REPO],
-            api_get=lambda _url: self.fail("cap must prevent API calls"), compare_cap=0,
+            self.db_path,
+            token="unused",
+            events=[_event()],
+            watched_repos=[REPO],
+            api_get=lambda _url: self.fail("cap must prevent API calls"),
+            compare_cap=0,
         )
         # GH-169 changed this assertion deliberately. It previously read
         # `events_deferred == 1`, which counted a cap deferral as a deferral
@@ -130,11 +145,17 @@ class DirectCommitCaptureTests(unittest.TestCase):
             return 200, commit
 
         capture_direct_commits(
-            self.db_path, token="unused", events=[_event()], watched_repos=[REPO], api_get=fetch,
+            self.db_path,
+            token="unused",
+            events=[_event()],
+            watched_repos=[REPO],
+            api_get=fetch,
         )
         self.assertEqual(sync_direct_commit_documents(self.db_path), 1)
         with db_connection(self.db_path, ensure_github_schema) as conn:
-            gh.upsert_commit(conn, (REPO, "pull_request", 155, SHA, "noelsaw1", "PR version", "2026-07-18T03:06:18Z", "", "now"))
+            gh.upsert_commit(
+                conn, (REPO, "pull_request", 155, SHA, "noelsaw1", "PR version", "2026-07-18T03:06:18Z", "", "now")
+            )
             conn.commit()
         self.assertEqual(sync_direct_commit_documents(self.db_path), 0)
         with db_connection(self.db_path, ensure_github_schema) as conn:
@@ -153,7 +174,11 @@ class DirectCommitCaptureTests(unittest.TestCase):
             return 200, commit
 
         capture_direct_commits(
-            self.db_path, token="unused", events=[_event()], watched_repos=[REPO], api_get=fetch,
+            self.db_path,
+            token="unused",
+            events=[_event()],
+            watched_repos=[REPO],
+            api_get=fetch,
         )
         with db_connection(self.db_path, ensure_github_schema) as conn:
             ensure_schema(conn)
@@ -203,18 +228,18 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
             gh.upsert_direct_commit(
                 conn,
                 (
-                    REPO,                            # repo_full_name
-                    sha,                             # sha
-                    f"push-{sha[:7]}",               # event_id
-                    "refs/heads/main",               # ref
-                    "noelsaw1",                      # author_login
-                    "Noel",                          # author_name
-                    f"direct commit {sha[:7]}",      # message
-                    "2026-07-18T03:06:18Z",          # committed_at
+                    REPO,  # repo_full_name
+                    sha,  # sha
+                    f"push-{sha[:7]}",  # event_id
+                    "refs/heads/main",  # ref
+                    "noelsaw1",  # author_login
+                    "Noel",  # author_name
+                    f"direct commit {sha[:7]}",  # message
+                    "2026-07-18T03:06:18Z",  # committed_at
                     f"https://github.com/{REPO}/commit/{sha}",
-                    "complete",                      # path_coverage
-                    "2026-07-18T03:06:20Z",          # discovered_at
-                    "2026-07-18T03:06:20Z",          # fetched_at
+                    "complete",  # path_coverage
+                    "2026-07-18T03:06:20Z",  # discovered_at
+                    "2026-07-18T03:06:20Z",  # fetched_at
                 ),
             )
             conn.commit()
@@ -233,12 +258,8 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
     def _counts(self) -> tuple[int, int, int]:
         """(documents, vectors, orphaned vectors)."""
         with db_connection(self.db_path, ensure_github_schema) as conn:
-            docs = conn.execute(
-                "SELECT COUNT(*) FROM github_documents WHERE doc_type = 'direct_commit'"
-            ).fetchone()[0]
-            vectors = conn.execute(
-                "SELECT COUNT(*) FROM github_embeddings"
-            ).fetchone()[0]
+            docs = conn.execute("SELECT COUNT(*) FROM github_documents WHERE doc_type = 'direct_commit'").fetchone()[0]
+            vectors = conn.execute("SELECT COUNT(*) FROM github_embeddings").fetchone()[0]
             orphans = conn.execute(
                 """
                 SELECT COUNT(*) FROM github_embeddings e
@@ -253,8 +274,7 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
         with db_connection(self.db_path, ensure_github_schema) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                "SELECT * FROM github_documents WHERE source_key = ?",
-                (f"{REPO}:direct_commit:{sha}",)
+                "SELECT * FROM github_documents WHERE source_key = ?", (f"{REPO}:direct_commit:{sha}",)
             ).fetchone()
             return dict(row) if row else None
 
@@ -293,10 +313,7 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
 
         # Mutate commit message
         with db_connection(self.db_path, ensure_github_schema) as conn:
-            conn.execute(
-                "UPDATE github_direct_commits SET message = 'mutated message' WHERE sha = ?",
-                (SHA,)
-            )
+            conn.execute("UPDATE github_direct_commits SET message = 'mutated message' WHERE sha = ?", (SHA,))
             conn.commit()
 
         self.assertEqual(sync_direct_commit_documents(self.db_path), 1)
@@ -327,8 +344,7 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
         # Make PR-overlapping
         with db_connection(self.db_path, ensure_github_schema) as conn:
             gh.upsert_commit(
-                conn,
-                (REPO, "pull_request", 999, SHA, "noelsaw1", "msg", "2026-07-18T03:06:18Z", "", "now")
+                conn, (REPO, "pull_request", 999, SHA, "noelsaw1", "msg", "2026-07-18T03:06:18Z", "", "now")
             )
             conn.commit()
 

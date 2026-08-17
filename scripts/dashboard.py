@@ -65,6 +65,7 @@ from rebalance.web_components import ITEM_SUB_GLYPHS, KIND_GLYPHS  # noqa: E402
 
 try:
     from rebalance.paths import resolve_database_path as _resolve_db_path
+
     DB_PATH = _resolve_db_path()
 except Exception:
     # Fallback for unusual run contexts where the package isn't importable.
@@ -93,9 +94,9 @@ DARK_PALETTE = {
     "fg_dim": "#928a81",
     "trough": "#23262b",
     "accent": "#e8b86a",  # amber — single signature colour
-    "ok": "#88bd71",      # green — commits / fresh
-    "info": "#75afea",    # blue — PRs / calendar
-    "warn": "#e8b86a",    # amber — issues (alias of accent)
+    "ok": "#88bd71",  # green — commits / fresh
+    "info": "#75afea",  # blue — PRs / calendar
+    "warn": "#e8b86a",  # amber — issues (alias of accent)
     "danger": "#e07171",  # red — never-synced / errors
 }
 
@@ -157,7 +158,7 @@ def _title(label: str) -> Text:
 class RefreshState:
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        self.status = "idle"          # idle | running | ok | error
+        self.status = "idle"  # idle | running | ok | error
         self.last_finished: datetime | None = None
         self.last_started: datetime | None = None
         self.last_error: str = ""
@@ -206,10 +207,7 @@ def _github_scope_result(result: dict[str, Any]) -> dict[str, Any] | None:
 def _summarize_refresh_profile(result: dict[str, Any]) -> dict[str, Any]:
     github = _github_scope_result(result) or {}
     rows = [r for r in github.get("artifact_sync") or [] if isinstance(r, dict)]
-    timed_rows = [
-        r for r in rows
-        if isinstance(r.get("elapsed_seconds"), (int, float))
-    ]
+    timed_rows = [r for r in rows if isinstance(r.get("elapsed_seconds"), (int, float))]
     timed_rows.sort(key=lambda r: float(r["elapsed_seconds"]), reverse=True)
     slowest = timed_rows[0] if timed_rows else None
     return {
@@ -435,8 +433,7 @@ def fetch_recent_auto_promotion(days: int = 7) -> dict[str, Any] | None:
     try:
         with db_connection(DB_PATH) as conn:
             rows = conn.execute(
-                "SELECT name, custom_fields_json FROM project_registry "
-                "WHERE custom_fields_json IS NOT NULL"
+                "SELECT name, custom_fields_json FROM project_registry WHERE custom_fields_json IS NOT NULL"
             ).fetchall()
     except Exception:  # noqa: BLE001 — empty DB before first sync
         return None
@@ -461,11 +458,14 @@ def fetch_recent_auto_promotion(days: int = 7) -> dict[str, Any] | None:
         if promoted_dt < cutoff:
             continue
         if best is None or promoted_dt > best[0]:
-            best = (promoted_dt, {
-                "repo": inference.get("repo_full_name"),
-                "project_name": row["name"],
-                "promoted_at": promoted_at,
-            })
+            best = (
+                promoted_dt,
+                {
+                    "repo": inference.get("repo_full_name"),
+                    "project_name": row["name"],
+                    "promoted_at": promoted_at,
+                },
+            )
     return best[1] if best else None
 
 
@@ -508,14 +508,16 @@ def fetch_org_activity(days: int = 14, limit: int = 100) -> dict[str, list[dict[
     for row in rows:
         repo = row["repo_full_name"]
         org = repo.split("/")[0] if "/" in repo else repo
-        by_org.setdefault(org, []).append({
-            "repo_full_name": repo,
-            "commits": int(row["commits"] or 0),
-            "prs_opened": int(row["prs_opened"] or 0),
-            "prs_merged": int(row["prs_merged"] or 0),
-            "issues_opened": int(row["issues_opened"] or 0),
-            "last_active_at": row["last_active_at"],
-        })
+        by_org.setdefault(org, []).append(
+            {
+                "repo_full_name": repo,
+                "commits": int(row["commits"] or 0),
+                "prs_opened": int(row["prs_opened"] or 0),
+                "prs_merged": int(row["prs_merged"] or 0),
+                "issues_opened": int(row["issues_opened"] or 0),
+                "last_active_at": row["last_active_at"],
+            }
+        )
 
     for org_repos in by_org.values():
         org_repos.sort(key=lambda r: r["last_active_at"] or "", reverse=True)
@@ -620,6 +622,7 @@ def fetch_open_prs(limit: int = 10, stale_days: int = 2) -> list[dict[str, Any]]
     Closed PRs drop off automatically since we filter on state='open'.
     """
     from datetime import datetime  # noqa: PLC0415
+
     try:
         with db_connection(DB_PATH) as conn:
             rows = conn.execute(
@@ -647,21 +650,23 @@ def fetch_open_prs(limit: int = 10, stale_days: int = 2) -> list[dict[str, Any]]
             age_days = (now - dt).days
         except (TypeError, ValueError):
             age_days = 0
-        out.append({
-            "repo_full_name": r[0],
-            "number":         r[1],
-            "title":          r[2],
-            "author_login":   r[3],
-            "created_at":     r[4],
-            "updated_at":     r[5],
-            "is_draft":       bool(r[6]),
-            "review_decision": r[7] or "",
-            "html_url":        r[8] or "",
-            "check_status":    r[9] or "",
-            "age_days":        age_days,
-            "is_stale":        age_days > stale_days,
-            "ci_failing":      (r[9] or "") in ("failing", "mixed"),
-        })
+        out.append(
+            {
+                "repo_full_name": r[0],
+                "number": r[1],
+                "title": r[2],
+                "author_login": r[3],
+                "created_at": r[4],
+                "updated_at": r[5],
+                "is_draft": bool(r[6]),
+                "review_decision": r[7] or "",
+                "html_url": r[8] or "",
+                "check_status": r[9] or "",
+                "age_days": age_days,
+                "is_stale": age_days > stale_days,
+                "ci_failing": (r[9] or "") in ("failing", "mixed"),
+            }
+        )
     return out
 
 
@@ -672,8 +677,7 @@ def fetch_sleuth_due(limit: int = 4) -> list[dict[str, Any]]:
     pulse_config = get_pulse_config()
     slack_user_id = pulse_config.get("slack_user_id")
     ignored_workspaces = [
-        str(w).lower() for w in (pulse_config.get("sleuth_ignored_workspaces") or [])
-        if isinstance(w, str) and w
+        str(w).lower() for w in (pulse_config.get("sleuth_ignored_workspaces") or []) if isinstance(w, str) and w
     ]
     ws_clause = ""
     ws_params: list[Any] = []
@@ -761,9 +765,12 @@ def fetch_sleuth_display_sections() -> tuple[list[dict[str, Any]], int]:
     top_display = data.get("display") or {}
     # sectionOrder is [{key, label}, ...] in the published file
     section_order_raw = top_display.get("sectionOrder") or []
-    section_order = [
-        s["key"] for s in section_order_raw if isinstance(s, dict) and s.get("key")
-    ] or ["dueToday", "dueUpcoming", "dueLastWeek", "dueOlder"]
+    section_order = [s["key"] for s in section_order_raw if isinstance(s, dict) and s.get("key")] or [
+        "dueToday",
+        "dueUpcoming",
+        "dueLastWeek",
+        "dueOlder",
+    ]
 
     reminders_raw = data.get("reminders") or []
     now_utc = time_ops.now_utc()
@@ -783,28 +790,26 @@ def fetch_sleuth_display_sections() -> tuple[list[dict[str, Any]], int]:
             age_days = int(disp.get("ageDays") or 0)
 
         entry = {
-            "label":        disp.get("label", ""),
-            "summary":      disp.get("summary", ""),
+            "label": disp.get("label", ""),
+            "summary": disp.get("summary", ""),
             "assigneeName": disp.get("assigneeName", ""),
-            "permalink":    disp.get("permalink", ""),
+            "permalink": disp.get("permalink", ""),
             "sectionLabel": disp.get("sectionLabel", section_key),
-            "sectionKey":   section_key,
-            "ageDays":      age_days,
+            "sectionKey": section_key,
+            "ageDays": age_days,
             "shouldPostOn": r.get("shouldPostOn"),
         }
 
         if section_key not in sections_by_key:
             sections_by_key[section_key] = {
-                "sectionKey":   section_key,
+                "sectionKey": section_key,
                 "sectionLabel": disp.get("sectionLabel", section_key),
-                "reminders":    [],
+                "reminders": [],
             }
         sections_by_key[section_key]["reminders"].append(entry)
 
     result = [
-        sections_by_key[key]
-        for key in section_order
-        if key in sections_by_key and sections_by_key[key]["reminders"]
+        sections_by_key[key] for key in section_order if key in sections_by_key and sections_by_key[key]["reminders"]
     ]
     total = sum(len(s["reminders"]) for s in result)
     return result, total
@@ -854,13 +859,13 @@ def fetch_recent_figma(limit: int = 12) -> list[dict[str, Any]]:
 
 
 KIND_GLYPH = {
-    "commit":  (KIND_GLYPHS["commit"],  PALETTE["ok"]),
-    "item":    (KIND_GLYPHS["item"],    PALETTE["info"]),
+    "commit": (KIND_GLYPHS["commit"], PALETTE["ok"]),
+    "item": (KIND_GLYPHS["item"], PALETTE["info"]),
     "comment": (KIND_GLYPHS["comment"], PALETTE["fg_muted"]),
 }
 
 ITEM_SUB_GLYPH = {
-    "issue":        (ITEM_SUB_GLYPHS["issue"],        PALETTE["warn"]),
+    "issue": (ITEM_SUB_GLYPHS["issue"], PALETTE["warn"]),
     "pull_request": (ITEM_SUB_GLYPHS["pull_request"], PALETTE["info"]),
 }
 
@@ -1028,11 +1033,7 @@ def render_vault_calendar(
     if cal_rows:
         for c in cal_rows:
             start_dt = _parse_iso(c.get("start_time"))
-            when = (
-                start_dt.astimezone(TZ).strftime("%H:%M")
-                if start_dt is not None
-                else "—"
-            )
+            when = start_dt.astimezone(TZ).strftime("%H:%M") if start_dt is not None else "—"
             summary_txt = _truncate(c.get("summary") or "(no title)", 50)
             cal_table.add_row(
                 Text(when.rjust(6), style=f"bold {PALETTE['accent']}"),
@@ -1146,10 +1147,12 @@ def render_footer(refresh_snapshot: dict[str, Any], now: datetime) -> Panel:
         slowest_seconds = profile.get("slowest_seconds")
         if slowest_repo and isinstance(slowest_seconds, (int, float)):
             repo_short = str(slowest_repo).split("/")[-1]
-            bits.append(Text(
-                f"● github refreshed {_ago(last, now=now)} · slowest {repo_short} {slowest_seconds:.1f}s",
-                style=PALETTE["ok"],
-            ))
+            bits.append(
+                Text(
+                    f"● github refreshed {_ago(last, now=now)} · slowest {repo_short} {slowest_seconds:.1f}s",
+                    style=PALETTE["ok"],
+                )
+            )
         else:
             bits.append(Text(f"● github refreshed {_ago(last, now=now)}", style=PALETTE["ok"]))
     elif status == "error":
@@ -1158,11 +1161,7 @@ def render_footer(refresh_snapshot: dict[str, Any], now: datetime) -> Panel:
     else:
         bits.append(Text("○ idle", style=PALETTE["fg_dim"]))
 
-    auto = (
-        f"auto-refresh every {AUTO_REFRESH_MINUTES}m"
-        if AUTO_REFRESH_MINUTES > 0
-        else "auto-refresh off"
-    )
+    auto = f"auto-refresh every {AUTO_REFRESH_MINUTES}m" if AUTO_REFRESH_MINUTES > 0 else "auto-refresh off"
 
     sep = Text("  ·  ", style=PALETTE["fg_dim"])
 
@@ -1212,8 +1211,13 @@ def render(layout: Layout) -> Layout:
         watched = fetch_watched_summary(now)
     except Exception as exc:
         watched = {
-            "total": 0, "fresh": 0, "stale": 0, "never": 0,
-            "ignored": 0, "auto_discovered": 0, "last_synced": None,
+            "total": 0,
+            "fresh": 0,
+            "stale": 0,
+            "never": 0,
+            "ignored": 0,
+            "auto_discovered": 0,
+            "last_synced": None,
             "_err": f"{type(exc).__name__}: {exc}",
         }
 
@@ -1298,12 +1302,15 @@ def main() -> int:
 
     threading.Thread(target=_auto_refresh_loop, daemon=True).start()
 
-    with CbreakStdin() as kb, Live(
-        render(layout),
-        console=console,
-        refresh_per_second=4,
-        screen=True,
-    ) as live:
+    with (
+        CbreakStdin() as kb,
+        Live(
+            render(layout),
+            console=console,
+            refresh_per_second=4,
+            screen=True,
+        ) as live,
+    ):
         try:
             while True:
                 if _stop_event.wait(TICK_SECONDS):

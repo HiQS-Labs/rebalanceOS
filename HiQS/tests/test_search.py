@@ -279,8 +279,13 @@ def test_a_question_matches_on_its_distinctive_terms_not_all_of_them(memory_db):
     """
     from hiqs.search import _fts_search
 
-    doc = Doc(source="vault", id="d1", title="Architecture decision record storage",
-              body="ADR documents live under docs/adr.", unit="n1.md")
+    doc = Doc(
+        source="vault",
+        id="d1",
+        title="Architecture decision record storage",
+        body="ADR documents live under docs/adr.",
+        unit="n1.md",
+    )
     insert_doc(memory_db, doc)
 
     hits = _fts_search(memory_db, "Where is the earlier generated ADR doc stored?")

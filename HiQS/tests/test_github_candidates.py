@@ -76,7 +76,9 @@ def test_github_candidates_are_attested_and_preserve_activity_time(tmp_path, mon
     assert all(item.source and item.evidence and item.why for item in first)
     assert candidate.owed_by == "owner"
     assert candidate.due == "2026-08-15T00:00:00Z"
-    assert candidate.evidence == "PR #42, assigned to owner, last activity 2026-08-01T09:00:00Z, due 2026-08-15T00:00:00Z"
+    assert (
+        candidate.evidence == "PR #42, assigned to owner, last activity 2026-08-01T09:00:00Z, due 2026-08-15T00:00:00Z"
+    )
 
 
 def test_github_candidates_use_requested_reviewer_and_leave_unknown_obligations_blank(tmp_path, monkeypatch):

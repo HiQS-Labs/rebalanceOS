@@ -50,10 +50,7 @@ def test_health_issue_reporter_has_no_concurrent_enabled_3eyes_owner():
     """#139: the legacy emitters stay superseded, never independently adopted."""
     jobs = _jobs()
     allow = registry.load_commands_allow(include_local=False)
-    enabled_reporters = [
-        job for job in jobs.values()
-        if job.enabled and _runs_health_issue_reporter(job, allow)
-    ]
+    enabled_reporters = [job for job in jobs.values() if job.enabled and _runs_health_issue_reporter(job, allow)]
 
     assert len(enabled_reporters) <= 1
     assert not enabled_reporters

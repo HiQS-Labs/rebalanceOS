@@ -49,10 +49,7 @@ ADOPTED = {
 
 
 def _jobs(*, include_local: bool):
-    return {
-        job.id: job
-        for job in registry.load_jobs(REGISTRY_DIR, include_local=include_local)
-    }
+    return {job.id: job for job in registry.load_jobs(REGISTRY_DIR, include_local=include_local)}
 
 
 def test_wave3_jobs_are_local_only_and_replace_the_live_agents():
@@ -87,8 +84,11 @@ def test_wave3_command_template_has_all_fixed_commands_without_machine_paths():
 
     assert set(ADOPTED) <= set(commands)
     assert "/Users/noelsaw" not in text
-    assert all("/ABSOLUTE/PATH/" in str(spec["exec"]) or spec["exec"] == "/bin/bash"
-               for job_id, spec in commands.items() if job_id in ADOPTED)
+    assert all(
+        "/ABSOLUTE/PATH/" in str(spec["exec"]) or spec["exec"] == "/bin/bash"
+        for job_id, spec in commands.items()
+        if job_id in ADOPTED
+    )
 
     ga = commands["ga-pull-binoid"]
     assert "Documents/GH Repos" in ga["exec"]
@@ -101,9 +101,11 @@ def test_wave3_command_template_has_all_fixed_commands_without_machine_paths():
 
 
 def test_wave3_never_leaks_machine_paths_into_the_committed_registry_or_dashboard():
-    committed = [* (REGISTRY_DIR / "jobs.d").glob("*.toml"),
-                 REGISTRY_DIR / "commands.allow",
-                 REGISTRY_DIR / "commands.local.allow.example"]
+    committed = [
+        *(REGISTRY_DIR / "jobs.d").glob("*.toml"),
+        REGISTRY_DIR / "commands.allow",
+        REGISTRY_DIR / "commands.local.allow.example",
+    ]
     assert all("/Users/noelsaw" not in path.read_text() for path in committed)
 
     rendered = dashboard.render(REGISTRY_DIR)

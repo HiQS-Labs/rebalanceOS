@@ -72,6 +72,7 @@ def logdir(tmp_path, monkeypatch):
 # Rule 1 — a log holds many runs; only the last one is current
 # --------------------------------------------------------------------------- #
 
+
 def test_only_the_LAST_run_in_a_multi_run_log_counts(logdir):
     """`daily_sync_2026-07-19.log` really does hold a degraded run then a complete one.
 
@@ -110,6 +111,7 @@ def test_the_last_outcome_wins_even_with_NO_start_markers(logdir):
 # Rule 2 — terminal-by-elimination, and the ceiling on "still running"
 # --------------------------------------------------------------------------- #
 
+
 def test_a_DEGRADED_banner_counts_as_terminal(logdir):
     """The bug that would have made this whole module useless.
 
@@ -122,13 +124,16 @@ def test_a_DEGRADED_banner_counts_as_terminal(logdir):
     assert observe.parse_sync_log(path)["state"] == "degraded"
 
 
-@pytest.mark.parametrize("banner", [
-    "=== rebalance daily sync complete ===",
-    "=== rebalance daily sync finished with errors (see JSON above) ===",
-    "=== rebalance hourly github sync finished with errors ===",
-    "=== rebalance daily sync degraded; partial errors recorded (see JSON above) ===",
-    "=== rebalance daily sync some-future-outcome-word ===",
-])
+@pytest.mark.parametrize(
+    "banner",
+    [
+        "=== rebalance daily sync complete ===",
+        "=== rebalance daily sync finished with errors (see JSON above) ===",
+        "=== rebalance hourly github sync finished with errors ===",
+        "=== rebalance daily sync degraded; partial errors recorded (see JSON above) ===",
+        "=== rebalance daily sync some-future-outcome-word ===",
+    ],
+)
 def test_every_non_starting_banner_is_terminal(banner):
     """Terminality is decided by elimination, so a NEW outcome word still terminates.
 
@@ -156,8 +161,7 @@ def test_a_STALE_in_flight_run_is_a_dead_run(logdir):
     The run was killed mid-flight during the memory crisis. Without a ceiling it reads
     as "running" forever and a dead nightly sync stays invisible permanently.
     """
-    _write(logdir, "daily_sync_2026-07-26.log", IN_FLIGHT,
-           age_hours=observe.IN_FLIGHT_MAX_HOURS + 2)
+    _write(logdir, "daily_sync_2026-07-26.log", IN_FLIGHT, age_hours=observe.IN_FLIGHT_MAX_HOURS + 2)
     finding = observe.observe(now=datetime.now(timezone.utc))
     assert finding is not None, "a run dead for hours was reported as still running"
     assert "never finished" in finding["title"]
@@ -167,6 +171,7 @@ def test_a_STALE_in_flight_run_is_a_dead_run(logdir):
 # --------------------------------------------------------------------------- #
 # Rule 3 — missing telemetry is UNKNOWN, never healthy
 # --------------------------------------------------------------------------- #
+
 
 def test_no_log_at_all_is_a_warning_not_a_clean_bill(logdir):
     (logdir / "temp" / "logs").mkdir(parents=True, exist_ok=True)
@@ -178,15 +183,17 @@ def test_no_log_at_all_is_a_warning_not_a_clean_bill(logdir):
 
 def test_an_unreadable_log_is_reported(logdir, monkeypatch):
     path = _write(logdir, "daily_sync_2026-07-28.log", COMPLETE)
-    monkeypatch.setattr(Path, "read_text",
-                        lambda self, **k: (_ for _ in ()).throw(OSError("permission denied")))
+    monkeypatch.setattr(Path, "read_text", lambda self, **k: (_ for _ in ()).throw(OSError("permission denied")))
     parsed = observe.parse_sync_log(path)
     assert parsed["state"] == "unreadable"
 
 
 def test_a_finished_run_with_no_outcome_is_reported(logdir):
-    _write(logdir, "daily_sync_2026-07-28.log",
-           "[x] === rebalance daily sync starting ===\n[y] === rebalance daily sync complete ===\n")
+    _write(
+        logdir,
+        "daily_sync_2026-07-28.log",
+        "[x] === rebalance daily sync starting ===\n[y] === rebalance daily sync complete ===\n",
+    )
     finding = observe.observe(now=datetime.now(timezone.utc))
     assert finding is not None and "no outcome" in finding["title"]
 
@@ -194,6 +201,7 @@ def test_a_finished_run_with_no_outcome_is_reported(logdir):
 # --------------------------------------------------------------------------- #
 # Suppression reuse, and "complete" that is not actually clean
 # --------------------------------------------------------------------------- #
+
 
 def test_complete_with_only_KNOWN_errors_stays_silent(logdir):
     """2026-07-25: outcome `complete`, 16 GitHub 403s — all rate-limit noise (#144).
@@ -209,7 +217,7 @@ def test_complete_with_only_KNOWN_errors_stays_silent(logdir):
 
 
 def test_complete_with_an_UNKNOWN_error_is_surfaced(logdir):
-    """"outcome said complete" can lie too — the GH-146 lesson one level up."""
+    """ "outcome said complete" can lie too — the GH-146 lesson one level up."""
     body = COMPLETE.replace(
         '"errors": [],',
         '"errors": [{"error": "ValueError: unexpected column widget_id"}],',
@@ -236,8 +244,7 @@ def test_a_degraded_finding_carries_NO_severity_so_it_gets_classified(logdir):
 def test_a_degraded_finding_reports_how_many_errors_were_suppressed(logdir):
     body = DEGRADED.replace(
         '{"scope": "vault", "error": "database is locked"}',
-        '{"error": "GitHub API request failed: 403 rate limit"}, '
-        '{"error": "ValueError: brand new problem"}',
+        '{"error": "GitHub API request failed: 403 rate limit"}, {"error": "ValueError: brand new problem"}',
     )
     _write(logdir, "daily_sync_2026-07-27.log", body)
     finding = observe.observe(now=datetime.now(timezone.utc))
@@ -256,6 +263,7 @@ def test_database_is_locked_still_reaches_the_operator(logdir):
 # --------------------------------------------------------------------------- #
 # Freshness + the emit contract
 # --------------------------------------------------------------------------- #
+
 
 def test_a_stale_completed_run_is_reported(logdir):
     _write(logdir, "daily_sync_2026-07-20.log", COMPLETE, age_hours=observe.STALE_HOURS + 5)
@@ -288,6 +296,7 @@ def test_a_problem_writes_an_emit_file_main_still_exits_zero(logdir):
 # --------------------------------------------------------------------------- #
 # Defects found by the agy QA relay (2026-07-28)
 # --------------------------------------------------------------------------- #
+
 
 def test_a_LONG_error_is_not_silently_invisible(logdir):
     """QA finding 4: `[^"]{0,200}` does not truncate a long error — it MISSES it.

@@ -38,6 +38,7 @@ def log(msg: str) -> None:
 
 # --- pure block logic -------------------------------------------------------
 
+
 def _fmt_time(t: dt.datetime) -> str:
     return t.strftime("%I:%M %p").lstrip("0")
 
@@ -70,8 +71,10 @@ def render_summary(rows: list[dict], g: dict) -> str:
     lines.append(f"| PR-linked *(informational)* | {g['pr_linked']:.0%} |")
     lines.append("")
     c = g["counts"]
-    lines.append(f"**PR status:** {c['merged']} merged · {c['open']} open · {c['no_pr']} no-PR"
-                 + (f" · {c['pr_lookup_failed']} lookup-failed" if c["pr_lookup_failed"] else ""))
+    lines.append(
+        f"**PR status:** {c['merged']} merged · {c['open']} open · {c['no_pr']} no-PR"
+        + (f" · {c['pr_lookup_failed']} lookup-failed" if c["pr_lookup_failed"] else "")
+    )
     lines.append("")
     lines.append("| Job | Status | PR |")
     lines.append("|---|---|---|")
@@ -106,9 +109,10 @@ def upsert_block(content: str, summary: str, generated_at: dt.datetime) -> str:
 
 # --- run --------------------------------------------------------------------
 
+
 def run(dry_run: bool = False) -> int:
     now = dt.datetime.now()
-    rows = sessions_for_day()          # today, PR-enriched, fail-soft ([] on error)
+    rows = sessions_for_day()  # today, PR-enriched, fail-soft ([] on error)
     g = grade(rows)
     summary = render_summary(rows, g)
     log(f"graded {g['n']} session(s): {g['letter']} ({g['overall']})")

@@ -66,7 +66,8 @@ class SetupStageMapTests(unittest.TestCase):
             for dep in stage.requires:
                 self.assertIn(dep, ids, f"{stage.id} requires unknown stage {dep}")
                 self.assertLess(
-                    order.index(dep), order.index(stage.id),
+                    order.index(dep),
+                    order.index(stage.id),
                     f"{stage.id}: prerequisite {dep} must come earlier in the map",
                 )
 
@@ -85,19 +86,30 @@ class SetupStageMapTests(unittest.TestCase):
 class _EvaluateHarness(unittest.TestCase):
     """Shared sandbox driver for the status machine (mocked config)."""
 
-    def _evaluate(self, *, config=True, vault_ok=True, token=True,
-                  calendar=False, gmail=False, vault_dir=None, db=None,
-                  skipped=()):
+    def _evaluate(
+        self,
+        *,
+        config=True,
+        vault_ok=True,
+        token=True,
+        calendar=False,
+        gmail=False,
+        vault_dir=None,
+        db=None,
+        skipped=(),
+    ):
         vault = vault_dir
-        with patch(f"{CONFIG}.get_config_path") as config_path, \
-             patch(f"{CONFIG}.get_vault_path") as vault_path, \
-             patch(f"{CONFIG}.get_github_token") as gh_token, \
-             patch(f"{CONFIG}.get_calendar_oauth_token_json") as cal_tok, \
-             patch(f"{CONFIG}.get_gmail_oauth_token_json") as gm_tok, \
-             patch(f"{CONFIG}.get_onboarding_skipped_stages") as skip_list, \
-             patch("rebalance.ingest.lifecycle._launch_agents_dir") as agents_dir, \
-             patch("rebalance.ingest.lifecycle._pulse_html_path") as pulse_html, \
-             patch("rebalance.paths.resolve_oauth_token_path") as oauth_path:
+        with (
+            patch(f"{CONFIG}.get_config_path") as config_path,
+            patch(f"{CONFIG}.get_vault_path") as vault_path,
+            patch(f"{CONFIG}.get_github_token") as gh_token,
+            patch(f"{CONFIG}.get_calendar_oauth_token_json") as cal_tok,
+            patch(f"{CONFIG}.get_gmail_oauth_token_json") as gm_tok,
+            patch(f"{CONFIG}.get_onboarding_skipped_stages") as skip_list,
+            patch("rebalance.ingest.lifecycle._launch_agents_dir") as agents_dir,
+            patch("rebalance.ingest.lifecycle._pulse_html_path") as pulse_html,
+            patch("rebalance.paths.resolve_oauth_token_path") as oauth_path,
+        ):
             sandbox = Path(vault or tempfile.gettempdir())
             oauth_path.side_effect = lambda svc: sandbox / f"oauth-{svc}.json"
             agents_dir.return_value = sandbox / "LaunchAgents"
@@ -188,9 +200,7 @@ class ContractV2Tests(_EvaluateHarness):
         # Review finding: a skip marker must never mask unmet prerequisites —
         # clients execute `skipped` stages without re-checking deps.
         with tempfile.TemporaryDirectory() as tmp:
-            report = self._evaluate(
-                config=False, vault_dir=tmp, skipped=["calendar_auth"]
-            )
+            report = self._evaluate(config=False, vault_dir=tmp, skipped=["calendar_auth"])
         self.assertEqual(self._status(report, "calendar_auth"), "blocked")
 
     def test_oauth_file_fallback_counts_as_authenticated(self):
@@ -214,9 +224,7 @@ class ContractV2Tests(_EvaluateHarness):
 
     def test_completing_a_stage_wins_over_stale_skip_marker(self):
         with tempfile.TemporaryDirectory() as tmp:
-            report = self._evaluate(
-                vault_dir=tmp, calendar=True, skipped=["calendar_auth"]
-            )
+            report = self._evaluate(vault_dir=tmp, calendar=True, skipped=["calendar_auth"])
         self.assertEqual(self._status(report, "calendar_auth"), "done")
 
     def test_skip_state_is_persisted_and_reversible(self):
@@ -286,14 +294,10 @@ class WriteSemanticsEnforcementTests(unittest.TestCase):
                 )
                 conn.commit()
 
-            before = sqlite3.connect(db).execute(
-                "SELECT * FROM project_registry"
-            ).fetchall()
+            before = sqlite3.connect(db).execute("SELECT * FROM project_registry").fetchall()
             overlaid = apply_project_priorities(get_projects(db))
             self.assertTrue(overlaid)  # overlay produced output...
-            after = sqlite3.connect(db).execute(
-                "SELECT * FROM project_registry"
-            ).fetchall()
+            after = sqlite3.connect(db).execute("SELECT * FROM project_registry").fetchall()
             self.assertEqual(before, after)  # ...and persisted nothing
 
     def test_project_lifecycle_map_is_runtime_consumable(self):

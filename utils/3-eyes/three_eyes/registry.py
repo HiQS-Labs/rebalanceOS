@@ -133,9 +133,7 @@ def _parse_commands_allow(path: Path, out: dict[str, dict]) -> None:
     commands = data.get("commands", data)  # allow either [commands] table or top-level
     for name, spec in commands.items():
         if not isinstance(spec, dict) or "exec" not in spec:
-            raise RegistryError(
-                f"{path.name}: {name!r} must be a table with an 'exec' key"
-            )
+            raise RegistryError(f"{path.name}: {name!r} must be a table with an 'exec' key")
         out[name] = {
             "exec": str(spec["exec"]),
             "args": list(spec.get("args", [])),
@@ -143,9 +141,7 @@ def _parse_commands_allow(path: Path, out: dict[str, dict]) -> None:
         }
 
 
-def load_commands_allow(
-    registry_dir: Path | None = None, include_local: bool = True
-) -> dict[str, dict]:
+def load_commands_allow(registry_dir: Path | None = None, include_local: bool = True) -> dict[str, dict]:
     """The command allowlist: name → {exec, args, description}.
 
     ``include_local`` also merges the gitignored ``commands.local.allow`` overlay
@@ -273,26 +269,15 @@ def validate(registry_dir: Path | None = None, include_local: bool = True) -> li
                 problems.append(f"{where}: {cp}")
 
         if job.command not in allow:
-            problems.append(
-                f"{where}: command {job.command!r} is not in commands.allow"
-            )
+            problems.append(f"{where}: command {job.command!r} is not in commands.allow")
 
         for route in job.routes:
             if route not in KNOWN_ROUTES:
-                problems.append(
-                    f"{where}: unknown route {route!r} "
-                    f"(known: {', '.join(KNOWN_ROUTES)})"
-                )
+                problems.append(f"{where}: unknown route {route!r} (known: {', '.join(KNOWN_ROUTES)})")
             elif route not in routes_cfg and route != "log-only":
-                problems.append(
-                    f"{where}: route {route!r} not configured in routes.toml"
-                )
+                problems.append(f"{where}: route {route!r} not configured in routes.toml")
 
-        if (
-            job.launchd_interval() is None
-            and not job.launchd_calendar()
-            and not job.cron_expr()
-        ):
+        if job.launchd_interval() is None and not job.launchd_calendar() and not job.cron_expr():
             problems.append(f"{where}: job {job.id!r} has no schedule")
 
     return problems

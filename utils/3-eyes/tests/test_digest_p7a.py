@@ -28,6 +28,7 @@ UTC_NOW = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
 # The fence bug — a latent P5 defect the first live run exposed
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.parametrize(
     "reply",
     [
@@ -51,9 +52,7 @@ def test_model_json_survives_a_markdown_fence(reply):
     assert parsed["summary"] == "vault-sync is failing"
 
 
-@pytest.mark.parametrize(
-    "reply", ["", "   ", "I could not analyse that.", "```\n```", "[1, 2, 3]", None]
-)
+@pytest.mark.parametrize("reply", ["", "   ", "I could not analyse that.", "```\n```", "[1, 2, 3]", None])
 def test_a_genuinely_non_json_reply_is_reported_as_such(reply):
     """The fence fix must not turn "not JSON" into a silent empty dict.
 
@@ -67,11 +66,11 @@ def test_a_genuinely_non_json_reply_is_reported_as_such(reply):
 # Inert-by-default still holds with a new spender in the system
 # --------------------------------------------------------------------------- #
 
+
 def test_digest_makes_no_model_call_when_inert(monkeypatch):
     """Invariant 1 must survive P7a. No runtime.env => no model, ever."""
     called = []
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: called.append(1) or {"summary": "x"})
+    monkeypatch.setattr(classify, "summarize_digest", lambda *a, **k: called.append(1) or {"summary": "x"})
     finding = digest.build(job=None, now=UTC_NOW, force=True)
     assert called == [], "the digest reached the model while 3-Eyes was inert"
     assert finding["model_used"] is False
@@ -87,14 +86,26 @@ def test_a_quiet_fleet_does_not_spend_a_model_call(activate, monkeypatch):
     activate()
     monkeypatch.setenv("THREE_EYES_CLASSIFY_STUB", "1")
     called = []
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: called.append(1) or {"summary": "x"})
-    monkeypatch.setattr(digest, "collect", lambda now=None: {
-        "generated_at": UTC_NOW.isoformat(),
-        "health": {"ok": 24, "failing": 0, "not_loaded": 0, "unknown": 0,
-                   "rows": [], "unclassified": [], "launchctl_available": True},
-        "failing": [], "breakers": {}, "findings": [],
-    })
+    monkeypatch.setattr(classify, "summarize_digest", lambda *a, **k: called.append(1) or {"summary": "x"})
+    monkeypatch.setattr(
+        digest,
+        "collect",
+        lambda now=None: {
+            "generated_at": UTC_NOW.isoformat(),
+            "health": {
+                "ok": 24,
+                "failing": 0,
+                "not_loaded": 0,
+                "unknown": 0,
+                "rows": [],
+                "unclassified": [],
+                "launchctl_available": True,
+            },
+            "failing": [],
+            "breakers": {},
+            "findings": [],
+        },
+    )
 
     finding = digest.build(job=None, now=UTC_NOW)
 
@@ -106,16 +117,35 @@ def test_a_quiet_fleet_does_not_spend_a_model_call(activate, monkeypatch):
 def test_a_noisy_fleet_DOES_spend_a_model_call(activate, monkeypatch):
     """The other side: real breakage must reach the model."""
     activate()
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: {"severity": "error", "summary": "vault-sync down"})
-    monkeypatch.setattr(digest, "collect", lambda now=None: {
-        "generated_at": UTC_NOW.isoformat(),
-        "health": {"ok": 20, "failing": 1, "not_loaded": 0, "unknown": 0,
-                   "rows": [], "unclassified": [], "launchctl_available": True},
-        "failing": [{"label": "com.rebalance-os.vault-sync", "health": "FAIL(exit 1)",
-                     "last_exit": "1", "log_tail": "database is locked"}],
-        "breakers": {}, "findings": [],
-    })
+    monkeypatch.setattr(
+        classify, "summarize_digest", lambda *a, **k: {"severity": "error", "summary": "vault-sync down"}
+    )
+    monkeypatch.setattr(
+        digest,
+        "collect",
+        lambda now=None: {
+            "generated_at": UTC_NOW.isoformat(),
+            "health": {
+                "ok": 20,
+                "failing": 1,
+                "not_loaded": 0,
+                "unknown": 0,
+                "rows": [],
+                "unclassified": [],
+                "launchctl_available": True,
+            },
+            "failing": [
+                {
+                    "label": "com.rebalance-os.vault-sync",
+                    "health": "FAIL(exit 1)",
+                    "last_exit": "1",
+                    "log_tail": "database is locked",
+                }
+            ],
+            "breakers": {},
+            "findings": [],
+        },
+    )
 
     # A real job, so the call is budgeted. Passing job=None here used to work and
     # was precisely the unbudgeted path the agy review flagged.
@@ -127,22 +157,36 @@ def test_a_noisy_fleet_DOES_spend_a_model_call(activate, monkeypatch):
 
 
 def test_an_unreadable_launchctl_is_noisy_not_quiet(activate, monkeypatch):
-    """"We could not look" must never be reported as "nothing is wrong".
+    """ "We could not look" must never be reported as "nothing is wrong".
 
     This is health.py's own hard-won rule (a sandboxed shell makes `launchctl list`
     fail, which once made the whole fleet read as dormant). The digest's quiet-path
     optimisation must not quietly reintroduce it.
     """
     activate()
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: {"severity": "warn", "summary": "cannot see the fleet"})
-    monkeypatch.setattr(digest, "collect", lambda now=None: {
-        "generated_at": UTC_NOW.isoformat(),
-        "health": {"ok": 0, "failing": 0, "not_loaded": 0, "unknown": 31, "rows": [],
-                   "unclassified": [], "launchctl_available": False,
-                   "probe_error": "launchctl list exited 1"},
-        "failing": [], "breakers": {}, "findings": [],
-    })
+    monkeypatch.setattr(
+        classify, "summarize_digest", lambda *a, **k: {"severity": "warn", "summary": "cannot see the fleet"}
+    )
+    monkeypatch.setattr(
+        digest,
+        "collect",
+        lambda now=None: {
+            "generated_at": UTC_NOW.isoformat(),
+            "health": {
+                "ok": 0,
+                "failing": 0,
+                "not_loaded": 0,
+                "unknown": 31,
+                "rows": [],
+                "unclassified": [],
+                "launchctl_available": False,
+                "probe_error": "launchctl list exited 1",
+            },
+            "failing": [],
+            "breakers": {},
+            "findings": [],
+        },
+    )
 
     finding = digest.build(job=registry.load_job("daily-digest"), now=UTC_NOW)
 
@@ -155,6 +199,7 @@ def test_an_unreadable_launchctl_is_noisy_not_quiet(activate, monkeypatch):
 # Budget enforcement
 # --------------------------------------------------------------------------- #
 
+
 def test_the_daily_llm_budget_is_reserved_before_the_call(activate, monkeypatch):
     """Reserve-then-call, not call-then-record.
 
@@ -163,15 +208,28 @@ def test_the_daily_llm_budget_is_reserved_before_the_call(activate, monkeypatch)
     """
     activate()
     calls = []
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: calls.append(1) or {"severity": "warn", "summary": "s"})
-    monkeypatch.setattr(digest, "collect", lambda now=None: {
-        "generated_at": UTC_NOW.isoformat(),
-        "health": {"ok": 1, "failing": 1, "not_loaded": 0, "unknown": 0, "rows": [],
-                   "unclassified": [], "launchctl_available": True},
-        "failing": [{"label": "x", "health": "FAIL(exit 1)", "last_exit": "1"}],
-        "breakers": {}, "findings": [],
-    })
+    monkeypatch.setattr(
+        classify, "summarize_digest", lambda *a, **k: calls.append(1) or {"severity": "warn", "summary": "s"}
+    )
+    monkeypatch.setattr(
+        digest,
+        "collect",
+        lambda now=None: {
+            "generated_at": UTC_NOW.isoformat(),
+            "health": {
+                "ok": 1,
+                "failing": 1,
+                "not_loaded": 0,
+                "unknown": 0,
+                "rows": [],
+                "unclassified": [],
+                "launchctl_available": True,
+            },
+            "failing": [{"label": "x", "health": "FAIL(exit 1)", "last_exit": "1"}],
+            "breakers": {},
+            "findings": [],
+        },
+    )
 
     job = registry.load_job("daily-digest")
     budget = relief.budget_for(job, "llm")
@@ -193,14 +251,17 @@ def test_the_daily_llm_budget_is_reserved_before_the_call(activate, monkeypatch)
 # Corpus assembly
 # --------------------------------------------------------------------------- #
 
+
 def test_findings_outside_the_window_are_excluded(monkeypatch):
     path = config.state_dir() / "findings.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     old = (UTC_NOW - timedelta(hours=48)).isoformat()
     new = (UTC_NOW - timedelta(hours=1)).isoformat()
     path.write_text(
-        json.dumps({"ts": old, "source": "a", "title": "ancient", "severity": "warn"}) + "\n"
-        + json.dumps({"ts": new, "source": "b", "title": "recent", "severity": "warn"}) + "\n"
+        json.dumps({"ts": old, "source": "a", "title": "ancient", "severity": "warn"})
+        + "\n"
+        + json.dumps({"ts": new, "source": "b", "title": "recent", "severity": "warn"})
+        + "\n"
         + "not json at all\n"
     )
     got = digest._recent_findings(UTC_NOW)
@@ -238,8 +299,10 @@ def test_tail_is_bounded(tmp_path, monkeypatch):
 
 def test_a_broken_health_scan_does_not_take_the_digest_down(monkeypatch):
     """The reporter of failures must not itself fail on one."""
+
     def _boom():
         raise RuntimeError("launchctl exploded")
+
     monkeypatch.setattr(digest.health, "scan", _boom)
 
     data = digest.collect(UTC_NOW)
@@ -252,6 +315,7 @@ def test_a_broken_health_scan_does_not_take_the_digest_down(monkeypatch):
 # --------------------------------------------------------------------------- #
 # Registry wiring
 # --------------------------------------------------------------------------- #
+
 
 def test_the_digest_job_is_registered_and_allowlisted():
     job = registry.load_job("daily-digest")
@@ -273,6 +337,7 @@ def test_the_digest_does_NOT_file_a_github_issue():
 # Two defects the first LIVE runs exposed (stubbed runs could not have)
 # --------------------------------------------------------------------------- #
 
+
 def test_every_classifier_entry_point_allows_for_a_COLD_model():
     """The bug that would have made all three Gemma surfaces useless in production.
 
@@ -283,12 +348,11 @@ def test_every_classifier_entry_point_allows_for_a_COLD_model():
     Nothing crashes and nothing logs an error; the classifier just declines forever.
     """
     import inspect
+
     for fn in (classify.classify, classify.explain_failure, classify.summarize_digest):
         default = inspect.signature(fn).parameters["timeout"].default
         assert default == classify.DEFAULT_TIMEOUT_S, f"{fn.__name__} has its own timeout"
-    assert classify.DEFAULT_TIMEOUT_S >= 90, (
-        "the ceiling must exceed the ~70s cold load, or it reads as a broken model"
-    )
+    assert classify.DEFAULT_TIMEOUT_S >= 90, "the ceiling must exceed the ~70s cold load, or it reads as a broken model"
 
 
 def test_explicit_json_nulls_do_not_survive_as_None():
@@ -312,15 +376,28 @@ def test_no_job_context_means_NO_model_call(monkeypatch, activate):
     """
     activate()
     called = []
-    monkeypatch.setattr(classify, "summarize_digest",
-                        lambda *a, **k: called.append(1) or {"severity": "warn", "summary": "s"})
-    monkeypatch.setattr(digest, "collect", lambda now=None: {
-        "generated_at": UTC_NOW.isoformat(),
-        "health": {"ok": 1, "failing": 1, "not_loaded": 0, "unknown": 0, "rows": [],
-                   "unclassified": [], "launchctl_available": True},
-        "failing": [{"label": "x", "health": "FAIL(exit 1)", "last_exit": "1"}],
-        "breakers": {}, "findings": [],
-    })
+    monkeypatch.setattr(
+        classify, "summarize_digest", lambda *a, **k: called.append(1) or {"severity": "warn", "summary": "s"}
+    )
+    monkeypatch.setattr(
+        digest,
+        "collect",
+        lambda now=None: {
+            "generated_at": UTC_NOW.isoformat(),
+            "health": {
+                "ok": 1,
+                "failing": 1,
+                "not_loaded": 0,
+                "unknown": 0,
+                "rows": [],
+                "unclassified": [],
+                "launchctl_available": True,
+            },
+            "failing": [{"label": "x", "health": "FAIL(exit 1)", "last_exit": "1"}],
+            "breakers": {},
+            "findings": [],
+        },
+    )
 
     finding = digest.build(job=None, now=UTC_NOW)
 
@@ -329,11 +406,14 @@ def test_no_job_context_means_NO_model_call(monkeypatch, activate):
     assert "no budget" in finding["summary"]
 
 
-@pytest.mark.parametrize("reply", [
-    '{"severity": "error", "summary": "s"}\nHere is why that matters...',
-    'Thinking...\n{"severity": "error", "summary": "s"}\ntrailing prose',
-    '{"severity": "error", "summary": "s"} {"second": "object"}',
-])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        '{"severity": "error", "summary": "s"}\nHere is why that matters...',
+        'Thinking...\n{"severity": "error", "summary": "s"}\ntrailing prose',
+        '{"severity": "error", "summary": "s"} {"second": "object"}',
+    ],
+)
 def test_valid_json_followed_by_prose_is_not_discarded(reply):
     """QA finding 6: `Extra data` threw away an otherwise perfect answer."""
     parsed = classify._parse_model_json(reply)

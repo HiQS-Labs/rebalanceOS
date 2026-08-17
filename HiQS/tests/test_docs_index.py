@@ -41,11 +41,7 @@ def _sql_writers(table: str) -> set[tuple[str, str]]:
             continue
 
         rel_path = py_file.relative_to(pkg_path.parent).as_posix()
-        for function in (
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ):
+        for function in (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
             for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
                 call_args = call.args + [kw.value for kw in call.keywords]
                 for argument in call_args:
@@ -56,7 +52,6 @@ def _sql_writers(table: str) -> set[tuple[str, str]]:
 
 
 class MockSource:
-
     def __init__(self, name: str, docs_list: list[Doc]):
         self.name = name
         self._docs = docs_list
@@ -77,7 +72,19 @@ def test_docs_has_exactly_one_writer():
 def _insert_github_item(conn, repo: str, item_type: str, number: int, title: str = "Linked item"):
     conn.execute(
         "INSERT INTO github_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (repo, item_type, number, title, "", "open", f"https://github.com/{repo}/issues/{number}", "author", "", "2026-08-03", "2026-08-03"),
+        (
+            repo,
+            item_type,
+            number,
+            title,
+            "",
+            "open",
+            f"https://github.com/{repo}/issues/{number}",
+            "author",
+            "",
+            "2026-08-03",
+            "2026-08-03",
+        ),
     )
 
 
@@ -155,7 +162,14 @@ def test_unchanged_projection_does_not_write_github_reference_edges(tmp_path):
     conn = db_connection(tmp_path / "hiqs.db")
     try:
         _insert_github_item(conn, "acme/widgets", "issue", 123)
-        doc = Doc(source="vault", id="vault:decision", title="Decision", body="See #123", project="acme/widgets", unit="decision.md")
+        doc = Doc(
+            source="vault",
+            id="vault:decision",
+            title="Decision",
+            body="See #123",
+            project="acme/widgets",
+            unit="decision.md",
+        )
         source = MockSource("vault", [doc])
         report = SyncReport(counts={}, units_ok=("decision.md",))
         embedder = MagicMock()
@@ -179,7 +193,14 @@ def test_failed_document_fetch_retains_existing_github_reference_edges(tmp_path)
     conn = db_connection(tmp_path / "hiqs.db")
     try:
         _insert_github_item(conn, "acme/widgets", "issue", 123)
-        doc = Doc(source="vault", id="vault:decision", title="Decision", body="See #123", project="acme/widgets", unit="decision.md")
+        doc = Doc(
+            source="vault",
+            id="vault:decision",
+            title="Decision",
+            body="See #123",
+            project="acme/widgets",
+            unit="decision.md",
+        )
         embedder = MagicMock()
         embedder.encode.return_value = [[0.1] * 3]
         project_docs(
@@ -415,9 +436,7 @@ def test_both_models_resident_and_vectors_coexist(tmp_path):
     project_docs(conn, sources=[source], model_name="Qwen3-Embedding-0.6B", embedder=mock_qwen)
 
     # Both model rows must exist in docs_vec
-    rows = conn.execute(
-        "SELECT model, dim FROM docs_vec WHERE doc_id = ? ORDER BY model", ("mock:1",)
-    ).fetchall()
+    rows = conn.execute("SELECT model, dim FROM docs_vec WHERE doc_id = ? ORDER BY model", ("mock:1",)).fetchall()
     assert len(rows) == 2
     assert rows == [("Qwen3-Embedding-0.6B", 1024), ("all-MiniLM-L6-v2", 384)]
 
@@ -507,11 +526,7 @@ async def async_writer():
     tree = ast.parse(code)
     pattern = re.compile(r"\bINSERT\s+INTO\s+docs\b", re.IGNORECASE)
     writers = set()
-    for function in (
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    ):
+    for function in (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
         for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
             call_args = call.args + [kw.value for kw in call.keywords]
             for argument in call_args:
@@ -609,7 +624,9 @@ def test_within_unit_reconciliation_retains_unfetched_sibling_units_and_vectors(
     mock_embedder.encode.reset_mock()
 
     report_partial_sync = SyncReport(counts={}, units_ok=("one.md",))
-    report_partial = project_docs(conn, sources=[source_partial], embedder=mock_embedder, reports={"vault": report_partial_sync})
+    report_partial = project_docs(
+        conn, sources=[source_partial], embedder=mock_embedder, reports={"vault": report_partial_sync}
+    )
 
     # Pruned must be 1 (vault:one.md:h2 pruned), NOT 2 (vault:two.md:h1 retained)
     assert report_partial.counts["pruned"] == 1
@@ -659,7 +676,6 @@ def test_content_hash_helpers_and_delta_embedding(tmp_path):
 
 
 class MockSourceWithUnits:
-
     def __init__(self, name: str, docs_list: list[Doc], unit_names: list[str]):
         self.name = name
         self._docs = docs_list
@@ -700,7 +716,9 @@ def test_explicit_successful_empty_unit_deletes_docs_and_vectors(tmp_path):
     mock_embedder.encode.reset_mock()
 
     report_empty = SyncReport(counts={}, units_ok=("one.md",))
-    report_sync2 = project_docs(conn, sources=[source_empty_u1], embedder=mock_embedder, reports={"vault": report_empty})
+    report_sync2 = project_docs(
+        conn, sources=[source_empty_u1], embedder=mock_embedder, reports={"vault": report_empty}
+    )
 
     # 2 chunks from "one.md" pruned, 0 from "two.md"
     assert report_sync2.counts["pruned"] == 2
@@ -958,7 +976,7 @@ def test_encoding_is_batched_so_memory_cannot_grow_with_corpus_size():
     texts = [f"chunk {n}" for n in range(150)]
     vectors = _encode_texts(RecordingEmbedder(), texts, batch_size=64)
 
-    assert len(vectors) == 150               # nothing dropped by batching
+    assert len(vectors) == 150  # nothing dropped by batching
     assert seen_batch_sizes == [64, 64, 22]  # bounded, and the remainder is not lost
     assert max(seen_batch_sizes) <= 64
 

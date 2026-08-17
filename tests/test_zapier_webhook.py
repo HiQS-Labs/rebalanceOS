@@ -74,12 +74,15 @@ class ZapierWebhookTests(unittest.TestCase):
         self.assertEqual(resp.json()["error"], "unknown_source")
 
     def test_routes_email_source_to_email_handler(self) -> None:
-        with mock.patch(
-            "rebalance.web.zapier_email.handle_email_event",
-            side_effect=NotImplementedError("email stub"),
-        ) as email_handler, mock.patch(
-            "rebalance.web.zapier_calendar.handle_calendar_event",
-        ) as calendar_handler:
+        with (
+            mock.patch(
+                "rebalance.web.zapier_email.handle_email_event",
+                side_effect=NotImplementedError("email stub"),
+            ) as email_handler,
+            mock.patch(
+                "rebalance.web.zapier_calendar.handle_calendar_event",
+            ) as calendar_handler,
+        ):
             resp = self._client().post(
                 "/api/zapier/ingest",
                 headers=_basic_auth("super-secret"),

@@ -56,8 +56,8 @@ class DoctorCheckTests(unittest.TestCase):
             checks = self._by_name(run_doctor(db))
 
             self.assertEqual(checks["database"].status, OK)
-            self.assertEqual(checks["schema"].status, WARN)       # not stamped
-            self.assertEqual(checks["projects"].status, WARN)     # 0 registered
+            self.assertEqual(checks["schema"].status, WARN)  # not stamped
+            self.assertEqual(checks["projects"].status, WARN)  # 0 registered
             # GH-5 Phase 4 onboarding gate: empty github data is an error only
             # when a token is configured; unconfigured is a clean skip. Both
             # directions pinned in test_doctor_exit_pins.py; here we assert the
@@ -83,9 +83,7 @@ class DoctorCheckTests(unittest.TestCase):
             db = Path(tmp) / "rebalance.db"
             with db_connection(db) as conn:
                 run_migrations(conn)
-                conn.execute(
-                    "INSERT INTO project_registry (name, status) VALUES ('demo', 'active')"
-                )
+                conn.execute("INSERT INTO project_registry (name, status) VALUES ('demo', 'active')")
                 conn.execute(
                     "INSERT INTO github_activity "
                     "(login, repo_full_name, scan_date, scanned_at) "
@@ -170,9 +168,11 @@ class IntegrationCheckTests(unittest.TestCase):
         from rebalance.ingest import config as config_mod
 
         original = paths_mod.resolve_secret_path
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(config_mod, "_keyring_get", return_value=None), \
-             patch.object(config_mod, "_read_config", return_value={}):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(config_mod, "_keyring_get", return_value=None),
+            patch.object(config_mod, "_read_config", return_value={}),
+        ):
             paths_mod.resolve_secret_path = lambda name: Path(tmp) / name
             try:
                 check = _check_sleuth()
@@ -186,9 +186,11 @@ class IntegrationCheckTests(unittest.TestCase):
         from rebalance.ingest import config as config_mod
 
         original = paths_mod.resolve_secret_path
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(config_mod, "_keyring_get", return_value=None), \
-             patch.object(config_mod, "_read_config", return_value={}):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(config_mod, "_keyring_get", return_value=None),
+            patch.object(config_mod, "_read_config", return_value={}),
+        ):
             env = Path(tmp) / "sleuth-web-api-production.env"
             env.write_text("SLEUTH_WEB_API_BASE_URL=https://x\n", encoding="utf-8")
             paths_mod.resolve_secret_path = lambda name: Path(tmp) / name
@@ -203,11 +205,14 @@ class IntegrationCheckTests(unittest.TestCase):
         # Creds in keyring → OK regardless of env files (the new primary path).
         from rebalance.ingest import config as config_mod
         import json
-        blob = json.dumps({
-            "SLEUTH_WEB_API_BASE_URL": "https://x",
-            "SLEUTH_WEB_API_TOKEN": "tok",
-            "SLEUTH_WORKSPACE_NAME": "ws",
-        })
+
+        blob = json.dumps(
+            {
+                "SLEUTH_WEB_API_BASE_URL": "https://x",
+                "SLEUTH_WEB_API_TOKEN": "tok",
+                "SLEUTH_WORKSPACE_NAME": "ws",
+            }
+        )
         with patch.object(config_mod, "_keyring_get", return_value=blob):
             check = _check_sleuth()
         self.assertEqual(check.status, OK)
@@ -221,9 +226,11 @@ class IntegrationCheckTests(unittest.TestCase):
         from rebalance.ingest import secret_store
         import rebalance.paths as paths_mod
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(config_mod, "get_calendar_oauth_token_json", return_value=None), \
-             patch.object(paths_mod, "resolve_oauth_token_path", return_value=Path(tmp) / "legacy-pickle"):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(config_mod, "get_calendar_oauth_token_json", return_value=None),
+            patch.object(paths_mod, "resolve_oauth_token_path", return_value=Path(tmp) / "legacy-pickle"),
+        ):
             secret_store.delete_secret_file("google-calendar-oauth")  # ensure empty
             # keyring empty + secret store empty + no legacy pickle → WARN
             warn_check = _check_calendar()
@@ -240,8 +247,10 @@ class IntegrationCheckTests(unittest.TestCase):
         # Opt-in source with neither token nor file keys → OK, not a nag.
         from rebalance.ingest import config as config_mod
 
-        with patch.object(config_mod, "_get_secret_dual_store", return_value=(None, None)), \
-             patch.object(config_mod, "get_figma_file_keys", return_value=[]):
+        with (
+            patch.object(config_mod, "_get_secret_dual_store", return_value=(None, None)),
+            patch.object(config_mod, "get_figma_file_keys", return_value=[]),
+        ):
             check = _check_figma()
         self.assertEqual(check.status, OK)
         self.assertIn("not configured", check.detail)
@@ -249,8 +258,10 @@ class IntegrationCheckTests(unittest.TestCase):
     def test_figma_token_and_files_reports_source(self) -> None:
         from rebalance.ingest import config as config_mod
 
-        with patch.object(config_mod, "_get_secret_dual_store", return_value=("tok", "keyring")), \
-             patch.object(config_mod, "get_figma_file_keys", return_value=["abc", "def"]):
+        with (
+            patch.object(config_mod, "_get_secret_dual_store", return_value=("tok", "keyring")),
+            patch.object(config_mod, "get_figma_file_keys", return_value=["abc", "def"]),
+        ):
             check = _check_figma()
         self.assertEqual(check.status, OK)
         self.assertIn("keyring", check.detail)
@@ -259,8 +270,10 @@ class IntegrationCheckTests(unittest.TestCase):
     def test_figma_file_keys_without_token_warns(self) -> None:
         from rebalance.ingest import config as config_mod
 
-        with patch.object(config_mod, "_get_secret_dual_store", return_value=(None, None)), \
-             patch.object(config_mod, "get_figma_file_keys", return_value=["abc"]):
+        with (
+            patch.object(config_mod, "_get_secret_dual_store", return_value=(None, None)),
+            patch.object(config_mod, "get_figma_file_keys", return_value=["abc"]),
+        ):
             check = _check_figma()
         self.assertEqual(check.status, WARN)
         self.assertIn("no token", check.detail)
@@ -268,8 +281,10 @@ class IntegrationCheckTests(unittest.TestCase):
     def test_figma_token_without_file_keys_warns(self) -> None:
         from rebalance.ingest import config as config_mod
 
-        with patch.object(config_mod, "_get_secret_dual_store", return_value=("tok", "config")), \
-             patch.object(config_mod, "get_figma_file_keys", return_value=[]):
+        with (
+            patch.object(config_mod, "_get_secret_dual_store", return_value=("tok", "config")),
+            patch.object(config_mod, "get_figma_file_keys", return_value=[]),
+        ):
             check = _check_figma()
         self.assertEqual(check.status, WARN)
         self.assertIn("no file keys", check.detail)
@@ -351,16 +366,18 @@ class PulseCollectorCheckTests(unittest.TestCase):
         # the check only kept passing because it read the age directly.
         last_scan = datetime.now(timezone.utc) - timedelta(hours=age_hours)
         h = CollectorHealth(
-            device_id=name, device_name=name, last_scan_utc=last_scan,
-            repo_scan_failures=failures, scan_failure_examples=examples,
+            device_id=name,
+            device_name=name,
+            last_scan_utc=last_scan,
+            repo_scan_failures=failures,
+            scan_failure_examples=examples,
         )
         h.state, h.age_hours = state, age_hours
         return h
 
     def test_alive_is_ok_degraded_and_alert_warn(self) -> None:
         devices = [
-            self._health("Broken", "DEGRADED", healthy=False, age_hours=0.3,
-                         failures=4, examples="repo-a"),
+            self._health("Broken", "DEGRADED", healthy=False, age_hours=0.3, failures=4, examples="repo-a"),
             self._health("Stale", "ALERT", healthy=False, age_hours=30.0),
             self._health("Fine", "ALIVE", healthy=True, age_hours=1.0),
         ]
@@ -383,9 +400,7 @@ class PulseCollectorCheckTests(unittest.TestCase):
         self.assertEqual(by["fleet:Fine"].status, OK)
 
     def test_empty_when_no_collectors(self) -> None:
-        with patch(
-            "rebalance.ingest.pulse_health.read_collector_health", return_value=[]
-        ):
+        with patch("rebalance.ingest.pulse_health.read_collector_health", return_value=[]):
             self.assertEqual(_check_pulse_collectors(), [])
 
     def test_never_crashes_on_reader_error(self) -> None:

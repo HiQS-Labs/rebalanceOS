@@ -10,13 +10,18 @@ from rebalance.repair import RepairFSM, RepairResult, RepairState, RepairStatus,
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ok() -> RepairResult:
     return RepairResult(ok=True)
+
 
 def _fail(error: str = "transient failure") -> RepairResult:
     return RepairResult(ok=False, error=error)
 
-def _make_fsm(actions: dict, *, preferred: str | None = None, api_key: str | None = None, max_det: int = 2, max_llm: int = 1) -> RepairFSM:
+
+def _make_fsm(
+    actions: dict, *, preferred: str | None = None, api_key: str | None = None, max_det: int = 2, max_llm: int = 1
+) -> RepairFSM:
     # Hermetic: RepairFSM.__init__ does `llm_api_key or get_gemini_api_key()`, so
     # a bare api_key=None would otherwise resolve an AMBIENT machine key (env /
     # key file / gcloud). These are "no network" unit tests — pin the resolver to
@@ -37,6 +42,7 @@ def _make_fsm(actions: dict, *, preferred: str | None = None, api_key: str | Non
 # is_unrecoverable
 # ---------------------------------------------------------------------------
 
+
 class TestIsUnrecoverable(unittest.TestCase):
     def test_auth_failure(self) -> None:
         self.assertTrue(is_unrecoverable("fatal: Authentication failed for 'https://...'"))
@@ -55,6 +61,7 @@ class TestIsUnrecoverable(unittest.TestCase):
 # Deterministic repair
 # ---------------------------------------------------------------------------
 
+
 class TestDeterministicRepair(unittest.TestCase):
     def test_succeeds_first_attempt(self) -> None:
         fsm = _make_fsm({"fix": _ok})
@@ -65,6 +72,7 @@ class TestDeterministicRepair(unittest.TestCase):
 
     def test_succeeds_second_attempt(self) -> None:
         calls = [0]
+
         def flaky() -> RepairResult:
             calls[0] += 1
             return _ok() if calls[0] >= 2 else _fail()
@@ -83,6 +91,7 @@ class TestDeterministicRepair(unittest.TestCase):
 
     def test_unrecoverable_initial_error_skips_immediately(self) -> None:
         called = [False]
+
         def should_not_be_called() -> RepairResult:
             called[0] = True
             return _ok()
@@ -110,6 +119,7 @@ class TestDeterministicRepair(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Haiku escalation
 # ---------------------------------------------------------------------------
+
 
 class TestLLMEscalation(unittest.TestCase):
     def test_llm_called_after_deterministic_exhaustion(self) -> None:
@@ -153,6 +163,7 @@ class TestLLMEscalation(unittest.TestCase):
 
     def test_llm_capped_at_max_attempts(self) -> None:
         calls = [0]
+
         def triage(self_inner, state):  # noqa: ARG001
             calls[0] += 1
             return "fix"
@@ -166,6 +177,7 @@ class TestLLMEscalation(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # RepairState
 # ---------------------------------------------------------------------------
+
 
 class TestRepairState(unittest.TestCase):
     def test_as_dict_shape(self) -> None:

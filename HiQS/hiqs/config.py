@@ -151,9 +151,7 @@ def secret(
     if keyring_value:
         return keyring_value
 
-    file_value = _read_secret_file(
-        secret_file_path() if secret_file is None else Path(secret_file), name
-    )
+    file_value = _read_secret_file(secret_file_path() if secret_file is None else Path(secret_file), name)
     if file_value:
         return file_value
 

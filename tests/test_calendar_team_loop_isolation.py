@@ -41,10 +41,12 @@ def _config(team: list[TeamCalendarEntry]) -> CalendarConfig:
 
 class TestTeamCalendarLoopIsolation(unittest.TestCase):
     def test_one_failing_team_calendar_does_not_abort(self) -> None:
-        cfg = _config([
-            TeamCalendarEntry("matthew", "matthew@group.calendar.google.com"),
-            TeamCalendarEntry("jose", "jose@group.calendar.google.com"),
-        ])
+        cfg = _config(
+            [
+                TeamCalendarEntry("matthew", "matthew@group.calendar.google.com"),
+                TeamCalendarEntry("jose", "jose@group.calendar.google.com"),
+            ]
+        )
 
         def fake_sync(database_path, *, calendar_id, person=None, days_back, days_forward):
             if person is None:
@@ -53,8 +55,10 @@ class TestTeamCalendarLoopIsolation(unittest.TestCase):
                 raise RuntimeError("HttpError 403: calendar inaccessible")
             return _ok_result()  # a later teammate still gets synced
 
-        with patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg), \
-             patch("rebalance.ingest.calendar.sync_calendar", side_effect=fake_sync):
+        with (
+            patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg),
+            patch("rebalance.ingest.calendar.sync_calendar", side_effect=fake_sync),
+        ):
             # Must NOT raise.
             result = _refresh_calendar(Path("/tmp/unused.db"), since_days=30, dry_run=False)
 
@@ -76,8 +80,10 @@ class TestTeamCalendarLoopIsolation(unittest.TestCase):
     def test_all_team_calendars_succeed_unchanged(self) -> None:
         cfg = _config([TeamCalendarEntry("matthew", "matthew@group.calendar.google.com")])
 
-        with patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg), \
-             patch("rebalance.ingest.calendar.sync_calendar", return_value=_ok_result()):
+        with (
+            patch("rebalance.ingest.calendar_config.CalendarConfig.load", return_value=cfg),
+            patch("rebalance.ingest.calendar.sync_calendar", return_value=_ok_result()),
+        ):
             result = _refresh_calendar(Path("/tmp/unused.db"), since_days=30, dry_run=False)
 
         team = {t["person"]: t for t in result["team_calendars"]}

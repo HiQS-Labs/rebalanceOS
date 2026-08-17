@@ -55,13 +55,20 @@ def test_github_fetch_idempotence_activity_time_and_watermark(tmp_path, monkeypa
     monkeypatch.setattr(github.hiqs_config, "secret", lambda _name: None)
     monkeypatch.setattr(github, "log_event", lambda *_args: None)
     payloads = {
-        "/users/operator/events": [{"repo": {"name": "org/repo"}, "created_at": "2026-08-01T08:00:00Z", "type": "PushEvent"}],
+        "/users/operator/events": [
+            {"repo": {"name": "org/repo"}, "created_at": "2026-08-01T08:00:00Z", "type": "PushEvent"}
+        ],
         "/repos/org/repo/issues?": [_item()],
-        "/repos/org/repo/issues/events?": [{"event": "commented", "created_at": "2026-08-01T09:00:00Z", "issue": {"number": 7}}],
+        "/repos/org/repo/issues/events?": [
+            {"event": "commented", "created_at": "2026-08-01T09:00:00Z", "issue": {"number": 7}}
+        ],
     }
     monkeypatch.setattr(github, "urlopen", _stubbed_urlopen(payloads))
     watermark = {}
-    config = {"github": {"login": "operator", "repos": ["org/repo"], "api_url": "https://example.test"}, "watermark": watermark}
+    config = {
+        "github": {"login": "operator", "repos": ["org/repo"], "api_url": "https://example.test"},
+        "watermark": watermark,
+    }
     try:
         first = github.SOURCE.fetch(conn, config)
         second = github.SOURCE.fetch(conn, config)
@@ -99,7 +106,10 @@ def test_github_failure_continues_logs_error_and_keeps_watermark(tmp_path, monke
     monkeypatch.setattr(github, "urlopen", fake_urlopen)
     watermark = {"github": "old"}
     try:
-        report = github.SOURCE.fetch(conn, {"github": {"repos": ["org/bad", "org/good"], "api_url": "https://example.test"}, "watermark": watermark})
+        report = github.SOURCE.fetch(
+            conn,
+            {"github": {"repos": ["org/bad", "org/good"], "api_url": "https://example.test"}, "watermark": watermark},
+        )
         assert report.errors == ["GitHub item request failed"]
         assert report.units_ok == ("org/good",)
         assert watermark == {"github": "old"}

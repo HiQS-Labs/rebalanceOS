@@ -6,6 +6,7 @@ Pins:
 - chat.py delegates to semantic_index, not re-defining its own scope map
 - legacy facade docstrings carry the FACADE marker
 """
+
 from __future__ import annotations
 
 import inspect
@@ -17,6 +18,7 @@ class NormalizeSourcesContractTests(unittest.TestCase):
 
     def setUp(self) -> None:
         from rebalance.ingest.semantic_index import normalize_sources, WORK_SOURCES
+
         self.normalize = normalize_sources
         self.work_sources = WORK_SOURCES
 
@@ -60,6 +62,7 @@ class WorkSourcesAndScopeContractTests(unittest.TestCase):
 
     def setUp(self) -> None:
         from rebalance.ingest.semantic_index import WORK_SOURCES, scope_to_sources
+
         self.WORK_SOURCES = WORK_SOURCES
         self.scope_to_sources = scope_to_sources
 
@@ -97,27 +100,32 @@ class ChatDelegationContractTests(unittest.TestCase):
     def test_chat_imports_work_sources_from_semantic_index(self) -> None:
         import rebalance.chat as chat
         import rebalance.ingest.semantic_index as si
+
         self.assertIs(chat.WORK_SOURCES, si.WORK_SOURCES)
 
     def test_chat_scope_fn_is_semantic_index_scope_fn(self) -> None:
         import rebalance.chat as chat
         import rebalance.ingest.semantic_index as si
+
         # chat._semantic_sources_for_scope must be scope_to_sources from semantic_index
         self.assertIs(chat._semantic_sources_for_scope, si.scope_to_sources)
 
     def test_chat_scope_work_matches_semantic_index(self) -> None:
         from rebalance.chat import _semantic_sources_for_scope
         from rebalance.ingest.semantic_index import scope_to_sources
+
         self.assertEqual(_semantic_sources_for_scope("work"), scope_to_sources("work"))
 
     def test_chat_scope_code_matches_semantic_index(self) -> None:
         from rebalance.chat import _semantic_sources_for_scope
         from rebalance.ingest.semantic_index import scope_to_sources
+
         self.assertEqual(_semantic_sources_for_scope("code"), scope_to_sources("code"))
 
     def test_chat_scope_all_matches_semantic_index(self) -> None:
         from rebalance.chat import _semantic_sources_for_scope
         from rebalance.ingest.semantic_index import scope_to_sources
+
         self.assertEqual(_semantic_sources_for_scope("all"), scope_to_sources("all"))
 
 
@@ -130,14 +138,17 @@ class LegacyFacadeMarkerTests(unittest.TestCase):
 
     def _get_register_locals(self) -> dict:
         import rebalance.mcp.tools.retrieval as mod
+
         src = inspect.getsource(mod)
         return src
+
 
 class CliNormalizationDelegationTests(unittest.TestCase):
     """CLI source normalizer must delegate validation to normalize_sources()."""
 
     def setUp(self) -> None:
         from rebalance.cli.semantic import _normalize_semantic_sources_option
+
         self.normalize_cli = _normalize_semantic_sources_option
 
     def test_valid_source_accepted(self) -> None:
@@ -146,6 +157,7 @@ class CliNormalizationDelegationTests(unittest.TestCase):
 
     def test_invalid_source_raises_bad_parameter(self) -> None:
         import typer
+
         with self.assertRaises(typer.BadParameter):
             self.normalize_cli(["totally_bogus_source"])
 

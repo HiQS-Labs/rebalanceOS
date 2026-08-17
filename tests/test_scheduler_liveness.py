@@ -13,10 +13,7 @@ from rebalance.doctor import WARN, _check_launchd, _check_scheduler_liveness
 
 
 def _write_policy(directory: Path, jobs: list[str]) -> Path:
-    rows = "\n".join(
-        f"| `{job}` | hourly | `scripts/{job}.sh` | work | — | output |"
-        for job in jobs
-    )
+    rows = "\n".join(f"| `{job}` | hourly | `scripts/{job}.sh` | work | — | output |" for job in jobs)
     policy = directory / "SCHEDULER.md"
     policy.write_text(
         "\n".join(

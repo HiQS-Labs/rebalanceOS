@@ -277,11 +277,7 @@ def _chunk_markdown_content(content: str, rel_path: str) -> list[Doc]:
         heading_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:12]
 
         chunk_id = f"vault:{rel_path}:{heading_hash}"
-        doc_title = (
-            file_title
-            if (heading is None or heading == file_title)
-            else f"{file_title} - {heading}"
-        )
+        doc_title = file_title if (heading is None or heading == file_title) else f"{file_title} - {heading}"
 
         result.append(
             Doc(
@@ -344,4 +340,3 @@ SOURCE = Source(
     fetch=fetch,
     docs=docs,
 )
-

@@ -64,29 +64,35 @@ def _make_store(path: Path, *, with_optional: bool = True) -> None:
         )
         rows = [
             # parent task, due-dated, tagged in title
-            (1, "Buy milk #grocery", "CK-1", "skim only", None, 0, _CD_2026, None,
-             _CD_2026, _CD_2026, 1, None, None, 10, 0),
+            (
+                1,
+                "Buy milk #grocery",
+                "CK-1",
+                "skim only",
+                None,
+                0,
+                _CD_2026,
+                None,
+                _CD_2026,
+                _CD_2026,
+                1,
+                None,
+                None,
+                10,
+                0,
+            ),
             # subtask -> parent via local Z_PK
-            (2, "2% backup", "CK-2", None, None, 0, None, None,
-             _CD_2026, _CD_2026, 1, 1, None, 20, 0),
+            (2, "2% backup", "CK-2", None, None, 0, None, None, _CD_2026, _CD_2026, 1, 1, None, 20, 0),
             # completed
-            (3, "Eggs", "CK-3", None, None, 1, None, _CD_2026,
-             _CD_2026, _CD_2026, 1, None, None, 30, 0),
+            (3, "Eggs", "CK-3", None, None, 1, None, _CD_2026, _CD_2026, _CD_2026, 1, None, None, 30, 0),
             # marked for deletion -> must be skipped
-            (4, "ghost", "CK-4", None, None, 0, None, None,
-             _CD_2026, _CD_2026, 1, None, None, 40, 1),
+            (4, "ghost", "CK-4", None, None, 0, None, None, _CD_2026, _CD_2026, 1, None, None, 40, 1),
             # missing stable id -> must be skipped
-            (5, "no-ckid", None, None, None, 0, None, None,
-             _CD_2026, _CD_2026, 1, None, None, 50, 0),
+            (5, "no-ckid", None, None, None, 0, None, None, _CD_2026, _CD_2026, 1, None, None, 50, 0),
         ]
-        conn.executemany(
-            "INSERT INTO ZREMCDREMINDER VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows
-        )
+        conn.executemany("INSERT INTO ZREMCDREMINDER VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     else:
-        conn.execute(
-            "CREATE TABLE ZREMCDREMINDER (Z_PK INTEGER PRIMARY KEY, "
-            "ZTITLE TEXT, ZCKIDENTIFIER TEXT)"
-        )
+        conn.execute("CREATE TABLE ZREMCDREMINDER (Z_PK INTEGER PRIMARY KEY, ZTITLE TEXT, ZCKIDENTIFIER TEXT)")
         conn.executemany(
             "INSERT INTO ZREMCDREMINDER (Z_PK, ZTITLE, ZCKIDENTIFIER) VALUES (?,?,?)",
             [(1, "Minimal", "CK-1"), (2, "Another", "CK-2")],
@@ -194,13 +200,22 @@ class ExtractRemindersTests(unittest.TestCase):
         self.assertEqual(pick_active_store([empty, active]), active)
 
 
-def _reminder(rid, title, *, list_name="Reminders", completed=False, parent=None,
-              tags=(), due=None):
+def _reminder(rid, title, *, list_name="Reminders", completed=False, parent=None, tags=(), due=None):
     return AppleReminder(
-        reminder_id=rid, title=title, notes=None, is_completed=completed,
-        due_at=due, completed_at=None, list_name=list_name, section_name=None,
-        tags=tuple(tags), parent_reminder_id=parent, sort_hint=None,
-        created_at=None, updated_at=None, raw_payload={"z_pk": 1},
+        reminder_id=rid,
+        title=title,
+        notes=None,
+        is_completed=completed,
+        due_at=due,
+        completed_at=None,
+        list_name=list_name,
+        section_name=None,
+        tags=tuple(tags),
+        parent_reminder_id=parent,
+        sort_hint=None,
+        created_at=None,
+        updated_at=None,
+        raw_payload={"z_pk": 1},
     )
 
 
@@ -218,8 +233,7 @@ class SyncStorageTests(unittest.TestCase):
         conn = sqlite3.connect(self.db)
         conn.row_factory = sqlite3.Row
         try:
-            return {r["reminder_id"]: r for r in
-                    conn.execute("SELECT * FROM apple_reminders")}
+            return {r["reminder_id"]: r for r in conn.execute("SELECT * FROM apple_reminders")}
         finally:
             conn.close()
 
@@ -245,17 +259,13 @@ class SyncStorageTests(unittest.TestCase):
 
     def test_updated_row_is_detected(self):
         upsert_apple_reminders(self.db, [_reminder("A", "Buy milk")], list_name="Reminders")
-        counts = upsert_apple_reminders(
-            self.db, [_reminder("A", "Buy oat milk")], list_name="Reminders"
-        )
+        counts = upsert_apple_reminders(self.db, [_reminder("A", "Buy oat milk")], list_name="Reminders")
         self.assertEqual(counts["updated"], 1)
         self.assertEqual(self._rows()["A"]["title"], "Buy oat milk")
 
     def test_completed_row_updates_flag(self):
         upsert_apple_reminders(self.db, [_reminder("A", "Buy milk")], list_name="Reminders")
-        counts = upsert_apple_reminders(
-            self.db, [_reminder("A", "Buy milk", completed=True)], list_name="Reminders"
-        )
+        counts = upsert_apple_reminders(self.db, [_reminder("A", "Buy milk", completed=True)], list_name="Reminders")
         self.assertEqual(counts["updated"], 1)
         row = self._rows()["A"]
         self.assertEqual(row["is_completed"], 1)
@@ -263,7 +273,8 @@ class SyncStorageTests(unittest.TestCase):
 
     def test_disappeared_row_is_retired_not_deleted(self):
         upsert_apple_reminders(
-            self.db, [_reminder("A", "Buy milk"), _reminder("B", "Call bank")],
+            self.db,
+            [_reminder("A", "Buy milk"), _reminder("B", "Call bank")],
             list_name="Reminders",
         )
         counts = upsert_apple_reminders(self.db, [_reminder("A", "Buy milk")], list_name="Reminders")
@@ -405,7 +416,9 @@ class HardeningTests(unittest.TestCase):
 
     def test_health_ok_after_clean_sync(self):
         upsert_apple_reminders(
-            self.db, [_reminder("A", "x")], list_name="Reminders",
+            self.db,
+            [_reminder("A", "x")],
+            list_name="Reminders",
             meta={
                 "last_sync_at": "2026-06-27T00:00:00+00:00",
                 "schema_fingerprint": '{"macos": "15.7.5"}',
@@ -414,12 +427,13 @@ class HardeningTests(unittest.TestCase):
         )
         health = apple_reminders_health(self.db)
         self.assertEqual(health["status"], "ok")
-        self.assertEqual(get_apple_reminders_meta(self.db)["schema_fingerprint"],
-                         {"macos": "15.7.5"})
+        self.assertEqual(get_apple_reminders_meta(self.db)["schema_fingerprint"], {"macos": "15.7.5"})
 
     def test_health_drift_reports_missing_symbols(self):
         upsert_apple_reminders(
-            self.db, [_reminder("A", "x")], list_name="Reminders",
+            self.db,
+            [_reminder("A", "x")],
+            list_name="Reminders",
             meta={
                 "last_sync_at": "2026-06-27T00:00:00+00:00",
                 "drift_fallbacks": '["missing_optional_column:ZDUEDATE"]',

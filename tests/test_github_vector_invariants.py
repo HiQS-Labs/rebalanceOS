@@ -35,7 +35,7 @@ class VectorInvariantsTests(unittest.TestCase):
     def test_hand_inserted_vector_fails_orphan_check(self):
         with db_connection(self.db_path) as conn:
             # 1. Insert an orphaned vector into github_embeddings
-            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0]*1024)))
+            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
             conn.commit()
 
         checks = _check_orphaned_vectors(self.db_path)
@@ -48,12 +48,19 @@ class VectorInvariantsTests(unittest.TestCase):
         with db_connection(self.db_path) as conn:
             # Insert a doc and its vector
             doc_id = gh.insert_github_document(
-                conn, repo_full_name="Org/repo", source_type="issue", source_number=1,
-                doc_type="item_body", source_key="Org/repo:i:1", title="t",
-                body="x", content_hash="hash", updated_at="2026-05-20",
+                conn,
+                repo_full_name="Org/repo",
+                source_type="issue",
+                source_number=1,
+                doc_type="item_body",
+                source_key="Org/repo:i:1",
+                title="t",
+                body="x",
+                content_hash="hash",
+                updated_at="2026-05-20",
                 fetched_at="2026-05-20",
             )
-            gh.upsert_github_embedding(conn, doc_id, struct.pack("1024f", *([0.0]*1024)))
+            gh.upsert_github_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
 
             # Now delete the document
             conn.execute("DELETE FROM github_documents WHERE id = ?", (doc_id,))
@@ -69,9 +76,16 @@ class VectorInvariantsTests(unittest.TestCase):
         with db_connection(self.db_path) as conn:
             # Insert a long doc to trigger the backlog
             gh.insert_github_document(
-                conn, repo_full_name="Org/repo", source_type="issue", source_number=1,
-                doc_type="item_body", source_key="Org/repo:i:1", title="t",
-                body="x" * 60, content_hash="hash", updated_at="2026-05-20",
+                conn,
+                repo_full_name="Org/repo",
+                source_type="issue",
+                source_number=1,
+                doc_type="item_body",
+                source_key="Org/repo:i:1",
+                title="t",
+                body="x" * 60,
+                content_hash="hash",
+                updated_at="2026-05-20",
                 fetched_at="2026-05-20",
             )
             conn.commit()
@@ -86,11 +100,19 @@ class VectorInvariantsTests(unittest.TestCase):
         with db_connection(self.db_path) as conn:
             # Insert a doc and its vector
             doc_id = sem.insert_semantic_document(
-                conn, source_type="vault", source_table="chunks", source_pk="c1",
-                doc_kind="chunk", title="t", body="x", content_hash="hash",
-                metadata_json="{}", created_at="2026-05-20", updated_at="2026-05-20"
+                conn,
+                source_type="vault",
+                source_table="chunks",
+                source_pk="c1",
+                doc_kind="chunk",
+                title="t",
+                body="x",
+                content_hash="hash",
+                metadata_json="{}",
+                created_at="2026-05-20",
+                updated_at="2026-05-20",
             )
-            sem.insert_semantic_embedding(conn, doc_id, struct.pack("1024f", *([0.0]*1024)))
+            sem.insert_semantic_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
             # Delete the doc
             conn.execute("DELETE FROM semantic_documents WHERE id = ?", (doc_id,))
             conn.commit()
@@ -103,7 +125,7 @@ class VectorInvariantsTests(unittest.TestCase):
 
     def test_semantic_hand_inserted_fails_orphan_check(self):
         with db_connection(self.db_path) as conn:
-            sem.insert_semantic_embedding(conn, 999, struct.pack("1024f", *([0.0]*1024)))
+            sem.insert_semantic_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
             conn.commit()
 
         checks = _check_orphaned_vectors(self.db_path)
@@ -114,7 +136,7 @@ class VectorInvariantsTests(unittest.TestCase):
 
     def test_database_bloat_reports_nonzero_size(self):
         with db_connection(self.db_path) as conn:
-            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0]*1024)))
+            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
             conn.commit()
             size = gh.table_byte_size(conn, "github_embeddings")
             self.assertGreater(size, 0)
@@ -134,6 +156,7 @@ class VectorInvariantsTests(unittest.TestCase):
 
         check = _check_embedding_backlog(self.db_path)
         self.assertEqual(check.status, OK)
+
 
 if __name__ == "__main__":
     unittest.main()

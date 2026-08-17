@@ -30,6 +30,7 @@ def _error_scopes(result: dict) -> set[str]:
 # Smoke tests — dry_run, no DB or network needed
 # ---------------------------------------------------------------------------
 
+
 class CollectorSmokeTests(unittest.TestCase):
     """Dry-run smoke test per raw source: correct scope, expected steps, no side-effects."""
 
@@ -82,6 +83,7 @@ class CollectorSmokeTests(unittest.TestCase):
 # Auth / config failure tests — structured errors, not exceptions
 # ---------------------------------------------------------------------------
 
+
 class CollectorAuthConfigFailureTests(unittest.TestCase):
     """Missing credentials / API errors produce structured error envelopes, not uncaught exceptions."""
 
@@ -95,9 +97,7 @@ class CollectorAuthConfigFailureTests(unittest.TestCase):
 
     def test_vault_missing_path_appears_in_error_envelope(self):
         with patch("rebalance.ingest.index_ops.get_vault_path", return_value=""):
-            result = refresh_index(
-                self.db, scope=["vault"], vault_path="", update_dashboard_note=False
-            )
+            result = refresh_index(self.db, scope=["vault"], vault_path="", update_dashboard_note=False)
         self.assertIn("vault", _error_scopes(result), "vault error missing from errors list")
         result_scopes = {r.get("scope") for r in result.get("results", [])}
         self.assertNotIn("vault", result_scopes, "vault must not appear in results on missing path")
@@ -128,6 +128,7 @@ class CollectorAuthConfigFailureTests(unittest.TestCase):
         # GmailAuthError is caught inside _refresh_email and returned as a result
         # dict with an "error" key — it must not propagate as an exception.
         from rebalance.ingest.gmail import GmailAuthError
+
         with (
             patch("rebalance.ingest.config.get_gmail_ingest_method", return_value="oauth"),
             patch("rebalance.ingest.gmail.sync_gmail", side_effect=GmailAuthError("no token")),
@@ -140,6 +141,7 @@ class CollectorAuthConfigFailureTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Idempotency tests — repeated refreshes with unchanged input do not drift
 # ---------------------------------------------------------------------------
+
 
 class CollectorIdempotencyTests(unittest.TestCase):
     """Repeated refreshes prove that unchanged inputs produce stable counts with no duplicate writes."""
@@ -157,12 +159,8 @@ class CollectorIdempotencyTests(unittest.TestCase):
         vault.mkdir()
         (vault / "note.md").write_text("# Hello\nThis is a test note.")
 
-        fake_embed_r1 = SimpleNamespace(
-            total_chunks=1, embedded_chunks=1, skipped_unchanged=0, elapsed_seconds=0.01
-        )
-        fake_embed_r2 = SimpleNamespace(
-            total_chunks=1, embedded_chunks=0, skipped_unchanged=1, elapsed_seconds=0.01
-        )
+        fake_embed_r1 = SimpleNamespace(total_chunks=1, embedded_chunks=1, skipped_unchanged=0, elapsed_seconds=0.01)
+        fake_embed_r2 = SimpleNamespace(total_chunks=1, embedded_chunks=0, skipped_unchanged=1, elapsed_seconds=0.01)
         with (
             patch("rebalance.ingest.index_ops.get_vault_path", return_value=str(vault)),
             patch("rebalance.ingest.embedder.embed_chunks") as mock_embed,

@@ -28,8 +28,8 @@ def test_migrate_moves_github_token_out_of_config(seams):
     assert results["github_token"] == "migrated → secret store"
     assert secret_store.read_secret_file("github_token") == "ghp_legacy"
     cfg = config_module._read_config()
-    assert "github_token" not in cfg     # secret lifted out
-    assert cfg["vault_path"] == "/x"     # non-secret keys untouched
+    assert "github_token" not in cfg  # secret lifted out
+    assert cfg["vault_path"] == "/x"  # non-secret keys untouched
 
 
 def test_migrate_handles_sleuth_dict(seams):
@@ -86,6 +86,7 @@ def test_doctor_ok_when_config_clean(seams):
 # The plan's headline availability risk: migration must NEVER delete a secret
 # from rbos.config unless the out-of-repo store provably retained it. Otherwise
 # a failed store write would lock launchd out of the only credential it can read.
+
 
 def test_migrate_keeps_config_when_store_write_raises(seams, monkeypatch):
     config_module._write_config({"github_token": "ghp_legacy"})

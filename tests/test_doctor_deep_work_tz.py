@@ -74,9 +74,7 @@ class DeepWorkStallTimezoneTests(unittest.TestCase):
                     "today_date": "2026-07-18",
                     "yesterday_date": "2026-07-17",
                     "yesterday_rows": ["commit abc123"],
-                    "open_items": [
-                        {"item_type": "pull_request", "number": 42, "title": "Finish work"}
-                    ],
+                    "open_items": [{"item_type": "pull_request", "number": 42, "title": "Finish work"}],
                 },
             }
         }

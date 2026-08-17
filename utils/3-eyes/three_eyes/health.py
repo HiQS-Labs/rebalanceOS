@@ -44,7 +44,7 @@ def _launchctl_list() -> dict[str, tuple[str, str]]:
         why = detail[0][:160] if detail else "no output (a sandboxed shell blocks launchctl)"
         raise LaunchctlUnavailable(f"launchctl list exited {proc.returncode}: {why}")
     out: dict[str, tuple[str, str]] = {}
-    for line in proc.stdout.splitlines()[1:]:            # skip PID/Status/Label header
+    for line in proc.stdout.splitlines()[1:]:  # skip PID/Status/Label header
         parts = line.split("\t")
         if len(parts) >= 3:
             out[parts[2].strip()] = (parts[0].strip(), parts[1].strip())
@@ -72,13 +72,13 @@ def scan() -> dict:
         loaded = label in listed
         running = bool(pid) and pid.isdigit()
         if not available:
-            health = "unknown"                  # could not look — say so, do not guess
+            health = "unknown"  # could not look — say so, do not guess
             unknown += 1
         elif not loaded:
             health = "not-loaded"
             not_loaded += 1
         elif running:
-            health = "ok"                       # live PID; `status` is the prior instance's
+            health = "ok"  # live PID; `status` is the prior instance's
             ok += 1
         elif status in ("0", "-", ""):
             health = "ok"
@@ -86,11 +86,16 @@ def scan() -> dict:
         else:
             health = f"FAIL(exit {status})"
             failing += 1
-        row = {"label": label, "system": note.get("system"), "status_note": note.get("status"),
-               "loaded": loaded if available else None,
-               "pid": pid or "-",
-               "running": running if available else None,
-               "last_exit": status or "-", "health": health}
+        row = {
+            "label": label,
+            "system": note.get("system"),
+            "status_note": note.get("status"),
+            "loaded": loaded if available else None,
+            "pid": pid or "-",
+            "running": running if available else None,
+            "last_exit": status or "-",
+            "health": health,
+        }
         if note.get("status") == "managed":
             job_id = label.rsplit(".", 1)[-1]
             bst = breaker.status(job_id)
@@ -99,9 +104,14 @@ def scan() -> dict:
 
     drift = catalog.drift(notes)
     return {
-        "ok": ok, "failing": failing, "not_loaded": not_loaded, "unknown": unknown,
-        "launchctl_available": available, "probe_error": probe_error,
-        "unclassified": drift["new"], "removed": drift["removed"],
+        "ok": ok,
+        "failing": failing,
+        "not_loaded": not_loaded,
+        "unknown": unknown,
+        "launchctl_available": available,
+        "probe_error": probe_error,
+        "unclassified": drift["new"],
+        "removed": drift["removed"],
         "rows": rows,
     }
 
@@ -109,11 +119,13 @@ def scan() -> dict:
 def format_report(report: dict | None = None) -> str:
     r = report or scan()
     if not r.get("launchctl_available", True):
-        return "\n".join([
-            f"Fleet health: UNKNOWN — {r.get('unknown', 0)} jobs could not be read.",
-            f"  launchctl could not be consulted: {r.get('probe_error', 'unavailable')}",
-            "  This is NOT a clean bill of health. Re-run outside a sandboxed shell.",
-        ])
+        return "\n".join(
+            [
+                f"Fleet health: UNKNOWN — {r.get('unknown', 0)} jobs could not be read.",
+                f"  launchctl could not be consulted: {r.get('probe_error', 'unavailable')}",
+                "  This is NOT a clean bill of health. Re-run outside a sandboxed shell.",
+            ]
+        )
     lines = [
         f"Fleet health: {r['ok']} ok · {r['failing']} FAILING · {r['not_loaded']} not-loaded"
         + (f" · {len(r['unclassified'])} unclassified" if r["unclassified"] else ""),

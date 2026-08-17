@@ -15,6 +15,7 @@ sqlite-vec's own documentation examples, and a draft written against them cannot
 run here at all. Equally, a ``vec0`` virtual table does NOT expose a bare
 ``rowid`` column, so every predicate below keys on ``doc_id``.
 """
+
 import argparse
 import os
 import sqlite3
@@ -25,9 +26,7 @@ VEC_TABLE = "github_embeddings"
 DOC_TABLE = "github_documents"
 
 #: The real database. Not repo-relative — it lives in Application Support.
-PROD_DB = (
-    Path.home() / "Library" / "Application Support" / "rebalance-os" / "rebalance.db"
-)
+PROD_DB = Path.home() / "Library" / "Application Support" / "rebalance-os" / "rebalance.db"
 
 ORPHAN_PREDICATE = f"""
     NOT EXISTS (SELECT 1 FROM {DOC_TABLE} d WHERE d.id = {VEC_TABLE}.doc_id)
@@ -56,9 +55,7 @@ def load_vec_extension(conn: sqlite3.Connection) -> None:
 def get_metrics(conn: sqlite3.Connection, db_path: str) -> dict:
     cur = conn.cursor()
     total = cur.execute(f"SELECT count(*) FROM {VEC_TABLE}").fetchone()[0]
-    orphans = cur.execute(
-        f"SELECT count(*) FROM {VEC_TABLE} WHERE {ORPHAN_PREDICATE}"
-    ).fetchone()[0]
+    orphans = cur.execute(f"SELECT count(*) FROM {VEC_TABLE} WHERE {ORPHAN_PREDICATE}").fetchone()[0]
     live = total - orphans
     freelist = cur.execute("PRAGMA freelist_count").fetchone()[0]
     size = Path(db_path).stat().st_size if Path(db_path).exists() else 0
@@ -136,8 +133,7 @@ def main() -> None:
         is_prod = db_path == PROD_DB
     if is_prod and not args.i_know_this_is_production:
         print(
-            f"ERROR: {db_path} is the production database. Refusing without "
-            "--i-know-this-is-production.",
+            f"ERROR: {db_path} is the production database. Refusing without --i-know-this-is-production.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -191,13 +187,8 @@ def main() -> None:
 
         total_deleted += changes
         cp = checkpoint(cur, f"after batch {batch_num}")
-        remaining = cur.execute(
-            f"SELECT count(*) FROM {VEC_TABLE} WHERE {ORPHAN_PREDICATE}"
-        ).fetchone()[0]
-        print(
-            f"Batch {batch_num}: deleted {changes}, remaining {remaining}, "
-            f"checkpoint {cp}"
-        )
+        remaining = cur.execute(f"SELECT count(*) FROM {VEC_TABLE} WHERE {ORPHAN_PREDICATE}").fetchone()[0]
+        print(f"Batch {batch_num}: deleted {changes}, remaining {remaining}, checkpoint {cp}")
 
         if os.environ.get("_CRASH_AFTER_BATCH") == str(batch_num):
             print("CRASHING FOR TEST", file=sys.stderr)

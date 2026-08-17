@@ -55,9 +55,7 @@ def load_manifest(path: Path) -> list[dict[str, Any]]:
                 if not isinstance(value, list):
                     raise ValueError(f"{path} entry #{index} field '{field}' must be a list")
                 if not all(isinstance(item, str) and item for item in value):
-                    raise ValueError(
-                        f"{path} entry #{index} field '{field}' must contain only non-empty strings"
-                    )
+                    raise ValueError(f"{path} entry #{index} field '{field}' must contain only non-empty strings")
         entries.append(entry)
 
     return entries

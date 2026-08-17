@@ -108,9 +108,7 @@ def refresh(
         # that raised has no units_ok, and absent attestation must never authorise pruning
         # (§5 rule 2). Passing it through would be the GH-169 RC5 scar re-armed.
         fetched = [s for s in sources if s.name in reports]
-        projection = project_docs(
-            connection, sources=fetched, reports=reports, embedder=embedder
-        )
+        projection = project_docs(connection, sources=fetched, reports=reports, embedder=embedder)
         log_event(
             "projection.completed",
             "core",
@@ -123,9 +121,7 @@ def refresh(
         # failed and `refresh` still printed errors:{} and exited 0 — indistinguishable
         # from success to a scheduled job, which is the failure mode this project exists to
         # kill. Report-level errors are surfaced and counted the same as an exception.
-        source_errors = {
-            name: list(report.errors) for name, report in reports.items() if report.errors
-        }
+        source_errors = {name: list(report.errors) for name, report in reports.items() if report.errors}
 
         summary = {
             "sources": {name: report.counts for name, report in reports.items()},
@@ -162,9 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # and exited 0 is indistinguishable from success to a scheduled job (L6, L19).
         # source_errors counts here too: a source that reported failures without raising
         # is still a failed walk.
-        failed = (
-            summary["errors"] or summary["source_errors"] or summary["unknown_sources"]
-        )
+        failed = summary["errors"] or summary["source_errors"] or summary["unknown_sources"]
         return 1 if failed else 0
 
     if arguments.command == "search":

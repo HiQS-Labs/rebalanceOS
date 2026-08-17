@@ -23,9 +23,7 @@ from rebalance.ingest.embedder import _vec_to_bytes
 # so the PR-summary updated_at must stay inside the since_days window. Computed
 # relative to now so the fixture never ages out — a hardcoded April-2026 date
 # previously drifted past a 30-day cutoff and silently zeroed prs_synced.
-_RECENT_ISO = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
-    "%Y-%m-%dT%H:%M:%SZ"
-)
+_RECENT_ISO = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _fake_github_api(url: str) -> object:
@@ -307,8 +305,7 @@ class GitHubKnowledgeTests(unittest.TestCase):
                     FROM github_branches
                     WHERE repo_full_name = ?
                     ORDER BY name
-                    """
-                    ,
+                    """,
                     ("AcmeOrg/sample-child-theme-oct-2024",),
                 ).fetchall()
                 self.assertEqual(len(branch_rows), 2)
@@ -317,7 +314,9 @@ class GitHubKnowledgeTests(unittest.TestCase):
                 self.assertEqual(branch_rows[0]["is_protected"], 1)
                 self.assertEqual(branch_rows[1]["name"], "main")
 
-                item_rows = conn.execute("SELECT item_type, number, review_decision, check_status FROM github_items ORDER BY item_type, number").fetchall()
+                item_rows = conn.execute(
+                    "SELECT item_type, number, review_decision, check_status FROM github_items ORDER BY item_type, number"
+                ).fetchall()
                 self.assertEqual(len(item_rows), 2)
                 self.assertEqual(item_rows[1]["item_type"], "pull_request")
                 self.assertEqual(item_rows[1]["review_decision"], "APPROVED")
@@ -520,6 +519,7 @@ class GitHubKnowledgeTests(unittest.TestCase):
             self.assertGreater(embed_result.embedded_docs, 0)
 
             from rebalance.ingest.semantic_index import query as semantic_query
+
             results = semantic_query(
                 database_path=db_path,
                 query_text="Which PR handles nonce security for checkout?",
@@ -527,7 +527,7 @@ class GitHubKnowledgeTests(unittest.TestCase):
                 top_k=3,
                 model_name="fake-model",
                 embed_texts=_fake_embed_texts,
-                source_filter=["github"]
+                source_filter=["github"],
             )
             self.assertGreaterEqual(len(results), 1)
             self.assertEqual(results[0]["metadata"]["repo_full_name"], "AcmeOrg/sample-child-theme-oct-2024")

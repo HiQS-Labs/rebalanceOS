@@ -91,64 +91,71 @@ class WriteOrchestratorTests(unittest.TestCase):
 
     def test_create_to_foreign_list_is_rejected(self):
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name="Groceries",
-                     fields={"title": "milk"})],
+            [WriteOp(op="create", client_token="c1", list_name="Groceries", fields={"title": "milk"})],
             mode="apply",
         )
         with self.assertRaises(AppleRemindersWriteScopeError):
-            apply_reminder_writes(self.db, req, list_name=LIST,
-                                  invoker=lambda r: {}, reconcile_fn=lambda: None)
+            apply_reminder_writes(self.db, req, list_name=LIST, invoker=lambda r: {}, reconcile_fn=lambda: None)
 
     def test_create_to_configured_list_is_allowed(self):
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-1")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "milk"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "milk"})],
             mode="apply",
         )
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=lambda: None)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         self.assertTrue(res.ok)
         self.assertEqual(inv.calls, 1)
 
     def test_complete_and_delete_are_not_scope_checked(self):
-        inv = _Recorder(lambda r: _resp(r, results=[
-            {"op": "complete", "reminder_id": "RID-9", "status": "ok",
-             "readback_ok": True, "detail": ""}]))
-        req = build_request([WriteOp(op="complete", reminder_id="RID-9")],
-                            mode="apply")
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=lambda: None)
+        inv = _Recorder(
+            lambda r: _resp(
+                r,
+                results=[{"op": "complete", "reminder_id": "RID-9", "status": "ok", "readback_ok": True, "detail": ""}],
+            )
+        )
+        req = build_request([WriteOp(op="complete", reminder_id="RID-9")], mode="apply")
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         self.assertTrue(res.ok)
 
     # --- confirmation ---------------------------------------------------------
 
     def test_apply_delete_without_confirm_raises(self):
-        req = build_request([WriteOp(op="delete", reminder_id="RID-2")],
-                            mode="apply", confirm_destructive=False)
+        req = build_request([WriteOp(op="delete", reminder_id="RID-2")], mode="apply", confirm_destructive=False)
         with self.assertRaises(AppleRemindersConfirmationError):
-            apply_reminder_writes(self.db, req, list_name=LIST,
-                                  invoker=lambda r: {}, reconcile_fn=lambda: None)
+            apply_reminder_writes(self.db, req, list_name=LIST, invoker=lambda r: {}, reconcile_fn=lambda: None)
 
     def test_apply_delete_with_confirm_proceeds(self):
-        inv = _Recorder(lambda r: _resp(r, results=[
-            {"op": "delete", "reminder_id": "RID-2", "status": "ok",
-             "readback_ok": True, "detail": "deleted"}]))
-        req = build_request([WriteOp(op="delete", reminder_id="RID-2")],
-                            mode="apply", confirm_destructive=True)
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=lambda: None)
+        inv = _Recorder(
+            lambda r: _resp(
+                r,
+                results=[
+                    {"op": "delete", "reminder_id": "RID-2", "status": "ok", "readback_ok": True, "detail": "deleted"}
+                ],
+            )
+        )
+        req = build_request([WriteOp(op="delete", reminder_id="RID-2")], mode="apply", confirm_destructive=True)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         self.assertTrue(res.ok)
         self.assertEqual(inv.calls, 1)
 
     def test_plan_delete_does_not_require_confirm(self):
-        inv = _Recorder(lambda r: _resp(r, results=[
-            {"op": "delete", "reminder_id": "RID-2", "status": "ok",
-             "readback_ok": False, "detail": "would delete"}]))
-        req = build_request([WriteOp(op="delete", reminder_id="RID-2")],
-                            mode="plan")
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=lambda: None)
+        inv = _Recorder(
+            lambda r: _resp(
+                r,
+                results=[
+                    {
+                        "op": "delete",
+                        "reminder_id": "RID-2",
+                        "status": "ok",
+                        "readback_ok": False,
+                        "detail": "would delete",
+                    }
+                ],
+            )
+        )
+        req = build_request([WriteOp(op="delete", reminder_id="RID-2")], mode="plan")
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         self.assertEqual(res.state, STATE_SKIPPED)
 
     # --- plan vs apply / reconcile -------------------------------------------
@@ -161,12 +168,10 @@ class WriteOrchestratorTests(unittest.TestCase):
 
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-3")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="plan",
         )
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=recon)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=recon)
         self.assertEqual(res.state, STATE_SKIPPED)
         self.assertFalse(res.reconciled)
         self.assertEqual(reconciled["n"], 0)
@@ -179,12 +184,10 @@ class WriteOrchestratorTests(unittest.TestCase):
 
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-4")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=recon)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=recon)
         self.assertTrue(res.reconciled)
         self.assertEqual(res.state, STATE_RECONCILED)
         self.assertEqual(reconciled["n"], 1)
@@ -195,12 +198,10 @@ class WriteOrchestratorTests(unittest.TestCase):
 
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-5")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
-        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                    reconcile_fn=recon)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=recon)
         # The write itself succeeded; reconcile is best-effort.
         self.assertTrue(res.ok)
         self.assertFalse(res.reconciled)
@@ -211,45 +212,50 @@ class WriteOrchestratorTests(unittest.TestCase):
     def test_replay_of_applied_request_does_not_reinvoke(self):
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-6")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
-        first = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                                      reconcile_fn=lambda: None)
+        first = apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         self.assertEqual(inv.calls, 1)
 
         # Replay the SAME request_id with an invoker that would explode if called.
         def explode(r):
             raise AssertionError("helper must not be re-invoked on replay")
 
-        second = apply_reminder_writes(self.db, req, list_name=LIST,
-                                       invoker=explode, reconcile_fn=lambda: None)
+        second = apply_reminder_writes(self.db, req, list_name=LIST, invoker=explode, reconcile_fn=lambda: None)
         self.assertEqual(inv.calls, 1)  # unchanged
         self.assertEqual(second.request_id, first.request_id)
         self.assertEqual(second.results[0].reminder_id, "RID-6")
 
     def test_failed_request_is_retryable(self):
         # A request that applied nothing (auth denied) is NOT cached as done.
-        denied = _Recorder(lambda r: _resp(
-            r, auth="denied",
-            results=[{"op": "create", "client_token": "c1", "reminder_id": None,
-                      "status": "error", "readback_ok": False,
-                      "detail": "not authorized"}]))
+        denied = _Recorder(
+            lambda r: _resp(
+                r,
+                auth="denied",
+                results=[
+                    {
+                        "op": "create",
+                        "client_token": "c1",
+                        "reminder_id": None,
+                        "status": "error",
+                        "readback_ok": False,
+                        "detail": "not authorized",
+                    }
+                ],
+            )
+        )
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
-        res1 = apply_reminder_writes(self.db, req, list_name=LIST, invoker=denied,
-                                     reconcile_fn=lambda: None)
+        res1 = apply_reminder_writes(self.db, req, list_name=LIST, invoker=denied, reconcile_fn=lambda: None)
         self.assertFalse(res1.ok)
         self.assertEqual(res1.state, STATE_FAILED)
 
         # Retry with the same id now succeeds and DOES re-invoke (not cached).
         ok = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-7")]))
-        res2 = apply_reminder_writes(self.db, req, list_name=LIST, invoker=ok,
-                                     reconcile_fn=lambda: None)
+        res2 = apply_reminder_writes(self.db, req, list_name=LIST, invoker=ok, reconcile_fn=lambda: None)
         self.assertEqual(ok.calls, 1)
         self.assertTrue(res2.ok)
 
@@ -262,23 +268,28 @@ class WriteOrchestratorTests(unittest.TestCase):
             reconciled["n"] += 1
 
         def response(r):
-            return _resp(r, results=[
-                _ok_create("c1", "RID-8"),
-                {"op": "update", "reminder_id": "RID-MISSING", "status": "error",
-                 "readback_ok": False, "detail": "no such reminder"},
-            ])
+            return _resp(
+                r,
+                results=[
+                    _ok_create("c1", "RID-8"),
+                    {
+                        "op": "update",
+                        "reminder_id": "RID-MISSING",
+                        "status": "error",
+                        "readback_ok": False,
+                        "detail": "no such reminder",
+                    },
+                ],
+            )
 
         req = build_request(
             [
-                WriteOp(op="create", client_token="c1", list_name=LIST,
-                        fields={"title": "x"}),
-                WriteOp(op="update", reminder_id="RID-MISSING",
-                        fields={"title": "y"}),
+                WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"}),
+                WriteOp(op="update", reminder_id="RID-MISSING", fields={"title": "y"}),
             ],
             mode="apply",
         )
-        res = apply_reminder_writes(self.db, req, list_name=LIST,
-                                    invoker=_Recorder(response), reconcile_fn=recon)
+        res = apply_reminder_writes(self.db, req, list_name=LIST, invoker=_Recorder(response), reconcile_fn=recon)
         self.assertFalse(res.ok)  # one op errored
         self.assertEqual(reconciled["n"], 1)  # but one applied -> still reconcile
         statuses = {r.op: r.status for r in res.results}
@@ -292,13 +303,11 @@ class WriteOrchestratorTests(unittest.TestCase):
             raise AppleRemindersHelperError("bundle not found")
 
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
         with self.assertRaises(AppleRemindersHelperError):
-            apply_reminder_writes(self.db, req, list_name=LIST, invoker=boom,
-                                  reconcile_fn=lambda: None)
+            apply_reminder_writes(self.db, req, list_name=LIST, invoker=boom, reconcile_fn=lambda: None)
         rows = self._audit_rows()
         self.assertTrue(rows)
         self.assertEqual(rows[0][4], STATE_FAILED)  # state column
@@ -310,13 +319,11 @@ class WriteOrchestratorTests(unittest.TestCase):
             return resp
 
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
         with self.assertRaises(AppleRemindersHelperError):
-            apply_reminder_writes(self.db, req, list_name=LIST, invoker=wrong_id,
-                                  reconcile_fn=lambda: None)
+            apply_reminder_writes(self.db, req, list_name=LIST, invoker=wrong_id, reconcile_fn=lambda: None)
 
     def test_schema_version_mismatch_raises(self):
         def bad_version(r):
@@ -325,29 +332,24 @@ class WriteOrchestratorTests(unittest.TestCase):
             return resp
 
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "x"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "x"})],
             mode="apply",
         )
         with self.assertRaises(AppleRemindersHelperError):
-            apply_reminder_writes(self.db, req, list_name=LIST,
-                                  invoker=bad_version, reconcile_fn=lambda: None)
+            apply_reminder_writes(self.db, req, list_name=LIST, invoker=bad_version, reconcile_fn=lambda: None)
 
     # --- audit ----------------------------------------------------------------
 
     def test_audit_rows_capture_blobs_and_reminder_id(self):
         inv = _Recorder(lambda r: _resp(r, results=[_ok_create("c1", "RID-AUD")]))
         req = build_request(
-            [WriteOp(op="create", client_token="c1", list_name=LIST,
-                     fields={"title": "audit me"})],
+            [WriteOp(op="create", client_token="c1", list_name=LIST, fields={"title": "audit me"})],
             mode="apply",
         )
-        apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv,
-                              reconcile_fn=lambda: None)
+        apply_reminder_writes(self.db, req, list_name=LIST, invoker=inv, reconcile_fn=lambda: None)
         rows = self._audit_rows()
         self.assertEqual(len(rows), 1)
-        (request_id, op_index, op, reminder_id, state, op_status,
-         request_json, response_json) = rows[0]
+        (request_id, op_index, op, reminder_id, state, op_status, request_json, response_json) = rows[0]
         self.assertEqual(op, "create")
         self.assertEqual(reminder_id, "RID-AUD")
         self.assertEqual(state, STATE_RECONCILED)
@@ -363,8 +365,7 @@ class WriteOrchestratorTests(unittest.TestCase):
 
     def test_build_request_rejects_bad_mode(self):
         with self.assertRaises(Exception):
-            build_request([WriteOp(op="create", client_token="c1",
-                                   list_name=LIST)], mode="sideways")
+            build_request([WriteOp(op="create", client_token="c1", list_name=LIST)], mode="sideways")
 
 
 if __name__ == "__main__":

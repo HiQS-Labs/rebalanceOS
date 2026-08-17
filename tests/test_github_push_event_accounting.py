@@ -32,10 +32,18 @@ class PushEventAccountingTests(unittest.TestCase):
         self.db = Path(self._tmp.name) / "t.db"
         with db_connection(self.db, ensure_github_schema) as conn:
             for i in range(4):
-                gh.insert_push_event(conn, (
-                    f"e{i}", REPO, "refs/heads/development", "a" * 40, "b" * 40,
-                    f"2026-07-1{i}T00:00:00Z", "2026-07-19T00:00:00Z",
-                ))
+                gh.insert_push_event(
+                    conn,
+                    (
+                        f"e{i}",
+                        REPO,
+                        "refs/heads/development",
+                        "a" * 40,
+                        "b" * 40,
+                        f"2026-07-1{i}T00:00:00Z",
+                        "2026-07-19T00:00:00Z",
+                    ),
+                )
             conn.commit()
 
     def tearDown(self):
@@ -50,10 +58,7 @@ class PushEventAccountingTests(unittest.TestCase):
 
     def _pending_ids(self) -> list[str]:
         with db_connection(self.db, ensure_github_schema) as conn:
-            return [
-                r["event_id"]
-                for r in gh.pending_push_events(conn, 100, MAX_EVENT_ATTEMPTS)
-            ]
+            return [r["event_id"] for r in gh.pending_push_events(conn, 100, MAX_EVENT_ATTEMPTS)]
 
     # -- the core invariant --
 
@@ -61,8 +66,12 @@ class PushEventAccountingTests(unittest.TestCase):
         with db_connection(self.db, ensure_github_schema) as conn:
             for _ in range(5):
                 gh.update_push_event(
-                    conn, "e0", state="deferred", now="2026-07-19T00:00:00Z",
-                    reason="compare cap reached", deferral_kind="budget",
+                    conn,
+                    "e0",
+                    state="deferred",
+                    now="2026-07-19T00:00:00Z",
+                    reason="compare cap reached",
+                    deferral_kind="budget",
                 )
             conn.commit()
         self.assertEqual(self._attempts("e0"), 0)
@@ -72,8 +81,12 @@ class PushEventAccountingTests(unittest.TestCase):
         with db_connection(self.db, ensure_github_schema) as conn:
             for _ in range(MAX_EVENT_ATTEMPTS + 3):
                 gh.update_push_event(
-                    conn, "e0", state="deferred", now="2026-07-19T00:00:00Z",
-                    reason="compare cap reached", deferral_kind="budget",
+                    conn,
+                    "e0",
+                    state="deferred",
+                    now="2026-07-19T00:00:00Z",
+                    reason="compare cap reached",
+                    deferral_kind="budget",
                 )
             conn.commit()
         self.assertIn("e0", self._pending_ids())
@@ -84,8 +97,12 @@ class PushEventAccountingTests(unittest.TestCase):
         with db_connection(self.db, ensure_github_schema) as conn:
             for _ in range(MAX_EVENT_ATTEMPTS):
                 gh.update_push_event(
-                    conn, "e1", state="deferred", now="2026-07-19T00:00:00Z",
-                    reason="compare HTTP 500", deferral_kind="failure",
+                    conn,
+                    "e1",
+                    state="deferred",
+                    now="2026-07-19T00:00:00Z",
+                    reason="compare HTTP 500",
+                    deferral_kind="failure",
                 )
             conn.commit()
         self.assertEqual(self._attempts("e1"), MAX_EVENT_ATTEMPTS)
@@ -96,7 +113,10 @@ class PushEventAccountingTests(unittest.TestCase):
         """Absent a kind, charge -- the conservative direction."""
         with db_connection(self.db, ensure_github_schema) as conn:
             gh.update_push_event(
-                conn, "e2", state="deferred", now="2026-07-19T00:00:00Z",
+                conn,
+                "e2",
+                state="deferred",
+                now="2026-07-19T00:00:00Z",
                 reason="something new",
             )
             conn.commit()
@@ -120,11 +140,7 @@ class PushEventAccountingTests(unittest.TestCase):
 
         self.assertEqual(classify_legacy_deferrals(self.db), 2)
         with db_connection(self.db, ensure_github_schema) as conn:
-            kinds = {
-                r[0]: r[1] for r in conn.execute(
-                    "SELECT event_id, deferral_kind FROM github_push_events"
-                )
-            }
+            kinds = {r[0]: r[1] for r in conn.execute("SELECT event_id, deferral_kind FROM github_push_events")}
         self.assertEqual(kinds["e0"], "budget")
         self.assertEqual(kinds["e1"], "failure")
 

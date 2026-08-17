@@ -20,9 +20,7 @@ def _python_files(root: Path) -> list[Path]:
     exposing the extraction gate to a false positive from someone else's imports.
     """
     return [
-        path
-        for path in root.rglob("*.py")
-        if not any(part.startswith(".") for part in path.relative_to(root).parts)
+        path for path in root.rglob("*.py") if not any(part.startswith(".") for part in path.relative_to(root).parts)
     ]
 
 
@@ -79,9 +77,7 @@ def test_three_eyes_is_a_clean_room_too():
 
 def test_scan_skips_vendored_dependencies_but_still_sees_first_party_code(tmp_path):
     (tmp_path / ".venv" / "site-packages").mkdir(parents=True)
-    (tmp_path / ".venv" / "site-packages" / "vendored.py").write_text(
-        "import rebalance\n", encoding="utf-8"
-    )
+    (tmp_path / ".venv" / "site-packages" / "vendored.py").write_text("import rebalance\n", encoding="utf-8")
     (tmp_path / "first_party.py").write_text("x = 1\n", encoding="utf-8")
 
     assert _python_files(tmp_path) == [tmp_path / "first_party.py"]
@@ -96,9 +92,5 @@ def test_ast_detector_rejects_a_deliberate_import_in_either_direction(tmp_path):
     hiqs_module.write_text("import rebalance\n", encoding="utf-8")
     incumbent_module.write_text("from hiqs import plugins\n", encoding="utf-8")
 
-    assert _forbidden_imports(hiqs_module.parent, "rebalance") == [
-        (hiqs_module, 1, "rebalance")
-    ]
-    assert _forbidden_imports(incumbent_module.parent, "hiqs") == [
-        (incumbent_module, 1, "hiqs")
-    ]
+    assert _forbidden_imports(hiqs_module.parent, "rebalance") == [(hiqs_module, 1, "rebalance")]
+    assert _forbidden_imports(incumbent_module.parent, "hiqs") == [(incumbent_module, 1, "hiqs")]

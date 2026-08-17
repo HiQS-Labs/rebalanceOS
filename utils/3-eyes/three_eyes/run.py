@@ -134,11 +134,13 @@ def run_job(job_id: str, *, log=print) -> int:
             # One notice per cooldown window is enough to show it is still parked.
             if breaker.should_notice_skip(job.id):
                 routes.route(
-                    {"source": job.id, "title": f"{job.id} quarantined",
-                     "severity": "warn",
-                     "summary": "breaker open — skipped run (throttled: at most "
-                                "one notice per cooldown window)",
-                     "text": ""},
+                    {
+                        "source": job.id,
+                        "title": f"{job.id} quarantined",
+                        "severity": "warn",
+                        "summary": "breaker open — skipped run (throttled: at most one notice per cooldown window)",
+                        "text": "",
+                    },
                     ["log-only"],
                 )
             return 0
@@ -166,8 +168,10 @@ def run_job(job_id: str, *, log=print) -> int:
         log(f"[3eyes] {job.id} deferred exit={code} (did not run; failure count unchanged)")
     else:
         opened = breaker.record(job.id, outcome == "ok", job.trip_after_failures)
-        log(f"[3eyes] {job.id} finished exit={code} ok={outcome == 'ok'}"
-            + (" — BREAKER OPENED (quarantined)" if opened else ""))
+        log(
+            f"[3eyes] {job.id} finished exit={code} ok={outcome == 'ok'}"
+            + (" — BREAKER OPENED (quarantined)" if opened else "")
+        )
 
     # 6: route any finding the command emitted
     _process_emit(job)
@@ -181,7 +185,7 @@ def run_job(job_id: str, *, log=print) -> int:
         # only reaches the model for genuine novelty.
         try:
             explanation = explain.explain(job, code)
-        except Exception as exc:            # an explainer must not break the reporter
+        except Exception as exc:  # an explainer must not break the reporter
             log(f"[3eyes] explainer failed for {job.id}: {exc}")
             explanation = None
 
@@ -194,9 +198,10 @@ def run_job(job_id: str, *, log=print) -> int:
             return code
 
         finding = {
-            "source": job.id, "title": f"{job.id} breaker opened", "severity": "error",
-            "summary": f"{job.trip_after_failures} consecutive failures; "
-                       f"will self-retry once in {cooldown_min}m",
+            "source": job.id,
+            "title": f"{job.id} breaker opened",
+            "severity": "error",
+            "summary": f"{job.trip_after_failures} consecutive failures; will self-retry once in {cooldown_min}m",
             "text": "",
         }
         if explanation:

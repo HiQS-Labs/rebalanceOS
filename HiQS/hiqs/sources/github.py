@@ -130,7 +130,9 @@ def _item_row(
     author = user.get("login") if isinstance(user, Mapping) else None
     updated_at = item.get("updated_at")
     created_at = item.get("created_at")
-    if not isinstance(number, int) or not all(isinstance(value, str) and value.strip() for value in (title, url, author, updated_at, created_at)):
+    if not isinstance(number, int) or not all(
+        isinstance(value, str) and value.strip() for value in (title, url, author, updated_at, created_at)
+    ):
         return None
     assignee_data = item.get("assignee", {})
     assignee = assignee_data.get("login", "") if isinstance(assignee_data, Mapping) else ""
@@ -139,7 +141,19 @@ def _item_row(
     activity_at = activity.get(number) or item.get("closed_at") or created_at
     if not isinstance(activity_at, str) or not activity_at:
         return None
-    return (repo, item_type, number, title, str(item.get("body") or ""), str(item.get("state") or ""), url, author, str(assignee or ""), updated_at, activity_at)
+    return (
+        repo,
+        item_type,
+        number,
+        title,
+        str(item.get("body") or ""),
+        str(item.get("state") or ""),
+        url,
+        author,
+        str(assignee or ""),
+        updated_at,
+        activity_at,
+    )
 
 
 def _obligation_row(repo: str, item: Mapping[str, Any], item_type: str, number: int) -> tuple[str, str, int, str, str]:
@@ -162,7 +176,9 @@ def _obligation_row(repo: str, item: Mapping[str, Any], item_type: str, number: 
     return (repo, item_type, number, requested_reviewer, due.strip() if isinstance(due, str) else "")
 
 
-def _upsert_items(connection: Any, repo: str, items: list[Mapping[str, Any]], activity: Mapping[int, str], counts: dict[str, int]) -> list[str]:
+def _upsert_items(
+    connection: Any, repo: str, items: list[Mapping[str, Any]], activity: Mapping[int, str], counts: dict[str, int]
+) -> list[str]:
     """Upsert item rows by their stable GitHub identity; never delete absent rows."""
     watermarks: list[str] = []
     for item in items:
@@ -312,7 +328,11 @@ def fetch(connection: Any, config: Mapping[str, Any]) -> SyncReport:
     for repo in repos:
         encoded_repo = quote(repo, safe="/")
         try:
-            items = _request_json(f"{api_base}/repos/{encoded_repo}/issues?state=all&sort=updated&direction=desc&per_page=100", token, api_calls)
+            items = _request_json(
+                f"{api_base}/repos/{encoded_repo}/issues?state=all&sort=updated&direction=desc&per_page=100",
+                token,
+                api_calls,
+            )
             events = _request_json(f"{api_base}/repos/{encoded_repo}/issues/events?per_page=100", token, api_calls)
             if not isinstance(items, list) or not isinstance(events, list):
                 raise ValueError("unexpected item response")

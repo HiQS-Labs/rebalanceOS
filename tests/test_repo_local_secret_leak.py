@@ -38,21 +38,19 @@ class RepoLocalSecretLeakTests(unittest.TestCase):
     def test_real_setters_never_leak_into_rbos_config_without_keyring(self) -> None:
         # Simulate a launchd run: no keychain access. The dual store must persist
         # to the secret store only — never to repo-local rbos.config.
-        with patch.object(config_mod, "_keyring_set", return_value=False), \
-             patch.object(config_mod, "_keyring_get", return_value=None):
+        with (
+            patch.object(config_mod, "_keyring_set", return_value=False),
+            patch.object(config_mod, "_keyring_get", return_value=None),
+        ):
             config_mod.set_github_token("ghp_FAKETOKEN_github_0123456789")
             config_mod.set_figma_token("figd_FAKETOKEN_figma_0123456789")
-            config_mod.set_sleuth_credentials(
-                "https://example.test", "FAKE_sleuth_token", "workspace-x"
-            )
+            config_mod.set_sleuth_credentials("https://example.test", "FAKE_sleuth_token", "workspace-x")
 
             # The contract: nothing secret-bearing is in rbos.config.
             self.assertEqual(config_mod.repo_local_secret_keys_present(), [])
 
             # And the secret is still resolvable launchd-safe (from the store).
-            self.assertEqual(
-                config_mod.get_github_token(), "ghp_FAKETOKEN_github_0123456789"
-            )
+            self.assertEqual(config_mod.get_github_token(), "ghp_FAKETOKEN_github_0123456789")
 
         # Belt-and-braces: the raw file (if written at all) holds no secret value.
         cfg_path = config_mod.CONFIG_PATH

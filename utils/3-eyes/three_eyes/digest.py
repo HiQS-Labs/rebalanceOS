@@ -68,7 +68,7 @@ def _tail(path: Path, limit: int = LOG_TAIL_BYTES) -> str:
         return ""
     text = raw.decode("utf-8", errors="replace")
     if size > limit:
-        text = text.split("\n", 1)[-1]      # drop the partial first line
+        text = text.split("\n", 1)[-1]  # drop the partial first line
     return text.strip()
 
 
@@ -92,7 +92,7 @@ def _logs_for(label: str) -> str:
                 tail = _tail(path)
                 if tail:
                     chunks.append(f"--- {path.name} ---\n{tail}")
-    return "\n\n".join(chunks[:3])          # at most 3 files per job
+    return "\n\n".join(chunks[:3])  # at most 3 files per job
 
 
 def _recent_findings(now: datetime) -> list[dict]:
@@ -115,7 +115,7 @@ def _recent_findings(now: datetime) -> list[dict]:
         try:
             when = datetime.fromisoformat(ts)
         except ValueError:
-            out.append(rec)                 # undateable: include rather than drop
+            out.append(rec)  # undateable: include rather than drop
             continue
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
@@ -129,10 +129,18 @@ def collect(now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     try:
         report = health.scan()
-    except Exception as exc:                # health must never take the digest down
-        report = {"rows": [], "probe_error": f"health.scan failed: {exc}",
-                  "launchctl_available": False, "ok": 0, "failing": 0,
-                  "not_loaded": 0, "unknown": 0, "unclassified": [], "removed": []}
+    except Exception as exc:  # health must never take the digest down
+        report = {
+            "rows": [],
+            "probe_error": f"health.scan failed: {exc}",
+            "launchctl_available": False,
+            "ok": 0,
+            "failing": 0,
+            "not_loaded": 0,
+            "unknown": 0,
+            "unclassified": [],
+            "removed": [],
+        }
 
     failing = [r for r in report.get("rows", []) if "FAIL" in str(r.get("health", ""))]
     for row in failing:
@@ -167,7 +175,8 @@ def render_corpus(data: dict[str, Any]) -> str:
     if not h.get("launchctl_available", True):
         lines += [
             "LAUNCHCTL COULD NOT BE READ — this is NOT a clean bill of health.",
-            f"  {h.get('probe_error', 'unavailable')}", "",
+            f"  {h.get('probe_error', 'unavailable')}",
+            "",
         ]
     else:
         lines += [
@@ -206,8 +215,7 @@ def render_corpus(data: dict[str, Any]) -> str:
         lines.append("")
 
     if h.get("unclassified"):
-        lines += ["UNCLASSIFIED AGENTS (not in catalog-notes.toml)",
-                  *(f"- {lbl}" for lbl in h["unclassified"]), ""]
+        lines += ["UNCLASSIFIED AGENTS (not in catalog-notes.toml)", *(f"- {lbl}" for lbl in h["unclassified"]), ""]
 
     return "\n".join(lines).strip()
 
@@ -271,16 +279,11 @@ def build(job=None, now: datetime | None = None, force: bool = False) -> dict[st
                 model_used = True
                 summary = str(result.get("summary", "")).strip() or "(model returned no summary)"
                 severity = str(result.get("severity", "info"))
-                extras = {
-                    k: result[k]
-                    for k in ("confidence", "evidence", "next_safe_step")
-                    if result.get(k)
-                }
+                extras = {k: result[k] for k in ("confidence", "evidence", "next_safe_step") if result.get(k)}
 
     h = data["health"]
-    headline = (
-        f"{h.get('failing', 0)} failing · {h.get('ok', 0)} ok"
-        + (f" · {len(data['breakers'])} breaker(s) not clean" if data["breakers"] else "")
+    headline = f"{h.get('failing', 0)} failing · {h.get('ok', 0)} ok" + (
+        f" · {len(data['breakers'])} breaker(s) not clean" if data["breakers"] else ""
     )
 
     return {
@@ -307,16 +310,17 @@ def write_report(finding: dict[str, Any], now: datetime | None = None) -> Path:
     body = [
         f"# {finding['title']}",
         "",
-        f"_generated {now.isoformat()} · "
-        f"{'model-summarised' if finding.get('model_used') else 'not summarised'}_",
+        f"_generated {now.isoformat()} · {'model-summarised' if finding.get('model_used') else 'not summarised'}_",
         "",
         "## Summary",
         finding.get("summary", ""),
         "",
         "## Model notes",
         *(
-            [f"- **{k.replace('_', ' ')}:** {v if not isinstance(v, list) else '; '.join(map(str, v))}"
-             for k, v in finding.get("extras", {}).items()]
+            [
+                f"- **{k.replace('_', ' ')}:** {v if not isinstance(v, list) else '; '.join(map(str, v))}"
+                for k, v in finding.get("extras", {}).items()
+            ]
             or ["_(none)_"]
         ),
         "",
@@ -362,5 +366,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":                  # pragma: no cover - launchd entry point
+if __name__ == "__main__":  # pragma: no cover - launchd entry point
     raise SystemExit(main(list(os.sys.argv[1:])))

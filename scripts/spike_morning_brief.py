@@ -89,27 +89,29 @@ def collect_projects(db: Path, since_days: int) -> tuple[list[dict[str, Any]], s
             last_active = b.get("last_active_at")
 
             # "Continue working on": priority-weighted, lifted by recent momentum.
-            priority_score = max(0, (6 - tier)) * 10           # tier 1 -> 50, tier 5 -> 10
-            momentum_score = min(40, momentum * 4)             # cap the bonus
+            priority_score = max(0, (6 - tier)) * 10  # tier 1 -> 50, tier 5 -> 10
+            momentum_score = min(40, momentum * 4)  # cap the bonus
             salience = priority_score + momentum_score
 
-            rows.append({
-                "source": "project",
-                "id": p["name"],
-                "label": p["name"],
-                "salience": float(salience),
-                "timestamp": last_active,
-                "detail": {
-                    "priority_tier": tier,
-                    "summary": (p.get("summary") or "").strip(),
-                    "repos_touched": b.get("repos_touched", []),
-                    "commits": commits,
-                    "prs": prs,
-                    "issues": issues,
-                    "momentum": momentum,
-                    "idle": bool(b.get("is_idle", momentum == 0)),
-                },
-            })
+            rows.append(
+                {
+                    "source": "project",
+                    "id": p["name"],
+                    "label": p["name"],
+                    "salience": float(salience),
+                    "timestamp": last_active,
+                    "detail": {
+                        "priority_tier": tier,
+                        "summary": (p.get("summary") or "").strip(),
+                        "repos_touched": b.get("repos_touched", []),
+                        "commits": commits,
+                        "prs": prs,
+                        "issues": issues,
+                        "momentum": momentum,
+                        "idle": bool(b.get("is_idle", momentum == 0)),
+                    },
+                }
+            )
         return rows, None
     except Exception as exc:  # noqa: BLE001 - spike: record, don't crash the run
         return [], f"{type(exc).__name__}: {exc}"
@@ -139,18 +141,20 @@ def collect_reminders(db: Path) -> tuple[list[dict[str, Any]], str | None]:
                 bucket, salience = "due_today", 85.0
             else:
                 bucket, salience = "upcoming", 45.0
-            rows.append({
-                "source": "reminder",
-                "id": r["reminder_id"],
-                "label": (r["reminder_message_text"] or "").strip()[:160],
-                "salience": salience,
-                "timestamp": r["should_post_on"],
-                "detail": {
-                    "bucket": bucket,
-                    "state": r["state"],
-                    "channel": r["original_channel_name"],
-                },
-            })
+            rows.append(
+                {
+                    "source": "reminder",
+                    "id": r["reminder_id"],
+                    "label": (r["reminder_message_text"] or "").strip()[:160],
+                    "salience": salience,
+                    "timestamp": r["should_post_on"],
+                    "detail": {
+                        "bucket": bucket,
+                        "state": r["state"],
+                        "channel": r["original_channel_name"],
+                    },
+                }
+            )
         return rows, None
     except Exception as exc:  # noqa: BLE001
         return [], f"{type(exc).__name__}: {exc}"
@@ -178,19 +182,21 @@ def collect_emails(db: Path, since_days: int) -> tuple[list[dict[str, Any]], str
             if not important and not in_inbox:
                 dropped += 1
                 continue  # promotional/social/archived noise
-            rows.append({
-                "source": "email",
-                "id": r["message_id"],
-                "label": (r["subject"] or "(no subject)").strip()[:160],
-                "salience": 80.0 if important else 50.0,
-                "timestamp": r["received_at"],
-                "detail": {
-                    "from": r["from_name"] or r["from_address"],
-                    "from_address": r["from_address"],
-                    "important": important,
-                    "snippet": (r["snippet"] or "").strip()[:200],
-                },
-            })
+            rows.append(
+                {
+                    "source": "email",
+                    "id": r["message_id"],
+                    "label": (r["subject"] or "(no subject)").strip()[:160],
+                    "salience": 80.0 if important else 50.0,
+                    "timestamp": r["received_at"],
+                    "detail": {
+                        "from": r["from_name"] or r["from_address"],
+                        "from_address": r["from_address"],
+                        "important": important,
+                        "snippet": (r["snippet"] or "").strip()[:200],
+                    },
+                }
+            )
         return rows, None, dropped
     except Exception as exc:  # noqa: BLE001
         return [], f"{type(exc).__name__}: {exc}", 0
@@ -219,19 +225,21 @@ def collect_calendar(db: Path) -> tuple[list[dict[str, Any]], str | None]:
             ).fetchall()
         for ev in recs:
             attendees = json.loads(ev["attendees_json"] or "[]")
-            rows.append({
-                "source": "calendar",
-                "id": ev["id"] or ev["summary"],
-                "label": (ev["summary"] or "(busy)").strip()[:160],
-                "salience": 75.0,
-                "timestamp": ev["start_time"],
-                "detail": {
-                    "start": ev["start_time"],
-                    "end": ev["end_time"],
-                    "location": ev["location"],
-                    "attendees": len(attendees),
-                },
-            })
+            rows.append(
+                {
+                    "source": "calendar",
+                    "id": ev["id"] or ev["summary"],
+                    "label": (ev["summary"] or "(busy)").strip()[:160],
+                    "salience": 75.0,
+                    "timestamp": ev["start_time"],
+                    "detail": {
+                        "start": ev["start_time"],
+                        "end": ev["end_time"],
+                        "location": ev["location"],
+                        "attendees": len(attendees),
+                    },
+                }
+            )
         return rows, None
     except Exception as exc:  # noqa: BLE001
         return [], f"{type(exc).__name__}: {exc}"

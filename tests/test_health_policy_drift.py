@@ -20,9 +20,7 @@ from rebalance.health import AUTH_RECOVERY, CREDENTIAL_SUPPRESSION_HOURS
 class FreshnessWarnHoursTests(unittest.TestCase):
     def test_returns_warn_days_times_24_for_every_registry_entry(self):
         for entry in _COLLECTOR_FRESHNESS:
-            self.assertEqual(
-                freshness_warn_hours(entry["name"]), entry["warn_days"] * 24
-            )
+            self.assertEqual(freshness_warn_hours(entry["name"]), entry["warn_days"] * 24)
 
     def test_unknown_name_raises_loudly(self):
         # A silent default would reintroduce the drift this accessor exists to
@@ -46,8 +44,7 @@ class SuppressionWindowDerivationTests(unittest.TestCase):
             self.assertEqual(
                 CREDENTIAL_SUPPRESSION_HOURS[check_name],
                 freshness_warn_hours(registry_name),
-                f"{check_name} suppression window drifted from the "
-                f"{registry_name!r} registry policy",
+                f"{check_name} suppression window drifted from the {registry_name!r} registry policy",
             )
 
     def test_auth_recovery_windows_equal_registry_policy(self):

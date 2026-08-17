@@ -447,7 +447,6 @@ class GitPulseCollectCliTests(unittest.TestCase):
         self.assertIn(str(blocked_repo), metadata_text)
         self.assertEqual(last_run_text, "0\n")
 
-
     def test_collect_stages_pdda_registry_projection(self) -> None:
         """GH-96: the per-device PDDA projection rides the normal pulse commit when present."""
         with tempfile.TemporaryDirectory() as tmpdir:

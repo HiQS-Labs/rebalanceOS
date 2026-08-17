@@ -23,9 +23,7 @@ NOW = datetime(2026, 6, 3, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def _h(last_scan, **kw):
-    return CollectorHealth(
-        device_id="d", device_name="Device", last_scan_utc=last_scan, **kw
-    )
+    return CollectorHealth(device_id="d", device_name="Device", last_scan_utc=last_scan, **kw)
 
 
 class ClassifyTests(unittest.TestCase):
@@ -72,16 +70,22 @@ class ReadCollectorHealthTests(unittest.TestCase):
             devices = repo / "devices"
             devices.mkdir()
             self._write_device(
-                devices, "alive-dev",
-                device_id="alive", device_name="Alive Box",
+                devices,
+                "alive-dev",
+                device_id="alive",
+                device_name="Alive Box",
                 last_scan_utc=(NOW - timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
-                scan_status="ok", repo_scan_failures="0",
+                scan_status="ok",
+                repo_scan_failures="0",
             )
             self._write_device(
-                devices, "broken-dev",
-                device_id="broken", device_name="Broken Box",
+                devices,
+                "broken-dev",
+                device_id="broken",
+                device_name="Broken Box",
                 last_scan_utc=(NOW - timedelta(minutes=20)).isoformat().replace("+00:00", "Z"),
-                scan_status="degraded", repo_scan_failures="4",
+                scan_status="degraded",
+                repo_scan_failures="4",
                 scan_failure_examples="repo-a,repo-b",
             )
             out = read_collector_health(sync_repo_dir=repo, now=NOW)
@@ -113,10 +117,13 @@ class ResolveSyncRepoDirTests(unittest.TestCase):
 
     def test_none_when_target_has_no_devices_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            with patch(
-                "rebalance.ingest.config.get_pulse_config",
-                return_value={"pulse_target_path": tmp},
-            ), patch.dict("os.environ", {"GIT_PULSE_CONFIG_DIR": tmp}, clear=False):
+            with (
+                patch(
+                    "rebalance.ingest.config.get_pulse_config",
+                    return_value={"pulse_target_path": tmp},
+                ),
+                patch.dict("os.environ", {"GIT_PULSE_CONFIG_DIR": tmp}, clear=False),
+            ):
                 # pulse_target_path has no devices/, and the bogus config dir has
                 # no config.sh/repo → unresolvable.
                 self.assertIsNone(resolve_sync_repo_dir())

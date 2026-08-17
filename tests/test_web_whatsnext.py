@@ -4,6 +4,7 @@ Pure: feed _whatsnext_body a hand-built RankedNextActions.as_dict()-shaped dict
 and assert the rendered HTML, with no DB or server. The full handler/route is
 control-flow only and exercised at the surface level in test_web_surface.py.
 """
+
 from __future__ import annotations
 
 import unittest
@@ -60,9 +61,15 @@ class WhatsNextBodyTests(unittest.TestCase):
     def test_renders_operator_and_teammate_items(self) -> None:
         ranked = [
             _action(rank=1, person=None, title="Operator task"),
-            _action(rank=2, person="Matt", source="calendar",
-                    title="Teammate review block", project=None,
-                    evidence=["Matt 14:00 (30m)"], why="cross-person signal"),
+            _action(
+                rank=2,
+                person="Matt",
+                source="calendar",
+                title="Teammate review block",
+                project=None,
+                evidence=["Matt 14:00 (30m)"],
+                why="cross-person signal",
+            ),
         ]
         body = _whatsnext_body(_data(ranked))
         self.assertIn("wn-list", body)
@@ -71,8 +78,8 @@ class WhatsNextBodyTests(unittest.TestCase):
         self.assertIn("Operator task", body)
         self.assertIn("Teammate review block", body)
         # Operator vs teammate attribution badges.
-        self.assertIn("You", body)            # operator badge
-        self.assertIn("Matt", body)           # teammate label
+        self.assertIn("You", body)  # operator badge
+        self.assertIn("Matt", body)  # teammate label
         # Evidence + why render.
         self.assertIn("cross-person signal", body)
         self.assertIn("Matt 14:00 (30m)", body)
@@ -118,9 +125,13 @@ class WhatsNextBodyTests(unittest.TestCase):
 
     def test_missing_optional_fields_render_safely(self) -> None:
         # No project, no evidence, empty why must not raise or leak None.
-        body = _whatsnext_body(_data([
-            _action(project=None, evidence=[], why=""),
-        ]))
+        body = _whatsnext_body(
+            _data(
+                [
+                    _action(project=None, evidence=[], why=""),
+                ]
+            )
+        )
         self.assertIn("wn-item", body)
         self.assertNotIn("None", body)
 
@@ -134,17 +145,15 @@ class WhatsNextRoutePersistsTests(unittest.TestCase):
         from rebalance.ingest.next_actions import RankedNextActions
 
         live = RankedNextActions(note="freshly computed", blended=False)
-        with patch(
-            "rebalance.paths.resolve_database_path", return_value=Path("/tmp/x.db")
-        ), patch(
-            "rebalance.ingest.next_actions.get_ranked_meta",
-            return_value={"row_count": 0},  # no precompute yet
-        ), patch(
-            "rebalance.ingest.next_actions.rank_next_actions", return_value=live
-        ) as mock_rank, patch(
-            "rebalance.ingest.next_actions.persist_ranked_next_actions"
-        ) as mock_persist, patch(
-            "rebalance.ingest.next_actions.load_ranked_next_actions", return_value=live
+        with (
+            patch("rebalance.paths.resolve_database_path", return_value=Path("/tmp/x.db")),
+            patch(
+                "rebalance.ingest.next_actions.get_ranked_meta",
+                return_value={"row_count": 0},  # no precompute yet
+            ),
+            patch("rebalance.ingest.next_actions.rank_next_actions", return_value=live) as mock_rank,
+            patch("rebalance.ingest.next_actions.persist_ranked_next_actions") as mock_persist,
+            patch("rebalance.ingest.next_actions.load_ranked_next_actions", return_value=live),
         ):
             # refresh=False (a NORMAL first hit with an empty cache).
             whatsnext_page(refresh=False)
@@ -159,18 +168,18 @@ class WhatsNextRoutePersistsTests(unittest.TestCase):
         from rebalance.ingest.next_actions import RankedNextActions
 
         live = RankedNextActions(note="x")
-        with patch(
-            "rebalance.paths.resolve_database_path", return_value=Path("/tmp/x.db")
-        ), patch(
-            "rebalance.ingest.next_actions.get_ranked_meta",
-            return_value={"row_count": 0},
-        ), patch(
-            "rebalance.ingest.next_actions.rank_next_actions", return_value=live
-        ), patch(
-            "rebalance.ingest.next_actions.persist_ranked_next_actions",
-            side_effect=RuntimeError("disk full"),
-        ), patch(
-            "rebalance.ingest.next_actions.load_ranked_next_actions", return_value=None
+        with (
+            patch("rebalance.paths.resolve_database_path", return_value=Path("/tmp/x.db")),
+            patch(
+                "rebalance.ingest.next_actions.get_ranked_meta",
+                return_value={"row_count": 0},
+            ),
+            patch("rebalance.ingest.next_actions.rank_next_actions", return_value=live),
+            patch(
+                "rebalance.ingest.next_actions.persist_ranked_next_actions",
+                side_effect=RuntimeError("disk full"),
+            ),
+            patch("rebalance.ingest.next_actions.load_ranked_next_actions", return_value=None),
         ):
             # Must not raise — the swallowed-compute path degrades cleanly.
             resp = whatsnext_page(refresh=False)

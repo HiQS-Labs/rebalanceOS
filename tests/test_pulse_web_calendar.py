@@ -88,7 +88,7 @@ class CalendarEventStateTests(unittest.TestCase):
     def test_finished_event_is_past_and_future_event_is_upcoming(self) -> None:
         rows = [
             _event("Earlier", "2026-07-18T19:00:00Z", "2026-07-18T19:30:00Z"),  # ended 12:30
-            _event("Later", "2026-07-18T22:00:00Z", "2026-07-18T22:30:00Z"),    # starts 3:00
+            _event("Later", "2026-07-18T22:00:00Z", "2026-07-18T22:30:00Z"),  # starts 3:00
         ]
         html = pulse_web.render_calendar_module(rows, [], NOW, tz=TZ)
         self.assertRegex(html, r'class="cal-event past"[^>]*>.*?Earlier')

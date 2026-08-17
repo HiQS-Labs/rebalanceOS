@@ -51,11 +51,7 @@ def test_upsert_preserves_manual_notes_above():
 
 
 def test_upsert_collapses_accidental_duplicate_blocks():
-    dup = (
-        "notes\n"
-        f"{ods.MARKER_START}\nold one\n{ods.MARKER_END}\n"
-        f"{ods.MARKER_START}\nold two\n{ods.MARKER_END}\n"
-    )
+    dup = f"notes\n{ods.MARKER_START}\nold one\n{ods.MARKER_END}\n{ods.MARKER_START}\nold two\n{ods.MARKER_END}\n"
     out = ods.upsert_block(dup, "fresh", GEN_AT)
     assert out.count(ods.MARKER_START) == 1
     assert out.count(ods.MARKER_END) == 1
@@ -63,10 +59,16 @@ def test_upsert_collapses_accidental_duplicate_blocks():
 
 
 # --- auto-generated reminder line --------------------------------------------
-@pytest.mark.parametrize("hour,minute,expected", [
-    (18, 0, "6:00 PM"), (6, 5, "6:05 AM"), (0, 0, "12:00 AM"),
-    (12, 0, "12:00 PM"), (23, 55, "11:55 PM"),
-])
+@pytest.mark.parametrize(
+    "hour,minute,expected",
+    [
+        (18, 0, "6:00 PM"),
+        (6, 5, "6:05 AM"),
+        (0, 0, "12:00 AM"),
+        (12, 0, "12:00 PM"),
+        (23, 55, "11:55 PM"),
+    ],
+)
 def test_format_time(hour, minute, expected):
     assert ods._format_time(datetime(2026, 7, 4, hour, minute)) == expected
 
@@ -79,8 +81,9 @@ def test_block_carries_auto_generated_reminder():
 
 
 # --- late-run guard ----------------------------------------------------------
-@pytest.mark.parametrize("hour,expected", [(0, True), (2, True), (11, True), (17, True),
-                                           (18, False), (19, False), (23, False)])
+@pytest.mark.parametrize(
+    "hour,expected", [(0, True), (2, True), (11, True), (17, True), (18, False), (19, False), (23, False)]
+)
 def test_is_late_run(hour, expected):
     assert ods.is_late_run(datetime(2026, 7, 4, hour, 30)) is expected
 

@@ -73,9 +73,7 @@ class TestNonPrimaryConfigStillReadsOperatorEvents(unittest.TestCase):
         # Sanity: the row really is keyed 'primary', != the config value.
         conn = sqlite3.connect(self.db)
         try:
-            stored = conn.execute(
-                "SELECT calendar_id FROM calendar_events WHERE id = 'evt-op'"
-            ).fetchone()[0]
+            stored = conn.execute("SELECT calendar_id FROM calendar_events WHERE id = 'evt-op'").fetchone()[0]
         finally:
             conn.close()
         self.assertEqual(stored, "primary")

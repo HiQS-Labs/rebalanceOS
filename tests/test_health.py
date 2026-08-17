@@ -46,7 +46,7 @@ class VerdictTests(unittest.TestCase):
             Check("database", FAIL, "missing"),
         ]
         ordered = ordered_problem_checks(checks, {"sources": {}}, NOW)
-        self.assertEqual(ordered[0].name, "database")        # FAIL first
+        self.assertEqual(ordered[0].name, "database")  # FAIL first
         self.assertEqual(ordered[-1].name, "launchd:github-sync")  # launchd last
 
 
@@ -101,12 +101,12 @@ class HealthNoticesTests(unittest.TestCase):
     def test_notice_warn_demoted_off_verdict(self) -> None:
         checks = [Check("email data", WARN, "stale > 7d")]
         h = compute_health_status(checks, self.EMPTY, NOW, notice_patterns=["email data"])
-        self.assertEqual(h.verdict, OK)          # not counted as a problem
+        self.assertEqual(h.verdict, OK)  # not counted as a problem
         self.assertEqual(h.problems, [])
         self.assertEqual([c.name for c in h.notices], ["email data"])
 
     def test_notice_match_is_case_insensitive_substring(self) -> None:
-        checks = [Check("pulse collector:noel’s MacBook Pro 14\"", WARN, "stale")]
+        checks = [Check('pulse collector:noel’s MacBook Pro 14"', WARN, "stale")]
         h = compute_health_status(checks, self.EMPTY, NOW, notice_patterns=["macbook pro"])
         self.assertEqual(h.verdict, OK)
         self.assertEqual(len(h.notices), 1)

@@ -60,9 +60,7 @@ class CoverageCheckTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _check(self, **kw):
-        return check_repo_coverage(
-            self.db, REPO, clone_path=self.clone, check_remote=False, **kw
-        )
+        return check_repo_coverage(self.db, REPO, clone_path=self.clone, check_remote=False, **kw)
 
     def _backfill(self):
         return backfill_commits(self.db, REPO, clone_path=self.clone, fetch=False)
@@ -93,8 +91,7 @@ class CoverageCheckTests(unittest.TestCase):
                 (REPO,),
             ).fetchone()[0]
             conn.execute(
-                "UPDATE github_direct_commits SET path_coverage = 'unavailable' "
-                "WHERE repo_full_name = ? AND sha = ?",
+                "UPDATE github_direct_commits SET path_coverage = 'unavailable' WHERE repo_full_name = ? AND sha = ?",
                 (REPO, sha),
             )
             conn.commit()
@@ -113,8 +110,7 @@ class CoverageCheckTests(unittest.TestCase):
         sync_direct_commit_documents(self.db)
         with db_connection(self.db, ensure_github_schema) as conn:
             conn.execute(
-                "DELETE FROM github_documents WHERE repo_full_name = ? "
-                "AND doc_type = 'direct_commit'", (REPO,)
+                "DELETE FROM github_documents WHERE repo_full_name = ? AND doc_type = 'direct_commit'", (REPO,)
             )
             conn.commit()
 
@@ -157,7 +153,10 @@ class CoverageCheckTests(unittest.TestCase):
 
     def test_stale_clone_reports_stale_not_zero(self):
         c = check_repo_coverage(
-            self.db, REPO, clone_path=self.clone, check_remote=True,
+            self.db,
+            REPO,
+            clone_path=self.clone,
+            check_remote=True,
         )
         # The fixture cannot contain a real github.com tip, so this exercises
         # the anchor: unreachable or not-contained must never read as "ok, 0".

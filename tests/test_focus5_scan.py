@@ -7,6 +7,7 @@ Split by what each layer needs:
   - discovery / probe / sync / summarize need real git, so they run against
     throwaway temp repos.
 """
+
 from __future__ import annotations
 
 import os
@@ -60,19 +61,35 @@ def _sig(name: str, **over) -> RepoSignals:
     sets both fields explicitly (e.g. the sleuth/EOS oracle).
     """
     base = dict(
-        device_id="dev", local_path=f"/repos/{name}", repo_name=name,
-        repo_full_name=None, branch="main", upstream=None, has_upstream=False,
-        ahead=0, behind=0, modified_count=0, untracked_count=0, is_dirty=False,
-        last_commit_at=None, last_commit_ts=None, my_last_commit_ts=None,
-        my_local_commit_ts=None, recency_basis="none",
-        head_reflog_ts=None, index_mtime_ts=None, remote_url=None,
+        device_id="dev",
+        local_path=f"/repos/{name}",
+        repo_name=name,
+        repo_full_name=None,
+        branch="main",
+        upstream=None,
+        has_upstream=False,
+        ahead=0,
+        behind=0,
+        modified_count=0,
+        untracked_count=0,
+        is_dirty=False,
+        last_commit_at=None,
+        last_commit_ts=None,
+        my_last_commit_ts=None,
+        my_local_commit_ts=None,
+        recency_basis="none",
+        head_reflog_ts=None,
+        index_mtime_ts=None,
+        remote_url=None,
         probed_at="2026-06-05T00:00:00Z",
     )
     base.update(over)
     if "my_local_commit_ts" not in over and "recency_basis" not in over:
         ts, basis = resolve_recency(
-            reflog_commit_ts=None, reflog_available=True,
-            author_email_ts=base["my_last_commit_ts"], any_commit_ts=base["last_commit_ts"],
+            reflog_commit_ts=None,
+            reflog_available=True,
+            author_email_ts=base["my_last_commit_ts"],
+            any_commit_ts=base["last_commit_ts"],
         )
         base["my_local_commit_ts"], base["recency_basis"] = ts, basis
     return RepoSignals(**base)
@@ -82,12 +99,10 @@ def _sig(name: str, **over) -> RepoSignals:
 # Pure: status parsing
 # ---------------------------------------------------------------------------
 
+
 class ParseStatusTests(unittest.TestCase):
     def test_clean_with_upstream(self) -> None:
-        out = (
-            "# branch.oid abc\n# branch.head main\n"
-            "# branch.upstream origin/main\n# branch.ab +0 -0\n"
-        )
+        out = "# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n"
         h = _parse_status(out)
         self.assertEqual(h["branch"], "main")
         self.assertTrue(h["has_upstream"])
@@ -102,7 +117,7 @@ class ParseStatusTests(unittest.TestCase):
             "? untracked.txt\n? another.txt\n"
         )
         h = _parse_status(out)
-        self.assertEqual(h["modified_count"], 2)   # the "1 " and "2 " lines
+        self.assertEqual(h["modified_count"], 2)  # the "1 " and "2 " lines
         self.assertEqual(h["untracked_count"], 2)  # the two "? " lines
         self.assertTrue(h["is_dirty"])
 
@@ -126,12 +141,12 @@ class ParseStatusTests(unittest.TestCase):
 # Pure: ranking strategies + the swappable seam
 # ---------------------------------------------------------------------------
 
+
 class RankingTests(unittest.TestCase):
     def test_dirty_first_forces_wip_above_newer_clean(self) -> None:
         # A clean repo I committed to 1h ago vs my dirty repo last committed 5d ago.
         clean = _sig("clean", my_last_commit_ts=NOW - HOUR)
-        dirty = _sig("dirty", is_dirty=True, modified_count=3,
-                     my_last_commit_ts=NOW - 5 * DAY)
+        dirty = _sig("dirty", is_dirty=True, modified_count=3, my_last_commit_ts=NOW - 5 * DAY)
         ranked = rank_repos([clean, dirty], mode="dirty_first", now_ts=NOW)
         self.assertEqual([r.signals.repo_name for r in ranked], ["dirty", "clean"])
         self.assertIn("modified", ranked[0].reason)
@@ -141,11 +156,9 @@ class RankingTests(unittest.TestCase):
         # dirty repo I last authored 5d ago — the exact inversion dirty_first
         # makes. No dirty pinning here.
         clean_recent = _sig("clean_recent", my_last_commit_ts=NOW - HOUR)
-        dirty_old = _sig("dirty_old", is_dirty=True, modified_count=4,
-                         my_last_commit_ts=NOW - 5 * DAY)
+        dirty_old = _sig("dirty_old", is_dirty=True, modified_count=4, my_last_commit_ts=NOW - 5 * DAY)
         ranked = rank_repos([dirty_old, clean_recent], mode="recent_activity", now_ts=NOW)
-        self.assertEqual([r.signals.repo_name for r in ranked],
-                         ["clean_recent", "dirty_old"])
+        self.assertEqual([r.signals.repo_name for r in ranked], ["clean_recent", "dirty_old"])
         self.assertIn("your commit", ranked[0].reason)
 
     def test_recent_activity_excludes_dirty_only_no_authored_repo(self) -> None:
@@ -153,13 +166,11 @@ class RankingTests(unittest.TestCase):
         # I dirtied but never committed to) must NOT appear in recent_activity —
         # admitting it would reintroduce the "junk buries my real work" bug. It
         # still surfaces under dirty_first (the Dirty Five safety view).
-        dirty_only = _sig("dirty_only", is_dirty=True, modified_count=2,
-                          my_last_commit_ts=None)
+        dirty_only = _sig("dirty_only", is_dirty=True, modified_count=2, my_last_commit_ts=None)
         mine = _sig("mine", my_last_commit_ts=NOW - 2 * DAY)
         recent = rank_repos([dirty_only, mine], mode="recent_activity", now_ts=NOW)
         self.assertEqual([r.signals.repo_name for r in recent], ["mine"])
-        dirty = {r.signals.repo_name for r in
-                 rank_repos([dirty_only, mine], mode="dirty_first", now_ts=NOW)}
+        dirty = {r.signals.repo_name for r in rank_repos([dirty_only, mine], mode="dirty_first", now_ts=NOW)}
         self.assertIn("dirty_only", dirty)  # but Dirty Five still carries it
 
     def test_recent_activity_orders_among_clean_authored_repos(self) -> None:
@@ -202,36 +213,35 @@ class RankingTests(unittest.TestCase):
         self.assertIn("dirty_first", str(ctx.exception))
 
     def test_limit_caps_roster(self) -> None:
-        sigs = [_sig(f"r{i}", is_dirty=True, my_last_commit_ts=NOW - i * HOUR)
-                for i in range(8)]
+        sigs = [_sig(f"r{i}", is_dirty=True, my_last_commit_ts=NOW - i * HOUR) for i in range(8)]
         self.assertEqual(len(rank_repos(sigs, mode="dirty_first", now_ts=NOW, limit=5)), 5)
 
     def test_hidden_repos_are_filtered_and_promote_next(self) -> None:
         # 6 dirty repos but a roster of 5: the hidden one must drop out and the
         # 6th must be promoted into the freed slot.
-        sigs = [_sig(f"r{i}", is_dirty=True, my_last_commit_ts=NOW - i * HOUR,
-                     repo_full_name=f"Org/r{i}") for i in range(6)]
+        sigs = [
+            _sig(f"r{i}", is_dirty=True, my_last_commit_ts=NOW - i * HOUR, repo_full_name=f"Org/r{i}") for i in range(6)
+        ]
         full = rank_repos(sigs, mode="dirty_first", now_ts=NOW, limit=5)
         self.assertEqual([r.signals.repo_name for r in full], ["r0", "r1", "r2", "r3", "r4"])
-        hidden = rank_repos(sigs, mode="dirty_first", now_ts=NOW, limit=5,
-                            hidden=["Org/r1"])
+        hidden = rank_repos(sigs, mode="dirty_first", now_ts=NOW, limit=5, hidden=["Org/r1"])
         names = [r.signals.repo_name for r in hidden]
         self.assertNotIn("r1", names)
-        self.assertIn("r5", names)          # 6th candidate promoted into the slot
+        self.assertIn("r5", names)  # 6th candidate promoted into the slot
         self.assertEqual(len(names), 5)
 
     def test_hidden_identity_falls_back_to_local_path(self) -> None:
         # A local-only repo (no remote) is hidden by its device-local path.
         local = _sig("local", is_dirty=True, local_path="/repos/local")
         other = _sig("other", is_dirty=True)
-        ranked = rank_repos([local, other], mode="dirty_first", now_ts=NOW,
-                            hidden=["/repos/local"])
+        ranked = rank_repos([local, other], mode="dirty_first", now_ts=NOW, hidden=["/repos/local"])
         self.assertEqual([r.signals.repo_name for r in ranked], ["other"])
 
 
 # ---------------------------------------------------------------------------
 # GH-81: reflog op classification (the semantic accept/reject op set)
 # ---------------------------------------------------------------------------
+
 
 class ReflogOpClassificationTests(unittest.TestCase):
     """The one place that decides 'is this reflog op a local commit?' — proven
@@ -273,26 +283,33 @@ class ReflogOpClassificationTests(unittest.TestCase):
 # GH-81: the recency fallback ladder (local_reflog → author_email → any_commit)
 # ---------------------------------------------------------------------------
 
+
 class ResolveRecencyTests(unittest.TestCase):
     def test_local_reflog_wins_when_present(self) -> None:
         ts, basis = resolve_recency(
-            reflog_commit_ts=NOW, reflog_available=True,
-            author_email_ts=NOW - DAY, any_commit_ts=NOW - 2 * DAY,
+            reflog_commit_ts=NOW,
+            reflog_available=True,
+            author_email_ts=NOW - DAY,
+            any_commit_ts=NOW - 2 * DAY,
         )
         self.assertEqual((ts, basis), (NOW, "local_reflog"))
 
     def test_falls_to_author_email_when_no_reflog_commit(self) -> None:
         ts, basis = resolve_recency(
-            reflog_commit_ts=None, reflog_available=True,
-            author_email_ts=NOW - DAY, any_commit_ts=NOW,
+            reflog_commit_ts=None,
+            reflog_available=True,
+            author_email_ts=NOW - DAY,
+            any_commit_ts=NOW,
         )
         self.assertEqual((ts, basis), (NOW - DAY, "author_email"))
 
     def test_any_commit_only_when_reflog_unavailable(self) -> None:
         # Reflog disabled + no author-email match → the last-resort rung fires.
         ts, basis = resolve_recency(
-            reflog_commit_ts=None, reflog_available=False,
-            author_email_ts=None, any_commit_ts=NOW - 3 * DAY,
+            reflog_commit_ts=None,
+            reflog_available=False,
+            author_email_ts=None,
+            any_commit_ts=NOW - 3 * DAY,
         )
         self.assertEqual((ts, basis), (NOW - 3 * DAY, "any_commit"))
 
@@ -301,8 +318,10 @@ class ResolveRecencyTests(unittest.TestCase):
         # DEFINITIVE 'I never committed here' — a foreign-only clone stays
         # ineligible (none), it must NOT fall through to any_commit.
         ts, basis = resolve_recency(
-            reflog_commit_ts=None, reflog_available=True,
-            author_email_ts=None, any_commit_ts=NOW,  # foreign commit present
+            reflog_commit_ts=None,
+            reflog_available=True,
+            author_email_ts=None,
+            any_commit_ts=NOW,  # foreign commit present
         )
         self.assertEqual((ts, basis), (None, "none"))
 
@@ -310,6 +329,7 @@ class ResolveRecencyTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # GH-81 Phase 2: operator-facing explain UX (pure)
 # ---------------------------------------------------------------------------
+
 
 class ExplainRecencyTests(unittest.TestCase):
     def test_on_roster_local_reflog_just_shows_recency(self) -> None:
@@ -353,18 +373,28 @@ class BasisBadgeTests(unittest.TestCase):
 # GH-105: single "BTW, this went dirty" banner (pure)
 # ---------------------------------------------------------------------------
 
+
 def _off_roster_row(
-    name: str, *, is_dirty: bool = True, ahead: int = 0,
-    my_local_commit_ts: int | None = NOW, modified_count: int = 1,
+    name: str,
+    *,
+    is_dirty: bool = True,
+    ahead: int = 0,
+    my_local_commit_ts: int | None = NOW,
+    modified_count: int = 1,
     untracked_count: int = 0,
 ) -> dict:
     return {
-        "repo_name": name, "local_path": f"/repos/{name}",
-        "repo_full_name": f"me/{name}", "branch": "development",
-        "ahead": ahead, "modified_count": modified_count,
-        "untracked_count": untracked_count, "is_dirty": is_dirty,
+        "repo_name": name,
+        "local_path": f"/repos/{name}",
+        "repo_full_name": f"me/{name}",
+        "branch": "development",
+        "ahead": ahead,
+        "modified_count": modified_count,
+        "untracked_count": untracked_count,
+        "is_dirty": is_dirty,
         "probed_at": "2026-07-03T00:00:00Z",
-        "my_local_commit_ts": my_local_commit_ts, "recency_basis": "local_reflog",
+        "my_local_commit_ts": my_local_commit_ts,
+        "recency_basis": "local_reflog",
     }
 
 
@@ -442,14 +472,21 @@ class OffRosterReasonTests(unittest.TestCase):
 # Real git helpers
 # ---------------------------------------------------------------------------
 
+
 def _run(cwd: Path, *args: str, env: dict | None = None) -> None:
     subprocess.run(args, cwd=cwd, check=True, capture_output=True, text=True, env=env)
 
 
 def _make_git_repo(
-    root: Path, name: str, *, user_email: str = "me@example.com",
-    author_email: str | None = None, commit: bool = True,
-    dirty: bool = False, untracked: bool = False, disable_reflog: bool = False,
+    root: Path,
+    name: str,
+    *,
+    user_email: str = "me@example.com",
+    author_email: str | None = None,
+    commit: bool = True,
+    dirty: bool = False,
+    untracked: bool = False,
+    disable_reflog: bool = False,
 ) -> Path:
     """Create a real git repo under *root*. author_email defaults to user_email.
 
@@ -469,8 +506,10 @@ def _make_git_repo(
         ae = author_email or user_email
         env = {
             **os.environ,
-            "GIT_AUTHOR_EMAIL": ae, "GIT_AUTHOR_NAME": "Author",
-            "GIT_COMMITTER_EMAIL": user_email, "GIT_COMMITTER_NAME": "Committer",
+            "GIT_AUTHOR_EMAIL": ae,
+            "GIT_AUTHOR_NAME": "Author",
+            "GIT_COMMITTER_EMAIL": user_email,
+            "GIT_COMMITTER_NAME": "Committer",
         }
         _run(repo, "git", "commit", "-q", "-m", "init", env=env)
     if dirty:
@@ -489,6 +528,7 @@ def _db(tmp: Path) -> Path:
 # ---------------------------------------------------------------------------
 # Real git: discovery
 # ---------------------------------------------------------------------------
+
 
 class DiscoveryTests(unittest.TestCase):
     def test_finds_repos_prunes_noise_and_stops_at_boundary(self) -> None:
@@ -525,6 +565,7 @@ class DiscoveryTests(unittest.TestCase):
 # Real git: probe signals
 # ---------------------------------------------------------------------------
 
+
 class ProbeTests(unittest.TestCase):
     def test_probe_reads_dirty_and_my_commit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -542,12 +583,14 @@ class ProbeTests(unittest.TestCase):
         # repo is only eligible when dirty. This is the identity-matching guard.
         with tempfile.TemporaryDirectory() as tmp:
             repo = _make_git_repo(
-                Path(tmp), "clone", user_email="me@example.com",
+                Path(tmp),
+                "clone",
+                user_email="me@example.com",
                 author_email="someoneelse@upstream.com",
             )
             s = probe_repo_signals(repo, device_id="dev", probed_at="t")
-            self.assertIsNotNone(s.last_commit_ts)     # a commit exists
-            self.assertIsNone(s.my_last_commit_ts)     # but not authored by me
+            self.assertIsNotNone(s.last_commit_ts)  # a commit exists
+            self.assertIsNone(s.my_last_commit_ts)  # but not authored by me
 
     def test_probe_on_non_repo_is_safe(self) -> None:
         # A `.git` that isn't a real repo (git failure path): no crash, defaults.
@@ -565,6 +608,7 @@ class ProbeTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # GH-81: real-git reflog vector + the fallback ladder rungs
 # ---------------------------------------------------------------------------
+
 
 class ReflogVectorProbeTests(unittest.TestCase):
     def test_local_commit_basis_is_reflog(self) -> None:
@@ -584,13 +628,15 @@ class ReflogVectorProbeTests(unittest.TestCase):
         # reflog catches the local `commit` op, so the repo is still eligible.
         with tempfile.TemporaryDirectory() as tmp:
             repo = _make_git_repo(
-                Path(tmp), "sleuth", user_email="bot@noreply.github",
+                Path(tmp),
+                "sleuth",
+                user_email="bot@noreply.github",
                 author_email="devops@neochro.me",
             )
             s = probe_repo_signals(repo, device_id="dev", probed_at="t")
-            self.assertIsNone(s.my_last_commit_ts)        # old gate would drop it
+            self.assertIsNone(s.my_last_commit_ts)  # old gate would drop it
             self.assertEqual(s.recency_basis, "local_reflog")
-            self.assertIsNotNone(s.my_local_commit_ts)    # new vector keeps it
+            self.assertIsNotNone(s.my_local_commit_ts)  # new vector keeps it
 
     def test_reflog_disabled_falls_back_to_author_email(self) -> None:
         # core.logAllRefUpdates=false → no HEAD reflog. We must NOT regress below
@@ -598,7 +644,7 @@ class ReflogVectorProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _make_git_repo(Path(tmp), "noreflog", disable_reflog=True)
             ts, available = _probe_head_reflog_commit(repo)
-            self.assertFalse(available)                   # reflog unavailable
+            self.assertFalse(available)  # reflog unavailable
             self.assertIsNone(ts)
             s = probe_repo_signals(repo, device_id="dev", probed_at="t")
             self.assertEqual(s.recency_basis, "author_email")
@@ -608,8 +654,11 @@ class ReflogVectorProbeTests(unittest.TestCase):
         # Reflog off AND no author-email match → the last-resort any_commit rung.
         with tempfile.TemporaryDirectory() as tmp:
             repo = _make_git_repo(
-                Path(tmp), "vendor", user_email="bot@noreply.github",
-                author_email="upstream@x.com", disable_reflog=True,
+                Path(tmp),
+                "vendor",
+                user_email="bot@noreply.github",
+                author_email="upstream@x.com",
+                disable_reflog=True,
             )
             s = probe_repo_signals(repo, device_id="dev", probed_at="t")
             self.assertIsNone(s.my_last_commit_ts)
@@ -632,12 +681,13 @@ class Focus5RankOracleTests(unittest.TestCase):
         # OLD merge (3d). eos: no local commit — only a stale author-email match.
         # OLD ranking (my_last_commit_ts) → eos wins (the bug). NEW ranking
         # (my_local_commit_ts) → sleuth wins (fixed).
-        sleuth = _sig("sleuth", my_last_commit_ts=NOW - 3 * DAY,
-                      my_local_commit_ts=NOW - 15 * HOUR, recency_basis="local_reflog")
-        eos = _sig("eos", my_last_commit_ts=NOW - 2 * DAY,
-                   my_local_commit_ts=NOW - 2 * DAY, recency_basis="author_email")
-        new = [r.signals.repo_name for r in
-               rank_repos([eos, sleuth], mode="recent_activity", now_ts=NOW)]
+        sleuth = _sig(
+            "sleuth", my_last_commit_ts=NOW - 3 * DAY, my_local_commit_ts=NOW - 15 * HOUR, recency_basis="local_reflog"
+        )
+        eos = _sig(
+            "eos", my_last_commit_ts=NOW - 2 * DAY, my_local_commit_ts=NOW - 2 * DAY, recency_basis="author_email"
+        )
+        new = [r.signals.repo_name for r in rank_repos([eos, sleuth], mode="recent_activity", now_ts=NOW)]
         self.assertEqual(new, ["sleuth", "eos"])
         # Document the bug the fix inverts: ranking on the old email vector alone.
         old = sorted([sleuth, eos], key=lambda s: s.my_last_commit_ts, reverse=True)
@@ -648,13 +698,11 @@ class Focus5RankOracleTests(unittest.TestCase):
             root = Path(tmp) / "repos"
             root.mkdir()
             # sleuth: a local commit authored under a non-user.email identity.
-            _make_git_repo(root, "sleuth", user_email="bot@noreply.github",
-                           author_email="devops@neochro.me")
+            _make_git_repo(root, "sleuth", user_email="bot@noreply.github", author_email="devops@neochro.me")
             # eos: receives its commit from a foreign repo via fetch+checkout — NO
             # local-commit op in its reflog (the web-merge-only analog). The
             # upstream lives OUTSIDE the scan root so it isn't itself rostered.
-            upstream = _make_git_repo(Path(tmp) / "_up", "upstream",
-                                      user_email="other@up.com")
+            upstream = _make_git_repo(Path(tmp) / "_up", "upstream", user_email="other@up.com")
             eos = root / "eos"
             eos.mkdir()
             _run(eos, "git", "init", "-q", "-b", "main")
@@ -666,11 +714,10 @@ class Focus5RankOracleTests(unittest.TestCase):
 
             db = _db(Path(tmp))
             sync_focus5(db, roots=[root], device_id="dev", mode="recent_activity")
-            out = summarize_focus5(db, device_id="dev",
-                                   with_activity=False, with_live_health=False)
+            out = summarize_focus5(db, device_id="dev", with_activity=False, with_live_health=False)
             cards = {c["repo_name"]: c for c in out["roster"]}
-            self.assertIn("sleuth", cards)            # local work surfaces
-            self.assertNotIn("eos", cards)            # web-merge-only does not
+            self.assertIn("sleuth", cards)  # local work surfaces
+            self.assertNotIn("eos", cards)  # web-merge-only does not
             # And the fix is via the reflog, not the email gate (which is blind here).
             self.assertEqual(cards["sleuth"]["recency_basis"], "local_reflog")
             self.assertIsNone(cards["sleuth"]["my_last_commit_ts"])
@@ -685,22 +732,22 @@ class Focus5LegacyRowBackfillTests(unittest.TestCase):
         from rebalance.ingest.db import db_connection, run_migrations
         from rebalance.ingest.db.migrate import discover_migrations
         from rebalance.ingest.db.schema import (
-            ensure_baseline_schema, ensure_schema_version_table,
+            ensure_baseline_schema,
+            ensure_schema_version_table,
         )
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "rebalance.db"
             with db_connection(db) as conn:
                 ensure_baseline_schema(conn)
                 ensure_schema_version_table(conn)
-                conn.execute("INSERT OR IGNORE INTO schema_version (version, applied_at) "
-                             "VALUES (1, 't')")
+                conn.execute("INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (1, 't')")
                 # Apply real migrations THROUGH 0007 (adds the NULL columns) but not 0008.
                 for ver, path in discover_migrations():
                     if ver > 7:
                         break
                     conn.executescript(path.read_text(encoding="utf-8"))
-                    conn.execute("INSERT OR IGNORE INTO schema_version (version, applied_at) "
-                                 "VALUES (?, 't')", (ver,))
+                    conn.execute("INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, 't')", (ver,))
                 # Seed a legacy row: authored commit, but NULL GH-81 recency — exactly
                 # a pre-0007 row after 0007 adds the columns.
                 conn.execute(
@@ -715,15 +762,12 @@ class Focus5LegacyRowBackfillTests(unittest.TestCase):
                 # run_migrations now applies 0008 → backfills the NULL row.
                 run_migrations(conn)
                 row = conn.execute(
-                    "SELECT my_local_commit_ts, recency_basis FROM focus5_repo_signals "
-                    "WHERE local_path='/r/legacy'"
+                    "SELECT my_local_commit_ts, recency_basis FROM focus5_repo_signals WHERE local_path='/r/legacy'"
                 ).fetchone()
                 self.assertEqual(row["my_local_commit_ts"], NOW - HOUR)
                 self.assertEqual(row["recency_basis"], "author_email")
             # The hide/rerank path (recent_activity) keeps the repo — board not blanked.
-            self.assertEqual(
-                rerank_focus5_from_cache(db, device_id="dev", mode="recent_activity"), 1
-            )
+            self.assertEqual(rerank_focus5_from_cache(db, device_id="dev", mode="recent_activity"), 1)
 
 
 class Focus5WorktreeTopologyTests(unittest.TestCase):
@@ -739,8 +783,10 @@ class Focus5WorktreeTopologyTests(unittest.TestCase):
             _run(wt, "git", "add", ".")
             env = {
                 **os.environ,
-                "GIT_AUTHOR_EMAIL": "me@example.com", "GIT_AUTHOR_NAME": "A",
-                "GIT_COMMITTER_EMAIL": "me@example.com", "GIT_COMMITTER_NAME": "A",
+                "GIT_AUTHOR_EMAIL": "me@example.com",
+                "GIT_AUTHOR_NAME": "A",
+                "GIT_COMMITTER_EMAIL": "me@example.com",
+                "GIT_COMMITTER_NAME": "A",
             }
             _run(wt, "git", "commit", "-q", "-m", "wt commit", env=env)
             self.assertTrue((wt / ".git").is_file())  # linked worktree → .git is a FILE
@@ -756,17 +802,22 @@ class Focus5WorktreeTopologyTests(unittest.TestCase):
 # Real git: sync + summarize (the read contract)
 # ---------------------------------------------------------------------------
 
+
 class SyncSummarizeTests(unittest.TestCase):
     def test_sync_ranks_persists_and_surfaces_off_roster(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repos"
             root.mkdir()
-            _make_git_repo(root, "wip", dirty=True)      # at-risk → roster
+            _make_git_repo(root, "wip", dirty=True)  # at-risk → roster
             _make_git_repo(root, "also_dirty", untracked=True)  # at-risk, off-roster (limit=1)
             db = _db(Path(tmp))
 
             result = sync_focus5(
-                db, roots=[root], device_id="dev", mode="dirty_first", limit=1,
+                db,
+                roots=[root],
+                device_id="dev",
+                mode="dirty_first",
+                limit=1,
             )
             self.assertEqual(result.discovered, 2)
             self.assertEqual(result.roster_size, 1)
@@ -782,7 +833,7 @@ class SyncSummarizeTests(unittest.TestCase):
             rostered = {c["repo_name"] for c in out["roster"]}
             warned = {w["repo_name"] for w in out["off_roster_warnings"]}
             self.assertEqual(rostered | warned, {"wip", "also_dirty"})  # both surfaced
-            self.assertEqual(rostered & warned, set())                  # never double-counted
+            self.assertEqual(rostered & warned, set())  # never double-counted
             self.assertEqual(out["summary"]["discovered"], 2)
 
     def test_resync_replaces_roster_without_duplicates(self) -> None:
@@ -801,6 +852,7 @@ class SyncSummarizeTests(unittest.TestCase):
         # A checkout/worktree deleted from disk must vanish from the roster anyway,
         # not linger from its stale cached row until the next full sync.
         import shutil
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repos"
             root.mkdir()
@@ -815,13 +867,13 @@ class SyncSummarizeTests(unittest.TestCase):
 
             out = summarize_focus5(db, device_id="dev")  # read-only, NO resync
             self.assertEqual({c["repo_name"] for c in out["roster"]}, {"keep"})
-            self.assertNotIn(
-                "gone", {w["repo_name"] for w in out["off_roster_warnings"]})
+            self.assertNotIn("gone", {w["repo_name"] for w in out["off_roster_warnings"]})
 
     def test_off_roster_drops_repo_removed_from_disk_without_resync(self) -> None:
         # GH-109, off-roster path: a deleted repo sitting in the attention strip must
         # also drop on a read-only refresh (and must not get promoted into the roster).
         import shutil
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repos"
             root.mkdir()
@@ -836,18 +888,15 @@ class SyncSummarizeTests(unittest.TestCase):
             shutil.rmtree(gone_path)  # delete the off-roster repo from disk
 
             out = summarize_focus5(db, device_id="dev")  # read-only, NO resync
-            self.assertNotIn(
-                gone_name, {w["repo_name"] for w in out["off_roster_warnings"]})
-            self.assertNotIn(
-                gone_name, {c["repo_name"] for c in out["roster"]})  # not promoted
+            self.assertNotIn(gone_name, {w["repo_name"] for w in out["off_roster_warnings"]})
+            self.assertNotIn(gone_name, {c["repo_name"] for c in out["roster"]})  # not promoted
 
     def test_newest_pr_enrichment_joins_corpus(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repos"
             root.mkdir()
             repo = _make_git_repo(root, "widget", dirty=True)
-            _run(repo, "git", "remote", "add", "origin",
-                 "https://github.com/Acme/widget.git")
+            _run(repo, "git", "remote", "add", "origin", "https://github.com/Acme/widget.git")
             db = _db(Path(tmp))
             sync_focus5(db, roots=[root], device_id="dev", mode="dirty_first")
 
@@ -855,14 +904,14 @@ class SyncSummarizeTests(unittest.TestCase):
             conn = sqlite3.connect(str(db))
             conn.row_factory = sqlite3.Row
             from rebalance.ingest.db import run_migrations
+
             run_migrations(conn)
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
                 "INSERT INTO github_items "
                 "(repo_full_name, item_type, number, title, state, html_url, fetched_at) "
                 "VALUES (?,?,?,?,?,?,?)",
-                ("Acme/widget", "pull_request", 42, "Add thing", "open",
-                 "https://github.com/Acme/widget/pull/42", now),
+                ("Acme/widget", "pull_request", 42, "Add thing", "open", "https://github.com/Acme/widget/pull/42", now),
             )
             conn.commit()
             conn.close()
@@ -921,7 +970,7 @@ class SyncSummarizeTests(unittest.TestCase):
 
             (repo / "file.txt").write_text("changed now", encoding="utf-8")
             live = summarize_focus5(db, device_id="dev", with_live_health=True)["roster"][0]
-            self.assertTrue(live["is_dirty"])            # overlay sees the new edit
+            self.assertTrue(live["is_dirty"])  # overlay sees the new edit
             self.assertTrue(live["health_available"])
             self.assertIsNotNone(live["health_probed_at"])
 
@@ -934,8 +983,10 @@ class ReadHelperTests(unittest.TestCase):
             _run(repo, "git", "add", ".")
             env = {
                 **os.environ,
-                "GIT_AUTHOR_EMAIL": "me@example.com", "GIT_AUTHOR_NAME": "A",
-                "GIT_COMMITTER_EMAIL": "me@example.com", "GIT_COMMITTER_NAME": "A",
+                "GIT_AUTHOR_EMAIL": "me@example.com",
+                "GIT_AUTHOR_NAME": "A",
+                "GIT_COMMITTER_EMAIL": "me@example.com",
+                "GIT_COMMITTER_NAME": "A",
             }
             _run(repo, "git", "commit", "-q", "-m", "second", env=env)
             items = recent_activity(str(repo), limit=3)
@@ -1027,6 +1078,7 @@ class WebRouteTests(unittest.TestCase):
         # End-to-end: seed a roster, point REBALANCE_DB at it, hit the route.
         # Pre-seeding keeps the route's lazy bootstrap from scanning the machine.
         from rebalance.ingest.sync_snapshot import get_device_id
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repos"
             root.mkdir()
@@ -1038,6 +1090,7 @@ class WebRouteTests(unittest.TestCase):
             try:
                 from fastapi.testclient import TestClient
                 from rebalance.web import app
+
                 resp = TestClient(app).get("/focus-5")
             finally:
                 os.environ.pop("REBALANCE_DB", None)
@@ -1051,6 +1104,7 @@ class WebRouteTests(unittest.TestCase):
     def _seed(self, tmp: Path):
         """Seed a fresh single-repo roster; return (db, device_id)."""
         from rebalance.ingest.sync_snapshot import get_device_id
+
         root = tmp / "repos"
         root.mkdir()
         _make_git_repo(root, "widget", dirty=True)
@@ -1062,6 +1116,7 @@ class WebRouteTests(unittest.TestCase):
     def _get(self, db: Path, url: str = "/focus-5", **kw):
         from fastapi.testclient import TestClient
         from rebalance.web import app
+
         os.environ["REBALANCE_DB"] = str(db)
         try:
             return TestClient(app).get(url, **kw)
@@ -1074,15 +1129,16 @@ class WebRouteTests(unittest.TestCase):
             # Patch the recompute so the forced refresh doesn't scan the machine.
             with mock.patch("rebalance.ingest.focus5_scan.sync_focus5") as m:
                 resp = self._get(db, "/focus-5?refresh=1", follow_redirects=False)
-            self.assertEqual(resp.status_code, 303)          # post/redirect/get
+            self.assertEqual(resp.status_code, 303)  # post/redirect/get
             self.assertEqual(resp.headers["location"], "/focus-5")
-            self.assertTrue(m.called)                        # recompute fired
+            self.assertTrue(m.called)  # recompute fired
 
     # --- /api/focus5/open — focus-if-open exec endpoint (VSCODE Phase 2) ---
 
     def _post_open(self, db: Path, payload: dict, **kw):
         from fastapi.testclient import TestClient
         from rebalance.web import app
+
         os.environ["REBALANCE_DB"] = str(db)
         try:
             return TestClient(app).post("/api/focus5/open", json=payload, **kw)
@@ -1095,6 +1151,7 @@ class WebRouteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db, _ = self._seed(Path(tmp))
             from rebalance import web
+
             os.environ["REBALANCE_DB"] = str(db)
             try:
                 allow = web._focus5_open_allowlist(db)
@@ -1102,8 +1159,8 @@ class WebRouteTests(unittest.TestCase):
                 os.environ.pop("REBALANCE_DB", None)
             self.assertTrue(allow, "seeded roster should resolve at least one repo")
             _identity, local_path = next(iter(allow.items()))
-            self.assertTrue(os.path.isdir(local_path))     # a real, server-owned path
-            self.assertNotIn("no/such-repo", allow)        # unknown id not in allowlist
+            self.assertTrue(os.path.isdir(local_path))  # a real, server-owned path
+            self.assertNotIn("no/such-repo", allow)  # unknown id not in allowlist
 
     def test_open_known_repo_runs_code_with_server_path(self) -> None:
         # Known id → the launcher runs `code <server_path>` as a direct argv (no
@@ -1111,11 +1168,12 @@ class WebRouteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db, _ = self._seed(Path(tmp))
             fake = mock.Mock(returncode=0)
-            with mock.patch("rebalance.web._request_is_local", return_value=True), \
-                 mock.patch("rebalance.web._focus5_open_allowlist",
-                            return_value={"demo/repo": "/repos/demo"}), \
-                 mock.patch("rebalance.web._resolve_code_binary", return_value="/usr/bin/code"), \
-                 mock.patch("subprocess.run", return_value=fake) as run:
+            with (
+                mock.patch("rebalance.web._request_is_local", return_value=True),
+                mock.patch("rebalance.web._focus5_open_allowlist", return_value={"demo/repo": "/repos/demo"}),
+                mock.patch("rebalance.web._resolve_code_binary", return_value="/usr/bin/code"),
+                mock.patch("subprocess.run", return_value=fake) as run,
+            ):
                 resp = self._post_open(db, {"repo": "demo/repo"})
             self.assertEqual(resp.status_code, 200)
             self.assertTrue(resp.json()["ok"])
@@ -1125,11 +1183,12 @@ class WebRouteTests(unittest.TestCase):
     def test_open_unknown_repo_is_404_and_runs_nothing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db, _ = self._seed(Path(tmp))
-            with mock.patch("rebalance.web._request_is_local", return_value=True), \
-                 mock.patch("rebalance.web._focus5_open_allowlist",
-                            return_value={"demo/repo": "/repos/demo"}), \
-                 mock.patch("rebalance.web._resolve_code_binary", return_value="/usr/bin/code"), \
-                 mock.patch("subprocess.run") as run:
+            with (
+                mock.patch("rebalance.web._request_is_local", return_value=True),
+                mock.patch("rebalance.web._focus5_open_allowlist", return_value={"demo/repo": "/repos/demo"}),
+                mock.patch("rebalance.web._resolve_code_binary", return_value="/usr/bin/code"),
+                mock.patch("subprocess.run") as run,
+            ):
                 resp = self._post_open(db, {"repo": "no/such-repo"})
             self.assertEqual(resp.status_code, 404)
             run.assert_not_called()
@@ -1137,12 +1196,13 @@ class WebRouteTests(unittest.TestCase):
     def test_open_missing_code_binary_is_409(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db, _ = self._seed(Path(tmp))
-            with mock.patch("rebalance.web._request_is_local", return_value=True), \
-                 mock.patch("rebalance.web._focus5_open_allowlist",
-                            return_value={"demo/repo": "/repos/demo"}), \
-                 mock.patch("rebalance.web._resolve_code_binary", return_value=None):
+            with (
+                mock.patch("rebalance.web._request_is_local", return_value=True),
+                mock.patch("rebalance.web._focus5_open_allowlist", return_value={"demo/repo": "/repos/demo"}),
+                mock.patch("rebalance.web._resolve_code_binary", return_value=None),
+            ):
                 resp = self._post_open(db, {"repo": "demo/repo"})
-            self.assertEqual(resp.status_code, 409)   # client falls back to vscode://
+            self.assertEqual(resp.status_code, 409)  # client falls back to vscode://
 
     def test_open_non_local_request_is_403_and_runs_nothing(self) -> None:
         # Integration: with the real guard in place, a TestClient POST (non-loopback
@@ -1182,10 +1242,13 @@ class WebRouteTests(unittest.TestCase):
         # agy QA r1 Finding 2: a VSCODE_BIN pointing at a dir (X_OK true for dirs)
         # must NOT be returned as the launcher.
         from rebalance.web import _resolve_code_binary
+
         with tempfile.TemporaryDirectory() as d:
-            with mock.patch.dict(os.environ, {"VSCODE_BIN": d}), \
-                 mock.patch("rebalance.web._VSCODE_CODE_CANDIDATES", ()), \
-                 mock.patch("shutil.which", return_value=None):
+            with (
+                mock.patch.dict(os.environ, {"VSCODE_BIN": d}),
+                mock.patch("rebalance.web._VSCODE_CODE_CANDIDATES", ()),
+                mock.patch("shutil.which", return_value=None),
+            ):
                 self.assertIsNone(_resolve_code_binary())
 
     def test_dirty_view_renders_transiently_without_resync(self) -> None:
@@ -1198,7 +1261,7 @@ class WebRouteTests(unittest.TestCase):
             self.assertEqual(resp.status_code, 200)
             self.assertIn("Dirty Five", resp.text)
             self.assertIn("widget", resp.text)
-            self.assertFalse(m.called)                       # transient re-rank, no scan
+            self.assertFalse(m.called)  # transient re-rank, no scan
 
     def test_fresh_roster_skips_recompute(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1206,7 +1269,7 @@ class WebRouteTests(unittest.TestCase):
             with mock.patch("rebalance.ingest.focus5_scan.sync_focus5") as m:
                 resp = self._get(db)
             self.assertEqual(resp.status_code, 200)
-            self.assertFalse(m.called)                       # within TTL → no scan
+            self.assertFalse(m.called)  # within TTL → no scan
 
     def test_stale_roster_serves_cached_without_blocking_scan(self) -> None:
         # sync_focus5() is a ~30s synchronous git scan; a stale page load must NOT
@@ -1223,8 +1286,8 @@ class WebRouteTests(unittest.TestCase):
             with mock.patch("rebalance.ingest.focus5_scan.sync_focus5") as m:
                 resp = self._get(db)
             self.assertEqual(resp.status_code, 200)
-            self.assertFalse(m.called)                       # stale → no inline scan
-            self.assertIn("⚠ stale", resp.text)             # but the staleness is surfaced
+            self.assertFalse(m.called)  # stale → no inline scan
+            self.assertIn("⚠ stale", resp.text)  # but the staleness is surfaced
 
     # --- /focus-5.json — the read-only JSON contract the macOS app consumes ---
 
@@ -1247,8 +1310,7 @@ class WebRouteTests(unittest.TestCase):
             data = resp.json()
             self.assertEqual(
                 set(data),
-                {"roster", "off_roster_warnings", "dirty_banner", "computed_at",
-                 "ranking_mode", "summary"},
+                {"roster", "off_roster_warnings", "dirty_banner", "computed_at", "ranking_mode", "summary"},
             )
             self.assertLessEqual(len(data["roster"]), 5)
             self.assertEqual(
@@ -1256,9 +1318,19 @@ class WebRouteTests(unittest.TestCase):
                 {"discovered", "roster_size", "off_roster_attention", "rank_cutoff_ts"},
             )
             card = data["roster"][0]
-            for key in ("position", "repo_name", "local_path", "vscode_url",
-                        "branch", "is_dirty", "newest_pr", "recent_activity",
-                        "health_available", "my_local_commit_ts", "recency_basis"):
+            for key in (
+                "position",
+                "repo_name",
+                "local_path",
+                "vscode_url",
+                "branch",
+                "is_dirty",
+                "newest_pr",
+                "recent_activity",
+                "health_available",
+                "my_local_commit_ts",
+                "recency_basis",
+            ):
                 self.assertIn(key, card)
             self.assertTrue(card["vscode_url"].startswith("vscode://file"))
 
@@ -1271,7 +1343,7 @@ class WebRouteTests(unittest.TestCase):
             with mock.patch("rebalance.ingest.focus5_scan.sync_focus5") as m:
                 resp = self._get(db, "/focus-5.json")
             self.assertEqual(resp.status_code, 200)
-            self.assertFalse(m.called)                       # GET never scans
+            self.assertFalse(m.called)  # GET never scans
             self.assertEqual(self._roster_rows(db), before)  # GET never writes
 
     def test_focus5_json_dirty_view_reranks_without_write(self) -> None:
@@ -1290,15 +1362,14 @@ class WebRouteTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from rebalance.paths import DatabaseNotFoundError
         from rebalance.web import app
-        with mock.patch("rebalance.paths.resolve_database_path",
-                        side_effect=DatabaseNotFoundError([])):
+
+        with mock.patch("rebalance.paths.resolve_database_path", side_effect=DatabaseNotFoundError([])):
             resp = TestClient(app).get("/focus-5.json")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(
             set(data),
-            {"roster", "off_roster_warnings", "dirty_banner", "computed_at",
-             "ranking_mode", "summary"},
+            {"roster", "off_roster_warnings", "dirty_banner", "computed_at", "ranking_mode", "summary"},
         )
         self.assertEqual(data["roster"], [])
         self.assertEqual(data["summary"]["roster_size"], 0)
@@ -1308,9 +1379,11 @@ class WebRouteTests(unittest.TestCase):
 # Hide → ignore → re-rank
 # ---------------------------------------------------------------------------
 
+
 def _seed_signals(db: Path, sigs: list[RepoSignals]) -> None:
     """Insert raw signals into the focus5_repo_signals cache (no git probe)."""
     from rebalance.ingest.db import db_connection, run_migrations
+
     with db_connection(db) as conn:
         run_migrations(conn)
         ph = ", ".join("?" for _ in _SIGNAL_COLUMNS)
@@ -1326,6 +1399,7 @@ class _ConfigIsolated(unittest.TestCase):
 
     def setUp(self) -> None:
         import rebalance.ingest.config as config_module
+
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self._cfg_mod = config_module
@@ -1338,12 +1412,15 @@ class _ConfigIsolated(unittest.TestCase):
 class Focus5HiddenConfigTests(_ConfigIsolated):
     def test_add_remove_dedupe_list_and_is_hidden(self) -> None:
         from rebalance.ingest.config import (
-            add_focus5_hidden_repo, get_focus5_hidden_repos,
-            is_focus5_repo_hidden, remove_focus5_hidden_repo,
+            add_focus5_hidden_repo,
+            get_focus5_hidden_repos,
+            is_focus5_repo_hidden,
+            remove_focus5_hidden_repo,
         )
+
         self.assertEqual(get_focus5_hidden_repos(), [])
         self.assertTrue(add_focus5_hidden_repo("Org/a"))
-        self.assertFalse(add_focus5_hidden_repo("Org/a"))      # idempotent
+        self.assertFalse(add_focus5_hidden_repo("Org/a"))  # idempotent
         self.assertTrue(add_focus5_hidden_repo("  /repos/b  "))  # trims
         self.assertTrue(is_focus5_repo_hidden("Org/a"))
         self.assertFalse(is_focus5_repo_hidden("Org/z"))
@@ -1356,28 +1433,30 @@ class Focus5HiddenConfigTests(_ConfigIsolated):
 class Focus5ScanRootsConfigTests(_ConfigIsolated):
     def test_add_seeds_from_effective_then_appends_and_is_idempotent(self) -> None:
         from rebalance.ingest.config import (
-            add_focus5_scan_root, get_focus5_scan_roots, remove_focus5_scan_root,
+            add_focus5_scan_root,
+            get_focus5_scan_roots,
+            remove_focus5_scan_root,
         )
+
         default = get_focus5_scan_roots()  # effective default (repo_scan_roots)
         self.assertTrue(add_focus5_scan_root("/tmp/extra-root"))
         roots = get_focus5_scan_roots()
         self.assertIn("/tmp/extra-root", roots)
         for d in default:
-            self.assertIn(d, roots)        # existing scope preserved, not dropped
+            self.assertIn(d, roots)  # existing scope preserved, not dropped
         self.assertFalse(add_focus5_scan_root("/tmp/extra-root"))  # idempotent
         self.assertTrue(remove_focus5_scan_root("/tmp/extra-root"))
         self.assertNotIn("/tmp/extra-root", get_focus5_scan_roots())
 
     def test_add_expands_user_home(self) -> None:
         from rebalance.ingest.config import add_focus5_scan_root, get_focus5_scan_roots
+
         add_focus5_scan_root("~/some-dev-dir")
-        self.assertTrue(
-            any(r.endswith("/some-dev-dir") and "~" not in r
-                for r in get_focus5_scan_roots())
-        )
+        self.assertTrue(any(r.endswith("/some-dev-dir") and "~" not in r for r in get_focus5_scan_roots()))
 
     def test_empty_path_rejected(self) -> None:
         from rebalance.ingest.config import add_focus5_scan_root
+
         with self.assertRaises(ValueError):
             add_focus5_scan_root("   ")
 
@@ -1385,13 +1464,16 @@ class Focus5ScanRootsConfigTests(_ConfigIsolated):
 class Focus5RankingModeDefaultTests(_ConfigIsolated):
     def test_unset_defaults_to_recent_activity(self) -> None:
         from rebalance.ingest.config import get_focus5_ranking_mode
+
         # Fresh config (no focus5_ranking_mode key) → the headline view.
         self.assertEqual(get_focus5_ranking_mode(), "recent_activity")
 
     def test_explicit_mode_still_wins(self) -> None:
         from rebalance.ingest.config import (
-            get_focus5_ranking_mode, set_focus5_ranking_mode,
+            get_focus5_ranking_mode,
+            set_focus5_ranking_mode,
         )
+
         set_focus5_ranking_mode("dirty_first")
         self.assertEqual(get_focus5_ranking_mode(), "dirty_first")
 
@@ -1399,6 +1481,7 @@ class Focus5RankingModeDefaultTests(_ConfigIsolated):
         # The getter's unset default and DEFAULT_RANKING_MODE must not drift.
         from rebalance.ingest.config import get_focus5_ranking_mode
         from rebalance.ingest.focus5_scan import DEFAULT_RANKING_MODE
+
         self.assertEqual(get_focus5_ranking_mode(), DEFAULT_RANKING_MODE)
 
 
@@ -1406,51 +1489,61 @@ class Focus5RerankHideTests(_ConfigIsolated):
     def _dirty(self, name: str) -> RepoSignals:
         # Dirty AND authored, so it's eligible under every mode (recent_activity
         # — the default rerank_focus5_from_cache uses — as well as dirty_first).
-        return _sig(name, device_id="dev", is_dirty=True, modified_count=1,
-                    my_last_commit_ts=NOW - HOUR,
-                    local_path=f"/repos/{name}", repo_full_name=f"Org/{name}")
+        return _sig(
+            name,
+            device_id="dev",
+            is_dirty=True,
+            modified_count=1,
+            my_last_commit_ts=NOW - HOUR,
+            local_path=f"/repos/{name}",
+            repo_full_name=f"Org/{name}",
+        )
 
     def test_hide_rerank_drops_repo_then_unhide_restores(self) -> None:
         _seed_signals(self.db, [self._dirty(n) for n in ("a", "b", "c")])
         # Initial re-rank from cache: all three eligible.
-        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev",
-                                                  mode="dirty_first"), 3)
+        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev", mode="dirty_first"), 3)
         # Hide one and re-rank: it drops out, board refills with the rest.
         from rebalance.ingest.config import (
-            add_focus5_hidden_repo, remove_focus5_hidden_repo,
+            add_focus5_hidden_repo,
+            remove_focus5_hidden_repo,
         )
+
         add_focus5_hidden_repo("Org/b")
-        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev",
-                                                  mode="dirty_first"), 2)
-        out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                               with_activity=False, with_live_health=False)
+        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev", mode="dirty_first"), 2)
+        out = summarize_focus5(
+            self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+        )
         self.assertEqual({c["repo_name"] for c in out["roster"]}, {"a", "c"})
         # And it must NOT resurface in the off-roster "needs attention" strip —
         # hiding a dirty repo should silence it, not relocate it to the nag list.
         self.assertNotIn("b", {w["repo_name"] for w in out["off_roster_warnings"]})
         # Un-hide restores it on the next re-rank (reversible — not a one-way door).
         remove_focus5_hidden_repo("Org/b")
-        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev",
-                                                  mode="dirty_first"), 3)
+        self.assertEqual(rerank_focus5_from_cache(self.db, device_id="dev", mode="dirty_first"), 3)
 
     def test_web_helper_hides_and_reranks_from_cache(self) -> None:
         import rebalance.web as web
+
         _seed_signals(self.db, [self._dirty(n) for n in ("a", "b", "c")])
-        with mock.patch("rebalance.ingest.focus5_scan.get_device_id", return_value="dev"), \
-             mock.patch("rebalance.paths.resolve_database_path", return_value=self.db):
+        with (
+            mock.patch("rebalance.ingest.focus5_scan.get_device_id", return_value="dev"),
+            mock.patch("rebalance.paths.resolve_database_path", return_value=self.db),
+        ):
             res = web.focus5_set_hidden("Org/b", hidden=True)
-            self.assertEqual(res, {"ok": True, "changed": True,
-                                   "reranked": True, "roster_size": 2})
-            out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                                   with_activity=False, with_live_health=False)
+            self.assertEqual(res, {"ok": True, "changed": True, "reranked": True, "roster_size": 2})
+            out = summarize_focus5(
+                self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+            )
             self.assertNotIn("b", {c["repo_name"] for c in out["roster"]})
         from rebalance.ingest.config import get_focus5_hidden_repos
+
         self.assertIn("Org/b", get_focus5_hidden_repos())
 
     def test_web_helper_rejects_empty_identity(self) -> None:
         import rebalance.web as web
-        self.assertEqual(web.focus5_set_hidden("  ", hidden=True),
-                         {"ok": False, "error": "empty repo identity"})
+
+        self.assertEqual(web.focus5_set_hidden("  ", hidden=True), {"ok": False, "error": "empty repo identity"})
 
 
 class Focus5TransientViewTests(_ConfigIsolated):
@@ -1460,40 +1553,63 @@ class Focus5TransientViewTests(_ConfigIsolated):
     def _seed_two(self) -> None:
         # clean_recent wins recent_activity (newest authored); dirty_old wins
         # dirty_first (at-risk). So the two modes produce inverted rosters.
-        clean_recent = _sig("clean_recent", device_id="dev", my_last_commit_ts=NOW,
-                            local_path="/repos/clean_recent", repo_full_name="Org/clean_recent")
-        dirty_old = _sig("dirty_old", device_id="dev", is_dirty=True, modified_count=2,
-                        my_last_commit_ts=NOW - 5 * DAY,
-                        local_path="/repos/dirty_old", repo_full_name="Org/dirty_old")
+        clean_recent = _sig(
+            "clean_recent",
+            device_id="dev",
+            my_last_commit_ts=NOW,
+            local_path="/repos/clean_recent",
+            repo_full_name="Org/clean_recent",
+        )
+        dirty_old = _sig(
+            "dirty_old",
+            device_id="dev",
+            is_dirty=True,
+            modified_count=2,
+            my_last_commit_ts=NOW - 5 * DAY,
+            local_path="/repos/dirty_old",
+            repo_full_name="Org/dirty_old",
+        )
         _seed_signals(self.db, [clean_recent, dirty_old])
 
     def test_transient_view_does_not_mutate_persisted_roster(self) -> None:
         self._seed_two()
         # Persist the default recent_activity roster.
         rerank_focus5_from_cache(self.db, device_id="dev", mode="recent_activity")
-        default = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                                   with_activity=False, with_live_health=False)
-        self.assertEqual([c["repo_name"] for c in default["roster"]],
-                         ["clean_recent", "dirty_old"])
+        default = summarize_focus5(
+            self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+        )
+        self.assertEqual([c["repo_name"] for c in default["roster"]], ["clean_recent", "dirty_old"])
         self.assertEqual(default["ranking_mode"], "recent_activity")
 
         # Transient Dirty Five view: dirty_first ordering, same signal cache.
-        dirty = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False, mode="dirty_first",
-                                 with_activity=False, with_live_health=False)
+        dirty = summarize_focus5(
+            self.db,
+            device_id="dev",
+            drop_missing_paths=False,
+            mode="dirty_first",
+            with_activity=False,
+            with_live_health=False,
+        )
         self.assertEqual(dirty["roster"][0]["repo_name"], "dirty_old")
         self.assertEqual(dirty["ranking_mode"], "dirty_first")
 
         # The persisted roster is UNTOUCHED — re-read still recent_activity order.
-        again = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                                 with_activity=False, with_live_health=False)
-        self.assertEqual([c["repo_name"] for c in again["roster"]],
-                         ["clean_recent", "dirty_old"])
+        again = summarize_focus5(
+            self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+        )
+        self.assertEqual([c["repo_name"] for c in again["roster"]], ["clean_recent", "dirty_old"])
         self.assertEqual(again["ranking_mode"], "recent_activity")
 
     def test_transient_view_carries_signal_freshness(self) -> None:
         self._seed_two()
-        out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False, mode="dirty_first",
-                               with_activity=False, with_live_health=False)
+        out = summarize_focus5(
+            self.db,
+            device_id="dev",
+            drop_missing_paths=False,
+            mode="dirty_first",
+            with_activity=False,
+            with_live_health=False,
+        )
         # computed_at reflects the cached signals' probed_at (the last sync).
         self.assertEqual(out["computed_at"], "2026-06-05T00:00:00Z")
 
@@ -1504,32 +1620,54 @@ class DirtyBannerIntegrationTests(_ConfigIsolated):
     Dirty Five tests above (deterministic — no real git commit timing)."""
 
     def _seed(self) -> None:
-        clean_active = _sig("clean_active", device_id="dev", my_last_commit_ts=NOW,
-                            local_path="/repos/clean_active", repo_full_name="Org/clean_active")
-        dirty_leftover = _sig("dirty_leftover", device_id="dev", is_dirty=True,
-                              modified_count=3, my_last_commit_ts=NOW - 5 * DAY,
-                              local_path="/repos/dirty_leftover",
-                              repo_full_name="Org/dirty_leftover")
+        clean_active = _sig(
+            "clean_active",
+            device_id="dev",
+            my_last_commit_ts=NOW,
+            local_path="/repos/clean_active",
+            repo_full_name="Org/clean_active",
+        )
+        dirty_leftover = _sig(
+            "dirty_leftover",
+            device_id="dev",
+            is_dirty=True,
+            modified_count=3,
+            my_last_commit_ts=NOW - 5 * DAY,
+            local_path="/repos/dirty_leftover",
+            repo_full_name="Org/dirty_leftover",
+        )
         _seed_signals(self.db, [clean_active, dirty_leftover])
 
     def test_dirty_banner_surfaces_the_repo_pushed_off_the_roster(self) -> None:
         self._seed()
         rerank_focus5_from_cache(self.db, device_id="dev", mode="recent_activity", limit=1)
-        out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                               with_activity=False, with_live_health=False)
+        out = summarize_focus5(
+            self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+        )
         self.assertEqual([c["repo_name"] for c in out["roster"]], ["clean_active"])
         self.assertIsNotNone(out["dirty_banner"])
         self.assertEqual(out["dirty_banner"]["repo_name"], "dirty_leftover")
 
     def test_dirty_banner_absent_when_off_roster_is_all_clean(self) -> None:
-        older_clean = _sig("older_clean", device_id="dev", my_last_commit_ts=NOW - DAY,
-                           local_path="/repos/older_clean", repo_full_name="Org/older_clean")
-        newer_clean = _sig("newer_clean", device_id="dev", my_last_commit_ts=NOW,
-                           local_path="/repos/newer_clean", repo_full_name="Org/newer_clean")
+        older_clean = _sig(
+            "older_clean",
+            device_id="dev",
+            my_last_commit_ts=NOW - DAY,
+            local_path="/repos/older_clean",
+            repo_full_name="Org/older_clean",
+        )
+        newer_clean = _sig(
+            "newer_clean",
+            device_id="dev",
+            my_last_commit_ts=NOW,
+            local_path="/repos/newer_clean",
+            repo_full_name="Org/newer_clean",
+        )
         _seed_signals(self.db, [older_clean, newer_clean])
         rerank_focus5_from_cache(self.db, device_id="dev", mode="recent_activity", limit=1)
-        out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False,
-                               with_activity=False, with_live_health=False)
+        out = summarize_focus5(
+            self.db, device_id="dev", drop_missing_paths=False, with_activity=False, with_live_health=False
+        )
         self.assertIsNone(out["dirty_banner"])
 
     def test_dirty_banner_is_none_on_transient_dirty_five_rerank(self) -> None:
@@ -1537,8 +1675,14 @@ class DirtyBannerIntegrationTests(_ConfigIsolated):
         # would be redundant there, so it must be suppressed (mode is not None).
         self._seed()
         rerank_focus5_from_cache(self.db, device_id="dev", mode="recent_activity", limit=1)
-        out = summarize_focus5(self.db, device_id="dev", drop_missing_paths=False, mode="dirty_first",
-                               with_activity=False, with_live_health=False)
+        out = summarize_focus5(
+            self.db,
+            device_id="dev",
+            drop_missing_paths=False,
+            mode="dirty_first",
+            with_activity=False,
+            with_live_health=False,
+        )
         self.assertIsNone(out["dirty_banner"])
 
 

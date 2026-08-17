@@ -214,9 +214,7 @@ class CrashLoopDetectionRetainedTests(unittest.TestCase):
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[1]
-        source = (root / "utils" / "3-eyes" / "three_eyes" / "health.py").read_text(
-            encoding="utf-8"
-        )
+        source = (root / "utils" / "3-eyes" / "three_eyes" / "health.py").read_text(encoding="utf-8")
         self.assertNotIn("crash_state", source)
 
 
@@ -236,10 +234,9 @@ class DependencyDirectionTests(unittest.TestCase):
         3-Eyes exactly in the degraded conditions it is designed to survive."""
         from pathlib import Path
 
-        source = (
-            Path(__file__).resolve().parents[1]
-            / "utils" / "3-eyes" / "three_eyes" / "config.py"
-        ).read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "utils" / "3-eyes" / "three_eyes" / "config.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("ROOT.parent.parent", source)
 
     def test_bridge_is_importable_without_fastapi_web_module(self) -> None:

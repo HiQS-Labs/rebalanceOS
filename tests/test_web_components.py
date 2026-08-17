@@ -1,10 +1,14 @@
 """Tests for the shared web components (rebalance.web_components)."""
+
 from __future__ import annotations
 
 import unittest
 
 from rebalance.web_components import (
-    RB_BUTTON_CSS, badge_html, button_link, render_shell,
+    RB_BUTTON_CSS,
+    badge_html,
+    button_link,
+    render_shell,
 )
 
 
@@ -14,7 +18,7 @@ class ButtonLinkTests(unittest.TestCase):
         self.assertIn('class="rb-btn"', out)
         self.assertIn('href="vscode://file/x"', out)
         self.assertIn("Open", out)
-        self.assertIn("↗", out)                                  # the standard affordance
+        self.assertIn("↗", out)  # the standard affordance
         self.assertIn('class="rb-btn-arrow"', out)
 
     def test_external_adds_new_tab_rel(self) -> None:
@@ -29,15 +33,14 @@ class ButtonLinkTests(unittest.TestCase):
         self.assertNotIn("↗", button_link("Plain", "/x", arrow=False))
 
     def test_extra_class_is_appended(self) -> None:
-        self.assertIn('class="rb-btn hero-open"',
-                      button_link("Open in Obsidian", "obsidian://x", cls="hero-open"))
+        self.assertIn('class="rb-btn hero-open"', button_link("Open in Obsidian", "obsidian://x", cls="hero-open"))
 
     def test_title_and_values_are_escaped(self) -> None:
         out = button_link('a"b', 'https://x/?q="&z', title='t"<>')
-        self.assertNotIn('q="&z"', out)            # href quote/amp escaped
+        self.assertNotIn('q="&z"', out)  # href quote/amp escaped
         self.assertIn("&amp;", out)
-        self.assertIn("&quot;", out)               # the quote in label/href/title
-        self.assertNotIn("<>", out)                # title angle brackets escaped
+        self.assertIn("&quot;", out)  # the quote in label/href/title
+        self.assertNotIn("<>", out)  # title angle brackets escaped
 
     def test_css_targets_the_class_and_themes_via_accent(self) -> None:
         self.assertIn(".rb-btn", RB_BUTTON_CSS)
@@ -69,7 +72,7 @@ class RenderShellTests(unittest.TestCase):
     def test_emits_sidebar_and_active_marker(self) -> None:
         out = render_shell("Focus 5", "<p>body</p>", active="focus5")
         self.assertIn('<aside class="sidebar"', out)
-        self.assertIn("<p>body</p>", out)                       # body passed through
+        self.assertIn("<p>body</p>", out)  # body passed through
         # The active nav item carries class="active" on its <li>.
         self.assertIn('<li class="active"><a href="/focus-5">Focus 5</a></li>', out)
         # A non-active item must NOT be marked active.
@@ -77,9 +80,9 @@ class RenderShellTests(unittest.TestCase):
 
     def test_style_block_layers_tokens_chrome_and_button(self) -> None:
         out = render_shell("Home", "x", active="today", page_css=".pg{color:red}")
-        self.assertIn("--accent", out)    # RB_TOKENS_CSS
-        self.assertIn(".app", out)        # RB_CHROME_CSS
-        self.assertIn(".rb-btn", out)     # RB_BUTTON_CSS
+        self.assertIn("--accent", out)  # RB_TOKENS_CSS
+        self.assertIn(".app", out)  # RB_CHROME_CSS
+        self.assertIn(".rb-btn", out)  # RB_BUTTON_CSS
         self.assertIn(".pg{color:red}", out)  # page_css slotted in
 
     def test_wide_maps_to_bare_main_class(self) -> None:

@@ -75,8 +75,11 @@ class TestPulseSelfRepair:
             _remote, local = _make_repos(tmp)
 
             result = _commit_and_push_if_changed(
-                local, "pulse.md", "# updated content\n",
-                push=True, commit_message="test: clean push",
+                local,
+                "pulse.md",
+                "# updated content\n",
+                push=True,
+                commit_message="test: clean push",
             )
 
         assert result["pushed"] is True
@@ -92,8 +95,11 @@ class TestPulseSelfRepair:
             _push_competing_commit(remote, tmp)
 
             result = _commit_and_push_if_changed(
-                local, "pulse.md", "# repaired content\n",
-                push=True, commit_message="test: should repair",
+                local,
+                "pulse.md",
+                "# repaired content\n",
+                push=True,
+                commit_message="test: should repair",
             )
 
         assert result["pushed"] is True, f"expected pushed=True, got: {result}"
@@ -106,8 +112,11 @@ class TestPulseSelfRepair:
             _remote, local = _make_repos(tmp)
 
             result = _commit_and_push_if_changed(
-                local, "pulse.md", "# initial\n",  # same as seed content
-                push=True, commit_message="test: no change",
+                local,
+                "pulse.md",
+                "# initial\n",  # same as seed content
+                push=True,
+                commit_message="test: no change",
             )
 
         assert result["pushed"] is False
@@ -127,8 +136,11 @@ class TestPulseSelfRepair:
             _git(["commit", "-m", "conflicting local commit"], cwd=local)
 
             result = _commit_and_push_if_changed(
-                local, "pulse.md", "# after conflict\n",
-                push=True, commit_message="test: conflict repair",
+                local,
+                "pulse.md",
+                "# after conflict\n",
+                push=True,
+                commit_message="test: conflict repair",
             )
 
         # Either the rebase resolved cleanly (unlikely with this conflict shape)
@@ -145,8 +157,11 @@ class TestPulseSelfRepair:
             _push_competing_commit(remote, tmp)
 
             result = _commit_and_push_if_changed(
-                local, "pulse.md", expected_content,
-                push=True, commit_message="test: content preservation",
+                local,
+                "pulse.md",
+                expected_content,
+                push=True,
+                commit_message="test: content preservation",
             )
 
             assert result["pushed"] is True, f"expected pushed=True, got: {result}"
@@ -185,6 +200,7 @@ class TestPulseSelfRepair:
         """reset_hard must not be in the bounded action menu exposed to autonomous repair."""
         from rebalance.ingest.pulse import _push_repair_actions
         from pathlib import Path
+
         actions = _push_repair_actions(Path("/tmp"))
         assert "reset_hard" not in actions, (
             "reset_hard must be excluded from the autonomous menu — "

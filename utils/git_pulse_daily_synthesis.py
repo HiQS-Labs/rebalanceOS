@@ -57,6 +57,7 @@ try:
         log_job_failed,
         log_job_started as _ljs,
     )
+
     _JOB_LOG = True
 except ImportError:
     _JOB_LOG = False
@@ -189,6 +190,7 @@ Activity data:
 {data}
 """
 
+
 def collect_today_activity(dry_run: bool = False, force: bool = False) -> tuple[str | None, int]:
     """Shells out to view.sh --today and returns the TSV stdout string and exit code."""
     repo_root = Path(__file__).resolve().parent.parent
@@ -301,8 +303,10 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
     now = now or datetime.now()
 
     if not force and is_late_run(now):
-        log(f"SKIP: late catch-up run at {now:%H:%M} (< {RUN_HOUR_FLOOR:02d}:00) — the 00:00 "
-            f"rollover has already moved Today->Yesterday. Writing nothing.")
+        log(
+            f"SKIP: late catch-up run at {now:%H:%M} (< {RUN_HOUR_FLOOR:02d}:00) — the 00:00 "
+            f"rollover has already moved Today->Yesterday. Writing nothing."
+        )
         return 0
 
     # vault_ready() gates ONLY the Obsidian write below — collecting/synthesizing
@@ -314,6 +318,7 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
         log(f"{TODAY_FILE.name} missing — the rollover owns file creation. Skipping the vault write.")
 
     from rebalance.ingest.config import get_pulse_config
+
     clio_enabled = bool(get_pulse_config().get("git_pulse_clio_enabled"))
 
     if not vault_write_ready and not clio_enabled:
@@ -387,12 +392,11 @@ def show_status() -> int:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="print the block that would be written; change nothing")
-    parser.add_argument("--force", action="store_true",
-                        help="bypass the 6 PM floor guard for manual runs (uses real current time)")
-    parser.add_argument("--status", action="store_true",
-                        help="show vault/block state, then exit")
+    parser.add_argument("--dry-run", action="store_true", help="print the block that would be written; change nothing")
+    parser.add_argument(
+        "--force", action="store_true", help="bypass the 6 PM floor guard for manual runs (uses real current time)"
+    )
+    parser.add_argument("--status", action="store_true", help="show vault/block state, then exit")
     args = parser.parse_args(argv)
 
     if args.status:

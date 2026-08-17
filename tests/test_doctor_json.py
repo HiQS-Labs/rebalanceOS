@@ -31,11 +31,7 @@ NOW = datetime(2026, 8, 16, 12, 0, 0, tzinfo=timezone.utc)
 def _recent_sleuth_status() -> dict:
     """Index-status snapshot showing sleuth synced an hour ago — inside its
     48h suppression window, so a sleuth WARN must reconcile away."""
-    return {
-        "sources": {
-            "sleuth": {"last_synced_at": (NOW - timedelta(hours=1)).isoformat()}
-        }
-    }
+    return {"sources": {"sleuth": {"last_synced_at": (NOW - timedelta(hours=1)).isoformat()}}}
 
 
 class CheckDispositionTests(unittest.TestCase):
@@ -73,9 +69,7 @@ class CheckDispositionTests(unittest.TestCase):
 
     def test_configured_notice_pattern_demotes_to_notice(self) -> None:
         checks = [Check("launchd: com.x.optional", WARN, "", severity=WARNING)]
-        health = compute_health_status(
-            checks, {}, NOW, notice_patterns=["com.x.optional"]
-        )
+        health = compute_health_status(checks, {}, NOW, notice_patterns=["com.x.optional"])
         d = {c.name: disp for c, disp in check_dispositions(checks, health)}
         self.assertEqual("notice", d["launchd: com.x.optional"])
 
@@ -102,9 +96,7 @@ class DoctorJsonCliTests(unittest.TestCase):
             return runner.invoke(app, ["doctor", "--json"])
 
     def test_stdout_is_valid_json_with_verdict_and_dispositions(self) -> None:
-        report = DoctorReport(
-            checks=[Check("db", OK, "fine"), Check("token", WARN, "stale")]
-        )
+        report = DoctorReport(checks=[Check("db", OK, "fine"), Check("token", WARN, "stale")])
         result = self._invoke(report)
         payload = json.loads(result.stdout)
         self.assertEqual(WARN, payload["verdict"])
@@ -147,10 +139,7 @@ class DoctorJsonCliTests(unittest.TestCase):
         """The 4.2-pinned blast radius, activated: a WARN-status ERROR-severity
         check (dashboard shows an error, old CLI exited 0) now exits 1 —
         the CLI/dashboard disagreement this phase exists to close."""
-        report = DoctorReport(
-            checks=[Check("github data", WARN, "no github data ingested",
-                          severity=ERROR)]
-        )
+        report = DoctorReport(checks=[Check("github data", WARN, "no github data ingested", severity=ERROR)])
         result = self._invoke(report)
         self.assertEqual(1, result.exit_code)
         self.assertEqual(FAIL, json.loads(result.stdout)["verdict"])

@@ -119,14 +119,18 @@ class OnboardingEndToEndTests(unittest.TestCase):
     def test_setup_status_flips_done_after_promote(self):
         def status_report():
             sandbox = Path(self._tmp.name)
-            with patch(f"{CONFIG}.get_config_path", return_value=config_module.CONFIG_PATH), \
-                 patch(f"{CONFIG}.get_vault_path", return_value=str(self.vault)), \
-                 patch(f"{CONFIG}.get_github_token", return_value="fake-token"), \
-                 patch(f"{CONFIG}.get_calendar_oauth_token_json", return_value=None), \
-                 patch(f"{CONFIG}.get_gmail_oauth_token_json", return_value=None), \
-                 patch("rebalance.ingest.lifecycle._launch_agents_dir", return_value=sandbox / "LaunchAgents"), \
-                 patch("rebalance.ingest.lifecycle._pulse_html_path", return_value=sandbox / "web" / "pulse.html"), \
-                 patch("rebalance.paths.resolve_oauth_token_path", side_effect=lambda svc: sandbox / f"oauth-{svc}.json"):
+            with (
+                patch(f"{CONFIG}.get_config_path", return_value=config_module.CONFIG_PATH),
+                patch(f"{CONFIG}.get_vault_path", return_value=str(self.vault)),
+                patch(f"{CONFIG}.get_github_token", return_value="fake-token"),
+                patch(f"{CONFIG}.get_calendar_oauth_token_json", return_value=None),
+                patch(f"{CONFIG}.get_gmail_oauth_token_json", return_value=None),
+                patch("rebalance.ingest.lifecycle._launch_agents_dir", return_value=sandbox / "LaunchAgents"),
+                patch("rebalance.ingest.lifecycle._pulse_html_path", return_value=sandbox / "web" / "pulse.html"),
+                patch(
+                    "rebalance.paths.resolve_oauth_token_path", side_effect=lambda svc: sandbox / f"oauth-{svc}.json"
+                ),
+            ):
                 Path(config_module.CONFIG_PATH).write_text("{}")
                 return evaluate_setup(vault_path=self.vault, database_path=self.db)
 
@@ -178,9 +182,7 @@ class ProvenancePushRoundTripTests(unittest.TestCase):
             db = root / "rebalance.db"
 
             registry = Registry(
-                active_projects=[
-                    Project(name="acme/site", provenance="remote-activity", repos=["acme/site"])
-                ]
+                active_projects=[Project(name="acme/site", provenance="remote-activity", repos=["acme/site"])]
             )
             save_registry(registry_path, registry)
             sync_registry("pull", registry_path, projects_yaml, db)  # md -> yaml + db
@@ -206,21 +208,31 @@ class OptionalOfferInterruptTests(unittest.TestCase):
         from rebalance.cli import onboard as onboard_module
 
         fake_report = {
-            "stages": [{
-                "id": "calendar_auth", "title": "Google Calendar",
-                "optional": True, "status": "next",
-                "detail": "no token", "remediation": "run the script",
-                "executor": "script:scripts/setup_calendar_oauth.py",
-                "requires": [], "complete": False,
-            }],
-            "now": None, "setup_complete": True,
-            "required_remaining": [], "contract_version": 2,
+            "stages": [
+                {
+                    "id": "calendar_auth",
+                    "title": "Google Calendar",
+                    "optional": True,
+                    "status": "next",
+                    "detail": "no token",
+                    "remediation": "run the script",
+                    "executor": "script:scripts/setup_calendar_oauth.py",
+                    "requires": [],
+                    "complete": False,
+                }
+            ],
+            "now": None,
+            "setup_complete": True,
+            "required_remaining": [],
+            "contract_version": 2,
         }
         confirm = unittest.mock.MagicMock()
         confirm.return_value.ask.return_value = None  # Ctrl+C / EOF
-        with patch("rebalance.ingest.lifecycle.evaluate_setup", return_value=fake_report), \
-             patch(f"{CONFIG}.get_vault_path", return_value=""), \
-             patch(f"{CONFIG}.set_onboarding_stage_skipped") as set_skip, \
-             patch("questionary.confirm", confirm):
+        with (
+            patch("rebalance.ingest.lifecycle.evaluate_setup", return_value=fake_report),
+            patch(f"{CONFIG}.get_vault_path", return_value=""),
+            patch(f"{CONFIG}.set_onboarding_stage_skipped") as set_skip,
+            patch("questionary.confirm", confirm),
+        ):
             onboard_module._offer_optional_stages(None)
         set_skip.assert_not_called()

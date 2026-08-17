@@ -47,20 +47,20 @@ def _pdda_draft(finding: dict, now: _dt.datetime) -> tuple[str, str]:
     summary = finding.get("summary", finding.get("title", ""))
     body = finding.get("text", "")
     md = f"""---
-title: "3-Eyes finding: {finding.get('title', slug)}"
+title: "3-Eyes finding: {finding.get("title", slug)}"
 slug: {slug}
 status: "DRAFT (machine-authored by 3-Eyes; unverified)"
 created: {date}
 updated: {date}
 owner: 3-Eyes (auto) · Noel (operator)
 doc_type: bugfix
-goal: "Triage the {severity} signal 3-Eyes surfaced from {finding.get('source', 'a job')}."
+goal: "Triage the {severity} signal 3-Eyes surfaced from {finding.get("source", "a job")}."
 ratings_provisional: true
-source_job: {finding.get('source', 'unknown')}
+source_job: {finding.get("source", "unknown")}
 severity: {severity}
 ---
 
-# 3-Eyes finding — {finding.get('title', slug)}
+# 3-Eyes finding — {finding.get("title", slug)}
 
 **Severity:** {severity}
 
@@ -119,8 +119,9 @@ def _route_notify(finding: dict, dry_run: bool) -> dict:
     msg = finding.get("summary", finding.get("title", ""))[:200]
     try:
         subprocess.run(
-            ["osascript", "-e", f'display notification {json.dumps(msg)} with title {json.dumps(title)}'],
-            capture_output=True, timeout=8,
+            ["osascript", "-e", f"display notification {json.dumps(msg)} with title {json.dumps(title)}"],
+            capture_output=True,
+            timeout=8,
         )
     except (OSError, subprocess.SubprocessError):
         pass
@@ -150,7 +151,9 @@ def _route_gh(finding: dict, dry_run: bool) -> dict:
     try:
         proc = subprocess.run(
             ["gh", "issue", "create", "--title", title, "--body", body],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {"route": "gh-issue", "status": "error", "error": str(exc)}

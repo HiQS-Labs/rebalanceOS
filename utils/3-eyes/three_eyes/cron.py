@@ -89,9 +89,7 @@ def install(jobs) -> None:
         raise PermissionError("3-Eyes is inert; refusing to write crontab")
     problems = registry.validate()
     if problems:
-        raise registry.RegistryError(
-            "refusing to install crontab — registry invalid: " + "; ".join(problems)
-        )
+        raise registry.RegistryError("refusing to install crontab — registry invalid: " + "; ".join(problems))
     preserved = _strip_managed(_current_crontab())
     new = (preserved + "\n\n" if preserved else "") + render_block(jobs)
     subprocess.run(["crontab", "-"], input=new, text=True, timeout=8)

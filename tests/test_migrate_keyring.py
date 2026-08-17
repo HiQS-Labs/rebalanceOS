@@ -16,13 +16,15 @@ from rebalance.cli.config_cmds import _migrate_google_pickle_to_keyring
 
 
 def _blob(refresh: str) -> str:
-    return json.dumps({
-        "token": "access",
-        "refresh_token": refresh,
-        "client_id": "c",
-        "client_secret": "s",
-        "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
-    })
+    return json.dumps(
+        {
+            "token": "access",
+            "refresh_token": refresh,
+            "client_id": "c",
+            "client_secret": "s",
+            "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
+        }
+    )
 
 
 class _FakeCreds:

@@ -16,9 +16,10 @@ class ClientGapfillTests(unittest.TestCase):
         seed = _ProjectSeed(key="calendar:ltvera", display_name="LTVera", repos=set())
         project = {"name": "LTVera", "custom_fields": {"client_inferred": None}}
 
-        with patch("rebalance.ingest.config.get_gemini_api_key", return_value=""), patch(
-            "rebalance.ingest.querier._synthesize_with_fallback"
-        ) as synth:
+        with (
+            patch("rebalance.ingest.config.get_gemini_api_key", return_value=""),
+            patch("rebalance.ingest.querier._synthesize_with_fallback") as synth,
+        ):
             _gapfill_missing_clients([(seed, project)])
 
         synth.assert_not_called()
@@ -43,13 +44,16 @@ class ClientGapfillTests(unittest.TestCase):
         project_one = {"name": "Acme Website", "custom_fields": {"client_inferred": None}}
         project_two = {"name": "Internal Ops", "custom_fields": {"client_inferred": None}}
 
-        with patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"), patch(
-            "rebalance.ingest.querier._synthesize_with_fallback",
-            return_value=(
-                '{"Acme Website": "Acme Corp", "Internal Ops": null}',
-                DEFAULT_GEMINI_MODEL,
-            ),
-        ) as synth:
+        with (
+            patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"),
+            patch(
+                "rebalance.ingest.querier._synthesize_with_fallback",
+                return_value=(
+                    '{"Acme Website": "Acme Corp", "Internal Ops": null}',
+                    DEFAULT_GEMINI_MODEL,
+                ),
+            ) as synth,
+        ):
             _gapfill_missing_clients([(seed_one, project_one), (seed_two, project_two)])
 
         synth.assert_called_once()
@@ -63,9 +67,12 @@ class ClientGapfillTests(unittest.TestCase):
         seed = _ProjectSeed(key="calendar:ltvera", display_name="LTVera", repos=set())
         project = {"name": "LTVera", "custom_fields": {"client_inferred": None}}
 
-        with patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"), patch(
-            "rebalance.ingest.querier._synthesize_with_fallback",
-            return_value=('{"LTVera": "LTVera"}', f"{DEFAULT_CHAT_MODEL} (gemini-fallback)"),
+        with (
+            patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"),
+            patch(
+                "rebalance.ingest.querier._synthesize_with_fallback",
+                return_value=('{"LTVera": "LTVera"}', f"{DEFAULT_CHAT_MODEL} (gemini-fallback)"),
+            ),
         ):
             _gapfill_missing_clients([(seed, project)])
 
@@ -75,9 +82,12 @@ class ClientGapfillTests(unittest.TestCase):
         seed = _ProjectSeed(key="calendar:ltvera", display_name="LTVera", repos=set())
         project = {"name": "LTVera", "custom_fields": {"client_inferred": None}}
 
-        with patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"), patch(
-            "rebalance.ingest.querier._synthesize_with_fallback",
-            return_value=("not json", DEFAULT_GEMINI_MODEL),
+        with (
+            patch("rebalance.ingest.config.get_gemini_api_key", return_value="k"),
+            patch(
+                "rebalance.ingest.querier._synthesize_with_fallback",
+                return_value=("not json", DEFAULT_GEMINI_MODEL),
+            ),
         ):
             _gapfill_missing_clients([(seed, project)])
 

@@ -78,9 +78,7 @@ class AuthLogTests(unittest.TestCase):
         auth_log.log_gmail_scope_insufficient("missing scope")
         rows = self._read_raw()
         self.assertEqual([r["source"] for r in rows], ["gmail", "gmail"])
-        self.assertEqual(
-            [r["event"] for r in rows], ["adc_missing", "scope_insufficient"]
-        )
+        self.assertEqual([r["event"] for r in rows], ["adc_missing", "scope_insufficient"])
 
     def test_generic_log_event(self) -> None:
         auth_log.log_event("sleuth", "token_invalid", {"status": 403})
@@ -121,12 +119,15 @@ class AuthLogTests(unittest.TestCase):
         # A pre-unification legacy entry has no "source" key.
         legacy = self.log_dir / "calendar_oauth_activity.jsonl"
         legacy.write_text(
-            json.dumps({
-                "ts": "2026-05-01T00:00:00+00:00",
-                "device": "old-mac",
-                "event": "flow_succeeded",
-                "detail": {},
-            }) + "\n"
+            json.dumps(
+                {
+                    "ts": "2026-05-01T00:00:00+00:00",
+                    "device": "old-mac",
+                    "event": "flow_succeeded",
+                    "detail": {},
+                }
+            )
+            + "\n"
         )
         auth_log.log_github_token_validated("octocat", [])  # newer, unified file
         entries = auth_log.read_log()
@@ -137,10 +138,10 @@ class AuthLogTests(unittest.TestCase):
         self.assertEqual(entries[0]["source"], "github")
 
     def test_latest_failure_by_source(self) -> None:
-        auth_log.log_github_token_validated("octocat", [])   # success — ignored
+        auth_log.log_github_token_validated("octocat", [])  # success — ignored
         auth_log.log_github_auth_failed(401, endpoint="/user")  # failure
-        auth_log.log_gmail_adc_missing("no ADC")               # failure
-        auth_log.log_flow_succeeded(None, [], "/tok")          # success — ignored
+        auth_log.log_gmail_adc_missing("no ADC")  # failure
+        auth_log.log_flow_succeeded(None, [], "/tok")  # success — ignored
 
         latest = auth_log.latest_failure_by_source()
         self.assertEqual(set(latest), {"github", "gmail"})
@@ -166,9 +167,11 @@ class AuthLogTests(unittest.TestCase):
     def test_set_github_token_logs_token_set(self) -> None:
         from rebalance.ingest import config
 
-        with patch.object(config, "_keyring_set", return_value=True), \
-             patch.object(config, "_read_config", return_value={}), \
-             patch.object(config, "_write_config"):
+        with (
+            patch.object(config, "_keyring_set", return_value=True),
+            patch.object(config, "_read_config", return_value={}),
+            patch.object(config, "_write_config"),
+        ):
             config.set_github_token("ghp_freshtoken", source="gh-fallback")
 
         events = [r for r in self._read_raw() if r["event"] == "token_set"]

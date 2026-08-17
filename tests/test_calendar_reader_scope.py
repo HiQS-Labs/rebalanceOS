@@ -39,8 +39,18 @@ def _seed(db: Path, rows: list[dict]) -> None:
     for r in rows:
         conn.execute(
             "INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (r["id"], r["summary"], r["start"], r["end"], None, None,
-             r["cal"], "confirmed", None, "2026-06-01T00:00:00Z"),
+            (
+                r["id"],
+                r["summary"],
+                r["start"],
+                r["end"],
+                None,
+                None,
+                r["cal"],
+                "confirmed",
+                None,
+                "2026-06-01T00:00:00Z",
+            ),
         )
     conn.commit()
     conn.close()
@@ -50,13 +60,19 @@ class TestReaderScope(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "rebalance.db"
-        _seed(self.db, [
-            {"id": "mine", "summary": "My block",
-             "start": _past(1), "end": _past(1), "cal": "primary"},
-            {"id": "mate", "summary": "Teammate block",
-             "start": _past(1), "end": _past(1),
-             "cal": "teammate@group.calendar.google.com"},
-        ])
+        _seed(
+            self.db,
+            [
+                {"id": "mine", "summary": "My block", "start": _past(1), "end": _past(1), "cal": "primary"},
+                {
+                    "id": "mate",
+                    "summary": "Teammate block",
+                    "start": _past(1),
+                    "end": _past(1),
+                    "cal": "teammate@group.calendar.google.com",
+                },
+            ],
+        )
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -78,25 +94,37 @@ class TestReaderScope(unittest.TestCase):
         self.assertEqual(all_events, 2)
 
     def test_upcoming_events_default_primary_only(self) -> None:
-        _seed(self.db, [
-            {"id": "up-mine", "summary": "My upcoming",
-             "start": _future(1), "end": _future(1), "cal": "primary"},
-            {"id": "up-mate", "summary": "Teammate upcoming",
-             "start": _future(1), "end": _future(1),
-             "cal": "teammate@group.calendar.google.com"},
-        ])
+        _seed(
+            self.db,
+            [
+                {"id": "up-mine", "summary": "My upcoming", "start": _future(1), "end": _future(1), "cal": "primary"},
+                {
+                    "id": "up-mate",
+                    "summary": "Teammate upcoming",
+                    "start": _future(1),
+                    "end": _future(1),
+                    "cal": "teammate@group.calendar.google.com",
+                },
+            ],
+        )
         summaries = [e["summary"] for e in get_upcoming_events(self.db)]
         self.assertIn("My upcoming", summaries)
         self.assertNotIn("Teammate upcoming", summaries)
 
     def test_upcoming_events_none_includes_all(self) -> None:
-        _seed(self.db, [
-            {"id": "up-mine", "summary": "My upcoming",
-             "start": _future(1), "end": _future(1), "cal": "primary"},
-            {"id": "up-mate", "summary": "Teammate upcoming",
-             "start": _future(1), "end": _future(1),
-             "cal": "teammate@group.calendar.google.com"},
-        ])
+        _seed(
+            self.db,
+            [
+                {"id": "up-mine", "summary": "My upcoming", "start": _future(1), "end": _future(1), "cal": "primary"},
+                {
+                    "id": "up-mate",
+                    "summary": "Teammate upcoming",
+                    "start": _future(1),
+                    "end": _future(1),
+                    "cal": "teammate@group.calendar.google.com",
+                },
+            ],
+        )
         summaries = [e["summary"] for e in get_upcoming_events(self.db, calendar_id=None)]
         self.assertIn("My upcoming", summaries)
         self.assertIn("Teammate upcoming", summaries)
@@ -109,8 +137,7 @@ class TestCalendarIdFilter(unittest.TestCase):
         self.assertEqual(_calendar_id_filter(None), ("", ()))
 
     def test_value_is_parameterized_clause(self) -> None:
-        self.assertEqual(
-            _calendar_id_filter("primary"), ("AND calendar_id = ?", ("primary",)))
+        self.assertEqual(_calendar_id_filter("primary"), ("AND calendar_id = ?", ("primary",)))
 
 
 class TestPersonFilter(unittest.TestCase):
@@ -143,8 +170,19 @@ def _seed_with_person(db: Path, rows: list[dict]) -> None:
     for r in rows:
         conn.execute(
             "INSERT OR REPLACE INTO calendar_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (r["id"], r["summary"], r["start"], r["end"], None, None,
-             r["cal"], "confirmed", None, r.get("person"), "2026-06-01T00:00:00Z"),
+            (
+                r["id"],
+                r["summary"],
+                r["start"],
+                r["end"],
+                None,
+                None,
+                r["cal"],
+                "confirmed",
+                None,
+                r.get("person"),
+                "2026-06-01T00:00:00Z",
+            ),
         )
     conn.commit()
     conn.close()
@@ -158,17 +196,35 @@ class TestTeamUpcomingByPerson(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "rebalance.db"
-        _seed_with_person(self.db, [
-            {"id": "op", "summary": "Operator block",
-             "start": _future(1), "end": _future(1),
-             "cal": "primary", "person": None},
-            {"id": "matt", "summary": "Matt block",
-             "start": _future(1), "end": _future(1),
-             "cal": "matt@group.calendar.google.com", "person": "Matt"},
-            {"id": "jose", "summary": "Jose block",
-             "start": _future(1), "end": _future(1),
-             "cal": "jose@group.calendar.google.com", "person": "Jose"},
-        ])
+        _seed_with_person(
+            self.db,
+            [
+                {
+                    "id": "op",
+                    "summary": "Operator block",
+                    "start": _future(1),
+                    "end": _future(1),
+                    "cal": "primary",
+                    "person": None,
+                },
+                {
+                    "id": "matt",
+                    "summary": "Matt block",
+                    "start": _future(1),
+                    "end": _future(1),
+                    "cal": "matt@group.calendar.google.com",
+                    "person": "Matt",
+                },
+                {
+                    "id": "jose",
+                    "summary": "Jose block",
+                    "start": _future(1),
+                    "end": _future(1),
+                    "cal": "jose@group.calendar.google.com",
+                    "person": "Jose",
+                },
+            ],
+        )
 
     def tearDown(self) -> None:
         self._tmp.cleanup()

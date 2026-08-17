@@ -12,6 +12,7 @@ Pins the contract from APPLE-REMINDERS-UNIFIED-PLAN.md Phase 6:
 Headless: `apply_reminder_writes` is patched, so no macOS / EventKit / helper
 bundle is needed. Mirrors tests/test_pulse_server_figma.py.
 """
+
 from __future__ import annotations
 
 import sys
@@ -68,8 +69,10 @@ class AppleRemindersCompleteApiTests(unittest.TestCase):
             return _result(status="ok", reminder_id="R-1")
 
         client = TestClient(pulse_server.app)
-        with patch.object(pulse_server, "apply_reminder_writes", side_effect=fake_apply), \
-             patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")):
+        with (
+            patch.object(pulse_server, "apply_reminder_writes", side_effect=fake_apply),
+            patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")),
+        ):
             res = client.post(
                 "/api/apple-reminders/complete",
                 json={"reminder_id": "R-1", "title": "Buy milk"},
@@ -92,29 +95,37 @@ class AppleRemindersCompleteApiTests(unittest.TestCase):
 
     def test_missing_reminder_id_returns_400(self) -> None:
         client = TestClient(pulse_server.app)
-        with patch.object(pulse_server, "apply_reminder_writes") as apply_mock, \
-             patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")):
+        with (
+            patch.object(pulse_server, "apply_reminder_writes") as apply_mock,
+            patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")),
+        ):
             res = client.post("/api/apple-reminders/complete", json={"reminder_id": "   "})
         self.assertEqual(res.status_code, 400)
         apply_mock.assert_not_called()  # never reaches the writer
 
     def test_helper_failure_surfaces_as_502(self) -> None:
         client = TestClient(pulse_server.app)
-        with patch.object(
-            pulse_server,
-            "apply_reminder_writes",
-            side_effect=AppleRemindersHelperError("helper not built / not granted"),
-        ), patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")):
+        with (
+            patch.object(
+                pulse_server,
+                "apply_reminder_writes",
+                side_effect=AppleRemindersHelperError("helper not built / not granted"),
+            ),
+            patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")),
+        ):
             res = client.post("/api/apple-reminders/complete", json={"reminder_id": "R-9"})
         self.assertEqual(res.status_code, 502)
 
     def test_per_op_error_surfaces_non_2xx(self) -> None:
         client = TestClient(pulse_server.app)
-        with patch.object(
-            pulse_server,
-            "apply_reminder_writes",
-            return_value=_result(status="error", reminder_id="R-2"),
-        ), patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")):
+        with (
+            patch.object(
+                pulse_server,
+                "apply_reminder_writes",
+                return_value=_result(status="error", reminder_id="R-2"),
+            ),
+            patch.object(pulse_server, "resolve_database_path", return_value=Path("/tmp/rebalance.db")),
+        ):
             res = client.post("/api/apple-reminders/complete", json={"reminder_id": "R-2"})
         self.assertEqual(res.status_code, 502)  # row must not falsely show done
         self.assertEqual(res.json()["results"][0]["status"], "error")

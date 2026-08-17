@@ -38,8 +38,19 @@ def _insert_event(db, *, event_id, summary, start_time, end_time, calendar_id, p
         "(id, summary, start_time, end_time, location, attendees_json, "
         " calendar_id, status, description, fetched_at, person) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        (event_id, summary, start_time, end_time, None, None, calendar_id,
-         "confirmed", None, "2026-06-01T00:00:00Z", person),
+        (
+            event_id,
+            summary,
+            start_time,
+            end_time,
+            None,
+            None,
+            calendar_id,
+            "confirmed",
+            None,
+            "2026-06-01T00:00:00Z",
+            person,
+        ),
     )
     conn.commit()
     conn.close()
@@ -58,10 +69,13 @@ class TestNextActionsPrivacy(unittest.TestCase):
         na.get_pulse_config = lambda: {"github_login": "me", "slack_user_id": None}
         orig_load = CalendarConfig.load
         cfg = CalendarConfig(
-            calendar_id="primary", exclude_titles=[], aggregator_skip_words=[],
-            timezone=self.tz.key, projects=[], hours_format="decimal",
-            team_calendars=[TeamCalendarEntry(
-                person="matthew", calendar_id="matt@group.calendar.google.com")],
+            calendar_id="primary",
+            exclude_titles=[],
+            aggregator_skip_words=[],
+            timezone=self.tz.key,
+            projects=[],
+            hours_format="decimal",
+            team_calendars=[TeamCalendarEntry(person="matthew", calendar_id="matt@group.calendar.google.com")],
         )
         CalendarConfig.load = classmethod(lambda cls, *a, **k: cfg)
         self.addCleanup(lambda: setattr(CalendarConfig, "load", orig_load))
@@ -76,25 +90,36 @@ class TestNextActionsPrivacy(unittest.TestCase):
 
     def test_blended_rank_does_not_leak_to_export(self) -> None:
         # Operator's own block.
-        _insert_event(self.db, event_id="op1", summary="Operator Block",
-                      start_time=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
-                      end_time=(datetime.now(timezone.utc) + timedelta(hours=3)).isoformat(),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="op1",
+            summary="Operator Block",
+            start_time=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+            end_time=(datetime.now(timezone.utc) + timedelta(hours=3)).isoformat(),
+            calendar_id="primary",
+            person=None,
+        )
         # Rich teammate history (passes additivity) + a distinctive upcoming item.
         weights = SignalWeights()
         for i in range(weights.min_team_events + 1):
             _insert_event(
-                self.db, event_id=f"matt-hist-{i}", summary=f"Matt history {i}",
+                self.db,
+                event_id=f"matt-hist-{i}",
+                summary=f"Matt history {i}",
                 start_time=(datetime.now(timezone.utc) - timedelta(days=1, hours=i)).isoformat(),
                 end_time=(datetime.now(timezone.utc) - timedelta(days=1, hours=i) + timedelta(minutes=30)).isoformat(),
-                calendar_id="matt@group.calendar.google.com", person="matthew",
+                calendar_id="matt@group.calendar.google.com",
+                person="matthew",
             )
         soon = datetime.now(timezone.utc) + timedelta(hours=4)
         _insert_event(
-            self.db, event_id="matt-distinct", summary="SECRET Teammate Sync",
+            self.db,
+            event_id="matt-distinct",
+            summary="SECRET Teammate Sync",
             start_time=soon.isoformat(),
             end_time=(soon + timedelta(minutes=45)).isoformat(),
-            calendar_id="matt@group.calendar.google.com", person="matthew",
+            calendar_id="matt@group.calendar.google.com",
+            person="matthew",
         )
 
         # Run a blended rank — this reads the `person` column in-process.

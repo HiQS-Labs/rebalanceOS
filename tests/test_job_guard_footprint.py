@@ -28,7 +28,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from utils import job_guard  # noqa: E402
 
-GIB = 1024 ** 3
+GIB = 1024**3
 FAKE_TOTAL_RAM = 64 * GIB
 
 
@@ -82,9 +82,7 @@ def test_over_ceiling_trips_and_child_is_reaped(isolated_guard, monkeypatch):
 
     monkeypatch.setattr(subprocess, "Popen", capturing_popen)
     # Force the ceiling branch specifically, independent of what the child does.
-    monkeypatch.setattr(
-        job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0)
-    )
+    monkeypatch.setattr(job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0))
 
     code = job_guard.run_guarded(
         name="test-over-ceiling",
@@ -118,7 +116,8 @@ def test_preflight_refusal_has_its_own_exit_code(isolated_guard, monkeypatch):
     launched: list[int] = []
     real_popen = subprocess.Popen
     monkeypatch.setattr(
-        subprocess, "Popen",
+        subprocess,
+        "Popen",
         lambda *a, **k: (lambda p: (launched.append(p.pid), p)[1])(real_popen(*a, **k)),
     )
     # Starve the machine so the availability preflight refuses.
@@ -140,9 +139,7 @@ def test_preflight_refusal_has_its_own_exit_code(isolated_guard, monkeypatch):
 
 def test_healthy_footprint_does_not_trip(isolated_guard, monkeypatch):
     """2. A process at a healthy footprint does not trip."""
-    monkeypatch.setattr(
-        job_guard, "tree_footprint_bytes", lambda pid: (1.4 * GIB, False, 0)
-    )
+    monkeypatch.setattr(job_guard, "tree_footprint_bytes", lambda pid: (1.4 * GIB, False, 0))
     ceiling = job_guard.MemoryCeiling(max_footprint_bytes=8 * GIB, poll_seconds=0.05)
     ceiling.start()
     time.sleep(0.3)
@@ -156,9 +153,7 @@ def test_high_footprint_near_zero_rss(isolated_guard, monkeypatch):
     This is the case the RSS-based guard structurally could not see — it ran 233
     jobs on 2026-07-27 without tripping while the machine fell to 0.09 GB free.
     """
-    monkeypatch.setattr(
-        job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0)
-    )
+    monkeypatch.setattr(job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0))
     ceiling = job_guard.MemoryCeiling(max_footprint_bytes=8 * GIB, poll_seconds=0.05)
     ceiling.start()
     time.sleep(0.3)
@@ -210,9 +205,7 @@ def test_unreadable_pids_are_skipped_and_counted(isolated_guard, monkeypatch):
     assert unreadable == 1
     assert footprint == 3072, "an unreadable pid must not silently contribute 0"
 
-    ceiling = job_guard.MemoryCeiling(
-        pid=1000, max_footprint_bytes=1000, poll_seconds=0.1
-    )
+    ceiling = job_guard.MemoryCeiling(pid=1000, max_footprint_bytes=1000, poll_seconds=0.1)
     reason = ceiling._check()
     assert reason is not None
     assert "skipped 1 unreadable pids" in reason
@@ -307,9 +300,7 @@ def test_deprecated_env_var_reaches_the_actual_ceiling(isolated_guard, monkeypat
         grace_seconds=0.2,
     )
 
-    assert seen.get("max_footprint") == int(7.0 * GIB), (
-        "the deprecated alias parsed but never reached the ceiling"
-    )
+    assert seen.get("max_footprint") == int(7.0 * GIB), "the deprecated alias parsed but never reached the ceiling"
 
 
 def test_compressor_pressure_refuses_to_start(isolated_guard, monkeypatch):

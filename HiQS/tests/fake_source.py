@@ -30,12 +30,7 @@ def fetch(connection: Any, config: Mapping[str, Any]) -> SyncReport:
     fetched = config["fetch_unit"](timeout=NETWORK_TIMEOUT_SECONDS)
     unit = fetched["unit"]
     records = list(fetched["records"])
-    existing_ids = {
-        row[0]
-        for row in connection.execute(
-            "SELECT id FROM fake_source_records WHERE unit = ?", (unit,)
-        )
-    }
+    existing_ids = {row[0] for row in connection.execute("SELECT id FROM fake_source_records WHERE unit = ?", (unit,))}
     current_ids = {record[0] for record in records}
 
     with connection:
@@ -64,12 +59,9 @@ def fetch(connection: Any, config: Mapping[str, Any]) -> SyncReport:
 
 def docs(connection: Any) -> Iterable[Doc]:
     """Expose raw records through the public document-provider contract."""
-    rows = connection.execute(
-        "SELECT unit, id, title, body FROM fake_source_records ORDER BY unit, id"
-    ).fetchall()
+    rows = connection.execute("SELECT unit, id, title, body FROM fake_source_records ORDER BY unit, id").fetchall()
     return [
-        Doc(source="fake", id=f"{unit}:{record_id}", title=title, body=body)
-        for unit, record_id, title, body in rows
+        Doc(source="fake", id=f"{unit}:{record_id}", title=title, body=body) for unit, record_id, title, body in rows
     ]
 
 

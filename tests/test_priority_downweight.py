@@ -19,8 +19,13 @@ from rebalance.ingest.next_actions import (
 
 def _action(title: str, project: str | None) -> RankedAction:
     return RankedAction(
-        rank=0, title=title, person="operator", source="github",
-        project=project, evidence=[], why="",
+        rank=0,
+        title=title,
+        person="operator",
+        source="github",
+        project=project,
+        evidence=[],
+        why="",
     )
 
 
@@ -28,7 +33,7 @@ class PriorityDownweightTests(unittest.TestCase):
     def test_is_low_priority_threshold(self) -> None:
         pri = {"a/low": 5, "a/edge": _DEPRIORITIZE_TIER, "a/high": 1}
         self.assertTrue(_is_low_priority("a/low", pri))
-        self.assertTrue(_is_low_priority("a/edge", pri))   # >= threshold
+        self.assertTrue(_is_low_priority("a/edge", pri))  # >= threshold
         self.assertFalse(_is_low_priority("a/high", pri))
         self.assertFalse(_is_low_priority("a/unknown", pri))  # absent -> not low
         self.assertFalse(_is_low_priority(None, pri))

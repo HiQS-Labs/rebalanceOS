@@ -22,10 +22,7 @@ class ReadPinTest(unittest.TestCase):
     def test_valid_pin_parses_keys(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / ".xyz-pin").write_text(
-                "# a comment\n"
-                "\n"
-                "commit=c829000bad5e196392e5ffbff5838cc558877f67\n"
-                "pinned_at=2026-07-03\n",
+                "# a comment\n\ncommit=c829000bad5e196392e5ffbff5838cc558877f67\npinned_at=2026-07-03\n",
                 encoding="utf-8",
             )
             pin = read_pin(Path(d))
@@ -36,8 +33,7 @@ class ReadPinTest(unittest.TestCase):
     def test_malformed_lines_are_skipped_not_fatal(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / ".xyz-pin").write_text(
-                "this line has no equals sign\n"
-                "commit=abc123\n",
+                "this line has no equals sign\ncommit=abc123\n",
                 encoding="utf-8",
             )
             pin = read_pin(Path(d))

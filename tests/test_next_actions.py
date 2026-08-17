@@ -43,8 +43,19 @@ def _insert_event(
         "(id, summary, start_time, end_time, location, attendees_json, "
         " calendar_id, status, description, fetched_at, person) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        (event_id, summary, start_time, end_time, None, None, calendar_id,
-         "confirmed", None, "2026-06-01T00:00:00Z", person),
+        (
+            event_id,
+            summary,
+            start_time,
+            end_time,
+            None,
+            None,
+            calendar_id,
+            "confirmed",
+            None,
+            "2026-06-01T00:00:00Z",
+            person,
+        ),
     )
     conn.commit()
     conn.close()
@@ -151,15 +162,19 @@ class TestDedup(unittest.TestCase):
         self.assertEqual(na._norm_title("1:45 - Team Call"), "1 45 team call")
 
     def _blk(self, eid, summary, day="2026-06-17", time="13:45"):
-        return {"id": eid, "summary": summary, "local_day": day, "time": time,
-                "duration_minutes": 30, "person": "matthew"}
+        return {
+            "id": eid,
+            "summary": summary,
+            "local_day": day,
+            "time": time,
+            "duration_minutes": 30,
+            "person": "matthew",
+        }
 
     def test_drops_shared_id(self) -> None:
         operator = [self._blk("op1", "Standup")]
         teammate = [self._blk("shared", "Some other meeting")]
-        kept, dropped = na.dedup_teammate_blocks(
-            teammate, operator, shared_ids={"shared"}
-        )
+        kept, dropped = na.dedup_teammate_blocks(teammate, operator, shared_ids={"shared"})
         self.assertEqual(kept, [])
         self.assertEqual(dropped, 1)
 
@@ -181,13 +196,11 @@ class TestDedup(unittest.TestCase):
     def test_keeps_distinct_and_counts(self) -> None:
         operator = [self._blk("op1", "Standup"), self._blk("op2", "1:45 - Team Call")]
         teammate = [
-            self._blk("shared", "anything"),            # dropped by id
-            self._blk("mate2", "1:45 Team Call"),        # dropped by title
-            self._blk("mate3", "Customer Onboarding"),   # kept (distinct)
+            self._blk("shared", "anything"),  # dropped by id
+            self._blk("mate2", "1:45 Team Call"),  # dropped by title
+            self._blk("mate3", "Customer Onboarding"),  # kept (distinct)
         ]
-        kept, dropped = na.dedup_teammate_blocks(
-            teammate, operator, shared_ids={"shared"}
-        )
+        kept, dropped = na.dedup_teammate_blocks(teammate, operator, shared_ids={"shared"})
         self.assertEqual(dropped, 2)
         self.assertEqual([b["id"] for b in kept], ["mate3"])
 
@@ -235,8 +248,13 @@ class TestAssembleDayBundle(unittest.TestCase):
         try:
             with db_connection(self.db) as conn:
                 bundle = na.assemble_day_bundle(
-                    conn, local_day=local_day, start=start, end=end,
-                    github_login="me", slack_user_id=None, tz=self.tz,
+                    conn,
+                    local_day=local_day,
+                    start=start,
+                    end=end,
+                    github_login="me",
+                    slack_user_id=None,
+                    tz=self.tz,
                 )
         finally:
             na._query_day_activity = orig
@@ -250,14 +268,24 @@ class TestAssembleDayBundle(unittest.TestCase):
 
     def test_calendar_blocks_operator_scoped(self) -> None:
         local_day = datetime.now(self.tz).date().isoformat()
-        _insert_event(self.db, event_id="mine", summary="My Block",
-                      start_time=_today_at(10, tz=self.tz),
-                      end_time=_today_at(11, tz=self.tz),
-                      calendar_id="primary", person=None)
-        _insert_event(self.db, event_id="theirs", summary="Their Block",
-                      start_time=_today_at(12, tz=self.tz),
-                      end_time=_today_at(13, tz=self.tz),
-                      calendar_id="matt@group.calendar.google.com", person="matthew")
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="My Block",
+            start_time=_today_at(10, tz=self.tz),
+            end_time=_today_at(11, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
+        _insert_event(
+            self.db,
+            event_id="theirs",
+            summary="Their Block",
+            start_time=_today_at(12, tz=self.tz),
+            end_time=_today_at(13, tz=self.tz),
+            calendar_id="matt@group.calendar.google.com",
+            person="matthew",
+        )
         now = datetime.now(self.tz)
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=1)
@@ -272,8 +300,13 @@ class TestAssembleDayBundle(unittest.TestCase):
         try:
             with db_connection(self.db) as conn:
                 bundle = na.assemble_day_bundle(
-                    conn, local_day=local_day, start=start, end=end,
-                    github_login="me", slack_user_id=None, tz=self.tz,
+                    conn,
+                    local_day=local_day,
+                    start=start,
+                    end=end,
+                    github_login="me",
+                    slack_user_id=None,
+                    tz=self.tz,
                 )
         finally:
             na._query_day_activity = orig
@@ -303,9 +336,7 @@ class TestComputeDeepWorkSignals(unittest.TestCase):
         self._tmp.cleanup()
 
     def _stamp(self, days_ago: int, hour: int = 10) -> str:
-        dt = (self.today - timedelta(days=days_ago)).replace(
-            hour=hour, minute=0, second=0, microsecond=0
-        )
+        dt = (self.today - timedelta(days=days_ago)).replace(hour=hour, minute=0, second=0, microsecond=0)
         return dt.isoformat()
 
     def test_compute_deep_work_signals_phase1_cases(self) -> None:
@@ -405,8 +436,12 @@ class TestRankNextActions(unittest.TestCase):
     def _patch_roster(self, entries):
         orig = CalendarConfig.load
         cfg = CalendarConfig(
-            calendar_id="primary", exclude_titles=[], aggregator_skip_words=[],
-            timezone=self.tz.key, projects=[], hours_format="decimal",
+            calendar_id="primary",
+            exclude_titles=[],
+            aggregator_skip_words=[],
+            timezone=self.tz.key,
+            projects=[],
+            hours_format="decimal",
             team_calendars=entries,
         )
         CalendarConfig.load = classmethod(lambda cls, *a, **k: cfg)
@@ -415,10 +450,15 @@ class TestRankNextActions(unittest.TestCase):
     def test_sparse_empty_roster_yields_operator_only(self) -> None:
         self._patch_pulse_cfg()
         self._patch_roster([])  # no teammates
-        _insert_event(self.db, event_id="mine", summary="Operator Meeting",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="Operator Meeting",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         result = na.rank_next_actions(self.db, blend_team=True, synthesize=False)
         self.assertIsInstance(result, na.RankedNextActions)
         # Valid operator-only result — calendar block surfaces, no teammate label.
@@ -429,30 +469,40 @@ class TestRankNextActions(unittest.TestCase):
         """A teammate carries an item the operator lacks: blend_team=True surfaces
         >=1 ranked item that blend_team=False does not."""
         self._patch_pulse_cfg()
-        self._patch_roster([TeamCalendarEntry(person="matthew",
-                                              calendar_id="matt@group.calendar.google.com")])
+        self._patch_roster([TeamCalendarEntry(person="matthew", calendar_id="matt@group.calendar.google.com")])
         # Operator's own block.
-        _insert_event(self.db, event_id="op1", summary="Operator Block",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="op1",
+            summary="Operator Block",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         # Teammate (matthew) — rich enough to pass additivity: seed >= min_team_events
         # events in-window, plus the distinctive upcoming item the operator lacks.
         weights = SignalWeights()
         for i in range(weights.min_team_events + 1):
             _insert_event(
-                self.db, event_id=f"matt-hist-{i}", summary=f"Matt history {i}",
+                self.db,
+                event_id=f"matt-hist-{i}",
+                summary=f"Matt history {i}",
                 start_time=(datetime.now(timezone.utc) - timedelta(days=1, hours=i)).isoformat(),
                 end_time=(datetime.now(timezone.utc) - timedelta(days=1, hours=i) + timedelta(minutes=30)).isoformat(),
-                calendar_id="matt@group.calendar.google.com", person="matthew",
+                calendar_id="matt@group.calendar.google.com",
+                person="matthew",
             )
         # The distinctive UPCOMING teammate item (must be in the upcoming window).
         soon = datetime.now(timezone.utc) + timedelta(hours=4)
         _insert_event(
-            self.db, event_id="matt-distinct", summary="Customer Escalation Sync",
+            self.db,
+            event_id="matt-distinct",
+            summary="Customer Escalation Sync",
             start_time=soon.isoformat(),
             end_time=(soon + timedelta(minutes=45)).isoformat(),
-            calendar_id="matt@group.calendar.google.com", person="matthew",
+            calendar_id="matt@group.calendar.google.com",
+            person="matthew",
         )
 
         blended = na.rank_next_actions(self.db, blend_team=True, synthesize=False, weights=weights)
@@ -467,20 +517,23 @@ class TestRankNextActions(unittest.TestCase):
         self.assertTrue(any("Customer Escalation Sync" in t for t in blended_titles))
         self.assertFalse(any("Customer Escalation Sync" in t for t in solo_titles))
         # And it is person-attributed (local display only).
-        self.assertTrue(any(
-            a.person == "matthew" and "Customer Escalation Sync" in a.title
-            for a in blended.ranked
-        ))
+        self.assertTrue(any(a.person == "matthew" and "Customer Escalation Sync" in a.title for a in blended.ranked))
 
     def test_synthesize_monkeypatched_keeps_fallback_on_empty(self) -> None:
         """A failed/empty synthesis still yields a ranked (deterministic) view."""
         self._patch_pulse_cfg()
         self._patch_roster([])
-        _insert_event(self.db, event_id="mine", summary="Fallback Meeting",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="Fallback Meeting",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         import rebalance.ingest.querier as querier
+
         orig = querier._synthesize_with_fallback
         querier._synthesize_with_fallback = lambda *a, **k: ("", "fake (failed)")
         try:
@@ -496,11 +549,17 @@ class TestRankNextActions(unittest.TestCase):
         '2 items only' regression)."""
         self._patch_pulse_cfg()
         self._patch_roster([])
-        _insert_event(self.db, event_id="mine", summary="A Meeting",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="A Meeting",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         import rebalance.ingest.querier as querier
+
         captured: dict = {}
         orig = querier._synthesize_with_fallback
 
@@ -574,7 +633,7 @@ class TestParseRankedSynthesis(unittest.TestCase):
             "evidence=10:00 | why=deep work block"
         )
         actions = na._parse_ranked_synthesis(text)
-        self.assertTrue(actions[0].automation)   # github → eligible
+        self.assertTrue(actions[0].automation)  # github → eligible
         self.assertFalse(actions[1].automation)  # vague calendar hold → not
 
     def test_infer_automation_heuristic(self) -> None:
@@ -650,27 +709,22 @@ class TestParseRankedSynthesis(unittest.TestCase):
         self.assertEqual(len(actions), 1)
         a = actions[0]
         self.assertEqual(a.title, "Review the Binoid PR")
-        self.assertEqual(a.source, "")        # <source> ignored
-        self.assertIsNone(a.project)          # <project-or-empty> ignored
-        self.assertEqual(a.why, "")           # <one-line reason> ignored
+        self.assertEqual(a.source, "")  # <source> ignored
+        self.assertIsNone(a.project)  # <project-or-empty> ignored
+        self.assertEqual(a.why, "")  # <one-line reason> ignored
         self.assertEqual(a.evidence, ["GH 894"])  # real value kept
 
     def test_bare_angle_token_title_rejected(self) -> None:
         """A title that is wholly a `<...>` token is dropped."""
-        actions = na._parse_ranked_synthesis(
-            "1. <title> | person=operator | source=github | evidence=x | why=y"
-        )
+        actions = na._parse_ranked_synthesis("1. <title> | person=operator | source=github | evidence=x | why=y")
         self.assertEqual(actions, [])
 
     def test_generated_next_actions_file_excluded_from_candidates(self) -> None:
         """rebalance's own What-To-Do-Next vault file must not rank itself."""
-        self.assertTrue(na._is_generated_next_actions_file(
-            "Dashboards/What To Do Next.md", "What To Do Next"))
-        self.assertTrue(na._is_generated_next_actions_file(
-            "Dashboards/What To Do Next.md", ""))
+        self.assertTrue(na._is_generated_next_actions_file("Dashboards/What To Do Next.md", "What To Do Next"))
+        self.assertTrue(na._is_generated_next_actions_file("Dashboards/What To Do Next.md", ""))
         # A real, differently-named note is kept.
-        self.assertFalse(na._is_generated_next_actions_file(
-            "Projects/Binoid.md", "Binoid"))
+        self.assertFalse(na._is_generated_next_actions_file("Projects/Binoid.md", "Binoid"))
 
 
 class TestVaultRender(unittest.TestCase):
@@ -681,17 +735,28 @@ class TestVaultRender(unittest.TestCase):
         return na.RankedNextActions(
             ranked=[
                 na.RankedAction(
-                    rank=1, title="Review Binoid PR 894", person=None,
-                    source="github", project="Binoid", evidence=["GH 894"],
-                    why="bug fix for Bloomz", automation=True,
+                    rank=1,
+                    title="Review Binoid PR 894",
+                    person=None,
+                    source="github",
+                    project="Binoid",
+                    evidence=["GH 894"],
+                    why="bug fix for Bloomz",
+                    automation=True,
                 ),
                 na.RankedAction(
-                    rank=2, title="Sync with Matthew", person="Matthew",
-                    source="calendar", project=None, evidence=["14:00"],
-                    why="cross-person", automation=False,
+                    rank=2,
+                    title="Sync with Matthew",
+                    person="Matthew",
+                    source="calendar",
+                    project=None,
+                    evidence=["14:00"],
+                    why="cross-person",
+                    automation=False,
                 ),
             ],
-            model_used="gemini-3.5-flash", blended=True,
+            model_used="gemini-3.5-flash",
+            blended=True,
             note="team blended: 1 additive block",
             computed_at="2026-06-30T01:30:00+00:00",
         )
@@ -699,10 +764,10 @@ class TestVaultRender(unittest.TestCase):
     def test_render_has_banner_and_items(self) -> None:
         md = na.render_next_actions_markdown(self._result())
         self.assertIn("# What To Do Next", md)
-        self.assertIn("do not edit by hand", md)            # single-writer banner
-        self.assertIn("gemini-3.5-flash", md)               # provenance
+        self.assertIn("do not edit by hand", md)  # single-writer banner
+        self.assertIn("gemini-3.5-flash", md)  # provenance
         self.assertIn("1. **Review Binoid PR 894**", md)
-        self.assertIn("👤 Matthew", md)                      # teammate attribution
+        self.assertIn("👤 Matthew", md)  # teammate attribution
         self.assertIn("evidence: GH 894", md)
 
     def test_render_empty_is_graceful(self) -> None:
@@ -751,8 +816,12 @@ class TestAcceptanceGate(unittest.TestCase):
         na.get_pulse_config = lambda: {"github_login": "me", "slack_user_id": None}
         orig = CalendarConfig.load
         cfg = CalendarConfig(
-            calendar_id="primary", exclude_titles=[], aggregator_skip_words=[],
-            timezone=self.tz.key, projects=[], hours_format="decimal",
+            calendar_id="primary",
+            exclude_titles=[],
+            aggregator_skip_words=[],
+            timezone=self.tz.key,
+            projects=[],
+            hours_format="decimal",
             team_calendars=[],
         )
         CalendarConfig.load = classmethod(lambda cls, *a, **k: cfg)
@@ -763,16 +832,22 @@ class TestAcceptanceGate(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_prose_synthesis_rejected_keeps_structured_fallback(self) -> None:
-        _insert_event(self.db, event_id="mine", summary="Ship Release Notes",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="Ship Release Notes",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         prose = (
             "Here is what I think you should do:\n"
             "1. Maybe take a look at the calendar later.\n"
             "2. Could be worth catching up on email too."
         )
         import rebalance.ingest.querier as querier
+
         orig = querier._synthesize_with_fallback
         querier._synthesize_with_fallback = lambda *a, **k: (prose, "fake-model")
         try:
@@ -787,15 +862,21 @@ class TestAcceptanceGate(unittest.TestCase):
         self.assertIn("nothing useful", result.note)
 
     def test_structured_synthesis_accepted(self) -> None:
-        _insert_event(self.db, event_id="mine", summary="Ship Release Notes",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="Ship Release Notes",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         good = (
             "1. Cut the release | person=operator | source=github | "
             "project=acme/web | evidence=PR #9 | why=ready to merge"
         )
         import rebalance.ingest.querier as querier
+
         orig = querier._synthesize_with_fallback
         querier._synthesize_with_fallback = lambda *a, **k: (good, "fake-model")
         try:
@@ -830,8 +911,12 @@ class TestBlendedContribution(unittest.TestCase):
     def _patch_roster(self, entries):
         orig = CalendarConfig.load
         cfg = CalendarConfig(
-            calendar_id="primary", exclude_titles=[], aggregator_skip_words=[],
-            timezone=self.tz.key, projects=[], hours_format="decimal",
+            calendar_id="primary",
+            exclude_titles=[],
+            aggregator_skip_words=[],
+            timezone=self.tz.key,
+            projects=[],
+            hours_format="decimal",
             team_calendars=entries,
         )
         CalendarConfig.load = classmethod(lambda cls, *a, **k: cfg)
@@ -840,23 +925,31 @@ class TestBlendedContribution(unittest.TestCase):
     def test_blended_false_when_operator_only_roster(self) -> None:
         """Empty roster → blended=False (no teammate signal contributed) (C2)."""
         self._patch_roster([])
-        _insert_event(self.db, event_id="mine", summary="Solo Block",
-                      start_time=_today_at(9, tz=self.tz),
-                      end_time=_today_at(10, tz=self.tz),
-                      calendar_id="primary", person=None)
+        _insert_event(
+            self.db,
+            event_id="mine",
+            summary="Solo Block",
+            start_time=_today_at(9, tz=self.tz),
+            end_time=_today_at(10, tz=self.tz),
+            calendar_id="primary",
+            person=None,
+        )
         result = na.rank_next_actions(self.db, blend_team=True, synthesize=False)
         self.assertFalse(result.blended)
 
     def test_blended_false_when_no_teammate_passes_additivity(self) -> None:
         """A roster whose only teammate is too sparse → blended=False (C2/C1)."""
-        self._patch_roster([TeamCalendarEntry(
-            person="jose", calendar_id="jose@group.calendar.google.com")])
+        self._patch_roster([TeamCalendarEntry(person="jose", calendar_id="jose@group.calendar.google.com")])
         # Seed just ONE historical event — below min_team_events → gated.
         _insert_event(
-            self.db, event_id="jose-1", summary="Jose standup",
+            self.db,
+            event_id="jose-1",
+            summary="Jose standup",
             start_time=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
             end_time=(datetime.now(timezone.utc) - timedelta(days=1) + timedelta(minutes=15)).isoformat(),
-            calendar_id="jose@group.calendar.google.com", person="jose")
+            calendar_id="jose@group.calendar.google.com",
+            person="jose",
+        )
         result = na.rank_next_actions(self.db, blend_team=True, synthesize=False)
         self.assertFalse(result.blended)
 
@@ -866,72 +959,84 @@ class TestBlendedContribution(unittest.TestCase):
         candidate list only covers today — because the operator title map spans the
         teammate read horizon."""
         weights = SignalWeights()
-        self._patch_roster([TeamCalendarEntry(
-            person="matthew", calendar_id="matt@group.calendar.google.com")])
+        self._patch_roster([TeamCalendarEntry(person="matthew", calendar_id="matt@group.calendar.google.com")])
         # Make matthew pass additivity (trailing history).
         for i in range(weights.min_team_events + 1):
             _insert_event(
-                self.db, event_id=f"matt-h{i}", summary=f"Matt h{i}",
+                self.db,
+                event_id=f"matt-h{i}",
+                summary=f"Matt h{i}",
                 start_time=(datetime.now(timezone.utc) - timedelta(days=2, hours=i)).isoformat(),
                 end_time=(datetime.now(timezone.utc) - timedelta(days=2, hours=i) + timedelta(minutes=20)).isoformat(),
-                calendar_id="matt@group.calendar.google.com", person="matthew")
+                calendar_id="matt@group.calendar.google.com",
+                person="matthew",
+            )
 
         # Operator's OWN block TOMORROW (a joint meeting, on operator's calendar).
         tomorrow = datetime.now(self.tz) + timedelta(days=1)
         op_start = tomorrow.replace(hour=15, minute=0, second=0, microsecond=0)
         _insert_event(
-            self.db, event_id="op-tmrw", summary="Quarterly Planning Sync",
+            self.db,
+            event_id="op-tmrw",
+            summary="Quarterly Planning Sync",
             start_time=op_start.isoformat(),
             end_time=(op_start + timedelta(minutes=60)).isoformat(),
-            calendar_id="primary", person=None)
+            calendar_id="primary",
+            person=None,
+        )
         # Teammate hand-logs the SAME meeting tomorrow under a different id.
         _insert_event(
-            self.db, event_id="matt-tmrw", summary="Quarterly Planning Sync",
+            self.db,
+            event_id="matt-tmrw",
+            summary="Quarterly Planning Sync",
             start_time=op_start.isoformat(),
             end_time=(op_start + timedelta(minutes=60)).isoformat(),
-            calendar_id="matt@group.calendar.google.com", person="matthew")
+            calendar_id="matt@group.calendar.google.com",
+            person="matthew",
+        )
 
         result = na.rank_next_actions(self.db, blend_team=True, synthesize=False)
         # The teammate duplicate must NOT appear as a separate matthew-attributed
         # item — it is deduped against the operator's tomorrow block.
-        matt_dupes = [
-            a for a in result.ranked
-            if a.person == "matthew" and "Quarterly Planning Sync" in a.title
-        ]
+        matt_dupes = [a for a in result.ranked if a.person == "matthew" and "Quarterly Planning Sync" in a.title]
         self.assertEqual(matt_dupes, [])
 
     def test_additivity_window_still_yields_matthew(self) -> None:
         """FIX 6: the trailing-history additivity gate still PASSES the rich
         teammate (matthew) from realistic counts (C1/C6 unaffected)."""
         from rebalance.ingest.calendar_config import team_persons_passing_additivity
+
         weights = SignalWeights()
-        self._patch_roster([TeamCalendarEntry(
-            person="matthew", calendar_id="matt@group.calendar.google.com")])
+        self._patch_roster([TeamCalendarEntry(person="matthew", calendar_id="matt@group.calendar.google.com")])
         # Seed > min_team_events events within the trailing-history window.
         for i in range(weights.min_team_events + 2):
             _insert_event(
-                self.db, event_id=f"matt-{i}", summary=f"Matt {i}",
+                self.db,
+                event_id=f"matt-{i}",
+                summary=f"Matt {i}",
                 start_time=(datetime.now(timezone.utc) - timedelta(days=2, hours=i)).isoformat(),
                 end_time=(datetime.now(timezone.utc) - timedelta(days=2, hours=i) + timedelta(minutes=30)).isoformat(),
-                calendar_id="matt@group.calendar.google.com", person="matthew")
+                calendar_id="matt@group.calendar.google.com",
+                person="matthew",
+            )
         # A distinctive upcoming item so the delta is non-empty → blended True.
         soon = datetime.now(timezone.utc) + timedelta(hours=3)
         _insert_event(
-            self.db, event_id="matt-up", summary="Vendor Renewal Review",
+            self.db,
+            event_id="matt-up",
+            summary="Vendor Renewal Review",
             start_time=soon.isoformat(),
             end_time=(soon + timedelta(minutes=30)).isoformat(),
-            calendar_id="matt@group.calendar.google.com", person="matthew")
+            calendar_id="matt@group.calendar.google.com",
+            person="matthew",
+        )
 
         result = na.rank_next_actions(self.db, blend_team=True, synthesize=False)
         # Matthew passed → blended True and the teammate item surfaced.
         self.assertTrue(result.blended)
-        self.assertTrue(any(
-            a.person == "matthew" and "Vendor Renewal Review" in a.title
-            for a in result.ranked
-        ))
+        self.assertTrue(any(a.person == "matthew" and "Vendor Renewal Review" in a.title for a in result.ranked))
         # The gate helper itself yields exactly ['matthew'] from realistic counts.
-        passing = team_persons_passing_additivity(
-            {"matthew": weights.min_team_events + 2}, weights.min_team_events)
+        passing = team_persons_passing_additivity({"matthew": weights.min_team_events + 2}, weights.min_team_events)
         self.assertEqual(passing, ["matthew"])
 
 
@@ -952,12 +1057,23 @@ class TestPersistence(unittest.TestCase):
 
     def test_round_trip(self) -> None:
         result = na.RankedNextActions(
-            ranked=[na.RankedAction(rank=1, title="Do thing", person="matthew",
-                                    source="calendar", project="Acme",
-                                    evidence=["matt 14:00 (45m)"], why="cross-person")],
-            synthesis="", model_used="test", blended=True,
+            ranked=[
+                na.RankedAction(
+                    rank=1,
+                    title="Do thing",
+                    person="matthew",
+                    source="calendar",
+                    project="Acme",
+                    evidence=["matt 14:00 (45m)"],
+                    why="cross-person",
+                )
+            ],
+            synthesis="",
+            model_used="test",
+            blended=True,
             weights_used={"min_team_events": 12},
-            note="ok", elapsed_seconds=0.1,
+            note="ok",
+            elapsed_seconds=0.1,
             computed_at="2026-06-17T12:00:00+00:00",
         )
         na.persist_ranked_next_actions(self.db, result)
@@ -972,8 +1088,7 @@ class TestPersistence(unittest.TestCase):
 
     def test_get_ranked_meta_freshness(self) -> None:
         self.assertEqual(na.get_ranked_meta(self.db)["row_count"], 0)
-        result = na.RankedNextActions(blended=True, model_used="m",
-                                      computed_at="2026-06-17T12:00:00+00:00")
+        result = na.RankedNextActions(blended=True, model_used="m", computed_at="2026-06-17T12:00:00+00:00")
         na.persist_ranked_next_actions(self.db, result)
         meta = na.get_ranked_meta(self.db)
         self.assertEqual(meta["row_count"], 1)

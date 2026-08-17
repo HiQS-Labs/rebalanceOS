@@ -21,6 +21,7 @@ from rebalance.ingest.sleuth_grouping import (
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
+
 def _reminder(
     rid: str = "r1",
     channel: str = "general",
@@ -30,22 +31,22 @@ def _reminder(
     state: str = "scheduled",
 ) -> dict:
     return {
-        "reminder_id":          rid,
+        "reminder_id": rid,
         "original_channel_name": channel,
-        "original_channel_id":  channel_id,
+        "original_channel_id": channel_id,
         "reminder_message_text": text,
-        "github_urls":          urls or [],
-        "state":                state,
-        "should_post_on":       None,
-        "created_on":           None,
-        "task_text":            text,
+        "github_urls": urls or [],
+        "state": state,
+        "should_post_on": None,
+        "created_on": None,
+        "task_text": text,
     }
 
 
 BINOID_CLIENT = {
-    "ClientName":        "Binoid",
-    "Aliases":           ["binoid"],
-    "ChannelIDs":        [],
+    "ClientName": "Binoid",
+    "Aliases": ["binoid"],
+    "ChannelIDs": [],
     "ChannelNamePatterns": ["binoid"],
     "GitHubRepoPatterns": ["binoid"],
 }
@@ -54,6 +55,7 @@ BINOID_CLIENT = {
 # ---------------------------------------------------------------------------
 # extract_task_text
 # ---------------------------------------------------------------------------
+
 
 class TestExtractTaskText:
     def test_key_task_block(self):
@@ -108,6 +110,7 @@ class TestExtractTaskText:
 # _github_label_from_url
 # ---------------------------------------------------------------------------
 
+
 class TestGithubLabelFromUrl:
     def test_pull_request(self):
         assert _github_label_from_url("https://github.com/owner/repo/pull/42") == "PR #42"
@@ -129,6 +132,7 @@ class TestGithubLabelFromUrl:
 # ---------------------------------------------------------------------------
 # _does_reminder_match_client
 # ---------------------------------------------------------------------------
+
 
 class TestDoesReminderMatchClient:
     def test_channel_name_pattern_match(self):
@@ -161,6 +165,7 @@ class TestDoesReminderMatchClient:
 # group_reminders
 # ---------------------------------------------------------------------------
 
+
 class TestGroupReminders:
     def test_empty_input(self):
         assert group_reminders([]) == []
@@ -183,8 +188,7 @@ class TestGroupReminders:
 
     def test_github_transitive_union(self):
         r1 = _reminder("r1", urls=["https://github.com/o/r/issues/1"])
-        r2 = _reminder("r2", urls=["https://github.com/o/r/issues/1",
-                                    "https://github.com/o/r/issues/2"])
+        r2 = _reminder("r2", urls=["https://github.com/o/r/issues/1", "https://github.com/o/r/issues/2"])
         r3 = _reminder("r3", urls=["https://github.com/o/r/issues/2"])
         groups = group_reminders([r1, r2, r3], clients=[])
         gh = next(g for g in groups if g.kind == "github")
@@ -266,11 +270,12 @@ class TestGroupReminders:
 # find_connections
 # ---------------------------------------------------------------------------
 
+
 class TestFindConnections:
     def test_shared_github_url(self):
         url = "https://github.com/o/r/issues/1"
         target = _reminder("t", channel="chan-a", urls=[url])
-        other  = _reminder("o", channel="chan-b", urls=[url])
+        other = _reminder("o", channel="chan-b", urls=[url])
         unrelated = _reminder("u", channel="chan-c")
         result = find_connections(target, [target, other, unrelated], clients=[])
         ids = [r["reminder_id"] for r in result]
@@ -280,7 +285,7 @@ class TestFindConnections:
 
     def test_same_client(self):
         target = _reminder("t", channel="clients-1-binoid-devops")
-        other  = _reminder("o", channel="binoid-ltvera")
+        other = _reminder("o", channel="binoid-ltvera")
         unrelated = _reminder("u", channel="1-neochrome-team-tech")
         result = find_connections(target, [target, other, unrelated], clients=[BINOID_CLIENT])
         ids = [r["reminder_id"] for r in result]
@@ -289,7 +294,7 @@ class TestFindConnections:
 
     def test_same_channel(self):
         target = _reminder("t", channel="general")
-        other  = _reminder("o", channel="general")
+        other = _reminder("o", channel="general")
         unrelated = _reminder("u", channel="random")
         result = find_connections(target, [target, other, unrelated], clients=[])
         ids = [r["reminder_id"] for r in result]
@@ -309,6 +314,7 @@ class TestFindConnections:
 # ---------------------------------------------------------------------------
 # load_active_reminders (in-memory SQLite)
 # ---------------------------------------------------------------------------
+
 
 class TestLoadActiveReminders:
     def _make_db(self) -> sqlite3.Connection:
@@ -332,9 +338,27 @@ class TestLoadActiveReminders:
     def _insert(self, conn, rid, channel="general", text="do the thing", active=1, urls="[]"):
         conn.execute(
             "INSERT INTO sleuth_reminders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (rid, "ws", "scheduled", active, None, None, text, 0,
-             None, None, None, None, channel, None, None, urls,
-             "2026-01-01", "2026-01-01", "2026-01-01"),
+            (
+                rid,
+                "ws",
+                "scheduled",
+                active,
+                None,
+                None,
+                text,
+                0,
+                None,
+                None,
+                None,
+                None,
+                channel,
+                None,
+                None,
+                urls,
+                "2026-01-01",
+                "2026-01-01",
+                "2026-01-01",
+            ),
         )
         conn.commit()
 
@@ -372,6 +396,7 @@ class TestLoadActiveReminders:
 # ---------------------------------------------------------------------------
 # load_client_mapping
 # ---------------------------------------------------------------------------
+
 
 class TestLoadClientMapping:
     def test_returns_list(self):
