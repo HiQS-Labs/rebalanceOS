@@ -366,17 +366,17 @@ class PulseCollectorCheckTests(unittest.TestCase):
         ):
             checks = _check_pulse_collectors()
         by = {c.name: c for c in checks}
-        self.assertEqual(by["pulse collector:Broken"].status, WARN)
-        self.assertIn("4 repo scan failures", by["pulse collector:Broken"].detail)
-        self.assertIn("repo-a", by["pulse collector:Broken"].detail)
-        self.assertEqual(by["pulse collector:Stale"].status, WARN)
+        self.assertEqual(by["fleet:Broken"].status, WARN)
+        self.assertIn("4 repo scan failures", by["fleet:Broken"].detail)
+        self.assertIn("repo-a", by["fleet:Broken"].detail)
+        self.assertEqual(by["fleet:Stale"].status, WARN)
         # GH-189 re-sourced this from format_timestamp(relative=True), which
         # emits an absolute anchor plus the compact relative and returns ""
         # rather than a bare relative — so assert the anchor, not just the age.
-        stale_detail = by["pulse collector:Stale"].detail
+        stale_detail = by["fleet:Stale"].detail
         self.assertIn("1d ago", stale_detail)  # 30h → days
         self.assertRegex(stale_detail, r"last scan \d{4}-\d{2}-\d{2} \d{1,2}:\d{2} [AP]M · ")
-        self.assertEqual(by["pulse collector:Fine"].status, OK)
+        self.assertEqual(by["fleet:Fine"].status, OK)
 
     def test_empty_when_no_collectors(self) -> None:
         with patch(

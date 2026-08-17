@@ -972,12 +972,25 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
             stamp = beat.isoformat()
             if age_h > _SLEUTH_HEARTBEAT_STALE_HOURS:
                 sync_repo = get_sleuth_sync_repo_path() or "~/git-pulse-sync"
+                # WARNING, not ERROR (GH-5 Phase F): the publisher is a timer on
+                # another machine, so its staleness is fleet state — and every
+                # other stale-data freshness check already grades WARNING. The
+                # ERROR here was the inconsistency. The empty/never-synced case
+                # (onboarding-gated, 4.2) is separate and unchanged.
+                #
+                # Named "sleuth export", NOT "sleuth": health.py suppresses a
+                # WARN named "sleuth" when sources.sleuth.last_synced_at is
+                # recent — but that timestamp bumps on every reread of a DEAD
+                # export (this check's own reason for reading the publisher
+                # heartbeat instead). Under the shared name, demoting to
+                # WARNING made this finding vanish on false evidence; the
+                # distinct name keeps it a visible warning.
                 return Check(
-                    "sleuth", WARN,
-                    f"published export is stale — heartbeat {stamp} ({age_h:.1f}h ago)",
-                    "the Sleuth publisher (sleuth-reminders-export.timer on the box) or the "
-                    f"local export clone may be stuck; check the timer and `git -C {sync_repo} pull`",
-                    severity=ERROR,
+                    "sleuth export", WARN,
+                    f"publisher export is stale — heartbeat {stamp} ({age_h:.1f}h ago; "
+                    "the export publisher runs on another machine)",
+                    "check sleuth-reminders-export.timer on the publisher box, and "
+                    f"`git -C {sync_repo} pull` for a stuck local clone",
                 )
             return Check("sleuth", OK, f"configured (via {where}) · export {age_h:.1f}h old")
     return Check("sleuth", OK, f"configured (via {where})")
@@ -1319,7 +1332,10 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         # Every pulse row is a report about its own collector device.  The
         # optional registry overlay adds a longer staleness window for laptops.
         scope = _DEVICE_SCOPE_REGISTRY.get(("pulse_collector", health.device_id))
-        name = f"pulse collector:{health.device_name}"
+        # "fleet:" not "pulse collector:" (GH-5 Phase F): the row reports another
+        # machine's git-pulse job; the name states the scope instead of the
+        # mechanism. Renaming re-keys the health issue-reporter's dedup once.
+        name = f"fleet:{health.device_name}"
         other_device = _other_device_check(name, scope, current_device_id)
         if other_device is not None:
             checks.append(other_device)
@@ -1367,6 +1383,12 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         # at all. Both fixed here.
         if healthy:
             severity = NOTICE
+        elif health.device_id != current_device_id and severity == ERROR:
+            # Device-first health (GH-5 Phase F): the local verdict is graded on
+            # local state. A dead collector on ANOTHER machine stays visible in
+            # problems but is capped at WARNING so it cannot fail this device's
+            # exit; the same state on the device running doctor keeps ERROR.
+            severity = WARNING
         checks.append(
             Check(
                 name,
@@ -1523,7 +1545,7 @@ def _diagnostics_index() -> list[Check]:
 
     checks.append(Check(
         "diagnostics: git-pulse", OK,
-        "per-device collector health now shown inline above (`pulse collector:*`); "
+        "per-device collector health now shown inline above (`fleet:*`); "
         "`python experimental/git-pulse/health-check.py` for the full cross-machine "
         "table. Full module migration tracked in Phase 9.",
     ))

@@ -352,6 +352,52 @@ that would be this campaign's own failure mode, committed inside its own fix.
   Verified live on this machine: `rebalance doctor` now exits 1 on the same two error-severity
   problems the dashboard shows (previously exit 0 while the dashboard showed errors).
 
+## Phase F — Device-first health: fleet problems stop failing the local verdict
+
+**Added 2026-08-16, operator directive**, immediately after Phase 4 went live and its first honest
+exit-1 turned out to be driven entirely by *other machines*: the Mac Studio's dead git-pulse
+collector and a stale Sleuth publisher export (a systemd timer on another box). The operator's
+policy, quoted for the record: *"Users will care most about the Rebalance health of the device
+they're currently looking at as first priority… Knowing fleet health is a nice to have but not a
+priority right now."*
+
+Two changes, one principle — **the local workstation's verdict is graded on local state; fleet
+state informs, it does not fail**:
+
+1. **Rename `pulse collector:<device>` → `fleet:<device>`.** "Pulse collector" is jargon (which
+   pulse? collecting what?); `fleet:` states the scope. Known consequences, accepted: the health
+   issue-reporter dedups by check name, so any open auto-filed issue re-keys once; configured
+   notice patterns matching the old name would go stale (verified none configured on this device).
+2. **Severity cap for fleet-scoped findings.** A problem on a device other than the one running
+   doctor is capped at WARNING — visible in problems, sorted below errors, exit 0. The *local*
+   device's collector keeps its mapped severity (a dead collector on the machine you're looking at
+   IS local health). The Sleuth publisher-staleness check demotes to WARNING unconditionally — the
+   publisher is a remote timer, and every other stale-data freshness check is already WARNING;
+   ERROR there was the inconsistency, not the demotion. The empty/never-synced sleuth case keeps
+   its 4.2 onboarding-gate behaviour unchanged.
+
+Blast-radius interaction with 4.2's enumeration pin: `_check_sleuth` leaves the literal WARN+ERROR
+set (the pin updates with this rationale recorded); `_check_pulse_collectors` stays in the
+dynamic-severity set but gains cap tests (other-device ALERT → WARNING; local ALERT → ERROR).
+
+**Executed 2026-08-16 — three findings from the first live run:**
+
+1. **The demotion exposed a suppression trap.** A WARN named `sleuth` is suppressed when
+   `sources.sleuth.last_synced_at` is recent — but that timestamp bumps on every reread of a
+   *dead* export, the very false-evidence path the check reads the publisher heartbeat to avoid.
+   Demoting to WARNING made the staleness finding vanish entirely on that false evidence. Fix:
+   the staleness branch is its own check, **`sleuth export`**, outside the credential-suppression
+   map — a visible, unsuppressable warning. (ERROR severity had been masking this latent
+   interaction; it did not fix it.)
+2. **The operator's premise was half-true, and the half matters.** The stale Sleuth publisher is
+   indeed remote. But the erroring collector was **`noels-mac-studio` — the local device**: this
+   session runs on the Studio, and its own git-pulse launchd job has been dead since Aug 11. After
+   Phase F the exit-1 is *correct* under the operator's own policy: the machine you're looking at
+   has a local health problem. The ops action is reloading the Studio's `com.user.git-pulse` job.
+3. The other two ALERT devices never reached the cap: `_DEVICE_SCOPE_REGISTRY` already delegates
+   scoped devices to their owning machine ("not applicable on this device"). The cap is the
+   defense for *unscoped* remote devices.
+
 ## Phase O — Observability, so a binary verdict stays diagnosable
 
 Phase 4 reduces the *verdict* to one bit. That is only safe if the layer underneath explains

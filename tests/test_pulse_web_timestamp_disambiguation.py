@@ -4,7 +4,7 @@ The dashboard banner showed, adjacently:
 
   * "Last collector activity 7:08 PM"  — the newest *general ingestion*
     timestamp (vault / github / calendar / sleuth / email / semantic index)
-  * "pulse collector:noel's Mac Studio — … last scan 9:22 AM"  — a *git-pulse
+  * "fleet:noel's Mac Studio — … last scan 9:22 AM"  — a *git-pulse
     per-device* scan age
 
 Both said "collector", so the operator read one as contradicting the other and
@@ -37,7 +37,7 @@ def _strip_copy_payload(html: str) -> str:
     """Drop the copy button's `data-copy-text="…"` attribute.
 
     That payload is a serialised copy of the problem list, so it legitimately
-    contains check names like "pulse collector:Mac Studio". Assertions about the
+    contains check names like "fleet:Mac Studio". Assertions about the
     banner's own *labels* must not trip over it.
     """
     marker = 'data-copy-text="'
@@ -61,7 +61,7 @@ class BannerLeadDisambiguationTests(unittest.TestCase):
     def test_activity_label_does_not_share_wording_with_a_pulse_collector_pill(self) -> None:
         html = _banner([
             Check(
-                "pulse collector:noel's Mac Studio",
+                "fleet:noel's Mac Studio",
                 WARN,
                 "not collecting — last scan 2026-08-11 7:08 PM",
             ),
@@ -73,7 +73,7 @@ class BannerLeadDisambiguationTests(unittest.TestCase):
         # As originally posted on #2 this asserted against the whole lead div.
         # That over-reaches: the lead also carries the copy button's
         # `data-copy-text` payload, which embeds the problem list — and a
-        # per-device check named "pulse collector:…" SHOULD say collector there.
+        # per-device check named "fleet:…" SHOULD say collector there.
         # The defect was only ever the general-ingestion *label*, so the
         # assertion is scoped to the lead's own visible chrome.
         visible = _strip_copy_payload(lead_html)
@@ -91,10 +91,10 @@ class BannerLeadDisambiguationTests(unittest.TestCase):
         """Only the general-ingestion label changed. The pulse-collector problem
         items legitimately say "collector" — that IS what they measure."""
         html = _banner([
-            Check("pulse collector:Mac Studio", WARN, "not collecting — last scan earlier"),
+            Check("fleet:Mac Studio", WARN, "not collecting — last scan earlier"),
         ])
         items_html = html[html.index('class="health-banner-items"'):]
-        self.assertIn("pulse collector:Mac Studio", items_html)
+        self.assertIn("fleet:Mac Studio", items_html)
 
 
 class CopyPayloadMirrorsVisibleTextTests(unittest.TestCase):
@@ -109,13 +109,13 @@ class CopyPayloadMirrorsVisibleTextTests(unittest.TestCase):
 
     def test_clipboard_text_still_names_per_device_collector_checks(self) -> None:
         """The payload's job is to reproduce the problem list verbatim — a check
-        named "pulse collector:…" must survive into it unchanged."""
+        named "fleet:…" must survive into it unchanged."""
         text = pulse_web._health_banner_copy_text(
-            [Check("pulse collector:Mac Studio", WARN, "not collecting")],
+            [Check("fleet:Mac Studio", WARN, "not collecting")],
             status_text="1 warning",
             activity_text="2026-08-16 4:22 PM",
         )
-        self.assertIn("pulse collector:Mac Studio", text)
+        self.assertIn("fleet:Mac Studio", text)
 
 
 class SyncChipDisambiguationTests(unittest.TestCase):

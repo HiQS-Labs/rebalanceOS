@@ -513,7 +513,7 @@ def config_clear_sleuth() -> None:
 
 @config_app.command("add-health-notice")
 def config_add_health_notice(
-    pattern: str = typer.Argument(..., help="Check-name substring to demote, e.g. 'email data' or 'pulse collector:noel’s MacBook'"),
+    pattern: str = typer.Argument(..., help="Check-name substring to demote, e.g. 'email data' or 'fleet:noel’s MacBook'"),
 ) -> None:
     """Demote a health WARN to a 'notice' (shown on the dashboard, but not
     counted as 'collector attention needed'). Matches the check name as a
