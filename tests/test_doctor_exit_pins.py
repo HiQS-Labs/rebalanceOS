@@ -90,10 +90,14 @@ class BlastRadiusEnumerationTests(unittest.TestCase):
     # Every constructor that emits WARN status with LITERAL ERROR severity.
     # _check_collector_freshness appears twice: table-not-present and
     # empty-source (the latter now behind the onboarding gate).
+    # _check_sleuth LEFT this set in GH-5 Phase F (operator directive,
+    # 2026-08-16): the publisher-staleness check demoted to WARNING — the
+    # publisher is a timer on another machine, and every other stale-data
+    # check already grades WARNING; device-first health grades the local
+    # verdict on local state.
     LITERAL_WARN_ERROR = Counter(
         {
             "_check_collector_freshness": 2,
-            "_check_sleuth": 1,
             "_check_auth_failures": 1,
             "_check_three_eyes_supervision": 1,
         }
@@ -283,6 +287,52 @@ class OnboardingPolicyTests(unittest.TestCase):
             entry = _freshness_entry("email data")
             check = _check_collector_freshness(_empty_db(tmp), **entry)
         self.assertEqual(OK, check.status)
+
+
+class FleetDemotionTests(unittest.TestCase):
+    """GH-5 Phase F: the sleuth publisher-staleness finding is fleet state (the
+    publisher is a timer on another machine) — WARNING, never ERROR. The
+    per-device collector cap is pinned in test_doctor_pulse_severity.py."""
+
+    def test_stale_publisher_export_is_a_warning_not_an_error(self) -> None:
+        from datetime import timedelta
+
+        from rebalance.doctor import WARNING, _check_sleuth
+        from rebalance.ingest import config as config_mod
+
+        stale_beat = datetime.now(timezone.utc) - timedelta(hours=30)
+        with (
+            patch.object(config_mod, "get_sleuth_credentials", return_value=None),
+            patch.object(config_mod, "_keyring_get", return_value=None),
+            patch(
+                "rebalance.ingest.sleuth_reminders.get_export_generated_at",
+                return_value=stale_beat,
+            ),
+        ):
+            check = _check_sleuth(Path("/nonexistent-for-this-test.db"))
+        self.assertEqual(WARN, check.status)
+        self.assertEqual(WARNING, check.severity)
+        self.assertIn("another machine", check.detail)
+        # Distinct name: "sleuth" WARNs are suppressed by a recent local sync
+        # timestamp — which bumps even while rereading a DEAD export. Under the
+        # shared name this warning vanished on that false evidence.
+        self.assertEqual("sleuth export", check.name)
+
+    def test_sleuth_export_staleness_is_not_suppressible_by_local_reread(self) -> None:
+        """The reconciler must not hide publisher staleness just because the
+        local sync loop recently re-read the stale file."""
+        from datetime import timedelta
+
+        from rebalance.doctor import WARNING
+        from rebalance.health import compute_health_status
+
+        recent = (NOW - timedelta(hours=1)).isoformat()
+        status = {"sources": {"sleuth": {"last_synced_at": recent}}}
+        checks = [
+            Check("sleuth export", WARN, "publisher export is stale", severity=WARNING)
+        ]
+        health = compute_health_status(checks, status, NOW, notice_patterns=[])
+        self.assertEqual(["sleuth export"], [c.name for c in health.problems])
 
 
 # ---------------------------------------------------------------------------

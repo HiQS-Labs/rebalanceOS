@@ -49,11 +49,14 @@ def _health(
     return health
 
 
-def _checks_for(devices: list[CollectorHealth]):
+def _checks_for(devices: list[CollectorHealth], current_device_id: str | None = None):
     with patch(
         "rebalance.ingest.pulse_health.read_collector_health", return_value=devices
     ):
-        return {c.name: c for c in _check_pulse_collectors(current_device_id=None)}
+        return {
+            c.name: c
+            for c in _check_pulse_collectors(current_device_id=current_device_id)
+        }
 
 
 class RawStateWordDoesNotLeakTests(unittest.TestCase):
@@ -67,7 +70,7 @@ class RawStateWordDoesNotLeakTests(unittest.TestCase):
             _health("Broken", "DEGRADED", age_hours=0.3, failures=1),
         ]
         by = _checks_for(devices)
-        for check_name in ("pulse collector:Stale", "pulse collector:Broken"):
+        for check_name in ("fleet:Stale", "fleet:Broken"):
             detail = by[check_name].detail
             self.assertFalse(
                 detail.startswith(RAW_STATE_WORDS),
@@ -92,21 +95,52 @@ class SeverityInversionTests(unittest.TestCase):
 
     def test_healthy_collector_is_not_reported_at_warning_severity(self) -> None:
         by = _checks_for([_health("Good", "ALIVE")])
-        check = by["pulse collector:Good"]
+        check = by["fleet:Good"]
         self.assertEqual(OK, check.status)
         self.assertEqual(NOTICE, check.severity)
         self.assertNotEqual(WARNING, check.severity)
 
-    def test_unhealthy_collectors_carry_error_severity(self) -> None:
+    def test_unhealthy_local_collectors_carry_error_severity(self) -> None:
+        # current_device_id="D": since GH-5 Phase F only the LOCAL device's
+        # collector grades ERROR; other devices are capped (tested below).
         for state in ("ALERT", "DEGRADED", "NO PUSHES"):
             with self.subTest(state=state):
-                by = _checks_for([_health("D", state)])
-                self.assertEqual(ERROR, by["pulse collector:D"].severity)
+                by = _checks_for([_health("D", state)], current_device_id="D")
+                self.assertEqual(ERROR, by["fleet:D"].severity)
 
     def test_stale_is_a_warning_not_an_error(self) -> None:
         by = _checks_for([_health("D", "STALE")])
-        self.assertEqual(WARNING, by["pulse collector:D"].severity)
-        self.assertEqual(WARN, by["pulse collector:D"].status)
+        self.assertEqual(WARNING, by["fleet:D"].severity)
+        self.assertEqual(WARN, by["fleet:D"].status)
+
+
+class DeviceFirstSeverityTests(unittest.TestCase):
+    """GH-5 Phase F, operator directive: the local verdict is graded on local
+    state. A fleet problem stays visible but cannot fail this device's exit."""
+
+    def test_other_device_error_is_capped_at_warning(self) -> None:
+        for state in ("ALERT", "DEGRADED", "NO PUSHES"):
+            with self.subTest(state=state):
+                by = _checks_for(
+                    [_health("Studio", state)], current_device_id="this-machine"
+                )
+                check = by["fleet:Studio"]
+                self.assertEqual(WARN, check.status)  # still a visible problem
+                self.assertEqual(WARNING, check.severity)  # but never fails exit
+
+    def test_local_device_keeps_error(self) -> None:
+        by = _checks_for(
+            [_health("this-machine", "ALERT")], current_device_id="this-machine"
+        )
+        self.assertEqual(ERROR, by["fleet:this-machine"].severity)
+
+    def test_cap_does_not_touch_non_error_severities(self) -> None:
+        by = _checks_for(
+            [_health("Studio", "STALE"), _health("Good", "ALIVE")],
+            current_device_id="this-machine",
+        )
+        self.assertEqual(WARNING, by["fleet:Studio"].severity)
+        self.assertEqual(NOTICE, by["fleet:Good"].severity)
 
 
 class MappingContractTests(unittest.TestCase):
@@ -137,7 +171,7 @@ class MappingContractTests(unittest.TestCase):
         self.assertNotIn("18h", phrase)  # phrase itself is the canonical word
 
         by = _checks_for([_health("Laptop", "ALIVE (intermittent-device window 18h)")])
-        detail = by["pulse collector:Laptop"].detail
+        detail = by["fleet:Laptop"].detail
         self.assertIn("intermittent-device window 18h", detail)
         self.assertNotIn("ALIVE", detail)
 
