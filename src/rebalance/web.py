@@ -34,6 +34,7 @@ from fastapi.responses import (
 )
 from pydantic import BaseModel
 
+from rebalance.lib import time_ops
 from rebalance.ingest.auth_log import read_log, _log_path
 from rebalance.ingest import zapier_calendar, zapier_email
 from rebalance.ingest.sleuth_grouping import grouped_reminders_from_db
@@ -521,7 +522,7 @@ def _f5_warning_strip(data: dict[str, Any]) -> str:
     from rebalance.ingest.focus5_scan import explain_recency
     explain_on = data.get("ranking_mode") == "recent_activity"
     cutoff = (data.get("summary") or {}).get("rank_cutoff_ts")
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    now_ts = int(time_ops.now_utc().timestamp())
     shown, items = warns[:8], []
     for w in shown:
         reason = w.get("warning_reason")
@@ -767,7 +768,7 @@ def _roster_stale(computed_at: str | None) -> bool:
     ts = parse_utc_iso(computed_at)
     if ts is None:
         return True
-    return (datetime.now(timezone.utc) - ts).total_seconds() > FOCUS5_ROSTER_TTL_SECONDS
+    return (time_ops.now_utc() - ts).total_seconds() > FOCUS5_ROSTER_TTL_SECONDS
 
 
 @app.get("/focus-5")
@@ -877,7 +878,7 @@ def _build_three_eyes_card(report: dict) -> dict:
     else:
         title = "3-Eyes — all jobs OK"
         reason = f"3-Eyes fleet job health — {verdict}. All catalogued jobs healthy."
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = time_ops.now_iso()
     path = str(_THREE_EYES_DIR)
     return {
         "position": 0,                      # re-stamped by the caller

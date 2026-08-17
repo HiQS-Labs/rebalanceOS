@@ -37,6 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ACTIVE_JSON_PATH = PROJECT_ROOT / "temp" / "apple-reminders" / "active.json"
 import _bootstrap  # noqa: E402, F401  — puts src/ and scripts/ on sys.path
 
+from rebalance.lib.time_ops import now_utc
 from rebalance.lib.time_ops import format_timestamp, parse_utc_iso  # noqa: E402
 
 # Reuse the TUI's data layer so both views move in lockstep.
@@ -281,7 +282,7 @@ def fetch_health_filed_count(days: int = 30) -> int:
     from datetime import timedelta  # noqa: PLC0415
     if not HEALTH_LOG_PATH.exists():
         return 0
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = now_utc() - timedelta(days=days)
     seen: set[str] = set()
     try:
         for raw in HEALTH_LOG_PATH.read_text(encoding="utf-8").splitlines():
@@ -2989,7 +2990,7 @@ def _resolve_tz_source() -> tuple[str, bool]:
 
 
 def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: int) -> str:
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     local_now = now.astimezone(TZ)
 
     all_goals = parse_goals(goals_path, limit=PRIMARY_GOAL_LIMIT + SECONDARY_TODO_LIMIT)

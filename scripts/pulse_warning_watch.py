@@ -31,10 +31,11 @@ import re
 import subprocess
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from rebalance.lib.time_ops import now_utc
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_URL = "http://127.0.0.1:8767/"
@@ -129,7 +130,7 @@ class _PulseHTMLParser(HTMLParser):
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return now_utc()
 
 
 def _iso_now() -> str:

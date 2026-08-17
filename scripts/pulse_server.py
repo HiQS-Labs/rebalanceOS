@@ -44,6 +44,7 @@ import _bootstrap  # noqa: E402, F401  — puts src/ and scripts/ on sys.path
 # _open_bundle_invoker is a private symbol; coupling is intentional and documented here.
 # It is the only public-facing invoker for the signed Apple Reminders helper bundle.
 # Promote to a public name in apple_reminders_write.py when the module API stabilises.
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.apple_reminders_write import _open_bundle_invoker  # noqa: PLC2701
 from rebalance.ingest.config import get_apple_reminders_list_name
 from pulse_web import (  # noqa: E402
@@ -299,7 +300,7 @@ def health():
     if not PULSE_HTML.exists():
         return JSONResponse({"ok": False, "reason": "pulse.html missing"}, status_code=503)
     mtime = datetime.fromtimestamp(PULSE_HTML.stat().st_mtime, tz=timezone.utc)
-    age_s = (datetime.now(timezone.utc) - mtime).total_seconds()
+    age_s = (now_utc() - mtime).total_seconds()
     return {
         "ok": True,
         "generated_at": mtime.isoformat(),
@@ -451,7 +452,7 @@ class GoalUndoRequest(BaseModel):
 
 def _history_payload(goals_path: Path) -> list[dict[str, str]]:
     items = load_goal_history(goals_path=goals_path)
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     out: list[dict[str, str]] = []
     for item in items:
         completed_at = item.get("completed_at")

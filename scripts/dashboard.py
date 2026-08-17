@@ -29,7 +29,7 @@ import sys
 import termios
 import threading
 import tty
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,7 @@ from rich.text import Text
 # Make `rebalance.*` importable when running the script straight from the repo.
 import _bootstrap  # noqa: E402, F401
 
+from rebalance.lib import time_ops
 from rebalance.ingest.config import (  # noqa: E402
     get_calendar_ignored_summaries,
     get_github_ignored_repos,
@@ -165,19 +166,19 @@ class RefreshState:
     def start(self) -> None:
         with self.lock:
             self.status = "running"
-            self.last_started = datetime.now(timezone.utc)
+            self.last_started = time_ops.now_utc()
 
     def succeed(self, profile: dict[str, Any] | None = None) -> None:
         with self.lock:
             self.status = "ok"
-            self.last_finished = datetime.now(timezone.utc)
+            self.last_finished = time_ops.now_utc()
             self.last_error = ""
             self.last_profile = profile
 
     def fail(self, err: str) -> None:
         with self.lock:
             self.status = "error"
-            self.last_finished = datetime.now(timezone.utc)
+            self.last_finished = time_ops.now_utc()
             self.last_error = err
 
     def snapshot(self) -> dict[str, Any]:
@@ -225,7 +226,7 @@ def _write_refresh_profile(result: dict[str, Any]) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_path = LOG_DIR / f"github_refresh_{datetime.now(TZ).date().isoformat()}.log"
     record = {
-        "logged_at": datetime.now(timezone.utc).isoformat(),
+        "logged_at": time_ops.now_iso(),
         "source": "dashboard",
         "result": result,
     }
@@ -440,7 +441,7 @@ def fetch_recent_auto_promotion(days: int = 7) -> dict[str, Any] | None:
     except Exception:  # noqa: BLE001 — empty DB before first sync
         return None
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = time_ops.now_utc() - timedelta(days=days)
     best: tuple[datetime, dict[str, Any]] | None = None
     for row in rows:
         try:
@@ -618,7 +619,7 @@ def fetch_open_prs(limit: int = 10, stale_days: int = 2) -> list[dict[str, Any]]
     Each row gets an ``age_days`` int and a ``is_stale`` bool (age > stale_days).
     Closed PRs drop off automatically since we filter on state='open'.
     """
-    from datetime import datetime, timezone  # noqa: PLC0415
+    from datetime import datetime  # noqa: PLC0415
     try:
         with db_connection(DB_PATH) as conn:
             rows = conn.execute(
@@ -638,7 +639,7 @@ def fetch_open_prs(limit: int = 10, stale_days: int = 2) -> list[dict[str, Any]]
     except sqlite3.OperationalError:
         return []
 
-    now = datetime.now(timezone.utc)
+    now = time_ops.now_utc()
     out = []
     for r in rows:
         try:
@@ -765,7 +766,7 @@ def fetch_sleuth_display_sections() -> tuple[list[dict[str, Any]], int]:
     ] or ["dueToday", "dueUpcoming", "dueLastWeek", "dueOlder"]
 
     reminders_raw = data.get("reminders") or []
-    now_utc = datetime.now(timezone.utc)
+    now_utc = time_ops.now_utc()
 
     sections_by_key: dict[str, dict[str, Any]] = {}
     for r in reminders_raw:
@@ -1205,7 +1206,7 @@ def build_layout() -> Layout:
 
 
 def render(layout: Layout) -> Layout:
-    now = datetime.now(timezone.utc)
+    now = time_ops.now_utc()
 
     try:
         watched = fetch_watched_summary(now)

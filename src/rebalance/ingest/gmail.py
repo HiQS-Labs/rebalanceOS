@@ -39,6 +39,7 @@ DEFAULT_MAX_RESULTS = 100
 
 # launchd-reachable fallback for the OAuth token (keychain is unreachable from
 # the daily-sync's stripped environment). Mirrors calendar's TOKEN_PATH.
+from rebalance.lib.time_ops import now_iso
 from rebalance.paths import resolve_oauth_token_path
 TOKEN_PATH = resolve_oauth_token_path("gmail")
 
@@ -248,7 +249,7 @@ def sync_gmail(
         raise
     message_refs = list_response.get("messages", []) or []
 
-    synced_at = datetime.now(timezone.utc).isoformat()
+    synced_at = now_iso()
     metadata_headers = ["From", "To", "Subject", "Date"]
 
     inserted = 0
@@ -361,7 +362,7 @@ def ingest_email_messages(
     from rebalance.ingest.db import db_connection, ensure_email_schema
 
     start = time.monotonic()
-    synced_at = datetime.now(timezone.utc).isoformat()
+    synced_at = now_iso()
     inserted = updated = stored = skipped = 0
 
     with db_connection(database_path, ensure_email_schema) as conn:

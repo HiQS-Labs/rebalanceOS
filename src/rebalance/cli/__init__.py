@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import typer
 
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.preflight import run_preflight
 from rebalance.ingest.registry import sync_registry
 from rebalance.ingest.config import (
@@ -152,7 +153,7 @@ def doctor_cmd(
     # Same status snapshot and clock as pulse_web: a different `now` or a
     # missing status dict would make suppression evaluate differently and the
     # two surfaces disagree again through a new door (GH-5 Phase 4.3).
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     health_status = compute_health_status(report.checks, status, now)
     exit_code = 1 if health_status.verdict == FAIL else 0
 

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.calendar_config import (
     OPERATOR_CALENDAR_ID,
     CalendarConfig,
@@ -236,7 +237,7 @@ def _load_calendar_events(
     days_back: int,
     days_forward: int,
 ) -> list[dict[str, Any]]:
-    today = datetime.now(timezone.utc).date()
+    today = now_utc().date()
     min_date = (today - timedelta(days=days_back)).isoformat()
     max_date = (today + timedelta(days=days_forward)).isoformat()
     with db_connection(database_path, ensure_calendar_schema) as conn:
@@ -450,7 +451,7 @@ def _seed_status(seed: _ProjectSeed) -> str:
         latest_dt = parse_calendar_dt(latest).astimezone(timezone.utc)
     except Exception:
         return "potential"
-    age_days = (datetime.now(timezone.utc) - latest_dt).days
+    age_days = (now_utc() - latest_dt).days
     if age_days <= 30:
         return "active"
     if age_days <= 90:
@@ -887,7 +888,7 @@ def _repo_to_promoted_row(
                 "repo_full_name": repo_full_name,
                 "commit_count": commit_count,
                 "threshold": threshold,
-                "promoted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "promoted_at": now_utc().isoformat(timespec="seconds"),
             },
         },
     }

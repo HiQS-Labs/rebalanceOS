@@ -15,7 +15,6 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +62,7 @@ def instrument_embedding_pass(site_name: str) -> None:
         pass
 
 
+from rebalance.lib import time_ops
 from rebalance.ingest._job_guard import guarded_embedding
 from rebalance.ingest.db import db_connection, ensure_schema
 
@@ -275,7 +275,7 @@ def embed_chunks(
             conn.commit()
 
         # Update embedding_meta
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = time_ops.now_iso()
         for key, value in [
             ("model_name", model_name),
             ("embedding_dim", str(EMBEDDING_DIM)),

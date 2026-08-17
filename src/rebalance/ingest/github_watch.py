@@ -31,10 +31,10 @@ refresh: the rollup resumes, the stale per-login picture simply ages out of the 
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.config import normalize_github_repo_name
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.ingest._http import GITHUB_API
@@ -137,7 +137,7 @@ def derive_watched_repo_activity(
     footing as owned repos.
     """
     repo = normalize_github_repo_name(repo_full_name)
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     scan_date = now.strftime("%Y-%m-%d")
     cutoff_day = (now.replace(microsecond=0).isoformat())
     cutoff_date = _cutoff_iso(since_days)[:10]
@@ -252,7 +252,7 @@ def watched_repo_is_active_work(
         return False
 
     recent_local_ts = int(
-        datetime.now(timezone.utc).timestamp() - _LOCAL_RECENCY_DAYS * 86400
+        now_utc().timestamp() - _LOCAL_RECENCY_DAYS * 86400
     )
 
     with db_connection(database_path, ensure_github_schema) as conn:
