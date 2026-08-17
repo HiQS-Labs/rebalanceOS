@@ -2402,14 +2402,6 @@ PAGE_CSS = """
 .health-pill.metric:not(.has-issues) { color: var(--fg-dim); }
 """
 
-# Full page stylesheet, single-sourced: shared tokens + shared chrome (incl. the
-# base resets) by reference, then this page's local rules. Same bytes the old
-# inline literal produced; render_shell() composes the live <style> the same way
-# (it appends RB_BUTTON_CSS after page_css), so this constant is the documented
-# whole and the assembler is the live path.
-CSS = RB_TOKENS_CSS + RB_CHROME_CSS + PAGE_CSS
-
-
 PULSE_JS = r"""
 (() => {
   // Calendar now-indicator. The page is a STATIC generated file that can sit open

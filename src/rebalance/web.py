@@ -40,7 +40,6 @@ from pydantic import BaseModel
 from rebalance.lib import time_ops
 from rebalance.ingest.auth_log import read_log, _log_path
 from rebalance.ingest import zapier_calendar, zapier_email
-from rebalance.ingest.sleuth_grouping import grouped_reminders_from_db
 from rebalance.lib.time_ops import format_relative, parse_utc_iso
 from rebalance import three_eyes_bridge
 from rebalance.paths import resolve_db, resolve_secret_path
@@ -275,23 +274,6 @@ tr:hover td { background: var(--zebra); }
 .raw-link { float: right; font-size: 12px; color: var(--accent); text-decoration: none; }
 .raw-link:hover { text-decoration: underline; }
 
-/* Sleuth reminder groups (home page) */
-.sr-search-bar { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-.sr-input { flex:1; max-width:340px; padding:6px 10px; border:1px solid var(--border);
-            border-radius:6px; background:var(--card); color:var(--ink); font-size:13px; }
-.sr-count-label { font-size:12px; color:var(--muted); }
-.sr-groups { display:flex; flex-direction:column; gap:12px; }
-.sr-group  { background:var(--card); border-radius:8px;
-             box-shadow:var(--shadow); overflow:hidden; }
-.sr-group-header { display:flex; align-items:center; gap:8px; padding:10px 14px;
-                   border-bottom:1px solid var(--border); font-size:13px; font-weight:600; }
-.sr-group-name  { flex:1; }
-.sr-group-count { font-size:11px; font-weight:400; color:var(--muted); }
-.sr-tasks { list-style:none; padding:0; margin:0; }
-.sr-task  { padding:8px 14px; font-size:13px; border-top:1px solid var(--border); }
-.sr-task:first-child { border-top:none; }
-.sr-task:hover { background:var(--zebra); }
-
 /* Focus 5 — sits inside the .app 280px-sidebar grid, so it has ~280px less width
    than the old centred 1480px <main>. Breakpoints retuned for that frame. */
 .f5-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
@@ -395,83 +377,6 @@ def _page(title: str, body: str, *, active: str, wide: bool = False, extra_css: 
     marks the current nav item (``'today' | 'focus5' | 'authlog'``).
     """
     return HTMLResponse(render_shell(title, body, active=active, wide=wide, page_css=_CSS + "\n" + extra_css))
-
-
-_KIND_BADGE = {
-    "github": ("info", "GH"),
-    "client": ("ok", "client"),
-    "channel": ("neutral", "channel"),
-    "other": ("neutral", "other"),
-}
-
-
-def _render_task_text(task_text):
-    """Render task text with HTML escaping, or an em-dash placeholder."""
-    escaped = html.escape(task_text)
-    if escaped:
-        return escaped
-    return '<em style="color:var(--fg-dim)">—</em>'
-
-
-def _render_sleuth_groups() -> str:
-    """Return the Sleuth reminder groups section HTML, or an empty string on error."""
-    try:
-        groups = grouped_reminders_from_db(resolve_db())
-    except Exception:
-        return ""
-    if not groups:
-        return ""
-
-    total_tasks = sum(len(g.reminders) for g in groups)
-    rows: list[str] = []
-    for g in groups:
-        variant, badge_label = _KIND_BADGE.get(g.kind, ("neutral", g.kind))
-        tasks_html = "".join(
-            f"<li class='sr-task' data-text='{html.escape(r['task_text'].lower())}'>"
-            f"{_render_task_text(r['task_text'])}"
-            f"</li>"
-            for r in g.reminders
-        )
-        rows.append(
-            f"<div class='sr-group'>"
-            f"<div class='sr-group-header'>"
-            f"{badge_html(variant, badge_label)}"
-            f"<span class='sr-group-name'>{html.escape(g.label)}</span>"
-            f"<span class='sr-group-count'>{len(g.reminders)} reminder{'s' if len(g.reminders) != 1 else ''}</span>"
-            f"</div>"
-            f"<ul class='sr-tasks'>{tasks_html}</ul>"
-            f"</div>"
-        )
-
-    groups_html = "\n".join(rows)
-    return (
-        f"<h2 style='margin-top:28px;'>Reminders"
-        f"<span style='font-size:12px;font-weight:400;color:var(--muted);margin-left:10px;'>"
-        f"{total_tasks} active across {len(groups)} group{'s' if len(groups) != 1 else ''}"
-        f"</span></h2>"
-        f"<div class='sr-search-bar'>"
-        f"<input id='srSearch' class='sr-input' type='search' autocomplete='off'"
-        f"  oninput='srFilter()' placeholder='Search reminders…'>"
-        f"<span id='srCountLabel' class='sr-count-label'></span>"
-        f"</div>"
-        f"<div id='srGroups' class='sr-groups'>{groups_html}</div>"
-        f"<script>"
-        f"function srFilter(){{"
-        f"var q=(document.getElementById('srSearch').value||'').trim().toLowerCase();"
-        f"var vis=0;"
-        f"document.querySelectorAll('.sr-group').forEach(function(g){{"
-        f"var n=0;"
-        f"g.querySelectorAll('.sr-task').forEach(function(t){{"
-        f"var m=!q||t.dataset.text.includes(q);"
-        f"t.style.display=m?'':'none'; if(m)n++;"
-        f"}});"
-        f"g.style.display=n?'':'none'; vis+=n;"
-        f"}});"
-        f"var el=document.getElementById('srCountLabel');"
-        f"el.textContent=q?(vis+' task'+(vis!==1?'s':'')+' matching'):'';"
-        f"}}"
-        f"</script>"
-    )
 
 
 # The rich "Today" dashboard is rendered by the pulse server (web/pulse.html on

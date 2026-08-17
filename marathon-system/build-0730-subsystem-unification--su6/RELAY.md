@@ -1,6 +1,6 @@
 # Marathon Phase su6
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-SU6-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -80,3 +80,10 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Removed the unused home-page Sleuth reminder renderer from `src/rebalance/web.py`, including its private helpers, unreachable styles, and now-unused module import. The live `/sleuth-graph` route retains its local grouping import.
+- Removed the unused `CSS` composite from `scripts/pulse_web.py`; `render_shell()` continues to receive `PAGE_CSS` directly.
+- Replaced removed legacy MCP retrieval-tool references with `semantic_query` in `ARCHITECTURE.md` and `AGENTS.md`, and updated the semantic-query tool docstring to describe the current unified surface.
+- Verification: AST parsing passed for all changed Python files; scoped symbol/reference scan is clean. `ruff` is not installed in this worktree. The prescribed `tests/test_web.py` does not exist, and the available `pytest` process exits 134 before collection. `tests/test_web_badges.py` still asserts the removed private renderer, but the relay allowlist explicitly forbids editing that test; reviewer should resolve that task/allowlist mismatch.

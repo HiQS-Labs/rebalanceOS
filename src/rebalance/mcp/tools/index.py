@@ -283,9 +283,7 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         GitHub issues/PRs/comments, and Gmail subject/snippet documents in
         one ranked result set).
 
-        Prefer this over query_notes / query_github_context when you want a
-        single ranked result set across every source. The older tools still
-        work and read pre-unified per-source indexes.
+        Use this for a single ranked result set across every indexed source.
 
         Args:
             query: Natural language query.

@@ -49,13 +49,11 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 | `list_projects(status?)` | Query projects (default: active) |
 | `github_balance(since_days?)` | GitHub activity per project (requires prior refresh) |
 
-**Targeted retrieval (older, per-source — still valid):**
+**Targeted retrieval and synthesis:**
 
 | Tool | Purpose |
 |---|---|
-| `query_notes(query, top_k?)` | Vault-only vector search (legacy `embeddings` table) |
 | `search_vault(keyword, limit?)` | Full-text/keyword search over vault |
-| `query_github_context(query, repo?, top_k?)` | GitHub-only vector search (legacy `github_embeddings`) |
 | `ask(query, since_days?, skip_synthesis?)` | Combined context + optional local LLM synthesis |
 | `github_release_readiness(repo, milestone?)` | Milestone readiness inferred from local corpus |
 | `github_close_candidates(repo)` | Issues likely closed by merged PRs |
