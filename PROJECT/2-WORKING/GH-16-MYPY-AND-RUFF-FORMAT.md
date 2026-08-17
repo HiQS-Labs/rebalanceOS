@@ -38,10 +38,10 @@ The linting half landed with PR #12 (GH-298 Phase R), establishing `ruff check` 
 | Phase | Description | Status | Notes |
 |---|---|---|---|
 | **Phase 0** | Spike & error census on `src/rebalance` | **Done** | Found 2 parser syntax backslash issues (`web.py:415`, `web_components.py:565`). Baseline typing errors categorized. |
-| **Phase 1** | Mypy integration & baseline resolution | **Ready** | `mypy>=1.11` in `dev` extra, `[tool.mypy]` in `pyproject.toml`, clean `src/` resolution, CI `typecheck` job. |
-| **Phase 2** | `ruff format` adoption & blame ignore | **Ready** | Dedicated format commit, `.git-blame-ignore-revs`, CI `ruff format --check .` step. |
-| **Phase 3** | Documentation, Versioning & QA | **Ready** | Version bump to `0.69.7`, `CHANGELOG.md` entry, full pytest + HiQS isolation suite green. |
-| **Phase 4** | PR & Evaluation Grade | **Ready** | Branch pushed to origin, PR created to `main`, clone cleaned up, evaluation posted to issue #16. |
+| **Phase 1** | Mypy integration & baseline resolution | **Done** | `mypy>=1.11` in `dev` extra, `[tool.mypy]` in `pyproject.toml`, clean `src/` resolution, CI `typecheck` job. |
+| **Phase 2** | `ruff format` adoption & blame ignore | **Done** | Dedicated format commit (`f78caa1`), `.git-blame-ignore-revs`, CI `ruff format --check .` step. |
+| **Phase 3** | Documentation, Versioning & QA | **Done** | Version bump to `0.69.9`, `CHANGELOG.md` entry, full pytest + HiQS isolation suite green. |
+| **Phase 4** | PR & Evaluation Grade | **Done** | Rebased cleanly onto main (#18-#20), PR #21 updated, evaluation posted to issue #16. |
 
 ---
 

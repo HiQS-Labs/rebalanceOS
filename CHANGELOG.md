@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.9] - 2026-08-16
+
+### Added
+- Gradual type checking with mypy across the codebase, backed by a dedicated CI verification step.
+- Universal formatting standard enforced through ruff format, verified in CI and configured with git-blame ignore tracking so history attribution remains clean.
+
+### Changed
+- Standardized string formatting patterns in web component templates to ensure consistent parser compatibility across all toolchains.
+
 ## [0.69.8] - 2026-08-16
 
 ### Changed
