@@ -78,9 +78,20 @@ if "HiQS-Suite/rebalanceOS" not in url:
 
 
 def is_mcp_tool(dec):
-    """Match a @mcp.tool() / @mcp.tool decorator via the AST, not source formatting."""
+    """Match `@mcp.tool()` / `@mcp.tool` via the AST, not source formatting.
+
+    The receiver is checked too: matching any `.tool` attribute would count an
+    unrelated object's decorator as an MCP registration and invent tool-surface
+    drift. If the server ever renames the receiver, extraction drops to zero and
+    the empty-extraction guard below reports it — it cannot silently pass.
+    """
     node = dec.func if isinstance(dec, ast.Call) else dec
-    return isinstance(node, ast.Attribute) and node.attr == "tool"
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "tool"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "mcp"
+    )
 
 
 tools_dir = pathlib.Path("src/rebalance/mcp/tools")
@@ -134,14 +145,21 @@ while IFS= read -r hit; do
 done < <(git grep -nE 'Apache License|APACHE-LICENSE' -- ARCHITECTURE.md 2>/dev/null)
 
 # --- 5. credential-free checkpoint -------------------------------------------
-grep -q 'rebalance version' README.md \
-  || report 5 "README has no credential-free 'rebalance version' checkpoint"
+# Scoped to the Step 1 SECTION, not the whole file. A file-wide grep passes on the
+# top-of-page quick-start alone, so deleting the Step 1 checkpoint would go unnoticed —
+# the check must assert the thing it claims to protect, in the place it belongs.
+step1=$(awk '/^### Step 1 — Clone and install/{f=1;next} f&&/^### /{exit} f' README.md)
+if [ -z "$step1" ]; then
+  report 5 "cannot locate the 'Step 1 — Clone and install' section — check not verifiable"
+elif ! printf '%s' "$step1" | grep -q 'rebalance version'; then
+  report 5 "Step 1 has no credential-free 'rebalance version' checkpoint"
+fi
 
-# The checkpoint must come BEFORE the first credential step (Step 3 — Connect GitHub).
-ck=$(grep -n 'rebalance version' README.md | head -1 | cut -d: -f1)
+# It must also land before the first credential step (Step 3 — Connect GitHub).
+s1=$(grep -n '^### Step 1 — Clone and install' README.md | head -1 | cut -d: -f1)
 gh=$(grep -n '^### Step 3 — Connect GitHub' README.md | head -1 | cut -d: -f1)
-if [ -n "$ck" ] && [ -n "$gh" ] && [ "$ck" -gt "$gh" ]; then
-  report 5 "checkpoint (line $ck) comes after the first credential step (line $gh)"
+if [ -n "$s1" ] && [ -n "$gh" ] && [ "$s1" -gt "$gh" ]; then
+  report 5 "Step 1 (line $s1) comes after the first credential step (line $gh)"
 fi
 
 # --- 6. Getting Started reachable from the top -------------------------------
@@ -149,9 +167,17 @@ head -40 README.md | grep -q '#getting-started' \
   || report 6 "no Getting Started pointer in the first 40 lines of README"
 
 # --- 7. first-run egress list completeness -----------------------------------
-for host in 'github.com' 'pypi.org' 'files.pythonhosted.org'; do
-  grep -q "$host" README.md || report 7 "egress list omits $host"
-done
+# Bounded to the egress list itself. A file-wide grep would be satisfied by the clone
+# URL for github.com, masking a removed list entry.
+egress=$(awk '/^\*\*First-run network egress\*\*/{f=1;next} f&&/^### /{exit} f' README.md)
+if [ -z "$egress" ]; then
+  report 7 "cannot locate the 'First-run network egress' section — check not verifiable"
+else
+  for host in 'github.com' 'pypi.org' 'files.pythonhosted.org'; do
+    printf '%s' "$egress" | grep -q "$host" \
+      || report 7 "first-run egress list omits $host"
+  done
+fi
 
 # --- kept-green regression guards --------------------------------------------
 for f in LICENSE LICENSE-COMMERCIAL.md; do
