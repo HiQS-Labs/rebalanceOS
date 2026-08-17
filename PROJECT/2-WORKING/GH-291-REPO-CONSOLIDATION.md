@@ -94,18 +94,21 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
       `REPO_MAP.md`, `.pdda-gh-state.tsv`, and the OAuth patterns were **already
       covered**. Only three were missing — `MEMORY.md`, `phases/`, `DIAGRAM.md` —
       added in PR #48 (HiQS-Suite/rebalanceOS).
-- [ ] 🛑 **BLOCKER — `relay-system/` is tracked in the new repo (16 files).** The new
-      repo actively commits marathon transcripts (`relay-system/2026-08-17/*`);
-      issue #33 there wants that stopped. Carrying the retiring folder's
-      `relay-system/2026-08-14..16/` into a tree where the directory is tracked
-      leaves untracked-but-not-ignored files and **breaks the Phase 2
-      empty-porcelain gate**. Gitignoring a tracked path to make the gate pass is
-      explicitly forbidden by this plan. Operator decision required, two options:
-      - **(recommended)** drop `relay-system/` from the Phase 2 carry-over list and
-        park the old transcripts outside the tree
-        (`~/Documents/rebalance-OS-relay-archive-2026-08/`). They are historical
-        agent logs; nothing at runtime reads them.
-      - land #33 first (untrack + ignore `relay-system/`), then carry over normally.
+- [x] ✅ **BLOCKER CLEARED — `relay-system/` was tracked in the new repo (16 files).**
+      Carrying the retiring folder's transcripts into a tree where the directory was
+      tracked would have left untracked-but-not-ignored files and broken the Phase 2
+      empty-porcelain gate; gitignoring a tracked path to force the gate is forbidden
+      by this plan. Resolved 2026-08-17 in the correct order, per operator decision:
+      1. The retiring folder's **254 transcript files (10MB)** were moved out of the
+         tree to `~/relay-system/rebalanceOS-legacy/` and `relay-system/` was removed
+         from the Phase 2 carry-over list. Nothing at runtime reads them.
+      2. #33's stop-the-bleeding half landed (PR #50): `git rm -r --cached
+         relay-system` + `relay-system/` ignored. The 22 on-disk transcripts stay,
+         now untracked. The ~433MB history reclaim still needs a filter-repo rewrite
+         and stays open on #33.
+      Consequence for rollback: the retired folder no longer contains `relay-system/`.
+      Its contents are at the legacy path, and the old remote still holds the 167
+      tracked ones at tag `final-private-state`.
 - [ ] ⚠️ `.ona/` — `.ona/automations.yaml` is tracked on purpose in the new repo. Carry
       over only the local state files under `.ona/`, never the whole directory, or the
       tree proof will flag a modified tracked file.
@@ -159,8 +162,9 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
         `rebalance.db.orphan-*.bak`, `test.db`
       - Working/private dirs: `PARKED/`, `logs/`, `scratch/`,
         `graphify-out/`, `xyz-tick/`, `phases/`, `web/`
-        *(`relay-system/` removed pending the Phase 1 blocker — it is tracked in the
-        new repo; see Phase 1. Do not carry it until that decision is made.)*
+        *(`relay-system/` is intentionally **not** on this list — the retiring
+        folder's transcripts already live at `~/relay-system/rebalanceOS-legacy/`.
+        See the Phase 1 entry.)*
       - Private docs: `MEMORY.md`, `REPO_MAP.md`, `snapshot.md`, `ASK_SELF.md`,
         `DIAGRAM.md`, `APACHE-LICENSE-2.0.txt` (superseded by `LICENSE` — skip)
       - Tool state: `.tick/`, `.aider/`, `.gemini/`, `.xyz/`, `.ona/`,
@@ -255,10 +259,22 @@ names back → bootstrap jobs. Total exposure ~5 minutes.
       - Open PRs cannot be transferred either — none are open on the old repo as
         of 2026-08-17 (#302/#304 already resolved). If a new one appears: push the
         branch to the new remote, open the PR there, close the old with a pointer.
-- [ ] Rotate the embedded Google OAuth client in the Google Cloud Console.
-      Its id/secret live permanently in soon-to-be-archived public history; a
-      Desktop-app client grants nothing unattended (every access needs a human
-      consent click), but rotation costs two minutes and closes the exposure.
+- [ ] **Delete the leaked Google OAuth client.** Identified 2026-08-17 by decoding
+      the base64 blob removed in `c0a21b8c` (`src/rebalance/ingest/google_oauth_client.py`,
+      `_CID`/`_CS` — base64 was used deliberately to slip past secret scanners, so
+      TruffleHog would have reported the repo clean while publishing a live credential):
+      - **Leaked client id:** `409298341985-1kub4u1b1bd0leea3b74d4vmo5cqv75t.apps.googleusercontent.com`
+        (client secret leaked alongside it). Both live permanently in this repo's
+        soon-to-be-archived public history.
+      - **Replacement already created** by the operator in the same GCP project
+        (`409298341985`), client id ending `…-ur6vl1tpv4o6m73agpc7cnc95j54cn7q`, stored
+        outside the repo under `~/secrets/`. Nothing in-tree references the old one.
+      - Console: <https://console.cloud.google.com/apis/credentials?project=409298341985>
+        → OAuth 2.0 Client IDs → the `…-1kub4u1b…` row → **Delete** (delete, not just
+        reset the secret — the id itself is public). Then check
+        <https://myaccount.google.com/permissions> and revoke any lingering grant.
+      - A Desktop-app client grants nothing unattended (every access needs a human
+        consent click), so this is exposure closure, not an active incident.
 - [ ] Archive on GitHub: `gh repo archive Hypercart-Dev-Tools/rebalance-OS`
       (issues, commits, tags all remain readable; repo becomes read-only).
       **Archive, not delete, is the deliberate choice:** the old repo is and has
