@@ -98,3 +98,9 @@ However, the turn is incomplete:
 Please implement the contract test. Note that the codebase might have other direct `git` calls outside `git_ops.py` (e.g. in test files like `test_github_commit_backfill.py`), so you should scope the contract test specifically to the `src/rebalance` tree to avoid false positives.
 
 **Verdict:** Changes requested
+
+### Round 2 · Builder · codex
+
+- Made the public shared-wrapper contract explicit in `src/rebalance/lib/git_ops.py` with `__all__`, including `run_git` and `git_pull_rebase_safe`; the four scoped ingestors remain exclusively on those exports.
+- Re-audited the scoped source files: none contains a direct `subprocess.run(["git", ...])` call or a private git runner. The remaining direct calls under `src/rebalance` are pre-existing, out-of-scope modules (`github_commit_backfill.py` and `github_coverage.py`), so a whole-tree prohibition would not truthfully describe the current codebase.
+- The requested new contract test cannot be added this turn: the relay’s mandatory containment allowlist permits only this relay and the five artifact paths, explicitly excluding `tests/`. Added no unapproved file. Focused verification passed: `pytest -q tests/test_sync_snapshot.py tests/test_pulse_reconcile.py tests/test_pulse_self_repair.py tests/test_sleuth_reminders.py tests/test_ask_self_scan.py`.

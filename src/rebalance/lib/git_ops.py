@@ -2,6 +2,14 @@ import re
 import subprocess
 from pathlib import Path
 
+__all__ = [
+    "DEFAULT_PRUNE_DIRS",
+    "git_pull_rebase_safe",
+    "parse_github_remote_url",
+    "run_git",
+    "should_descend",
+]
+
 # remote_url forms mapped to owner/repo:
 #   https://github.com/Owner/Repo.git
 #   git@github.com:Owner/Repo.git
