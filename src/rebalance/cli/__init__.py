@@ -132,6 +132,7 @@ def doctor_cmd(
     from datetime import timezone
 
     from rebalance.doctor import FAIL, OK, WARN, run_doctor
+    from rebalance.health import check_dispositions, compute_health_status
     from rebalance.ingest.index_ops import get_index_status
 
     report = run_doctor(database)
@@ -146,17 +147,20 @@ def doctor_cmd(
         if health.get("status") == "degraded"
     }
 
-    if json_output:
-        # Same snapshot and clock as the dashboard (pulse_web) — the reconciled
-        # verdict must be the one every other surface renders, or --json becomes
-        # yet another parallel health opinion.
-        from rebalance.health import check_dispositions, compute_health_status
+    # One producer (run_doctor), one reconciler (compute_health_status), N
+    # renderers — the exit code is a renderer, same as the dashboard pills.
+    # Same status snapshot and clock as pulse_web: a different `now` or a
+    # missing status dict would make suppression evaluate differently and the
+    # two surfaces disagree again through a new door (GH-5 Phase 4.3).
+    now = datetime.now(timezone.utc)
+    health_status = compute_health_status(report.checks, status, now)
+    exit_code = 1 if health_status.verdict == FAIL else 0
 
-        now = datetime.now(timezone.utc)
-        health_status = compute_health_status(report.checks, status, now)
+    if json_output:
         payload = {
             "generated_at": now.isoformat(timespec="seconds"),
             "verdict": health_status.verdict,
+            "exit_code": exit_code,
             "summary": health_status.bucket_text or "healthy",
             "checks": [
                 {
@@ -170,14 +174,10 @@ def doctor_cmd(
                 for c, disposition in check_dispositions(report.checks, health_status)
             ],
             "signal_health_degraded": degraded,
-            # Pre-collapse exit-code inputs (raw, unreconciled). The process
-            # still exits on these until Phase 4.3 reroutes it; keeping them in
-            # the payload is what makes any verdict/exit divergence visible.
-            "legacy": {"failed": report.failed, "warned": report.warned},
         }
         typer.echo(json.dumps(payload, indent=2))
-        if report.failed:
-            raise typer.Exit(1)
+        if exit_code:
+            raise typer.Exit(exit_code)
         return
 
     from rich.console import Console
@@ -198,10 +198,22 @@ def doctor_cmd(
         detail = "; ".join(f"{name}: {reason}" for name, reason in degraded.items())
         console.print(f"  {label[WARN]}  [bold]signal health[/bold] — {detail}")
     console.print()
-    if report.failed:
+    # The raw rows above may show a WARN the reconciler suppressed; say so
+    # rather than letting the verdict look like it ignored the row.
+    suppressed = sum(
+        1
+        for _, disposition in check_dispositions(report.checks, health_status)
+        if disposition == "suppressed"
+    )
+    if suppressed:
+        console.print(
+            f"[dim]{suppressed} warning{'' if suppressed == 1 else 's'} suppressed "
+            "by a recent successful sync — `rebalance doctor --json` for detail.[/dim]"
+        )
+    if health_status.verdict == FAIL:
         console.print("[red]Health check found failures.[/red]")
         raise typer.Exit(1)
-    if report.warned:
+    if health_status.verdict == WARN:
         console.print("[yellow]Health check passed with warnings.[/yellow]")
     else:
         console.print("[green]All checks passed.[/green]")

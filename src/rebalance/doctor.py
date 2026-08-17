@@ -53,15 +53,16 @@ class Check:
 
 @dataclass
 class DoctorReport:
+    """Raw per-check facts. Verdicts belong to ``health.compute_health_status``.
+
+    The ``failed`` / ``warned`` aggregation properties were deleted in GH-5
+    Phase 4.3: they were a second, unreconciled verdict path (a raw
+    ``any(status == FAIL)`` scan) that only the CLI exit consumed, letting
+    ``rebalance doctor`` disagree with every dashboard. One producer, one
+    reconciler, N renderers.
+    """
+
     checks: list[Check] = field(default_factory=list)
-
-    @property
-    def failed(self) -> bool:
-        return any(c.status == FAIL for c in self.checks)
-
-    @property
-    def warned(self) -> bool:
-        return any(c.status == WARN for c in self.checks)
 
 
 @dataclass(frozen=True)

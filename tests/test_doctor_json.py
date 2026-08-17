@@ -117,31 +117,43 @@ class DoctorJsonCliTests(unittest.TestCase):
                 {"name", "status", "severity", "disposition", "detail", "hint"},
                 set(c),
             )
+        self.assertEqual(0, payload["exit_code"])
 
     def test_suppressed_warn_yields_ok_verdict_but_stays_diagnosable(self) -> None:
         """A binary OK with a hidden WARN is exactly the case that must not be
-        opaque: verdict ok, but the check is present, labelled suppressed."""
+        opaque: verdict ok — and since 4.3 exit 0 derives from it — but the
+        check is present, labelled suppressed."""
         report = DoctorReport(checks=[Check("sleuth", WARN, "credential warning")])
         result = self._invoke(report, status=_recent_sleuth_status())
         payload = json.loads(result.stdout)
         self.assertEqual(OK, payload["verdict"])
         self.assertEqual("suppressed", payload["checks"][0]["disposition"])
-        # Pre-4.3 the exit code is still raw — the payload must expose that.
-        self.assertTrue(payload["legacy"]["warned"])
-        self.assertFalse(payload["legacy"]["failed"])
+        self.assertEqual(0, payload["exit_code"])
         self.assertEqual(0, result.exit_code)
 
-    def test_additive_flag_keeps_legacy_exit_semantics(self) -> None:
-        """4.1 is purely additive: FAIL still exits 1, WARN still exits 0.
-        Rerouting the exit through the reconciled verdict is 4.3's job, gated
-        on the 4.2 pin tests existing first."""
+    def test_exit_code_derives_from_the_reconciled_verdict(self) -> None:
+        """GH-5 Phase 4.3: one verdict path. FAIL verdict → exit 1; WARN → 0."""
         failed = DoctorReport(checks=[Check("db", FAIL, "gone", severity=ERROR)])
         result = self._invoke(failed)
         self.assertEqual(1, result.exit_code)
-        self.assertEqual(FAIL, json.loads(result.stdout)["verdict"])
+        payload = json.loads(result.stdout)
+        self.assertEqual(FAIL, payload["verdict"])
+        self.assertEqual(1, payload["exit_code"])
 
         warned = DoctorReport(checks=[Check("token", WARN, "stale")])
         self.assertEqual(0, self._invoke(warned).exit_code)
+
+    def test_warn_status_error_severity_now_fails_the_exit(self) -> None:
+        """The 4.2-pinned blast radius, activated: a WARN-status ERROR-severity
+        check (dashboard shows an error, old CLI exited 0) now exits 1 —
+        the CLI/dashboard disagreement this phase exists to close."""
+        report = DoctorReport(
+            checks=[Check("github data", WARN, "no github data ingested",
+                          severity=ERROR)]
+        )
+        result = self._invoke(report)
+        self.assertEqual(1, result.exit_code)
+        self.assertEqual(FAIL, json.loads(result.stdout)["verdict"])
 
     def test_missing_database_still_emits_json(self) -> None:
         report = DoctorReport(checks=[Check("db", OK, "fine")])

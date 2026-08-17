@@ -33,7 +33,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| PR [#6](https://github.com/HiQS-Suite/rebalanceOS/pull/6) open (6 phases + post-ship QA: Phase 5a reverted, `unknown`-state hardened, claims narrowed). Recurrence **mitigated, not closed** — see "What we got wrong". One real mechanism shipped (`utils/pdda/prior-art-check.sh`, plus `HiQS/tests` in CI); the `ROUTER.md` block is documentation and will not fire on its own. | Merge PR #6, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. |
+| **Phase 4 executed** on `feat/gh-5-phase-4-unified-health` (PR #6 merged earlier): 4.1 `--json` (agy: Approved), 4.2 pins + onboarding gate (agy: Approved), 4.3 exit reroute. Two findings en route, recorded in the Phase 4 section: the hand-counted blast radius missed a **sixth site** (caught by the 4.2 AST enumeration), and fresh installs hit the *table-not-present* branch, not the empty branch (sleuth_reminders is created by first sync). `Check.status` deletion **deferred — it still has consumers** (renderers, health.py); goes with PR2's vocabulary unification. | Open the Phase 4 PR, then **Phase R — recover the stranded old-repo PRs before GH-291 archives them.** That is the only phase with an external deadline. Then Phase O2/O3. |
 
 ## Orientation for a reader arriving cold
 
@@ -243,6 +243,7 @@ and a sixth site added later cannot slip in silently.
 | `doctor.py:957` | Sleuth published export is stale |
 | `doctor.py:1238` | auth failure events |
 | `doctor.py:1458` | 3-Eyes: a job is unloaded or failing (#4's incident shape) |
+| `_check_pulse_collectors` | **found by writing 4.2's enumeration test** — severity flows dynamically from `_PULSE_STATE_TO_CHECK` (ALERT / DEGRADED / NO PUSHES → WARN+ERROR). The hand count above missed it, which is the enumeration test's whole argument, demonstrated on its own plan. |
 
 `:471` fires on **every brand-new install**, so the collapse makes `rebalance doctor` exit 1 on
 first run.
@@ -303,6 +304,13 @@ has a credential check in `doctor.py` whose resolver can be reused rather than d
 | GitHub token configured, no data ingested | **ERROR → exit 1** |
 | GitHub was ingesting, now empty | **ERROR → exit 1** |
 
+**Found during 4.2 (would have broken the fresh-install row):** some collector tables
+(`sleuth_reminders`) are created by the **first sync, not by migrations** — so a genuine fresh
+install hits the *table-not-present* branch of `_check_collector_freshness`, not the empty branch.
+The gate therefore covers both branches; unconfigured+missing-table skips, configured+missing-table
+stays an error. Discovered because the black-box fresh-install test failed on its first run — the
+pin did its job before the reroute ever shipped.
+
 **Known wrinkle to handle explicitly in 4.2:** Gmail's `mcp` ingest mode keeps credentials in the
 agent's connector, not locally (`doctor.py:1009-1011`), so "configured" there means only *"the
 operator selected mcp mode"* — it cannot distinguish "selected mcp and connected" from "selected
@@ -329,6 +337,20 @@ that would be this campaign's own failure mode, committed inside its own fix.
   snapshot and clock the dashboard uses** — one shared provider. Codex's Q4: ordering alone is not
   sufficient, because a different `now` or a missing status dict makes recovery/suppression evaluate
   differently and the two surfaces disagree again through a new door. **Net lines: down.**
+
+  **Executed 2026-08-16 — with the deletion honestly deferred.** The reroute shipped: exit 1 iff
+  reconciled verdict == fail, `DoctorReport.failed`/`.warned` (the raw second verdict path, whose
+  only consumer was the CLI) deleted, human mode gained a one-line suppressed-warnings note so a
+  visible WARN row can't contradict the summary. But the "no consumer" gate for `Check.status` is
+  **false today**: the CLI row renderer, pulse_web, and health.py's own visibility predicate all
+  still read it, and `__post_init__`'s FAIL→ERROR promotion turned out to be *load-bearing* for the
+  reroute itself (9 `FAIL` constructors carry no explicit severity; without the promotion a FAIL
+  check would yield verdict *warn*). Deleting either here would have been the campaign's own
+  failure mode — a wide rename disguised as a deletion. Both go with PR2's status-vocabulary
+  unification, where `FAIL`-as-a-status disappears entirely.
+
+  Verified live on this machine: `rebalance doctor` now exits 1 on the same two error-severity
+  problems the dashboard shows (previously exit 0 while the dashboard showed errors).
 
 ## Phase O — Observability, so a binary verdict stays diagnosable
 
