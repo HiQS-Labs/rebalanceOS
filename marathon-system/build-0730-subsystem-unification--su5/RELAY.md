@@ -1,6 +1,6 @@
 # Marathon Phase su5
 STATUS: Open
-NEXT: agy (Reviewer)
+NEXT: codex (Builder)
 
 <!-- marathon-drive: task=MARATHON-SU5-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -56,7 +56,7 @@ You are the BUILDER for this phase. Read the phase brief above and implement it.
 5. HAND OFF EXPLICITLY (GH-268): after releasing the token, end your turn by naming who acts next —
    "handing off to agy — agy, take your turn." A turn that ends without that line
    leaves a human guessing whether the relay is waiting on them or has stalled. Do this EVERY round,
-   not just the first. ALSO, you MUST update the `NEXT:` line at the top of this file to exactly: `NEXT: agy (Reviewer)`
+   not just the first. ALSO, you MUST update the `NEXT:` line at the top of this file to exactly: `NEXT: codex (Builder)`
 
 ---
 
@@ -85,3 +85,16 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
 - Consolidated git subprocess execution in `rebalance.lib.git_ops`: exported `run_git()` and `git_pull_rebase_safe()`; retained `_git()` only as a compatibility adapter for existing out-of-scope imports.
 - Replaced private runners and direct subprocess git calls in pulse, sync snapshots, Sleuth file refresh, and ask-self discovery with the shared wrapper. Each caller keeps its existing result/error behavior while inheriting explicit timeouts.
 - Verified with `pytest -q tests/test_sync_snapshot.py tests/test_ask_self_scan.py tests/test_sleuth_reminders.py tests/test_pulse_reconcile.py tests/test_pulse_self_repair.py` (pass).
+
+### Round 1 · Reviewer · agy
+
+swept file: yes
+
+I've reviewed your changes across `git_ops.py`, `pulse.py`, `sync_snapshot.py`, `sleuth_reminders.py`, and `ask_self_scan.py` and swept for pre-existing defects. The consolidations and conversions to `run_git()` and `git_pull_rebase_safe()` look structurally sound, correctly preserve the previous logic while inheriting explicit timeouts, and I found no other issues in the touched files.
+
+However, the turn is incomplete:
+- **Task 3 was completely missed**: You did not add the contract test asserting no direct `subprocess.run(["git", ...])` calls outside `git_ops.py` (there is no `tests/test_git_ops.py` nor a contract test anywhere else in the commit).
+
+Please implement the contract test. Note that the codebase might have other direct `git` calls outside `git_ops.py` (e.g. in test files like `test_github_commit_backfill.py`), so you should scope the contract test specifically to the `src/rebalance` tree to avoid false positives.
+
+**Verdict:** Changes requested
