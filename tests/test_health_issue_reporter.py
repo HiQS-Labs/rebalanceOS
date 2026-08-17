@@ -51,7 +51,7 @@ def _days_ago_str(days: int) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _make_check(name: str, status: str = "fail", detail: str = "test detail",
+def _make_check(name: str, status: str = "error", detail: str = "test detail",
                 hint: str = "fix it", source: str = "rebalance-doctor") -> dict:
     return {"name": name, "status": status, "detail": detail,
             "hint": hint, "source": source}
@@ -96,14 +96,14 @@ class TestOccurrenceCounter(unittest.TestCase):
             self.assertEqual(hr.parse_occurrence_count(body), n)
 
     def test_issue_body_starts_with_seen_1(self) -> None:
-        body = hr._issue_body("my-check", "fail", "detail text", "fix hint", "rebalance-doctor")
+        body = hr._issue_body("my-check", "error", "detail text", "fix hint", "rebalance-doctor")
         self.assertTrue(body.startswith("> **Seen:** 1×"),
                         f"Body should start with seen marker, got: {body[:80]!r}")
 
     def test_issue_body_contains_required_sections(self) -> None:
-        body = hr._issue_body("db-check", "warn", "DB is stale", "run refresh", "rebalance-doctor")
+        body = hr._issue_body("db-check", "warning", "DB is stale", "run refresh", "rebalance-doctor")
         self.assertIn("## Rebalance health: `db-check`", body)
-        self.assertIn("**Status:** `WARN`", body)
+        self.assertIn("**Status:** `WARNING`", body)
         self.assertIn("DB is stale", body)
         self.assertIn("run refresh", body)
         self.assertIn("rebalance-doctor", body)
@@ -117,16 +117,16 @@ class TestOccurrenceCounter(unittest.TestCase):
 class TestDetailRefresh(unittest.TestCase):
 
     def test_set_detail_replaces_detail_block(self) -> None:
-        body = hr._issue_body("db", "fail", "original detail", "", "rebalance-doctor")
+        body = hr._issue_body("db", "error", "original detail", "", "rebalance-doctor")
         updated = hr.set_detail(body, "new root-cause detail")
         self.assertIn("new root-cause detail", updated)
         self.assertNotIn("original detail", updated)
 
     def test_set_detail_preserves_rest_of_body(self) -> None:
-        body = hr._issue_body("db", "fail", "original detail", "a hint", "rebalance-doctor")
+        body = hr._issue_body("db", "error", "original detail", "a hint", "rebalance-doctor")
         updated = hr.set_detail(body, "new detail")
         self.assertIn("## Rebalance health: `db`", updated)
-        self.assertIn("**Status:** `FAIL`", updated)
+        self.assertIn("**Status:** `ERROR`", updated)
         self.assertIn("a hint", updated)
         self.assertTrue(updated.startswith("> **Seen:** 1×"))
 
@@ -135,7 +135,7 @@ class TestDetailRefresh(unittest.TestCase):
         self.assertEqual(hr.set_detail(body, "whatever"), body)
 
     def test_set_detail_does_not_touch_seen_counter(self) -> None:
-        body = hr._issue_body("db", "fail", "detail v1", "", "rebalance-doctor")
+        body = hr._issue_body("db", "error", "detail v1", "", "rebalance-doctor")
         body = hr.set_occurrence_count(body, 3, _now_str(), device="host-a")
         updated = hr.set_detail(body, "detail v2")
         self.assertIn("> **Seen:** 3×", updated)
@@ -144,7 +144,7 @@ class TestDetailRefresh(unittest.TestCase):
 
     def test_repeat_sighting_refreshes_detail_and_counter(self) -> None:
         """End-to-end: a second sighting with a changed detail must update both."""
-        body = hr._issue_body("db", "fail", "disk full", "", "rebalance-doctor")
+        body = hr._issue_body("db", "error", "disk full", "", "rebalance-doctor")
         refreshed = hr.set_detail(body, "disk full — now 99% (was 92%)")
         new_body = hr.set_occurrence_count(refreshed, 2, _now_str(), device="host-a")
         self.assertIn("disk full — now 99% (was 92%)", new_body)
@@ -160,7 +160,7 @@ class TestDetailRefresh(unittest.TestCase):
 class TestStableCheckIdDedup(unittest.TestCase):
 
     def test_issue_body_embeds_check_id_marker(self) -> None:
-        body = hr._issue_body("sleuth", "fail", "detail", "", "rebalance-doctor")
+        body = hr._issue_body("sleuth", "error", "detail", "", "rebalance-doctor")
         self.assertEqual(hr.parse_check_id(body), "sleuth")
 
     def test_parse_check_id_missing_marker_returns_none(self) -> None:
@@ -169,7 +169,7 @@ class TestStableCheckIdDedup(unittest.TestCase):
 
     def test_dedup_key_prefers_body_marker_over_title(self) -> None:
         """A human-retitled GitHub issue must still match its stable id."""
-        body = hr._issue_body("sleuth", "fail", "detail", "", "rebalance-doctor")
+        body = hr._issue_body("sleuth", "error", "detail", "", "rebalance-doctor")
         issue = {"title": "health: sleuth credentials (renamed by operator)", "body": body}
         self.assertEqual(hr.dedup_key_for_issue(issue), "sleuth")
 
@@ -191,7 +191,7 @@ class TestStableCheckIdDedup(unittest.TestCase):
         the marker (post-fix), one via legacy title parsing (pre-fix) — must
         both be reachable by their check name, proving the title text no
         longer gates dedup."""
-        marker_body = hr._issue_body("gmail", "fail", "detail", "", "rebalance-doctor")
+        marker_body = hr._issue_body("gmail", "error", "detail", "", "rebalance-doctor")
         renamed_issue = {
             "title": "health: gmail integration (renamed)",
             "number": 200,
@@ -217,7 +217,7 @@ class TestStableCheckIdDedup(unittest.TestCase):
         """Simulates main()'s matching logic: a check whose GitHub issue was
         retitled (title no longer equals ``health: <name>``) must still be
         found as 'already open' via the stable check id, not re-filed."""
-        body = hr._issue_body("figma", "fail", "token missing", "", "rebalance-doctor")
+        body = hr._issue_body("figma", "error", "token missing", "", "rebalance-doctor")
         open_issues = {
             hr.dedup_key_for_issue({"title": "health: figma token (renamed)", "body": body}):
                 {"title": "health: figma token (renamed)", "number": 77, "body": body}
@@ -368,7 +368,7 @@ class TestRunLog(unittest.TestCase):
     def test_flush_writes_valid_jsonl(self) -> None:
         log = hr.RunLog("2026-01-01T00:00:00Z", {"dry_run": False})
         log.add_check(_make_check("db", "ok"))
-        log.add_check(_make_check("vault", "warn"))
+        log.add_check(_make_check("vault", "warning"))
         log.add_llm_call("db", "haiku", "anthropic", "skip", "looks ok")
         log.add_action("filed", "vault", 42)
         log.flush(dry_run=False)
@@ -741,7 +741,7 @@ class TestDoctorFixtures(unittest.TestCase):
 class TestLLMTriage(unittest.TestCase):
 
     def _check(self) -> dict:
-        return _make_check("test-check", "warn")
+        return _make_check("test-check", "warning")
 
     def test_file_decision_passes_through(self) -> None:
         with patch.object(hr, "_triage_gemini",
@@ -795,7 +795,7 @@ class TestLLMTriage(unittest.TestCase):
 
         check = _make_check(
             "github data",
-            status="warn",
+            status="warning",
             detail="github_activity last scan 5 days ago (stale)",
             hint="run `rebalance refresh` (scope github)",
         )
@@ -853,7 +853,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_hard_db_not_found_should_not_skip(self) -> None:
         """A missing database on a configured machine is a regression — never skip."""
         check = _make_check(
-            "database", "fail",
+            "database", "error",
             detail=(
                 "no rebalance.db could be resolved — the database that was present "
                 "yesterday is now missing; sync has stopped completely"
@@ -868,7 +868,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_hard_github_token_missing_should_not_skip(self) -> None:
         """Token was present, now gone — all GitHub sync is broken."""
         check = _make_check(
-            "github token", "fail",
+            "github token", "error",
             detail=(
                 "no GitHub token configured — previously stored token is no longer "
                 "present; all GitHub activity ingestion has stopped"
@@ -883,7 +883,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_hard_schema_corrupt_should_not_skip(self) -> None:
         """A corrupt/unreadable schema is a real error, not noise."""
         check = _make_check(
-            "schema", "fail",
+            "schema", "error",
             detail="could not read schema: database disk image is malformed",
             hint="restore from backup or run `rebalance refresh` to recreate",
         )
@@ -900,7 +900,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_stale_github_data(self) -> None:
         """10-day-old GitHub activity — should be file or downgrade, rarely skip."""
         check = _make_check(
-            "github data", "warn",
+            "github data", "warning",
             detail="42 activity rows, latest 2026-05-20 — last scan 10 days ago (stale)",
             hint="run `rebalance refresh` (scope github) — check projects are registered",
         )
@@ -912,7 +912,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_calendar_token_missing(self) -> None:
         """Calendar OAuth token absent — optional integration, may be skip/downgrade."""
         check = _make_check(
-            "calendar", "warn",
+            "calendar", "warning",
             detail=(
                 "OAuth token not found at "
                 "/Users/user/.config/rebalance/calendar_token.json"
@@ -925,7 +925,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_sleuth_env_missing(self) -> None:
         """Sleuth env file absent — optional integration on machines without Sleuth."""
         check = _make_check(
-            "sleuth", "warn",
+            "sleuth", "warning",
             detail=(
                 "no Sleuth Web API env file "
                 "(/Users/user/.config/rebalance/sleuth-web-api-production.env)"
@@ -941,7 +941,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_launchd_single_nonzero_exit(self) -> None:
         """launchd job exited 1 once — may be transient; any decision is reasonable."""
         check = _make_check(
-            "launchd:daily-sync", "warn",
+            "launchd:daily-sync", "warning",
             detail="last run exited with status 1",
             hint="inspect temp/logs/ for this job's error output",
         )
@@ -951,7 +951,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_database_location_split(self) -> None:
         """Active DB not at canonical path — housekeeping issue, medium priority."""
         check = _make_check(
-            "database location", "warn",
+            "database location", "warning",
             detail=(
                 "active DB is not the canonical path\n"
                 "  canonical: /Users/user/Library/Application Support/rebalance-os/rebalance.db\n"
@@ -965,7 +965,7 @@ class TestTriageScenarios(unittest.TestCase):
     def test_soft_gmail_mcp_no_messages(self) -> None:
         """Gmail in MCP mode with 0 messages ingested — may not need an issue."""
         check = _make_check(
-            "gmail", "warn",
+            "gmail", "warning",
             detail="MCP mode — no email ingested yet",
             hint=(
                 "have an agent fetch via the Gmail MCP connector "
@@ -1036,7 +1036,7 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         """Every collected check carries source='rebalance-doctor', never a second producer."""
         fake_report = MagicMock()
         fake_report.checks = [
-            _make_check_obj("pulse collector:device-a", "warn", "ALERT — last scan 2.0d ago"),
+            _make_check_obj("pulse collector:device-a", "warning", "ALERT — last scan 2.0d ago"),
             _make_check_obj("email data", "ok", "107 rows"),
         ]
         with patch("rebalance.doctor.run_doctor", return_value=fake_report):
@@ -1049,7 +1049,7 @@ class TestNoDuplicateCollectorEmitter(unittest.TestCase):
         """The hyphen form is the fingerprint of the deleted emitter."""
         fake_report = MagicMock()
         fake_report.checks = [
-            _make_check_obj("pulse collector:device-a", "warn", "ALERT"),
+            _make_check_obj("pulse collector:device-a", "warning", "ALERT"),
         ]
         with patch("rebalance.doctor.run_doctor", return_value=fake_report):
             checks = hr.run_doctor_checks()
