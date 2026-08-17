@@ -10,6 +10,20 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.69.11] - 2026-08-17
+
+### Fixed
+- The health-issue auto-filer now targets the canonical repository instead of the
+  retiring one it was still pointed at by default.
+
+### Added
+- A health check that catches the failure behind this release: every scheduled
+  job's configuration must point at the same checkout as the code answering the
+  health check. After the repository moved, the entire scheduled stack silently
+  kept running old code from the previous location for days while the
+  command-line tools looked fully up to date — that drift is now a named,
+  visible warning listing exactly which jobs are stranded.
+
 ## [0.69.10] - 2026-08-17
 
 ### Changed
