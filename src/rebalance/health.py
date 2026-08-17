@@ -17,8 +17,9 @@ Two reconciliations, both "a recent success is evidence the problem cleared":
   the failure. This is what lets a deauth warning self-clear on recovery for
   every install, not just one machine.
 
-Suppression windows MUST track ``doctor.py`` ``warn_days * 24`` for each source;
-update both together.
+Suppression windows are derived from ``doctor.py``'s collector-freshness
+registry (``freshness_warn_hours``), so each source's staleness threshold is
+written down exactly once (GH-5 Phase O3).
 """
 
 from __future__ import annotations
@@ -27,22 +28,33 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from rebalance.doctor import ERROR, FAIL, NOTICE, OK, WARN, WARNING, Check
+from rebalance.doctor import (
+    ERROR,
+    FAIL,
+    NOTICE,
+    OK,
+    WARN,
+    WARNING,
+    Check,
+    freshness_warn_hours,
+)
 
-# Credential-check name → suppression window (hours). Mirrors doctor warn_days*24.
+# Credential-check name → suppression window (hours), derived from the doctor
+# freshness registry's warn_days for the same source. Vault is the one check
+# with no freshness registry entry, so it keeps an explicit 2-day default.
 CREDENTIAL_SUPPRESSION_HOURS: dict[str, int] = {
-    "vault":    48,   # no freshness check; 2d safe default
-    "calendar": 72,   # calendar data warn_days=3
-    "gmail":   168,   # email data warn_days=7
-    "sleuth":   48,   # sleuth data warn_days=2
+    "vault":    48,  # no freshness check; 2d safe default
+    "calendar": freshness_warn_hours("calendar data"),
+    "gmail":    freshness_warn_hours("email data"),
+    "sleuth":   freshness_warn_hours("sleuth data"),
 }
 
 # auth:* check name → (freshness status key, window hours). A recent successful
 # sync of the underlying collector clears a stale auth WARN.
 AUTH_RECOVERY: dict[str, tuple[str, int]] = {
-    "auth:github":   ("github data", 48),
-    "auth:gmail":    ("gmail", 168),
-    "auth:calendar": ("calendar", 72),
+    "auth:github":   ("github data", freshness_warn_hours("github data")),
+    "auth:gmail":    ("gmail", freshness_warn_hours("email data")),
+    "auth:calendar": ("calendar", freshness_warn_hours("calendar data")),
 }
 
 
