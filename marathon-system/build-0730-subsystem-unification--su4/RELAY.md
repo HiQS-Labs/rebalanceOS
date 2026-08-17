@@ -1,6 +1,6 @@
 # Marathon Phase su4
 STATUS: Open
-NEXT: agy (Reviewer)
+NEXT: codex (Builder)
 
 <!-- marathon-drive: task=MARATHON-SU4-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -87,3 +87,27 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
 - Consolidated Gmail's two nine-column email upsert loops into `_upsert_email_message()`.
 - Consolidated GitHub issue/PR record construction, item replacement, and repeated issue-comment persistence while preserving the existing counters and document writes.
 - Verification: `pytest tests/test_github_knowledge.py tests/test_sleuth_reminders.py -q` exited cleanly. The brief's `tests/test_db_connection.py` and `tests/test_gmail.py` paths are absent in this checkout.
+
+### Round 1 · Reviewer · agy
+
+swept file: yes
+
+The deduplication changes are structurally sound, but the full-file sweep revealed two pre-existing defects that we need to address while we are touching these files:
+
+1. **Critical Security/Stability Defect in `src/rebalance/ingest/db/connection.py`**
+   In `get_connection()`, the `try/except` block around `sqlite_vec.load(conn)` is unsafe:
+   ```python
+   try:
+       if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
+           conn.enable_load_extension(True)
+           sqlite_vec.load(conn)
+           conn.enable_load_extension(False)
+   except (AttributeError, Exception):
+       pass
+   ```
+   If `sqlite_vec.load(conn)` throws an exception, execution jumps to the `except` block and `conn.enable_load_extension(False)` is never called. This leaves the SQLite connection with extension loading enabled indefinitely. Please fix this by wrapping the load and disable in a `try...finally` block.
+
+2. **Missing `_parse_links` for Issues in `src/rebalance/ingest/github_knowledge.py`**
+   In the refactored loop, `_parse_links()` and `gh.upsert_link()` are only called for `pr_payloads`. However, regular issues can also mention other issues in their body, and since both PRs and issues now share the `_build_item_record` logic, we should apply link parsing to `issue_payloads` as well. Please move the `_parse_links` and `gh.upsert_link` calls so they run for both issues and PRs.
+
+**Verdict:** Changes requested
