@@ -259,7 +259,26 @@ names back → bootstrap jobs. Total exposure ~5 minutes.
       - Open PRs cannot be transferred either — none are open on the old repo as
         of 2026-08-17 (#302/#304 already resolved). If a new one appears: push the
         branch to the new remote, open the PR there, close the old with a pointer.
-- [ ] **Delete the leaked Google OAuth client.** Identified 2026-08-17 by decoding
+- [x] ✅ **Leaked Google OAuth client DELETED 2026-08-17** (operator, Cloud Console),
+      along with the Calendar grant at myaccount.google.com/permissions. The project
+      now holds exactly one client: `RebalanceOS - Gmail 2026-08-16`
+      (`…-ur6vl1t…`, Desktop). Follow-on work this created:
+      - The new client JSON was copied to `~/secrets/google_oauth_client.json`, the
+        path `resolve_client_file()` actually consults — the operator's own copy under
+        `~/secrets/reblanceOS/google calendar/` is not on the resolution path, and no
+        launchd plist sets `GOOGLE_OAUTH_CLIENT_FILE`. Verified: `resolve_client_file()`
+        → `~/secrets/google_oauth_client.json`, client id `…-ur6vl1t…`.
+      - 🔴 **Both Google collectors are dead until re-auth.** The stored keyring tokens
+        were issued by the deleted client; a live refresh returns
+        `deleted_client: The OAuth client was deleted.` Fix (needs a browser):
+        `.venv/bin/python scripts/setup_calendar_oauth.py --test` and
+        `.venv/bin/python scripts/setup_gmail_oauth.py --test`.
+      - `rebalance doctor` reported all three Google lines OK throughout — it checks
+        token *presence*, not validity. Filed as #52.
+      - ⚠️ `~/secrets/google-workspace-oauth-client.json` still contains the **deleted**
+        client id. Stale; delete it once re-auth is confirmed, so nothing can resolve
+        a dead client by accident.
+- [x] Original step, kept for the record — **Delete the leaked Google OAuth client.** Identified 2026-08-17 by decoding
       the base64 blob removed in `c0a21b8c` (`src/rebalance/ingest/google_oauth_client.py`,
       `_CID`/`_CS` — base64 was used deliberately to slip past secret scanners, so
       TruffleHog would have reported the repo clean while publishing a live credential):
