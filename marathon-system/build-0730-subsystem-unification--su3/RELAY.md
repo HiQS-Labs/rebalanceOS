@@ -1,6 +1,6 @@
 # Marathon Phase su3
 STATUS: Open
-NEXT: agy (Reviewer)
+NEXT: codex (Builder)
 
 <!-- marathon-drive: task=MARATHON-SU3-TURN builder=codex reviewer=agy round-cap=7 -->
 
@@ -89,3 +89,15 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Reviewer · agy
+
+swept file: yes
+
+**Verdict:** Changes requested
+
+I reviewed the files touched: `src/rebalance/ingest/_http.py`, `src/rebalance/ingest/github_knowledge.py`, `src/rebalance/ingest/github_watch.py`, and `tests/test_http_contract.py`.
+
+**Findings:**
+1. **Critical:** The new architectural contract test `tests/test_http_contract.py` fails on main. It catches a pre-existing violation in `src/rebalance/ingest/sleuth_reminders.py` (line 261), which is still constructing its own `Authorization` headers. You must migrate `sleuth_reminders.py` to use `GitHubClient` as well (or at least route its header construction through `_http.py`) so the test passes.
+2. **Note:** There are pre-existing test failures in `tests/test_github_knowledge.py` regarding a missing `github_embeddings` table (`sqlite3.OperationalError`). Please be careful if you run the full test suite, but fixing `sleuth_reminders.py` is the priority here for this ticket.
