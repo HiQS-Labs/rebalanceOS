@@ -1110,6 +1110,92 @@ def _google_oauth_source(service: str, in_keyring: bool) -> str | None:
     return None
 
 
+def _stored_google_token_json(service: str) -> str | None:
+    """The stored token as raw JSON, keyring → secret store. None for the legacy
+    pickle, which this section does not unpickle."""
+    from rebalance.ingest import config, secret_store
+
+    getter = {
+        "gmail": config.get_gmail_oauth_token_json,
+        "calendar": config.get_calendar_oauth_token_json,
+    }.get(service)
+    if getter is not None:
+        raw = getter()
+        if raw:
+            return raw
+    return secret_store.read_secret_file(f"google-{service}-oauth")
+
+
+def _short_client_id(client_id: str) -> str:
+    """A Google client id with its universal suffix dropped.
+
+    Every one of them ends ``.apps.googleusercontent.com``, so any right-hand
+    truncation renders two different clients as the same string — which is
+    exactly the confusion this check exists to resolve. Client ids are public
+    identifiers, not secrets, so the distinguishing head is shown in full.
+    """
+    return client_id.removesuffix(".apps.googleusercontent.com")
+
+
+def _google_oauth_client_check(service: str) -> Check | None:
+    """WARN when a stored Google token cannot work with the currently resolved
+    OAuth client. Returns None when the pairing is fine or undeterminable.
+
+    Stays offline like the rest of this section — it compares client ids rather
+    than attempting a refresh — but that is enough to catch what a bare presence
+    check cannot. When the leaked client was deleted on 2026-08-17, every token it
+    had issued died instantly; doctor reported "OAuth token present" on all three
+    Google lines while both collectors were returning ``deleted_client``. The token
+    was there. It just could not be used. (#52)
+    """
+    from rebalance.ingest.google_oauth_client import (
+        CLIENT_FILE_ENV,
+        GoogleOAuthClientNotConfigured,
+        build_google_oauth_client_config,
+        client_file_candidates,
+    )
+
+    try:
+        raw = _stored_google_token_json(service)
+    except Exception:  # noqa: BLE001 — doctor must never crash
+        return None
+    if not raw:
+        return None
+    try:
+        stored_id = (json.loads(raw) or {}).get("client_id")
+    except Exception:  # noqa: BLE001 — malformed token is another check's problem
+        return None
+    if not stored_id:
+        # Legacy token predating client_id capture — nothing to compare against.
+        return None
+
+    try:
+        resolved_id = build_google_oauth_client_config()["installed"]["client_id"]
+    except GoogleOAuthClientNotConfigured:
+        tried = ", ".join(str(p) for p in client_file_candidates())
+        return Check(
+            service,
+            WARN,
+            f"OAuth token present but no OAuth client file is configured (tried: {tried})",
+            "🔧 save your Desktop-app client JSON to one of those paths, or set "
+            f"{CLIENT_FILE_ENV} — without it every {service} sync fails to authenticate",
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+    if stored_id == resolved_id:
+        return None
+    return Check(
+        service,
+        WARN,
+        f"OAuth token was issued by a different client than the one configured "
+        f"(token {_short_client_id(stored_id)}, "
+        f"configured {_short_client_id(resolved_id)}) — it cannot refresh",
+        f"🔧 re-run scripts/setup_{service}_oauth.py to mint a token for the "
+        "current client; a token from a rotated or deleted client is dead weight",
+    )
+
+
 def _check_gmail(db_path: Path | None) -> Check:
     """Gmail ingest — desktop OAuth (``oauth`` mode) or the Gmail MCP connector (``mcp`` mode)."""
     from rebalance.ingest.config import get_gmail_ingest_method
@@ -1154,6 +1240,9 @@ def _check_gmail(db_path: Path | None) -> Check:
             "🔧 run the Gmail OAuth flow (scripts/setup_gmail_oauth.py) — or switch "
             "to MCP mode (`rebalance config set-gmail-method mcp`)",
         )
+    mismatch = _google_oauth_client_check("gmail")
+    if mismatch is not None:
+        return mismatch
     return Check("gmail", OK, f"OAuth token present (via {source})")
 
 
@@ -1172,6 +1261,9 @@ def _check_calendar() -> Check:
             "no Calendar OAuth credentials (keyring + secret store empty, no token file)",
             "🔧 run the Calendar OAuth flow (scripts/setup_calendar_oauth.py)",
         )
+    mismatch = _google_oauth_client_check("calendar")
+    if mismatch is not None:
+        return mismatch
     detail = f"OAuth token present (via {source})"
     try:
         from rebalance.ingest import token_meta
