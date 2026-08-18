@@ -191,23 +191,34 @@ operator name from what it does, never from how it ships.
 - Audit deps weekly (`safety check`, Dependabot).
 - Rate limit APIs; exponential backoff on 429s.
 
-### 3-Eyes — the local job supervisor (read this before touching scheduled jobs)
+### 3-Eyes — DEFERRED (do not repair, do not operate)
 
-**3-Eyes is the sentinel system for this machine's scheduled jobs.** It supersedes the earlier
-Cactus-Needle sentinel, which was disabled on 2026-07-27 (its four `com.neochro.*` launchd agents
-are parked in `~/Library/LaunchAgents/.disabled-cactus-sentinel-2026-07-27/`). Do not reintroduce a
-second supervisor — one machine, one sentinel.
+**3-Eyes is stood down as of 2026-08-17 by operator decision. Do not spend effort on it.** It is not
+this machine's sentinel any more, it is not run in CI, and its launchd jobs are unloaded. If you are
+here because something pointed you at 3-Eyes, the correct action is to stop and do nothing.
 
-- **Code:** `utils/3-eyes/` · **Plan:** [PROJECT/2-WORKING/GH-195-UNIFIED-SENTINEL.md](PROJECT/2-WORKING/GH-195-UNIFIED-SENTINEL.md)
-- **Status / inventory:** `cd utils/3-eyes && PYTHONPATH=$PWD python3 -m three_eyes status`
-- **Skill:** `/3-eyes` for job health; `/launchd-triage` for raw launchd triage beneath it
-- **Inert by default.** A clone without a gitignored `config/runtime.env` is a clean no-op —
-  "3-Eyes says nothing" on a fresh machine means *not activated*, not *nothing wrong*.
+This is a **pause, not a deletion**: `utils/3-eyes/` and its tests, registry, and lint entry all stay
+in the tree so the decision stays reversible. Nothing about it needs fixing first.
 
-**Known gap (2026-07-27): the registry does not match reality.** `registry/jobs.d/` lists
-`collector-health` and `selfcheck`, but `3eyes.skill-sync` is loaded in launchd and firing every
-120 s without a registry entry. A supervisor that doesn't know about one of its own jobs is the
-condition 3-Eyes exists to prevent — reconcile before trusting its inventory.
+**Do not:**
+- fix its failing tests, reconcile its registry, or repair its `pause` or `skill-sync` behaviour
+- re-add it to CI, or wire it into a health check, dashboard, or new code path
+- build a replacement supervisor — that re-opens the same project under a new name
+
+**Scheduled-job status now comes from launchd directly:** `launchctl list | grep rebalance`, plus the
+per-job logs. That is a manual check, and the loss is real and accepted — see the parked note on the
+supervision gap. The health check keeps a separate crash-loop diagnostic, which is **not** a
+substitute supervisor and should not be described as one.
+
+**Why it was deferred, so this is not relitigated:** it was the only source of CI failure on the
+default branch; its `pause` does not stop a launchd job; one of its jobs rewrote deleted files every
+120 s; and its own registry did not match what was actually loaded. An unreliable supervisor is worse
+than none, because it manufactures confidence. Independently reviewed by two models on 2026-08-17,
+both reaching the same conclusion.
+
+**To resume** (only on an explicit operator decision): re-add `utils/3-eyes/tests` to the CI test
+line, restore the registry/dashboard CI step, `launchctl bootstrap` the three agents, and restore the
+machine-local overlay files noted in `PARKED/`.
 
 ## Phase 0 Technical Spikes
 
