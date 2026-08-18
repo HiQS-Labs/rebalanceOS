@@ -389,7 +389,9 @@ class TestRunGitPulseHalf:
     @patch("daily_synthesis.collect_git_pulse_activity")
     @patch("rebalance.ingest.config.get_pulse_config")
     @patch("daily_synthesis.vault_ready")
-    def test_run_skips_entirely_with_no_destination(self, mock_vault_ready, mock_get_cfg, mock_collect, mock_synthesize):
+    def test_run_skips_entirely_with_no_destination(
+        self, mock_vault_ready, mock_get_cfg, mock_collect, mock_synthesize
+    ):
         mock_vault_ready.return_value = False
         mock_get_cfg.return_value = {"git_pulse_clio_enabled": False}
 

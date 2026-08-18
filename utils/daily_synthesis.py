@@ -244,7 +244,9 @@ Activity data:
 
 
 def build_git_pulse_block(summary: str, generated_at: datetime) -> str:
-    return build_marked_block(GIT_PULSE_BLOCK_HEADING, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END, summary, generated_at)
+    return build_marked_block(
+        GIT_PULSE_BLOCK_HEADING, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END, summary, generated_at
+    )
 
 
 def upsert_git_pulse_block(content: str, summary: str, generated_at: datetime) -> str:
