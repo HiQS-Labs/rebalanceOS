@@ -103,7 +103,11 @@ class StackScriptTests(unittest.TestCase):
         self.agents.mkdir(parents=True)
         self.addCleanup(self._tmp.cleanup)
 
-    def write_plist(self, label_suffix: str, root: str = "/Users/noelsaw/rebalance-runtime") -> Path:
+    def write_plist(self, label_suffix: str, root: str | None = None) -> Path:
+        # Default to THIS checkout: a fixture bound elsewhere now trips the
+        # target-root guard, which every destructive command honours since the
+        # branch review. Tests about teardown should not be testing the guard.
+        root = root if root is not None else str(REPO)
         path = self.agents / f"{PREFIX}{label_suffix}.plist"
         path.write_text(
             "<?xml version='1.0' encoding='UTF-8'?>\n"
@@ -321,6 +325,67 @@ class StackScriptTests(unittest.TestCase):
         self.assertFalse(
             [c for c in unloads if "3eyes" in c],
             "down tried to unload an unmanaged 3-Eyes job",
+        )
+
+    # -- 7. destructive commands honour the binding guard too ---------------
+
+    def test_down_refuses_a_fleet_bound_elsewhere(self):
+        """`up` refusing to ADOPT a foreign fleet while `down` was free to STOP
+        it was the wrong way round: unloading jobs this clone does not own is
+        the worse outcome of the two."""
+        self.write_plist("vault-sync", root="/somewhere/else")
+        result = run_stack("down", home=self.home)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bound to a different checkout", strip_ansi(result.stderr))
+        calls_log = self.home / "launchctl-calls.log"
+        calls = calls_log.read_text().splitlines() if calls_log.exists() else []
+        self.assertFalse([c for c in calls if c.startswith("unload ")], calls)
+
+    def test_purge_refuses_a_fleet_bound_elsewhere(self):
+        plist = self.write_plist("vault-sync", root="/somewhere/else")
+        result = run_stack("purge", home=self.home)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(plist.exists(), "purge deleted a plist it did not own")
+
+    def test_force_still_allows_a_deliberate_teardown(self):
+        """The guard must be an interlock, not a wall — --force is the escape
+        hatch, and it has to actually work."""
+        self.write_plist("vault-sync", root="/somewhere/else")
+        result = run_stack("down", "--force", home=self.home)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = (self.home / "launchctl-calls.log").read_text().splitlines()
+        self.assertTrue([c for c in calls if c.startswith("unload ")])
+
+    # -- 8. up validates every template before unloading anything ------------
+
+    def test_up_unloads_nothing_when_a_template_will_not_render(self):
+        """`rb_install_launchd_job` unloads the old job before writing the new
+        plist, so a template that fails to lint used to leave that job down —
+        and under `restart`, every job processed before it as well. Preflight
+        now renders and lints the whole policy set first."""
+        policy = self.home / "POLICY.md"
+        policy.write_text(
+            "| Job (label suffix) | Cadence | Wrapper |\n"
+            "|---|---|---|\n"
+            "| `vault-sync` | hourly | `scripts/vault_sync.sh` |\n"
+            "| `no-such-job` | hourly | — |\n",
+            encoding="utf-8",
+        )
+        self.write_plist("vault-sync")
+
+        result = run_stack(
+            "up", home=self.home, extra_env={"STACK_POLICY_DOC": str(policy)}
+        )
+
+        self.assertNotEqual(result.returncode, 0, "up accepted a missing template")
+        self.assertIn("no-such-job", strip_ansi(result.stderr))
+        calls_log = self.home / "launchctl-calls.log"
+        calls = calls_log.read_text().splitlines() if calls_log.exists() else []
+        self.assertFalse(
+            [c for c in calls if c.startswith("unload ")],
+            f"up unloaded a job before discovering the bad template: {calls}",
         )
 
     def test_usage_lists_every_dispatcher_command(self):

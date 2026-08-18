@@ -30,7 +30,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBALANCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PYTHON_BIN="$REBALANCE_DIR/.venv/bin/python"
 REBALANCE_CLI="$REBALANCE_DIR/.venv/bin/rebalance"
-POLICY_DOC="$REBALANCE_DIR/SCHEDULER.md"
+# STACK_POLICY_DOC is a test seam: it lets the suite drive the parser and the
+# preflight with a policy table it controls, without editing the repo's real
+# SCHEDULER.md. Unset in normal use.
+POLICY_DOC="${STACK_POLICY_DOC:-$REBALANCE_DIR/SCHEDULER.md}"
 AGENTS_DIR="$HOME/Library/LaunchAgents"
 LABEL_PREFIX="com.rebalance-os."
 
@@ -186,18 +189,22 @@ print(f'{src}:{len(token) if token else 0}')
         fi
     fi
 
-    # Every policy job needs a template; a missing one fails `up` halfway through.
-    local missing=0 name
-    for name in "${JOB_NAMES[@]}"; do
-        [ -f "$SCRIPT_DIR/${LABEL_PREFIX}$name.plist.template" ] || {
-            log_error "missing plist template for policy job: $name"
-            missing=$((missing + 1))
-        }
+    # Prove every template renders and lints BEFORE `up` unloads anything.
+    # Checking mere existence let a malformed template fail mid-apply, with the
+    # jobs already processed left down (Codex branch review).
+    local bad=0 name i
+    for i in "${!JOB_NAMES[@]}"; do
+        name="${JOB_NAMES[$i]}"
+        if ! out=$(RB_RENDER_CHECK=1 rb_install_launchd_job "${LABEL_PREFIX}$name" "${JOB_WRAPPERS[$i]}" 2>&1); then
+            log_error "policy job $name will not render/lint:"
+            echo "$out" | /usr/bin/sed 's/^/      /' >&2
+            bad=$((bad + 1))
+        fi
     done
-    if [ "$missing" -eq 0 ]; then
-        log_ok "All ${#JOB_NAMES[@]} policy jobs have a plist template"
+    if [ "$bad" -eq 0 ]; then
+        log_ok "All ${#JOB_NAMES[@]} policy jobs render and lint cleanly"
     else
-        errors=$((errors + missing))
+        errors=$((errors + bad))
     fi
 
     mkdir -p "$REBALANCE_DIR/temp/logs"
@@ -214,7 +221,7 @@ print(f'{src}:{len(token) if token else 0}')
 # derives REBALANCE_DIR from its own location, so running `up` from a dev clone
 # repoints every plist at that clone — a fleet-wide change with no prompt.
 check_target_root() {
-    local force="$1"
+    local force="$1" verb="${2:-adopt}"
     log_info "Target root: $REBALANCE_DIR"
 
     local conflicts=() name root
@@ -243,8 +250,11 @@ check_target_root() {
     log_error "${#conflicts[@]} installed job(s) are bound to a different checkout:"
     local c
     for c in "${conflicts[@]}"; do echo "    $c" >&2; done
-    log_error "Running 'up' here would move the whole fleet to $REBALANCE_DIR."
-    log_error "Re-run from the intended checkout, or pass --force to rebind deliberately."
+    case "$verb" in
+        adopt) log_error "Running 'up' here would move the whole fleet to $REBALANCE_DIR." ;;
+        *)     log_error "These jobs belong to another checkout — $verb would stop jobs this clone does not own." ;;
+    esac
+    log_error "Re-run from the intended checkout, or pass --force to act on them deliberately."
     return 1
 }
 
@@ -306,7 +316,13 @@ stack_up() {
 # which you have to ask for by name.
 # ------------------------------------------------------------------------------
 stack_down() {
-    local remove="${1:-0}"
+    local remove="${1:-0}" force="${2:-0}"
+    # The binding guard belongs on the DESTRUCTIVE commands too. It used to run
+    # only via `up`/`restart`, so a dev clone would correctly refuse to adopt the
+    # runtime's fleet while still being free to unload or delete it (Codex
+    # branch review). Unloading someone else's jobs is the worse outcome.
+    local verb="teardown"; [ "$remove" = "1" ] && verb="purge"
+    check_target_root "$force" "$verb" || exit 1
     echo "================================================================================"
     if [ "$remove" = "1" ]; then
         echo "                rebalance OS — Purging Background Stack                         "
@@ -315,13 +331,24 @@ stack_down() {
     fi
     echo "================================================================================"
 
-    local count=0 name
+    local count=0 failed=0 name
+    refresh_launchctl_cache
     for name in "${JOB_NAMES[@]}"; do
         local dest
         dest=$(plist_path "$name")
         [ -f "$dest" ] || continue
         printf "  • %-28s " "$name"
-        "$LAUNCHCTL_BIN" unload "$dest" 2>/dev/null || true
+        local unloaded_ok=0
+        "$LAUNCHCTL_BIN" unload "$dest" 2>/dev/null && unloaded_ok=1
+        # An unload can fail while the job stays live. Deleting the plist then
+        # orphans a running job from its only installation record, and doctor
+        # reads it as "never installed" — the job disappears from the health
+        # report while still running (Codex branch review).
+        if [ "$unloaded_ok" = "0" ] && launchctl_row "$name" >/dev/null && [ -n "$(launchctl_row "$name")" ]; then
+            echo -e "\033[31mSTILL LOADED — not purged\033[0m"
+            failed=$((failed + 1))
+            continue
+        fi
         if [ "$remove" = "1" ]; then
             rm -f "$dest"
             echo -e "\033[33mPURGED\033[0m"
@@ -338,6 +365,10 @@ stack_down() {
         log_ok "Teardown complete: $count managed job(s) unloaded (plists kept)."
     fi
     log_info "Unmanaged ${LABEL_PREFIX}* plists were not touched."
+    if [ "$failed" -gt 0 ]; then
+        log_error "$failed job(s) could not be unloaded and were left installed."
+        return 1
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -429,15 +460,15 @@ done
 
 case "$cmd" in
     up|boot|start)  stack_up "$FORCE" ;;
-    down|stop)      stack_down 0 ;;
-    purge)          stack_down 1 ;;
+    down|stop)      stack_down 0 "$FORCE" ;;
+    purge)          stack_down 1 "$FORCE" ;;
     restart|reload)
         # Preflight FIRST. `restart` used to unload everything and only then
         # discover that `up` could not run, leaving the machine with no agents
         # at all — the exact silent outage this script exists to prevent.
         run_preflight "$FORCE" || exit 1
         echo
-        stack_down 0
+        stack_down 0 1   # preflight already passed the guard above
         echo
         stack_up "$FORCE"
         ;;
