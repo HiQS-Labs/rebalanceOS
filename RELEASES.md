@@ -10,7 +10,7 @@ learned belong there at ship time, not duplicated here). Contract lives in PROJE
 issues the release closes. The prose is not decoration: under the public repo's fresh single-commit
 history there is no issue tracker to resolve the numbers against, so a bare manifest reads as
 pointers to nothing. `Exit:` is the one observable that decides whether it shipped. Both stay on a
-single line. Issue state verified 2026-08-14.
+single line. Issue state verified 2026-08-18 against HiQS-Suite/rebalanceOS, the live repo (#55 retires the old one).
 
 > **`#nnn` and `GH-nnn` refer to this project's internal issue tracker.** They are retained as
 > historical labels, not links — in the public repository they do not resolve to anything, and that
@@ -35,9 +35,9 @@ Status: Draft
 Target Date: 2026-09-15
 Codename: Green Board
 Milestone:
-Description: The first release a stranger can clone and succeed with — published to a new public repository under its own organization, with install, onboarding and secret-scanning proven rather than assumed. #276 release-gate tracker (front-door, shakedown, TruffleHog), #275 README Step 1 hardcodes a Homebrew interpreter (RC blocker), #273 date parsing has two canonical hubs, #242 CLIO suites report a vacuous dual-interpreter pass, #255 working-directory-dependent tests. Scope QA'd by cross-model relay 2026-08-15 (Approved r5); #178 and #225 verified stale and closeable, 3-Eyes excluded by operator decision as diagnostics rather than core.
-Exit: A clean clone on a machine that has never run rebalance completes the documented README Getting Started path end to end — install, onboarding, first pulse — with no undocumented step, and `rebalance doctor` then reports no FAIL. Verified on one Apple Silicon host — macOS-first launch by operator decision 2026-08-15; Linux/Windows are documented as work in progress rather than gated, after a Docker pre-flight showed stock Ubuntu images ship no `python3` at all and 22.04 cannot reach the 3.12 floor from its own archive. `/front-door`, `/shakedown` and a full-history TruffleHog scan are gates tracked in #276, evidence retained.
-GH_URL: https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/275
+Description: The first release a stranger can clone and succeed with — published to a new public repository under its own organization, with install, onboarding and secret-scanning proven rather than assumed. #66 release-gate tracker (front-door, shakedown, TruffleHog) — the sole remaining scope, carried over from the retiring repo's #276 (see #55). Manifest re-verified against this tree 2026-08-18: the four other issues it named are already fixed here — the README carries no hardcoded interpreter, tz_utils is gone so date parsing has one hub, the CLIO suites now resolve both interpreter paths and skip the duplicate, and the HiQS pipeline tests pass from any working directory. #178 and #225 confirmed stale (suite 1894 passed, CI green). 3-Eyes excluded by operator decision as diagnostics rather than core. Scope QA'd by cross-model relay 2026-08-15 (Approved r5).
+Exit: A clean clone on a machine that has never run rebalance completes the documented README Getting Started path end to end — install, onboarding, first pulse — with no undocumented step, and `rebalance doctor` then reports no FAIL. Verified on one Apple Silicon host — macOS-first launch by operator decision 2026-08-15; Linux/Windows are documented as work in progress rather than gated, after a Docker pre-flight showed stock Ubuntu images ship no `python3` at all and 22.04 cannot reach the 3.12 floor from its own archive. `/front-door`, `/shakedown` and a full-history TruffleHog scan are gates tracked in #66, evidence retained. Blocked today by the one FAIL doctor reports, `launchd:github-sync` (#54 / #62).
+GH_URL: https://github.com/HiQS-Suite/rebalanceOS/issues/66
 Front-door reviewed:
 Shakedown reviewed:
 License file: Yes
