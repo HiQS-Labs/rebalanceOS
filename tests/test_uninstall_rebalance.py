@@ -4,19 +4,81 @@ This is a deletion tool, so the tests that matter most are the ones proving it d
 delete: ~/Library/LaunchAgents holds Google, Setapp and Homebrew agents beside rebalance's,
 and a uninstaller that matched on label alone could take them out.
 
-Every test runs against a fixture LaunchAgents directory and a fixture template directory, so
-nothing here can touch the real machine.
+Every test runs against a fixture LaunchAgents directory, a fixture template directory, AND a
+recording ``launchctl`` stub. That third one is not belt-and-braces — it is the only part of
+the isolation that works. The fixture directories redirect every FILE the script touches, and
+for a long time that was mistaken for isolation while this suite was quietly unloading four
+live jobs on every run: ``launchctl bootout gui/<uid>/<label>`` resolves the job from the
+label in the caller's GUI domain and never consults a directory, and ``launchctl unload
+<path>`` resolves it from the Label INSIDE the plist rather than from the path. A fixture
+plist carrying a real label therefore reached straight past the sandbox. ``_run`` now points
+the script's ``LAUNCHCTL_BIN`` seam at a stub and asserts, after every single invocation, that
+no real job label was targeted — so the claim in this docstring is now enforced rather than
+merely asserted.
 """
 
 from __future__ import annotations
 
+import inspect
 import os
 from pathlib import Path
+import re
 import subprocess
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "uninstall_rebalance.sh"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = REPO_ROOT / "scripts" / "uninstall_rebalance.sh"
+
+
+def _template_labels() -> frozenset[str]:
+    """Labels this repo installs from ``scripts/*.plist.template``.
+
+    Derived, never hardcoded, for the same reason the uninstaller derives its job list from the
+    templates (see its header, rule 1): a job added tomorrow must be guarded tomorrow with no
+    edit here. In-repo, so the guard is exactly as strong on a Linux CI runner as on the
+    operator's Mac — reading ``~/Library/LaunchAgents`` instead would have been vacuous on CI.
+    """
+    return frozenset(p.name[: -len(".plist.template")] for p in (REPO_ROOT / "scripts").glob("*.plist.template"))
+
+
+def _non_template_labels() -> frozenset[str]:
+    """Labels the script hardcodes in ``NON_TEMPLATE_JOBS`` (``com.user.git-pulse`` and kin).
+
+    These follow no naming convention, so the script cannot glob them and names them outright.
+    That makes them the one set a fixture is NOT free to fake: a test covering the
+    non-template code path has to use the label the script actually looks for. They are
+    therefore exempt from the label guard below — an exemption that is only safe because
+    ``test_the_uninstaller_never_calls_launchctl_directly`` proves no call site can reach a
+    real launchctl in the first place.
+    """
+    block = re.search(r"NON_TEMPLATE_JOBS=\((.*?)\n\)", SCRIPT.read_text(encoding="utf-8"), re.DOTALL)
+    return frozenset(re.findall(r'"([^"|]+)\|', block.group(1))) if block else frozenset()
+
+
+# The labels a fixture must never name, because it is free to pick any other string instead.
+FORBIDDEN_FIXTURE_LABELS = _template_labels() - _non_template_labels()
+
+
+def _targeted_labels(recorded: str) -> list[str]:
+    """The launchd label each recorded launchctl call would have acted on.
+
+    Both verbs are label-resolved, so both have to be read for a label rather than a path:
+    ``bootout gui/501/com.example.job`` names it in the last segment, and ``unload
+    /some/dir/com.example.job.plist`` names it in the file's stem (launchd reads the Label key
+    inside; our fixtures always match the filename, and a fixture that did not would be a
+    different bug).
+    """
+    labels: list[str] = []
+    for line in recorded.splitlines():
+        verb, _, target = line.strip().partition(" ")
+        if not target:
+            continue
+        if verb == "bootout":
+            labels.append(target.rsplit("/", 1)[-1])
+        elif verb == "unload":
+            labels.append(Path(target).name.removesuffix(".plist"))
+    return labels
 
 
 def _touch_executable(program: str) -> None:
@@ -105,15 +167,55 @@ def sandbox(tmp_path):
     return repo, templates, agents
 
 
-def _run(sandbox, *args):
+def _launchctl_stub(tmp_root: Path) -> tuple[Path, Path]:
+    """A launchctl that records its argv and does nothing else.
+
+    Returns ``(binary, record_file)``. Exits 0 always: the script treats both launchctl calls
+    as best-effort (``|| true``), so a stub that failed would not exercise the real path.
+    """
+    stub = tmp_root / "launchctl"
+    record = tmp_root / "launchctl-calls.txt"
+    stub.write_text(f'#!/bin/sh\necho "$@" >> "{record}"\nexit 0\n', encoding="utf-8")
+    stub.chmod(0o755)
+    record.touch()
+    return stub, record
+
+
+def _run(sandbox, *args, env=None, cwd=None):
+    """Invoke the uninstaller. THE only way this suite is allowed to invoke it.
+
+    ``env`` overlays extra variables (``HOME``, ``PATH``, a different template dir); ``cwd``
+    sets the working directory. Those knobs exist so that no test needs to hand-roll its own
+    ``subprocess.run`` — nine of them used to, and every one silently opted out of the guard
+    below. That is not hypothetical: the guard was written first, fired on three fixtures, and
+    missed a fourth (``com.user.git-pulse``) precisely because that test built its own call to
+    override ``HOME``. A safety check with a bypass is a safety check you do not have.
+
+    ``LAUNCHCTL_BIN`` is applied AFTER the overlay, so a caller cannot unset the stub even by
+    accident.
+    """
     repo, templates, agents = sandbox
+    stub, record = _launchctl_stub(agents.parent)
     environment = {
         **os.environ,
         "RB_UNINSTALL_REPO_DIR": str(repo),
         "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
         "RB_UNINSTALL_AGENTS_DIR": str(agents),
+        **(env or {}),
+        "LAUNCHCTL_BIN": str(stub),
     }
-    return subprocess.run(["bash", str(SCRIPT), *args], capture_output=True, text=True, env=environment)
+    result = subprocess.run(["bash", str(SCRIPT), *args], capture_output=True, text=True, env=environment, cwd=cwd)
+
+    # Checked on EVERY invocation rather than in one dedicated test, because the failure mode
+    # is a fixture author reaching for a realistic label in a brand-new test — which a test
+    # written today cannot enumerate. Sited here, the guard covers tests that do not exist yet.
+    escaped = sorted(set(_targeted_labels(record.read_text(encoding="utf-8"))) & FORBIDDEN_FIXTURE_LABELS)
+    assert not escaped, (
+        f"fixture targeted real launchd label(s) {escaped} — these name jobs this repo installs "
+        f"on the operator's machine, and launchctl resolves both bootout and unload by LABEL, "
+        f"not by path, so the fixture directory does not contain them. Use a fake label."
+    )
+    return result
 
 
 def test_a_dry_run_changes_nothing(sandbox):
@@ -203,18 +305,7 @@ def test_a_non_template_job_is_matched_exactly_not_by_prefix(sandbox, tmp_path, 
     evil = agents / "com.user.git-pulse.plist"
     _plist(evil, f"{home}/bin/git-pulse-evil")
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "HOME": str(home),
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"HOME": str(home)})
 
     assert evil.exists(), "a prefix match must not authorise deleting a different binary's job"
     assert result.returncode == 1
@@ -228,18 +319,7 @@ def test_a_genuine_non_template_job_is_still_removed(sandbox, tmp_path):
     ours = agents / "com.user.git-pulse.plist"
     _plist(ours, f"{home}/bin/git-pulse")
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "HOME": str(home),
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"HOME": str(home)})
 
     assert not ours.exists()
     assert result.returncode == 0
@@ -272,11 +352,15 @@ def test_an_interpreter_backed_job_inside_the_repo_is_recognised(sandbox):
     """health-check et al. launch {{PYTHON}} = <repo>/.venv/bin/python with a script argument.
 
     The strict executable check must not refuse these — that would leave a partial uninstall.
+
+    Modelled on health-check, under a FAKE label: the argument shape is what is under test and
+    the label is incidental, but a fixture label is not inert — launchctl resolves by label,
+    so naming the real job here is what unloaded it on the operator's Mac every test run.
     """
     repo, templates, agents = sandbox
     args = ["{{PYTHON}}", "{{REBALANCE_DIR}}/scripts/health_issue_reporter.py", "--close"]
-    _template(templates, "com.rebalance-os.health-check", args)
-    plist = _rendered(agents, "com.rebalance-os.health-check", repo, args)
+    _template(templates, "com.rebalance-os.delta", args)
+    plist = _rendered(agents, "com.rebalance-os.delta", repo, args)
 
     result = _run(sandbox, "--apply")
 
@@ -318,18 +402,7 @@ def test_a_failing_security_command_is_not_reported_as_success(sandbox, tmp_path
     security.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
     security.chmod(0o755)
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply", "--include-secrets"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", "--include-secrets", env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
 
     assert result.returncode == 1
     assert "may still be present" in result.stdout
@@ -344,18 +417,7 @@ def test_no_secrets_left_behind_exits_clean(sandbox, tmp_path):
     security.write_text("#!/bin/sh\nexit 44\n", encoding="utf-8")
     security.chmod(0o755)
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply", "--include-secrets"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", "--include-secrets", env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
 
     assert result.returncode == 0
 
@@ -442,18 +504,7 @@ def test_an_absent_exact_marker_is_also_refused(sandbox, tmp_path):
     plist = agents / "com.user.git-pulse.plist"
     _plist(plist, f"{home}/bin/git-pulse", create=False)
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "HOME": str(home),
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"HOME": str(home)})
 
     assert plist.exists()
     assert result.returncode == 1
@@ -510,18 +561,7 @@ def test_a_directory_is_refused_for_the_exact_marker_too(sandbox, tmp_path):
     plist = agents / "com.user.git-pulse.plist"
     _plist(plist, f"{home}/bin/git-pulse", create=False)
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "HOME": str(home),
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"HOME": str(home)})
 
     assert plist.exists()
     assert result.returncode == 1
@@ -638,18 +678,7 @@ def test_matching_processes_are_reported_without_claiming_the_checkout(sandbox, 
     pgrep.write_text("#!/bin/sh\nprintf '4242\\n4243\\n'\n", encoding="utf-8")
     pgrep.chmod(0o755)
 
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(templates),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
 
     assert "4242 4243" in result.stdout
     assert "Not attributed to this checkout" in result.stdout
@@ -709,11 +738,14 @@ def test_inline_code_and_module_invocations_are_refused(sandbox):
 
 
 def test_a_genuine_interpreter_job_with_flags_is_still_removed(sandbox):
-    """pulse-warning-watch passes flags after its script; those must not break ownership."""
+    """pulse-warning-watch passes flags after its script; those must not break ownership.
+
+    Real arguments, fake label — see test_an_interpreter_backed_job_inside_the_repo_is_recognised.
+    """
     repo, templates, agents = sandbox
     args = ["{{PYTHON}}", "{{REBALANCE_DIR}}/scripts/pulse_warning_watch.py", "--url", "http://127.0.0.1:8767/"]
-    _template(templates, "com.rebalance-os.pulse-warning-watch", args)
-    plist = _rendered(agents, "com.rebalance-os.pulse-warning-watch", repo, args)
+    _template(templates, "com.rebalance-os.echo", args)
+    plist = _rendered(agents, "com.rebalance-os.echo", repo, args)
 
     result = _run(sandbox, "--apply")
 
@@ -744,18 +776,7 @@ def test_a_relative_script_operand_is_refused(sandbox):
     )
 
     # Run from inside the checkout, the CWD that makes the relative path look owned.
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        cwd=str(repo),
-        env={
-            **os.environ,
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(sandbox[1]),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", cwd=str(repo))
 
     assert plist.exists()
     assert result.returncode == 1
@@ -823,8 +844,8 @@ def test_long_options_after_a_script_are_unaffected(sandbox):
         "--llm-max-per-run",
         "5",
     ]
-    _template(templates, "com.rebalance-os.health-check-triage", args)
-    plist = _rendered(agents, "com.rebalance-os.health-check-triage", repo, args)
+    _template(templates, "com.rebalance-os.foxtrot", args)
+    plist = _rendered(agents, "com.rebalance-os.foxtrot", repo, args)
 
     result = _run(sandbox, "--apply")
 
@@ -894,17 +915,7 @@ def test_a_missing_template_directory_fails_loudly(sandbox, tmp_path):
     repo, _templates, agents = sandbox
     empty = tmp_path / "no-templates"
     empty.mkdir()
-    result = subprocess.run(
-        ["bash", str(SCRIPT), "--apply"],
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "RB_UNINSTALL_REPO_DIR": str(repo),
-            "RB_UNINSTALL_TEMPLATE_DIR": str(empty),
-            "RB_UNINSTALL_AGENTS_DIR": str(agents),
-        },
-    )
+    result = _run(sandbox, "--apply", env={"RB_UNINSTALL_TEMPLATE_DIR": str(empty)})
 
     assert result.returncode == 1
     assert "cannot derive the job list" in result.stdout
@@ -1092,3 +1103,53 @@ def test_an_environment_variable_we_did_not_render_is_refused_and_named(sandbox)
     assert result.returncode == 1
     # the refusal must NAME the variable, or the operator cannot act on it
     assert "environment differs: PULSE_PUSH" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# The isolation guarantee itself (GH-59 follow-up)
+# ---------------------------------------------------------------------------
+#
+# The per-invocation label check inside _run is only as good as its coverage. These two tests
+# pin the two ways coverage can be lost — a test that calls the script another way, and a
+# script that calls launchctl another way. Both were live holes: nine tests hand-rolled their
+# own subprocess.run, and the script called `launchctl` as a bare word.
+
+
+def test_every_invocation_of_the_uninstaller_goes_through_run():
+    """No test may build its own subprocess.run for SCRIPT — that bypasses the launchctl stub.
+
+    This is the hole that let `com.user.git-pulse` through after the label guard was already
+    in place: the guard lived in `_run`, and the offending test never called `_run`. Nine
+    tests had grown their own invocation to override HOME/PATH/cwd, so `_run` grew those
+    parameters instead.
+
+    Excising `_run`'s own source is deliberately narrower than "skip everything above the first
+    test", which is what this checked first: that version silently exempted every helper
+    defined near the top of the file, so a bypass added there would have sailed through. The
+    guard's own negative control is what caught it.
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    elsewhere = source.replace(inspect.getsource(_run), "")
+    offenders = re.findall(r"subprocess\.run\([^)]*SCRIPT", elsewhere)
+    assert not offenders, (
+        f"{len(offenders)} test(s) invoke the uninstaller directly instead of via _run(), so the "
+        f"recording launchctl stub is not installed for them and a real job could be unloaded. "
+        f"Pass env=/cwd= to _run() instead."
+    )
+
+
+def test_the_uninstaller_never_calls_launchctl_directly():
+    """Every launchctl call in the script must go through the $LAUNCHCTL_BIN seam.
+
+    Without this, `_run`'s stub is unenforceable: a new bare `launchctl unload` added to the
+    script tomorrow would ignore LAUNCHCTL_BIN and act on the operator's real fleet, and no
+    fixture-level guard could see it. This is also what makes exempting the NON_TEMPLATE_JOBS
+    labels from FORBIDDEN_FIXTURE_LABELS safe — those fixtures use real labels, so the seam is
+    the only thing standing between them and a live bootout.
+    """
+    bare = [
+        line.strip()
+        for line in SCRIPT.read_text(encoding="utf-8").splitlines()
+        if re.search(r"(^|[;&|(\s])launchctl\s", line) and not line.strip().startswith("#")
+    ]
+    assert not bare, f'un-seamed launchctl call(s) in {SCRIPT.name}: {bare} — use "$LAUNCHCTL_BIN"'

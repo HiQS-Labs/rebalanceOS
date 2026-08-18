@@ -33,6 +33,16 @@ REBALANCE_DIR="${RB_UNINSTALL_REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 LAUNCH_AGENTS_DIR="${RB_UNINSTALL_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 TEMPLATE_DIR="${RB_UNINSTALL_TEMPLATE_DIR:-$SCRIPT_DIR}"
 
+# The RB_UNINSTALL_* variables above redirect every FILE this script touches into a fixture
+# directory, which is what made the test suite look isolated. It was not: `launchctl bootout
+# gui/<uid>/<label>` resolves the job from the LABEL in the caller's GUI domain and never looks
+# at a directory at all, and `launchctl unload <path>` resolves it from the Label INSIDE the
+# plist rather than from the path. So a fixture plist carrying a real label reached straight
+# past the sandbox and unloaded the live job. Redirecting the filesystem cannot fix that;
+# only redirecting the binary can. Same seam name install_common.sh already honors, so one
+# variable covers the installers and the uninstaller together.
+LAUNCHCTL_BIN="${LAUNCHCTL_BIN:-launchctl}"
+
 APPLY=0
 INCLUDE_DATA=0
 INCLUDE_SECRETS=0
@@ -429,8 +439,8 @@ rb_remove_job() {
     if [ "$APPLY" -eq 1 ]; then
         # bootout is the modern verb; unload covers older macOS. Neither failing is fatal —
         # the job may simply not be loaded — but the plist removal below must succeed.
-        launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
-        launchctl unload "$plist" 2>/dev/null || true
+        "$LAUNCHCTL_BIN" bootout "gui/$(id -u)/$label" 2>/dev/null || true
+        "$LAUNCHCTL_BIN" unload "$plist" 2>/dev/null || true
         if ! rm -f -- "$plist"; then
             say "  ! $label: could not delete $plist"
             return 1

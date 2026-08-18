@@ -220,6 +220,9 @@ _EVENT_BADGE = {
     "token_validated": ("ok", "✓ token validated"),
     "token_set": ("info", "↻ token (re)set"),
     "token_invalid": ("error", "✗ token invalid"),
+    # Warning, not error: the credential was never tested, so nothing is known to be wrong
+    # with it. Reading this as a failure is what sent the operator to reissue a healthy PAT.
+    "rate_limited": ("warning", "⚠ rate limited"),
     "auth_failed": ("error", "✗ auth failed (401)"),
     "gh_fallback": ("ok", "✓ healed via gh CLI"),
     # sleuth

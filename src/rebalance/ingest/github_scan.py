@@ -345,9 +345,21 @@ def validate_github_token(token: str) -> dict[str, Any]:
     Returns:
         {"valid": True, "login": "...", "scopes": ["repo", ...]}
         or {"valid": False, "login": "", "scopes": [], "error": "..."}
+
+    A throttled response is reported separately, with ``rate_limited: True``. GitHub answers
+    both a rejected credential and an exhausted quota with 403, and treating the pair alike
+    made a healthy PAT read as revoked: the auth log alternated ``token_invalid`` with
+    ``token_validated`` hour after hour, and ``rebalance doctor`` failed on it at
+    error severity, pointing the operator at the one repair that could not help.
+
+    The distinction is not new here — ``_is_rate_limit`` has always drawn it for
+    ``get_json``, and ``resolve_github_token`` below already declines to treat a 403 as a
+    deauthorization. Only the logging disagreed, so this reuses that rule rather than
+    restating it; two copies of "which 403 is which" is how they drift apart.
     """
     # No retries: a bad token should fail fast for the onboarding flow.
     from rebalance.ingest import auth_log
+    from rebalance.ingest._http import _is_rate_limit
 
     status, data, headers = GitHubClient(token, retries=1).get_with_headers("/user")
     if status == 200 and isinstance(data, dict):
@@ -356,6 +368,20 @@ def validate_github_token(token: str) -> dict[str, Any]:
         login = data.get("login", "")
         auth_log.log_github_token_validated(login, scopes)
         return {"valid": True, "login": login, "scopes": scopes, "status": status}
+    if _is_rate_limit(status, headers):
+        auth_log.log_github_rate_limited(
+            status,
+            remaining=headers.get("x-ratelimit-remaining", ""),
+            reset=headers.get("x-ratelimit-reset", ""),
+        )
+        return {
+            "valid": False,
+            "rate_limited": True,
+            "login": "",
+            "scopes": [],
+            "error": f"HTTP {status} — rate limited; the token was not tested",
+            "status": status,
+        }
     auth_log.log_github_token_invalid(status)
     return {"valid": False, "login": "", "scopes": [], "error": f"HTTP {status}", "status": status}
 

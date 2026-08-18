@@ -14,13 +14,21 @@ dependencies = [
     # install (torch deferred until the vector-leg gate) silently omits it, which is how the p3 gate
     # failed with ModuleNotFoundError on an otherwise-approved phase.
     "numpy",
-    "sentence-transformers",
     "google-auth-oauthlib",
     "keyring",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# sentence-transformers pulls torch, which is a 527 MB wheel on linux before its CUDA
+# transitives. Every import of it in this package is already deferred to inside a function
+# body, and get_default_embedder turns a missing install into an actionable RuntimeError
+# rather than a crash — that is the shape of an optional dependency, and the note above
+# already describes torch as deferred "until the vector-leg gate". Declaring it required
+# anyway bought nothing and cost CI the whole download to run a suite whose embedder is a
+# stub. numpy stays required for exactly the reason stated above: search.py imports it
+# unconditionally, so it is not optional and must not ride in on this extra.
+embeddings = ["sentence-transformers"]
 
 [project.entry-points."hiqs.sources"]
 vault = "hiqs.sources.vault:SOURCE"

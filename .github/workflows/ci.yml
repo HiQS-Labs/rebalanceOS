@@ -70,6 +70,14 @@ jobs:
           # locally and some modules are pytest-style (unittest discover
           # can't collect them, and one imports pytest at module scope).
           pip install -e ".[calendar,server]" pytest
+          # HiQS is a standalone package with its own pyproject, and the step below runs its
+          # suite. That step was added without this line, so it had never once passed: every
+          # run since died collecting four test modules on `No module named 'numpy'`, which
+          # HiQS declares and nothing installed. Installing the package rather than
+          # hand-listing the missing import is deliberate — HiQS's own dependency note warns
+          # that hand-picking is how a declared requirement gets silently omitted, and this
+          # way a dependency added there tomorrow is installed here tomorrow.
+          pip install -e HiQS/
 
       # tests/test_pulse_reconcile.py drives real `git pull --rebase` against a
       # throwaway clone. Without an identity that dies with code 128 on a fresh
@@ -96,7 +104,9 @@ jobs:
       # hypothetical: sharing a process makes
       # test_github_failure_continues_logs_error_and_keeps_watermark fail on
       # state leaked from tests/ (reproduced on pristine main; tracked separately).
-      # This step is how HiQS will run after extraction, and it is green today.
+      # This step is how HiQS will run after extraction. It shipped without the install
+      # its own package needed, so it was red from the day it was added — see the install
+      # step above.
       - name: HiQS suite (isolated — standalone package)
         run: python -m pytest HiQS/tests -q
 

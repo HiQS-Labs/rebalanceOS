@@ -10,6 +10,43 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.4] - 2026-08-18
+
+### Fixed
+
+- Running the test suite no longer removes four background jobs from the machine it runs on.
+  The tests wrote their fixtures into a throwaway folder and looked isolated, but the command
+  that unloads a job finds it by name rather than by where its file sits, so fixtures that
+  borrowed real job names reached past the sandbox and switched off live health monitoring.
+  The tests now hand that command a stand-in, and three checks keep it that way: no fixture may
+  borrow a real job name, no test may skip the shared helper that installs the stand-in, and no
+  code path in the uninstaller may reach the real command directly.
+- A GitHub check that was merely throttled is no longer reported as a broken credential. The
+  service answers "your token is not allowed" and "you have used up your hourly allowance" with
+  the same code, and treating them alike made a healthy token look revoked — the log alternated
+  between "invalid" and "valid" hour after hour for one unchanged token, and the health check
+  failed on it. A throttled check now says the token was never tested and records when the
+  allowance returns, while genuinely rejected tokens are still reported as invalid.
+- Continuous integration now installs the standalone query package before running its tests.
+  That step had never once passed since it was added: it was introduced without the install its
+  own tests need, so every run since died before reaching them, and three later merges landed on
+  a branch that was already failing. The heavy machine-learning dependency those tests never use
+  became optional in the process, so the fix does not cost a half-gigabyte download per run.
+  Repairing it revealed a second failure that had been hidden behind the first, because the
+  broken step aborted the run before the later checks could execute: a house-style check that
+  looks for hand-rolled duration arithmetic was flagging two calculations that are not durations
+  at all, and had been since the first public release. Those two are now marked as the deliberate
+  exceptions they are, using the mechanism that check already provides for the purpose.
+
+### Added
+
+- Background GitHub work now records how long each request took, which endpoints were slowest,
+  and the lowest remaining allowance seen during the run alongside the endpoint that reached it.
+  Only request counts were recorded before, which made a job that spent tens of minutes waiting
+  on a single stalled read look like a job doing almost nothing. Retry waiting is excluded from
+  the timings and a request that never answers is still measured, so the numbers describe the
+  service rather than our own patience.
+
 ## [0.73.3] - 2026-08-17
 
 ### Added

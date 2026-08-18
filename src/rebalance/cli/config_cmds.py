@@ -371,6 +371,10 @@ def config_doctor() -> None:
         result = validate_github_token(token)
         if result["valid"]:
             row("GitHub token", True, f"source={source}  login={result.get('login')}  scopes={result.get('scopes')}")
+        elif result.get("rate_limited"):
+            # Not "invalid": GitHub throttled the check, so the token was never tested. Saying
+            # otherwise sends the operator to reissue a credential that is probably fine.
+            row("GitHub token", False, f"source={source}  could not verify — {result.get('error', '')}")
         else:
             row("GitHub token", False, f"source={source}  invalid — {result.get('error', 'unknown error')}")
     else:

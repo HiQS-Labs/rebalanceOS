@@ -32,7 +32,7 @@ to keep them deterministic.
 from __future__ import annotations
 
 import atexit
-from collections import Counter
+from collections import Counter, defaultdict
 import json
 import logging
 import os
@@ -52,6 +52,10 @@ logger = logging.getLogger(__name__)
 
 _PROCESS_RUN_ID = f"pid-{os.getpid()}-{time.time_ns()}"
 _ATTRIBUTION_LOCK = threading.Lock()
+
+# How many individual slow requests the job summary keeps. Enough to show a pattern
+# (one hung endpoint vs. uniform slowness) without the summary growing with the crawl.
+_SLOWEST_KEPT = 5
 
 
 def _endpoint_path(url: str) -> str:
@@ -81,6 +85,22 @@ class _RequestAttribution:
         self.rate_limit_last: dict[str, str | int] | None = None
         self.rate_limit_reset_epochs: set[str] = set()
         self._emitted_attempts = 0
+        # GH-59 follow-up. This class counted requests and never timed them, and the cost of
+        # the failing job lives in the untimed dimension: the process was observed blocked in
+        # a single SSL read for tens of minutes. Few, very slow calls are invisible in a count
+        # and obvious in a duration, so counts alone actively misled — they made the job look
+        # near-idle while it overran its hour.
+        # A plain dict rather than a Counter: Counter is typed to integer values, and these
+        # are seconds. The count-shaped containers above are genuinely Counters.
+        self.endpoint_seconds: dict[str, float] = defaultdict(float)
+        self.endpoint_seconds_max: dict[str, float] = {}
+        self.total_seconds = 0.0
+        self.slowest: list[dict[str, Any]] = []
+        # Attribution for exhaustion, as opposed to a first/last pair that can easily miss it:
+        # the lowest `remaining` ever seen and the endpoint that saw it. When a run reports
+        # remaining=0 this is what names the spender.
+        self.remaining_min: int | None = None
+        self.remaining_min_endpoint = ""
 
     def record_request(self, url: str) -> None:
         with _ATTRIBUTION_LOCK:
@@ -92,7 +112,27 @@ class _RequestAttribution:
             self.attempts += 1
             self.endpoint_attempt_counts[_endpoint_path(url)] += 1
 
-    def record_headers(self, status: int, attempt: int, headers: dict[str, str]) -> None:
+    def record_latency(self, url: str, seconds: float) -> None:
+        """Record one attempt's wall time, including attempts that ended in an error.
+
+        Timed per ATTEMPT rather than per logical request, and outside the retry backoff, so
+        the number means "how long did GitHub take to answer" rather than "how long did we
+        wait, sleeps included" — a retried call would otherwise report its own backoff as
+        server latency and hide the real shape.
+        """
+        endpoint = _endpoint_path(url)
+        with _ATTRIBUTION_LOCK:
+            self.total_seconds += seconds
+            self.endpoint_seconds[endpoint] += seconds
+            if seconds > self.endpoint_seconds_max.get(endpoint, 0.0):
+                self.endpoint_seconds_max[endpoint] = seconds
+            # A bounded top-N rather than every sample: a full crawl makes thousands of
+            # requests, and the summary has to stay readable in a log line.
+            self.slowest.append({"endpoint": endpoint, "seconds": round(seconds, 3)})
+            self.slowest.sort(key=lambda row: row["seconds"], reverse=True)
+            del self.slowest[_SLOWEST_KEPT:]
+
+    def record_headers(self, status: int, attempt: int, headers: dict[str, str], url: str = "") -> None:
         if not any(key.startswith("x-ratelimit-") for key in headers):
             return
         # Do not derive a per-job quota delta: this PAT can be shared and a
@@ -111,6 +151,10 @@ class _RequestAttribution:
             self.rate_limit_last = sample
             if reset := str(sample["reset"]):
                 self.rate_limit_reset_epochs.add(reset)
+            remaining = str(sample["remaining"])
+            if remaining.isdigit() and (self.remaining_min is None or int(remaining) < self.remaining_min):
+                self.remaining_min = int(remaining)
+                self.remaining_min_endpoint = _endpoint_path(url) if url else ""
 
     def snapshot(self) -> dict[str, Any]:
         with _ATTRIBUTION_LOCK:
@@ -121,10 +165,16 @@ class _RequestAttribution:
                 "attempts": self.attempts,
                 "endpoint_counts": dict(sorted(self.endpoint_counts.items())),
                 "endpoint_attempt_counts": dict(sorted(self.endpoint_attempt_counts.items())),
+                "total_seconds": round(self.total_seconds, 3),
+                "endpoint_seconds": {k: round(v, 3) for k, v in sorted(self.endpoint_seconds.items())},
+                "endpoint_seconds_max": {k: round(v, 3) for k, v in sorted(self.endpoint_seconds_max.items())},
+                "slowest_requests": list(self.slowest),
                 "rate_limit_headers": {
                     "first": self.rate_limit_first,
                     "last": self.rate_limit_last,
                     "reset_epochs": sorted(self.rate_limit_reset_epochs),
+                    "remaining_min": self.remaining_min,
+                    "remaining_min_endpoint": self.remaining_min_endpoint,
                 },
                 "rate_limit_note": "Header values are samples, not a per-job quota delta.",
             }
@@ -268,17 +318,23 @@ class GitHubClient:
         for attempt in range(self.retries):
             self._attribution.record_attempt(url)
             req = urllib.request.Request(url, headers=self.headers())
+            # Spans the body read as well as the connect: the observed stall was inside
+            # resp.read(), not in establishing the connection, so timing only urlopen()
+            # would have measured the fast half of a slow request.
+            started = time.monotonic()
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     body = resp.read().decode()
                     parsed = json.loads(body) if body else None
                     response_headers = {k.lower(): v for k, v in resp.headers.items()}
-                    self._attribution.record_headers(resp.status, attempt + 1, response_headers)
+                    self._attribution.record_latency(url, time.monotonic() - started)
+                    self._attribution.record_headers(resp.status, attempt + 1, response_headers, url)
                     return resp.status, parsed, response_headers, ""
             except urllib.error.HTTPError as exc:
+                self._attribution.record_latency(url, time.monotonic() - started)
                 last_status = exc.code
                 last_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
-                self._attribution.record_headers(last_status, attempt + 1, last_headers)
+                self._attribution.record_headers(last_status, attempt + 1, last_headers, url)
                 try:
                     last_body = exc.read().decode() if exc.fp else ""
                 except Exception:  # noqa: BLE001 — body read can fail mid-stream
@@ -298,6 +354,13 @@ class GitHubClient:
                     self.retries,
                 )
                 self._sleep(delay)
+            except Exception:
+                # A socket timeout or connection reset is not an HTTPError, so it would
+                # otherwise escape untimed — and a read that hangs until the timeout fires is
+                # the single most interesting sample this instrumentation can take. Timed,
+                # then re-raised unchanged: this clause observes, it does not handle.
+                self._attribution.record_latency(url, time.monotonic() - started)
+                raise
         return last_status, None, last_headers, last_body
 
     def request_summary(self) -> dict[str, Any]:
