@@ -32,6 +32,11 @@
   own tests need, so every run since died before reaching them, and three later merges landed on
   a branch that was already failing. The heavy machine-learning dependency those tests never use
   became optional in the process, so the fix does not cost a half-gigabyte download per run.
+  Repairing it revealed a second failure that had been hidden behind the first, because the
+  broken step aborted the run before the later checks could execute: a house-style check that
+  looks for hand-rolled duration arithmetic was flagging two calculations that are not durations
+  at all, and had been since the first public release. Those two are now marked as the deliberate
+  exceptions they are, using the mechanism that check already provides for the purpose.
 
 ### Added
 

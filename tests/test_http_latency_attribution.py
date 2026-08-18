@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import unittest
 import urllib.error
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from rebalance.ingest import _http
@@ -68,6 +69,22 @@ class _Clock:
         return self.now
 
 
+def _patch_clock(case, clock):
+    """Give `_http` a fake clock without touching the real `time` module.
+
+    `patch.object(_http.time, "monotonic", ...)` would rebind the attribute on the stdlib
+    module itself, i.e. process-wide for the duration of the test — pytest internals, logging
+    and anything else running concurrently would see it too. Replacing `_http`'s own module-
+    level `time` name keeps the fake inside the unit under test. `_http` calls only
+    `time.monotonic()` at runtime; `time.sleep` is bound as a default argument at import, and
+    `time.time_ns` runs once at import, so neither is reachable through this name afterwards.
+    """
+    shim = SimpleNamespace(monotonic=clock)
+    patcher = patch.object(_http, "time", shim)
+    patcher.start()
+    case.addCleanup(patcher.stop)
+
+
 def _client(**kwargs):
     # A distinct job label per test keeps the process-global attribution registry from
     # sharing state between tests.
@@ -77,9 +94,7 @@ def _client(**kwargs):
 class LatencyRecordedTests(unittest.TestCase):
     def setUp(self):
         self.clock = _Clock()
-        patcher = patch.object(_http.time, "monotonic", self.clock)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        _patch_clock(self, self.clock)
         _http._JOB_ATTRIBUTION.clear()
 
     def test_a_slow_request_is_timed_and_named(self):
@@ -144,9 +159,7 @@ class LatencyExcludesOurOwnWaitingTests(unittest.TestCase):
 
     def setUp(self):
         self.clock = _Clock()
-        patcher = patch.object(_http.time, "monotonic", self.clock)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        _patch_clock(self, self.clock)
         _http._JOB_ATTRIBUTION.clear()
 
     def test_retry_backoff_is_not_counted_as_server_latency(self):
@@ -203,8 +216,8 @@ class RemainingAttributionTests(unittest.TestCase):
             ]
         )
         clock = _Clock()
+        _patch_clock(self, clock)
         with (
-            patch.object(_http.time, "monotonic", clock),
             patch.object(
                 _http.urllib.request,
                 "urlopen",

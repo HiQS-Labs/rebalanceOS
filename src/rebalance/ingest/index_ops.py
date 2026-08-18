@@ -299,7 +299,12 @@ def _vault_ingest_lag_minutes(last_modified_in_vault: Any, last_ingested_at: Any
     ingested = parse_utc_iso(last_ingested_at)
     if modified is None or ingested is None:
         return None
-    lag = (modified - ingested).total_seconds() / 60
+    # event_duration_minutes() takes two ISO event STRINGS, returns an int, and deliberately
+    # reports 0 for naive datetimes (its all-day rule) — applied here it would silently turn an
+    # unknown ingest lag into "no lag at all". These are already-parsed UTC datetimes and the
+    # caller needs a float. The marker has to sit on the matching line itself: the CI guard
+    # greps line by line, so an exemption written on the line above is not seen.
+    lag = (modified - ingested).total_seconds() / 60  # raw-ok: index lag, not an event duration
     return max(0.0, lag)
 
 
@@ -308,7 +313,7 @@ def _minutes_since(raw_timestamp: Any, now: datetime) -> float | None:
     ts = parse_utc_iso(raw_timestamp)
     if ts is None:
         return None
-    return (now - ts).total_seconds() / 60
+    return (now - ts).total_seconds() / 60  # raw-ok: staleness of a parsed timestamp, not an event duration
 
 
 def _source_total_rows(source_name: str, source_payload: dict[str, Any]) -> int:
