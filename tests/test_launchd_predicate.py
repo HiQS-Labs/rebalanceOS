@@ -17,7 +17,7 @@ tests or real `doctor` runs (GH-278).
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from rebalance.doctor import NOTICE, OK, WARN, WARNING, _check_launchd
+from rebalance.doctor import ERROR, FAIL, NOTICE, OK, _check_launchd
 
 
 def _one(snapshot: str, log_dir: Path | None = None):
@@ -53,11 +53,18 @@ def test_running_daemon_with_positive_last_exit_is_ok(tmp_path) -> None:
     assert check.detail == "running"
 
 
-def test_crashed_job_positive_exit_no_pid_still_warns(tmp_path) -> None:
-    """The genuine failure: no live PID and a positive non-zero exit (non-daily-sync)."""
+def test_crashed_job_positive_exit_no_pid_fails(tmp_path) -> None:
+    """The genuine failure: no live PID and a positive non-zero exit (non-daily-sync).
+
+    FAIL since GH-59, not WARN. This exact state — exit 1, no live PID — was
+    true of github-sync and pulse-sync for a full day. Detection was already
+    correct; the grade was the bug. WARN never moves doctor's verdict off 0, and
+    health_issue_reporter files `error` only by default, so a correctly-detected
+    dead job produced neither a non-zero exit nor a GitHub issue.
+    """
     check = _one("-\t7\tcom.rebalance-os.vault-sync\n", log_dir=tmp_path / "logs")
-    assert check.status == WARN
-    assert check.severity == WARNING
+    assert check.status == FAIL
+    assert check.severity == ERROR
     assert check.detail == "last run exited with status 7"
 
 
@@ -74,7 +81,13 @@ def test_clean_states_are_ok(tmp_path) -> None:
 
 def test_crash_looping_daemon_is_flagged_despite_live_pid(tmp_path) -> None:
     """GH-160: a KeepAlive job repeatedly crashing and being relaunched must
-    eventually WARN even though every poll catches it mid-live-PID."""
+    eventually degrade even though every poll catches it mid-live-PID.
+
+    GH-59 raised this from WARN to FAIL. A job that exited once is FAIL, so a job
+    crash-looping three times could not stay a lesser grade without the scale
+    reading backwards. WHEN it fires is untouched — the PID-identity requirement
+    below is exactly what GH-146/GH-160 tuned.
+    """
     log_dir = tmp_path / "logs"
     base = datetime(2026, 1, 1, tzinfo=timezone.utc)
     label = "com.rebalance-os.pulse-server"
@@ -95,8 +108,8 @@ def test_crash_looping_daemon_is_flagged_despite_live_pid(tmp_path) -> None:
     # Poll 3: a second crash-relaunch inside the lookback window — this is a
     # genuine loop and must degrade despite the PID being live right now.
     check3 = _check_launchd(f"1103\t1\t{label}\n", log_dir=log_dir, now=base + timedelta(minutes=2))[0]
-    assert check3.status == WARN
-    assert check3.severity == WARNING
+    assert check3.status == FAIL
+    assert check3.severity == ERROR
     assert "crash-loop" in check3.detail.lower()
 
 

@@ -24,6 +24,13 @@ job.
 | `obsidian-daily-sync` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/obsidian_daily_sync.sh` | `utils/obsidian_daily_sync.py` — Gemini daily-activity summary from the structured pulse snapshot | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block appended to `0. Today's Notes.md`; log in `~/Library/Logs/rebalance-os/` |
 | `git-pulse-daily-synthesis` | daily 18:30 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself; **must stay after `obsidian-daily-sync`** | `utils/git_pulse_daily_synthesis.sh` | `utils/git_pulse_daily_synthesis.py` — Gemini synthesis of `view.sh --today` multi-device git activity (GH-114) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) for the optional vault write | idempotent Git Pulse summary block appended to `0. Today's Notes.md` (if vault configured) AND/OR upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` |
 
+> **Do not put a literal `|` inside a cell of the table above, even escaped as
+> `\|`.** Two consumers split these rows on the pipe character —
+> `doctor._scheduler_policy_jobs` and `scripts/stack.sh`'s `load_policy` — and
+> neither implements Markdown escaping. A pipe inside a cell shifts every column
+> after it, which silently drops a job from the managed set rather than raising
+> an error. Write pipelines as prose, or name the wrapper script instead.
+
 All labels are prefixed `com.rebalance-os.`. Experimental/utility agents
 (`com.user.git-pulse`, `com.user.stickies2obsidian`) live in `experimental/`
 and `utils/stickies-to-obsidian/` with their own installers and are out of
@@ -99,15 +106,35 @@ since GH-175 **no two jobs share a minute**:
 
 ## Runbook
 
+**`scripts/stack.sh` is the front door.** It reads the job table above as its
+manifest — it keeps no list of its own, so this document stays the only place
+the fleet is defined. Anything not in that table is *unmanaged*: `stack.sh`
+shows it under a separate heading and never loads, unloads or deletes it. That
+is what keeps the deferred 3-Eyes plists safe (GH-59).
+
 | Task | Command |
 |---|---|
-| Install / reinstall a job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
-| Check fleet status | `launchctl list \| grep rebalance` (also surfaced by `rebalance doctor`) |
+| Check fleet status | `bash scripts/stack.sh status` |
+| Bring the whole stack up | `bash scripts/stack.sh up` |
+| Unload everything (plists kept) | `bash scripts/stack.sh down` |
+| Reload everything | `bash scripts/stack.sh restart` |
+| Health check | `bash scripts/stack.sh doctor` |
+| Preflight without changing anything | `bash scripts/stack.sh verify` |
+| Unload **and delete** managed plists | `bash scripts/stack.sh purge` |
+| Install / reinstall ONE job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
 | Run a job now | `bash scripts/<job>.sh` |
 | Tail a job log | `cat temp/logs/<job_name>_$(date +%Y-%m-%d).log` |
 | Job lifecycle history | `temp/logs/auth_activity.jsonl` (also `rebalance serve` → /auth-log) |
-| Uninstall a job | `launchctl unload ~/Library/LaunchAgents/com.rebalance-os.<job>.plist && rm` same path |
 | Verify templates match installed plists | render with the installer substitutions and `diff` against `~/Library/LaunchAgents/` |
+
+Plists pin absolute paths, so a job belongs to **one checkout**. `stack.sh up`
+prints the root it is about to bind to and refuses to move a fleet that is
+bound somewhere else unless you pass `--force`; `status` shows the current
+binding in its `BOUND TO` column. Running `up` from the wrong clone is
+otherwise a silent fleet-wide migration (GH-36, GH-59).
+
+The 12 per-job installers remain supported and are what `stack.sh` calls
+underneath. They stay until `stack.sh` has been proven on a second machine.
 
 Secrets: never put API keys in templates (tracked in git). The
 health-check-triage job reads `ANTHROPIC_API_KEY` from the rendered plist or

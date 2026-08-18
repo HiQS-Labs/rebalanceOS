@@ -608,8 +608,26 @@ def _check_scheduler_liveness(
     launchctl_output: str | None = None,
     *,
     current_device_id: str | None = None,
+    agents_dir: Path | None = None,
 ) -> list[Check]:
-    """Warn for policy jobs absent from this device's live launchd registry."""
+    """Report policy jobs absent from this device's live launchd registry.
+
+    "Absent" is two situations and they are not equally bad (GH-59):
+
+    * **Never installed here** — no plist in ``~/Library/LaunchAgents``. A fresh
+      clone has run no installers, and most machines deliberately run only part
+      of the fleet. Muted notice, with the installer command as the hint.
+    * **Installed here and now gone** — the plist exists but launchd does not
+      have the label. Someone installed this job on this machine and it has
+      since been unloaded or lost. **FAIL.**
+
+    The plist file IS the device-local installation record, so no new state is
+    needed; ``_check_scheduled_stack_checkout`` already reads it that way
+    (GH-36). Three agents — health-check, health-check-triage and
+    pulse-warning-watch — sat installed-but-unloaded for days, and because
+    "absent" was one undifferentiated muted warning, the hourly health check
+    that would have reported everything else was itself among the silent ones.
+    """
     try:
         if policy_path is None:
             from rebalance.paths import resolve_project_root
@@ -638,6 +656,8 @@ def _check_scheduler_liveness(
 
     loaded = _loaded_rebalance_labels(launchctl_output)
     current_device_id = current_device_id or _local_device_id()
+    if agents_dir is None:
+        agents_dir = Path.home() / "Library" / "LaunchAgents"
     checks: list[Check] = []
     for job in jobs:
         if f"com.rebalance-os.{job}" not in loaded:
@@ -651,6 +671,20 @@ def _check_scheduler_liveness(
                 checks.append(other_device)
                 continue
             installer = _scheduler_installer(job, repo_root)
+            if (agents_dir / f"com.rebalance-os.{job}.plist").is_file():
+                checks.append(
+                    Check(
+                        name,
+                        FAIL,
+                        "installed on this device but NOT loaded in launchd",
+                        f"`launchctl load -w ~/Library/LaunchAgents/com.rebalance-os.{job}.plist` "
+                        "(-w is required if the job was disabled; plain `load` reports success "
+                        "and does nothing), or `bash scripts/stack.sh up` for the whole stack. "
+                        "If this plist is left over from a repo move or a restored backup and "
+                        "the job is not wanted here, `bash scripts/stack.sh purge` removes it.",
+                    )
+                )
+                continue
             checks.append(
                 Check(
                     name,
@@ -723,9 +757,14 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
         if outcome == "fatal":
+            # FAIL (GH-59). This is the high-confidence branch: daily-sync's own
+            # structured result says it failed. The missing-contract fallback
+            # below deliberately stays WARN because there it means "unknown" —
+            # the distinction GH-146 Root cause A drew — and "unknown" is not
+            # the same claim as "it told us it died".
             return Check(
                 "launchd:daily-sync",
-                WARN,
+                FAIL,
                 f"{source} failed fatally",
                 "inspect temp/logs/daily_sync_*.log for the structured error result",
             )
@@ -954,7 +993,7 @@ def _check_launchd(
             checks.append(
                 Check(
                     f"launchd:{short}",
-                    WARN,
+                    FAIL,
                     f"crash-looping: {len(crash_events)} crash-relaunches in the "
                     f"last {_LAUNCHD_CRASH_LOOP_LOOKBACK_S // 60}m despite a live PID",
                     "inspect temp/logs/ for this job's error output — it is being "
@@ -965,12 +1004,20 @@ def _check_launchd(
             running = "running" if has_live_pid else "idle, last run ok"
             checks.append(Check(f"launchd:{short}", OK, running, severity=NOTICE))
         else:
+            # FAIL, not WARN (GH-59). github-sync and pulse-sync sat at exit 1
+            # for a full day and doctor still exited 0, so nothing escalated and
+            # health_issue_reporter — which files `error` only by default —
+            # never opened an issue. Detection was already correct here; only
+            # the grade was wrong.
             checks.append(
                 Check(
                     f"launchd:{short}",
-                    WARN,
+                    FAIL,
                     f"last run exited with status {status_val}",
-                    "inspect temp/logs/ for this job's error output",
+                    "inspect temp/logs/ for this job's error output. This status is sticky: "
+                    "launchctl keeps it until launchd reruns the job, so running the wrapper "
+                    "by hand will not clear it — use "
+                    f"`launchctl kickstart -k gui/$(id -u)/com.rebalance-os.{short}`",
                 )
             )
 
@@ -1742,7 +1789,21 @@ def _diagnostics_index() -> list[Check]:
 
 
 def _check_pulse() -> Check:
-    """Pulse publish config — warn when the hourly publisher cannot run."""
+    """Pulse publish config — FAIL when a configured publisher cannot run.
+
+    Two situations, deliberately graded differently (GH-59):
+
+    * **Not configured** — the keys are absent. A fresh clone has never set
+      them, so this stays WARN: the same line the collector freshness registry
+      draws with its ``configured=`` probes.
+    * **Configured but broken** — the keys are set and the path they name is
+      missing or is not a git repo. Someone configured this, it is expected to
+      work, and it does not. FAIL.
+
+    The second case is not hypothetical: ``pulse_target_path`` pointed at a
+    directory that had been archived away, hourly pulse-sync exited 1 for a full
+    day, and doctor reported a warning that nobody escalated.
+    """
     from rebalance.ingest.config import get_pulse_config
 
     cfg = get_pulse_config()
@@ -1759,14 +1820,14 @@ def _check_pulse() -> Check:
     if not target.exists():
         return Check(
             "pulse",
-            WARN,
+            FAIL,
             f"pulse_target_path does not exist: {target}",
             "point pulse_target_path at a local clone of the destination git repo",
         )
     if not (target / ".git").exists():
         return Check(
             "pulse",
-            WARN,
+            FAIL,
             f"pulse_target_path is not a git repo: {target}",
             "point pulse_target_path at the root of the destination git repo",
         )
