@@ -85,7 +85,12 @@ class CheckDispositionTests(unittest.TestCase):
 
 class DoctorJsonCliTests(unittest.TestCase):
     def _invoke(self, report: DoctorReport, status: dict | None = None):
+        # The clock has to be pinned, not just the fixture timestamps. `NOW` is a fixed date and
+        # the suppression window is 48h wide, so with the CLI reading the real clock these tests
+        # passed for exactly two days after `NOW` was written and then failed permanently — which
+        # is what happened on 2026-08-18, when "synced an hour ago" quietly became 52 hours ago.
         with (
+            patch("rebalance.cli.now_utc", return_value=NOW),
             patch("rebalance.doctor.run_doctor", return_value=report),
             patch(
                 "rebalance.ingest.index_ops.get_index_status",
