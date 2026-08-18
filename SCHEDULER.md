@@ -99,15 +99,35 @@ since GH-175 **no two jobs share a minute**:
 
 ## Runbook
 
+**`scripts/stack.sh` is the front door.** It reads the job table above as its
+manifest — it keeps no list of its own, so this document stays the only place
+the fleet is defined. Anything not in that table is *unmanaged*: `stack.sh`
+shows it under a separate heading and never loads, unloads or deletes it. That
+is what keeps the deferred 3-Eyes plists safe (GH-59).
+
 | Task | Command |
 |---|---|
-| Install / reinstall a job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
-| Check fleet status | `launchctl list \| grep rebalance` (also surfaced by `rebalance doctor`) |
+| Check fleet status | `bash scripts/stack.sh status` |
+| Bring the whole stack up | `bash scripts/stack.sh up` |
+| Unload everything (plists kept) | `bash scripts/stack.sh down` |
+| Reload everything | `bash scripts/stack.sh restart` |
+| Health check | `bash scripts/stack.sh doctor` |
+| Preflight without changing anything | `bash scripts/stack.sh verify` |
+| Unload **and delete** managed plists | `bash scripts/stack.sh purge` |
+| Install / reinstall ONE job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
 | Run a job now | `bash scripts/<job>.sh` |
 | Tail a job log | `cat temp/logs/<job_name>_$(date +%Y-%m-%d).log` |
 | Job lifecycle history | `temp/logs/auth_activity.jsonl` (also `rebalance serve` → /auth-log) |
-| Uninstall a job | `launchctl unload ~/Library/LaunchAgents/com.rebalance-os.<job>.plist && rm` same path |
 | Verify templates match installed plists | render with the installer substitutions and `diff` against `~/Library/LaunchAgents/` |
+
+Plists pin absolute paths, so a job belongs to **one checkout**. `stack.sh up`
+prints the root it is about to bind to and refuses to move a fleet that is
+bound somewhere else unless you pass `--force`; `status` shows the current
+binding in its `BOUND TO` column. Running `up` from the wrong clone is
+otherwise a silent fleet-wide migration (GH-36, GH-59).
+
+The 12 per-job installers remain supported and are what `stack.sh` calls
+underneath. They stay until `stack.sh` has been proven on a second machine.
 
 Secrets: never put API keys in templates (tracked in git). The
 health-check-triage job reads `ANTHROPIC_API_KEY` from the rendered plist or

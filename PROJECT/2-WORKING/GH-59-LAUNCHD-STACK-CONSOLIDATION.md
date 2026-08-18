@@ -46,15 +46,17 @@ table, and nothing else does.
 
 | # | Finding | How it was checked |
 |---|---|---|
-| E1 | **11 rebalance LaunchAgents**, plus 3 preserved 3-Eyes plists = 14 files. | `ls ~/Library/LaunchAgents/` |
+| E1 | **`SCHEDULER.md` declares 12 jobs.** 11 are installed; `git-pulse-daily-synthesis` never was. Plus 3 preserved 3-Eyes plists = 14 files on disk. | `SCHEDULER.md` policy table, `ls ~/Library/LaunchAgents/` |
 | E2 | **8 loaded, 3 installed-but-never-loaded**: `health-check`, `health-check-triage`, `pulse-warning-watch`. | `launchctl list` |
-| E3 | **12** installer scripts, not 11. | `ls scripts/install_*.sh` |
+| E3 | **12** installer scripts — one per policy job. | `ls scripts/install_*.sh` |
 | E4 | `github-sync` and `pulse-sync` both report last exit `1`. | `launchctl list` |
-| E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `/Users/noelsaw/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. | `temp/logs/pulse_sync_2026-08-17.log`, `ls` |
-| E6 | **`github-sync` root cause:** the full crawl costs more than one hour of PAT budget. See the run ledger below. | `temp/logs/github_sync_2026-08-17.log` |
-| E7 | Rate limit at time of writing: `core` 4986/5000 remaining. The quota is not permanently gone — it is burned and refilled. | `GET /rate_limit` |
-| E8 | All 11 managed jobs have a `scripts/com.rebalance-os.*.plist.template`. `stack.sh up` can render the whole fleet today. | `ls scripts/*.plist.template` |
-| E9 | The live plists point at **`~/rebalance-runtime`**, not this checkout. | `plutil -p ~/Library/LaunchAgents/…` |
+| E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `/Users/noelsaw/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. **Fixed and verified in Phase 0** — `reconcile_pulse_mirror` now returns OK and `publish_pulse` dry-run returns `ok=True`. | `temp/logs/pulse_sync_2026-08-17.log`, then re-run |
+| E6 | **`github-sync` fails on primary rate limiting.** Every failing run reports `remaining=0`. See the ledger below. | `temp/logs/github_sync_2026-08-17.log` |
+| E6a | **Attribution is NOT yet proven.** The ledger shows correlation, not that *this job* consumed the quota. `_http.py:95-129` states its `x-ratelimit-*` values are samples, not a per-job delta — a PAT can be shared, and a 50-minute run can cross a reset boundary. **Phase 0 measures it.** | `src/rebalance/ingest/_http.py:95-129` |
+| E7 | Rate limit at 21:32: `core` 4980/5000. The quota is burned and refilled, not permanently gone. | `GET /rate_limit` |
+| E8 | All **12** policy jobs have a `scripts/com.rebalance-os.*.plist.template`. `stack.sh up` can render the whole fleet today. | `bash scripts/stack.sh verify` |
+| E9 | All 11 installed plists are bound to **`~/rebalance-runtime`**, not this checkout. | `bash scripts/stack.sh status` (BOUND TO column) |
+| E10 | `SCHEDULER.md` is already the enforced source of truth for the job list — `doctor._scheduler_policy_jobs` parses it and `tests/test_scheduler_policy.py` holds templates, installers, cadences and wrappers to it. | `src/rebalance/doctor.py:544`, `tests/test_scheduler_policy.py` |
 
 ### github-sync run ledger, 2026-08-17
 
@@ -74,11 +76,22 @@ table, and nothing else does.
 | 19:45 | **3167 s (53 min)** | **complete** |
 | 20:45 | 77 s | Rate limited, `remaining=0` |
 
-Read it as a two-hour oscillation: a long run consumes the entire 5,000-request window, the next
-hourly run starts eight minutes later with nothing left and dies in ~80 seconds, the window resets
-during that hour, and the cycle repeats. The 19:45 run proves the point — it **succeeded** and still
-exhausted the budget. So this is not a bug in the retry path being bypassed; the job is simply
-larger than its schedule. Throttling is the correct fix, not a workaround.
+Read as a two-hour oscillation: a long run appears to consume the window, the next hourly run starts
+eight minutes later with nothing left and dies in ~80 seconds, the window resets during that hour,
+and the cycle repeats. The 19:45 run is the interesting one — it **succeeded**, took 53 minutes, and
+was still followed by an exhausted window.
+
+That pattern is consistent with "the job is larger than its schedule", but it does not **prove** it
+(E6a). Two other explanations survive the ledger:
+
+- another consumer shares this PAT and burns the quota independently;
+- a run crossing the hourly reset double-counts, making one job look like two.
+
+Both are cheap to rule out and expensive to get wrong — Phase 3's whole shape depends on which is
+true. Phase 0 measures `remaining` on a 30-second interval across a full scheduled run, with the
+baseline drift captured beforehand while nothing is running. If `remaining` is flat while idle and
+falls to zero only while `github_sync.sh` is alive, attribution is settled and Phase 3 proceeds. If
+it drains while idle, the fix is a dedicated PAT and Phase 3 is re-scoped.
 
 ### Prior art — build on these, do not duplicate them
 
@@ -99,24 +112,35 @@ relies on launchd's own `KeepAlive`, a CLI you run on purpose, and a non-zero ex
 
 ---
 
-## Phase 0 — Stop the bleeding
+## Phase 0 — Stop the bleeding, and settle attribution
 
-Four small changes that fix the actual outage. No new code.
+Small changes that fix the actual outage, plus the one measurement Phase 3 depends on. No new code.
 
-- [ ] Commit and push `scripts/stack.sh`. It is 267 untracked lines living in one working tree with
+- [x] Commit and push `scripts/stack.sh`. It was 267 untracked lines living in one working tree with
       no backup behind it, and every later phase builds on it.
-- [ ] Repoint `pulse_target_path` to `/Users/noelsaw/git-pulse-sync` (E5). One config value.
-- [ ] Load the 3 installed-but-unloaded agents (E2) — this restores `health-check` today, before any
-      refactor.
-- [ ] Record the outstanding unknown as its own issue: `mlx_embeddings` fails to import inside the
-      launchd context and ends 4 of 13 runs after 40+ minutes. It is **not** the cause of the rate
-      limiting (the 19:45 run succeeded and still exhausted the budget), so it does not block this
-      plan — but it must not be lost.
+- [x] Repoint `pulse_target_path` to `/Users/noelsaw/git-pulse-sync` (E5). One config value, in both
+      checkouts. Verified: `reconcile_pulse_mirror` OK, `publish_pulse` dry-run `ok=True`.
+- [x] Load the 3 installed-but-unloaded agents (E2). Fleet is now 11 loaded, 0 dormant — this
+      restores `health-check` today, before any refactor.
+- [ ] **Measure rate-limit attribution (E6a).** Sample `GET /rate_limit` every 30 s across a full
+      scheduled `github-sync` run, recording whether `github_sync.sh` is alive at each sample, with
+      at least 10 minutes of idle baseline beforehand. Three outcomes, three different Phase 3s:
+
+      | Observation | Conclusion | Phase 3 |
+      |---|---|---|
+      | flat while idle, drains only while the job runs | this job owns the burn | proceed as written |
+      | drains while idle | the PAT is shared | issue a dedicated PAT first; re-scope |
+      | drains faster than the job's own request count | retry amplification | fix the loop, not the schedule |
+
+- [ ] Record the outstanding unknown for triage: `mlx_embeddings` fails to import inside the launchd
+      context and ends 4 of 13 runs after 40+ minutes. Separate defect, does not block this plan,
+      must not be lost.
 
 ### QA Gate 0
-- `launchctl list | grep rebalance` shows 11 jobs, 0 unloaded.
+- `bash scripts/stack.sh status` shows 12 managed jobs and `unloaded: 0`.
 - The next `pulse-sync` fire exits 0.
 - `git ls-files scripts/stack.sh` returns the path.
+- The attribution measurement is recorded in this document with its conclusion.
 
 ---
 
@@ -124,30 +148,48 @@ Four small changes that fix the actual outage. No new code.
 
 ### Scope (GH-60)
 
-Make the draft script trustworthy. Four defects found by reading it against the machine:
+Make the draft script trustworthy. **Five** defects found by reading it against the machine:
 
 1. **`doctor` is broken.** It runs `python -m rebalance.doctor`, but `doctor.py` has no
-   `__main__` block. Call the CLI entry point instead.
+   `__main__` block. Call the installed `rebalance` console script instead.
 2. **The manifest is incomplete.** `git-pulse-daily-synthesis` has a template and an installer but
-   is absent from `JOBS`, so `status` will never mention it and `up` will never load it.
+   is absent from `JOBS`, so `status` never mentions it and `up` never loads it.
 3. **`down` deletes plists, and `restart` is `down` then `up`.** A failed `up` therefore leaves the
-   machine with *zero* agents — precisely the silent outage this plan exists to prevent. `down`
-   should unload and leave the file; add a separate explicit `purge` if removal is ever wanted.
+   machine with *zero* agents — precisely the silent outage this plan exists to prevent.
 4. **`up` silently rebinds the fleet to whichever checkout it runs from.** `rb_install_launchd_job`
-   derives `REBALANCE_DIR` from its own location, and the live plists currently point at
-   `~/rebalance-runtime` (E9). Running `up` from a dev clone migrates all 11 jobs with no warning.
-   `up` must print the target root and refuse to change it without `--force`.
+   derives `REBALANCE_DIR` from its own location (`scripts/lib/install_common.sh:23-26`) and renders
+   it into every plist (`:60-64`). All 11 installed plists currently point at `~/rebalance-runtime`
+   (E9), so running `up` from a dev clone migrates the entire fleet with no prompt.
+5. **`grep "$label"` substring-matches.** `com.rebalance-os.health-check` also matches
+   `…health-check-triage`, so `status` reads two launchctl rows into a one-row parse and reports
+   garbage for both.
 
-Plus the agreed hardening:
+The fix for #2 is structural rather than "add the missing entry": **read the job list from
+`SCHEDULER.md`** (E10), which is already the enforced source of truth. A hardcoded array in
+`stack.sh` is a second list to forget to update — and forgetting it is precisely how
+`git-pulse-daily-synthesis` went missing. With the policy as the manifest, that drift class is gone,
+and the "every template has an entry and vice versa" test becomes unnecessary rather than merely
+passing.
 
-- Drive `up`/`down`/`status` from the explicit `JOBS` manifest, never a `com.rebalance-os.*` glob,
-  so the 3 preserved 3-Eyes plists are structurally untouchable.
-- `status` lists unmanaged `com.rebalance-os.*` plists in a separate section rather than hiding them.
-- Reconcile the usage block with the dispatcher: `up`, `down`, `restart`, `status`, `doctor`,
-  `verify` (`test` is an accepted alias).
-- `tests/test_stack_script.py` — manifest completeness (every template has a `JOBS` entry and vice
-  versa), `plutil -lint` on every rendered plist, and a negative control proving `down` refuses a
-  label outside the manifest.
+Everything not in `SCHEDULER.md` is **unmanaged**: never loaded, unloaded or deleted, and shown in
+its own section of `status`. That is what makes the three preserved 3-Eyes plists structurally
+untouchable rather than untouched by convention.
+
+Also in scope:
+
+- `down` unloads and keeps the plist; deleting is a separate `purge` you have to ask for by name.
+- `up` prints its target root, and refuses to rebind a fleet bound elsewhere without `--force`.
+- `status` gains a `BOUND TO` column so a cross-checkout fleet is visible at a glance.
+- Reconcile the usage block with the dispatcher: `up [--force]`, `down`, `restart`, `status`,
+  `doctor`, `verify`, `purge`.
+- `tests/test_stack_script.py` — policy parse agrees with `doctor._scheduler_policy_jobs`, `purge`
+  refuses a label outside the policy (negative control), the substring-collision case
+  (`health-check` vs `health-check-triage`) resolves to one row, and the target-root guard refuses a
+  foreign binding.
+- **Machine-check the documented ordering.** `SCHEDULER.md:173` says `obsidian-daily-sync` must stay
+  before `git-pulse-daily-synthesis`, but only a comment enforces it. Add an assertion to
+  `tests/test_scheduler_policy.py` that its scheduled time is strictly earlier, so installing the
+  currently-missing job cannot silently invert them.
 - Point `SCHEDULER.md` at `stack.sh` as the runbook. It exists; this is an edit.
 
 Keep the 12 installers in place for now. Delete them only once `stack.sh` has been proven on a
@@ -155,11 +197,13 @@ second machine — a bootstrap tool that has replaced its own predecessors and e
 a single point of failure.
 
 ### QA Gate 1
-- `bash scripts/stack.sh up` loads all 11 managed jobs and prints the target root it bound them to.
-- `bash scripts/stack.sh down` unloads only managed jobs; all 14 plist files still on disk; the 3
-  3-Eyes plists never appear in its output.
+- `bash scripts/stack.sh status` lists all 12 policy jobs and the 3 unmanaged 3-Eyes plists in a
+  separate section.
+- `bash scripts/stack.sh up` from a checkout the fleet is not bound to **refuses** and names the
+  conflicts; with `--force` it rebinds and loads all 12.
+- `bash scripts/stack.sh down` unloads only managed jobs; all 14 plist files still on disk.
 - `bash scripts/stack.sh doctor` runs the health check and exits with the health check's own code.
-- `pytest tests/test_stack_script.py` passes in CI.
+- `pytest tests/test_stack_script.py tests/test_scheduler_policy.py` passes in CI.
 
 ---
 
@@ -176,10 +220,28 @@ nothing grades these `FAIL`. Promote three states from `WARN` to `FAIL`:
    (`_check_scheduler_liveness`).
 
 Requirement 3 is scoped deliberately. "Required agent is missing → `FAIL`" applied to the full
-catalogue would hard-fail a fresh clone that has never run an installer. The repo already draws this
-line — `_COLLECTOR_FRESHNESS` gives every source a `configured=` probe so an unconfigured source
-stays quiet instead of failing. Same rule here: *installed and now gone* is a failure; *never
-installed* is not.
+policy table would hard-fail a fresh clone that has never run an installer. The repo already draws
+this line — `_COLLECTOR_FRESHNESS` gives every source a `configured=` probe so an unconfigured
+source stays quiet instead of failing. Same rule here: *installed and now gone* is a failure;
+*never installed* is not.
+
+**The signal is the plist file**, and it needs no new state. `~/Library/LaunchAgents/com.rebalance-os.<job>.plist`
+exists if and only if this machine installed that job: `rb_install_launchd_job` writes it and
+`stack.sh purge` removes it. `doctor` already relies on exactly this — `_check_scheduled_stack_checkout`
+(`doctor.py:815-863`, the GH-36 tripwire) globs the agents directory and treats each plist as
+evidence that the job is installed here. So:
+
+| plist on disk | in `launchctl list` | grade |
+|---|---|---|
+| yes | yes | existing behaviour |
+| **yes** | **no** | **`FAIL`** — installed here and now gone |
+| no | — | no check at all — never installed |
+
+`_check_scheduler_liveness` currently compares the policy table to `launchctl list` only
+(`doctor.py:606-663`), which is why it cannot tell those last two apart. Passing it the agents
+directory — the parameter `_check_scheduled_stack_checkout` already takes — is the whole change. No
+new manifest file, no migration for existing installs, and rollback is `purge` removing the plist,
+which is already the right semantics.
 
 Also in scope:
 
@@ -217,14 +279,29 @@ Explicitly **not** in scope:
 
 Two steps, smallest first. **Ship 3a and re-measure before writing any of 3b.**
 
-**3a — Scope the hourly run (small).**
-- Hourly `github-sync` covers Band A only (0–7 days active), reusing `active_bands` from
-  `github_scan.py:56-57`. No new tiering concept.
+**Gated on Phase 0's attribution result.** If the measurement shows the PAT is shared or the burn is
+retry amplification, stop and re-scope — neither is fixed by anything below.
+
+**3a — Scope the hourly run (small, but not a config flip).**
+
+`active_bands` is an **output** of the scan, not an input to it: it is populated while processing
+already-fetched events (`github_scan.py:259-303`) and is never persisted — the insert stores
+`last_active_at` but no bands (`:493-529`). The hourly wrapper calls
+`refresh_index(db_path, scope=["github", "focus5"])` with no repo selector at all
+(`scripts/github_sync.sh:26-36`). So "hourly = Band A" cannot be expressed today, and this is real
+plumbing rather than a flag:
+
+- Derive the hourly repo set from persisted state — `last_active_at >= now - 7d` — which is the same
+  boundary Band A already means, read from a column that actually exists.
+- Pass it through the orchestrator's existing `repos` argument so the selector, not the collector,
+  decides scope.
+- Define the bootstrap case explicitly: an empty or absent `last_active_at` set (fresh database,
+  first run) must fall back to the full crawl once, not silently sync nothing.
 - Before the run, read the rate-limit sample `_http.py` already collects. If `remaining < 500`,
   stop cleanly and report `OK (throttled)` — a *success* for pipeline and doctor purposes, not a
   failure. A throttled skip is the system working.
 - The 06:30 `daily-sync` keeps the full crawl. It has the whole night's budget.
-- Then measure again: requests consumed and wall-clock for one Band A run.
+- Then measure again: requests consumed and wall-clock for one hourly run.
 
 **3b — Conditional requests (only if 3a leaves us over budget).**
 - `If-None-Match` / `If-Modified-Since` in `_http.py` and the GitHub item fetchers. GitHub does not
@@ -235,10 +312,12 @@ Two steps, smallest first. **Ship 3a and re-measure before writing any of 3b.**
   a successful no-change sync into apparent data loss.
 
 ### QA Gate 3
+- 3a: a fixture proves the hourly path fetches only the derived recent set while the daily path
+  still crawls everything.
+- 3a: an empty `last_active_at` set falls back to a full crawl rather than syncing nothing.
 - 3a: one hourly run completes in under 3 minutes and consumes a measured, recorded number of
   requests well under 5,000.
 - 3a: with `remaining` forced below 500, the job exits 0 and doctor shows `OK (throttled)`.
-- 3a: the daily 06:30 run still covers all bands.
 - 3b (if built): a `304` on an unchanged repo is observed in the log, and the row count for that
   repo is unchanged afterwards.
 

@@ -2,16 +2,26 @@
 # ==============================================================================
 # rebalance OS — Unified Stack Orchestrator (scripts/stack.sh)
 #
-# Single deterministic control plane for the entire Rebalance OS launchd fleet.
-# Replaces fragmented per-job install scripts with an atomic bootstrap & monitor.
+# One control plane for the launchd fleet. Replaces "which of the 12 installer
+# scripts do I run?" with a single command that can also answer "is it up?".
 #
 # Usage:
-#   bash scripts/stack.sh up       # Validate config, render plists, lint, and load all jobs
-#   bash scripts/stack.sh down     # Gracefully unload and purge all launchd agents
-#   bash scripts/stack.sh restart  # Atomic reload of all agents
-#   bash scripts/stack.sh status   # Formatted tabular status, PIDs, and exit codes
-#   bash scripts/stack.sh doctor   # Run full system health check
-#   bash scripts/stack.sh test     # Dry-run validation of plists and environment
+#   bash scripts/stack.sh up [--force]  # render, lint and load every policy job
+#   bash scripts/stack.sh down          # unload every managed job (plists kept)
+#   bash scripts/stack.sh restart       # down, then up
+#   bash scripts/stack.sh status        # per-job PID / last exit / state
+#   bash scripts/stack.sh doctor        # rebalance doctor (exits with its code)
+#   bash scripts/stack.sh verify        # preflight only — changes nothing
+#   bash scripts/stack.sh purge         # unload AND delete managed plists
+#
+# The job list is read from SCHEDULER.md, which is already the enforced source
+# of truth (tests/test_scheduler_policy.py). This script deliberately does NOT
+# keep its own copy: a second list is a second thing to forget to update, and
+# that is exactly how git-pulse-daily-synthesis went missing from the first
+# draft of this file.
+#
+# Anything not in SCHEDULER.md is UNMANAGED. `down` and `purge` refuse to touch
+# it, which is what keeps the three preserved 3-Eyes plists safe.
 # ==============================================================================
 
 set -euo pipefail
@@ -19,24 +29,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBALANCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PYTHON_BIN="$REBALANCE_DIR/.venv/bin/python"
+REBALANCE_CLI="$REBALANCE_DIR/.venv/bin/rebalance"
+POLICY_DOC="$REBALANCE_DIR/SCHEDULER.md"
+AGENTS_DIR="$HOME/Library/LaunchAgents"
+LABEL_PREFIX="com.rebalance-os."
 
 source "$SCRIPT_DIR/lib/install_common.sh"
-
-# Canonical list of core jobs managed by the stack:
-# Format: "label|wrapper_rel_path|required_flag"
-JOBS=(
-    "com.rebalance-os.pulse-server|scripts/pulse_server.sh|required"
-    "com.rebalance-os.daily-sync|scripts/daily_sync.sh|required"
-    "com.rebalance-os.github-sync|scripts/github_sync.sh|required"
-    "com.rebalance-os.vault-sync|scripts/vault_sync.sh|required"
-    "com.rebalance-os.pulse-sync|scripts/pulse_sync.sh|required"
-    "com.rebalance-os.pulse-web-sync|scripts/pulse_web_sync.sh|required"
-    "com.rebalance-os.pulse-warning-watch||required"
-    "com.rebalance-os.health-check||required"
-    "com.rebalance-os.health-check-triage||optional"
-    "com.rebalance-os.obsidian-daily-sync|utils/obsidian_daily_sync.sh|optional"
-    "com.rebalance-os.obsidian-rollover|utils/obsidian_rollover.sh|optional"
-)
 
 log_info()  { echo -e "\033[1;34m[INFO]\033[0m  $*"; }
 log_ok()    { echo -e "\033[1;32m[OK]\033[0m    $*"; }
@@ -44,13 +42,95 @@ log_warn()  { echo -e "\033[1;33m[WARN]\033[0m  $*"; }
 log_error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 
 # ------------------------------------------------------------------------------
-# Preflight Validation
+# Policy — the managed job set, read from SCHEDULER.md
+# ------------------------------------------------------------------------------
+JOB_NAMES=()
+JOB_WRAPPERS=()
+
+load_policy() {
+    if [ ! -f "$POLICY_DOC" ]; then
+        log_error "policy document not found: $POLICY_DOC"
+        exit 1
+    fi
+
+    # Column 1 is the backticked label suffix, column 3 the backticked wrapper
+    # path ("— (python direct)" for jobs launchd invokes without one).
+    local parsed
+    parsed=$(/usr/bin/sed -n '/^| Job (label suffix) |/,/^$/p' "$POLICY_DOC" \
+        | /usr/bin/sed '1,2d' \
+        | /usr/bin/awk -F'|' 'NF>3 {
+              lbl=$2; wrp=$4;
+              gsub(/^[ \t]+|[ \t]+$/,"",lbl); gsub(/^[ \t]+|[ \t]+$/,"",wrp);
+              if (lbl !~ /^`[a-z0-9-]+`$/) next;
+              gsub(/`/,"",lbl);
+              if (wrp ~ /^`[^`]+`$/) { gsub(/`/,"",wrp) } else { wrp="" }
+              print lbl "|" wrp;
+          }')
+
+    if [ -z "$parsed" ]; then
+        log_error "could not read the job policy table from $POLICY_DOC"
+        exit 1
+    fi
+
+    local line
+    while IFS= read -r line; do
+        JOB_NAMES+=("${line%%|*}")
+        JOB_WRAPPERS+=("${line#*|}")
+    done <<< "$parsed"
+}
+
+is_managed() {
+    local needle="$1" name
+    for name in "${JOB_NAMES[@]}"; do
+        [ "$name" = "$needle" ] && return 0
+    done
+    return 1
+}
+
+plist_path() { echo "$AGENTS_DIR/${LABEL_PREFIX}$1.plist"; }
+
+# The checkout a rendered plist is bound to. Every template substitutes
+# {{REBALANCE_DIR}} at least once, so this is defined for all of them.
+bound_root() {
+    [ -f "$1" ] || return 0
+    /usr/bin/grep -o '<string>[^<]*</string>' "$1" 2>/dev/null \
+        | /usr/bin/sed 's|<string>||; s|</string>||' \
+        | /usr/bin/sed -nE 's#^(/.+)/(scripts|utils|\.venv|temp)/.*#\1#p' \
+        | head -1
+}
+
+# Exact third-field match. A substring grep for "health-check" also matches
+# "health-check-triage", which silently returns two rows and corrupts the parse.
+launchctl_row() {
+    local label="${LABEL_PREFIX}$1"
+    echo "${LAUNCHCTL_CACHE:-}" | /usr/bin/awk -v want="$label" -F'\t' '$3 == want {print; exit}'
+}
+
+# STACK_LAUNCHCTL_BIN is a test seam, and it is load-bearing for safety:
+# `launchctl unload <path>` resolves the job from the Label INSIDE the file, not
+# from where the file sits. A test writing a fixture plist labelled
+# com.rebalance-os.vault-sync into a temp HOME therefore unloads the REAL
+# vault-sync. (Observed, GH-59 — the tests took the live job down.) Tests point
+# this at a stub; it also lets the suite run on a box with no launchctl.
+LAUNCHCTL_BIN="${STACK_LAUNCHCTL_BIN:-launchctl}"
+
+# STACK_LAUNCHCTL_OUTPUT lets the tests feed a fixed `launchctl list` table (and lets
+# this script run at all on a non-macOS CI box). Unset in normal use.
+refresh_launchctl_cache() {
+    if [ -n "${STACK_LAUNCHCTL_OUTPUT:-}" ]; then
+        LAUNCHCTL_CACHE="$STACK_LAUNCHCTL_OUTPUT"
+    else
+        LAUNCHCTL_CACHE="$("$LAUNCHCTL_BIN" list 2>/dev/null || true)"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Preflight
 # ------------------------------------------------------------------------------
 validate_environment() {
     log_info "Validating environment and runtime prerequisites..."
     local errors=0
 
-    # 1. Virtualenv Python
     if [ ! -x "$PYTHON_BIN" ]; then
         log_error "Virtualenv Python not found at: $PYTHON_BIN"
         log_error "Run: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'"
@@ -59,7 +139,10 @@ validate_environment() {
         log_ok "Virtualenv Python present ($("$PYTHON_BIN" --version 2>&1))"
     fi
 
-    # 2. Database resolution
+    if [ ! -x "$REBALANCE_CLI" ]; then
+        log_warn "rebalance CLI not found at $REBALANCE_CLI — 'stack.sh doctor' will not work"
+    fi
+
     if [ -x "$PYTHON_BIN" ]; then
         local db_res
         db_res=$("$PYTHON_BIN" -c "
@@ -72,37 +155,48 @@ except Exception as e:
 " 2>/dev/null || echo "ERR:Failed to execute python")
 
         if [[ "$db_res" == OK:* ]]; then
-            local db_path=$(echo "$db_res" | cut -d: -f2)
-            local db_exists=$(echo "$db_res" | cut -d: -f3)
+            local db_path db_exists
+            db_path=$(echo "$db_res" | cut -d: -f2)
+            db_exists=$(echo "$db_res" | cut -d: -f3)
             if [ "$db_exists" = "True" ]; then
                 log_ok "Resolved database at $db_path"
             else
-                log_warn "Resolved database path does not exist yet ($db_path) — will be initialized on first sync"
+                log_warn "Database path does not exist yet ($db_path) — created on first sync"
             fi
         else
             log_error "Database resolution failed: $db_res"
             errors=$((errors + 1))
         fi
-    fi
 
-    # 3. GitHub Token reachability
-    if [ -x "$PYTHON_BIN" ]; then
-        local token_res
+        local token_res src len
         token_res=$("$PYTHON_BIN" -c "
 from rebalance.ingest.config import get_github_token_with_source
 token, src = get_github_token_with_source()
 print(f'{src}:{len(token) if token else 0}')
 " 2>/dev/null || echo "error:0")
-        local src=$(echo "$token_res" | cut -d: -f1)
-        local len=$(echo "$token_res" | cut -d: -f2)
-        if [ "$len" -gt 0 ] && [ "$src" != "None" ]; then
+        src=$(echo "$token_res" | cut -d: -f1)
+        len=$(echo "$token_res" | cut -d: -f2)
+        if [ "${len:-0}" -gt 0 ] && [ "$src" != "None" ]; then
             log_ok "GitHub token reachable via '$src'"
         else
             log_warn "No GitHub token reachable. Some background sync jobs will fail."
         fi
     fi
 
-    # 4. Logs directory
+    # Every policy job needs a template; a missing one fails `up` halfway through.
+    local missing=0 name
+    for name in "${JOB_NAMES[@]}"; do
+        [ -f "$SCRIPT_DIR/${LABEL_PREFIX}$name.plist.template" ] || {
+            log_error "missing plist template for policy job: $name"
+            missing=$((missing + 1))
+        }
+    done
+    if [ "$missing" -eq 0 ]; then
+        log_ok "All ${#JOB_NAMES[@]} policy jobs have a plist template"
+    else
+        errors=$((errors + missing))
+    fi
+
     mkdir -p "$REBALANCE_DIR/temp/logs"
     log_ok "Logs directory ready at $REBALANCE_DIR/temp/logs"
 
@@ -113,155 +207,225 @@ print(f'{src}:{len(token) if token else 0}')
     return 0
 }
 
+# Refuse to silently migrate the whole fleet between checkouts. rb_install_launchd_job
+# derives REBALANCE_DIR from its own location, so running `up` from a dev clone
+# repoints every plist at that clone — a fleet-wide change with no prompt.
+check_target_root() {
+    local force="$1"
+    log_info "Target root: $REBALANCE_DIR"
+
+    local conflicts=() name root
+    for name in "${JOB_NAMES[@]}"; do
+        local dest
+        dest=$(plist_path "$name")
+        [ -f "$dest" ] || continue
+        root=$(bound_root "$dest")
+        if [ -n "$root" ] && [ "$root" != "$REBALANCE_DIR" ]; then
+            conflicts+=("$name -> $root")
+        fi
+    done
+
+    [ "${#conflicts[@]}" -eq 0 ] && return 0
+
+    if [ "$force" = "1" ]; then
+        log_warn "Rebinding ${#conflicts[@]} job(s) to $REBALANCE_DIR (--force)"
+        return 0
+    fi
+
+    log_error "${#conflicts[@]} installed job(s) are bound to a different checkout:"
+    local c
+    for c in "${conflicts[@]}"; do echo "    $c" >&2; done
+    log_error "Running 'up' here would move the whole fleet to $REBALANCE_DIR."
+    log_error "Re-run from the intended checkout, or pass --force to rebind deliberately."
+    return 1
+}
+
 # ------------------------------------------------------------------------------
-# Boot / Up Command
+# up
 # ------------------------------------------------------------------------------
 stack_up() {
+    local force="${1:-0}"
     echo "================================================================================"
     echo "                rebalance OS — Bootstrapping Background Stack                   "
     echo "================================================================================"
-    
+
     validate_environment || exit 1
     echo
+    check_target_root "$force" || exit 1
+    echo
 
-    log_info "Installing and loading all LaunchAgents..."
-    local failed=0
-    local loaded=0
-
-    for item in "${JOBS[@]}"; do
-        local label=$(echo "$item" | cut -d'|' -f1)
-        local wrapper=$(echo "$item" | cut -d'|' -f2)
-        local req=$(echo "$item" | cut -d'|' -f3)
-        local short_name=${label#"com.rebalance-os."}
-
-        echo -n "  • Loading $short_name... "
-        if rb_install_launchd_job "$label" "$wrapper" > /dev/null 2>&1; then
+    log_info "Installing and loading ${#JOB_NAMES[@]} LaunchAgents..."
+    local failed=0 loaded=0 i
+    for i in "${!JOB_NAMES[@]}"; do
+        local name="${JOB_NAMES[$i]}" wrapper="${JOB_WRAPPERS[$i]}" out
+        printf "  • %-28s " "$name"
+        if out=$(rb_install_launchd_job "${LABEL_PREFIX}$name" "$wrapper" 2>&1); then
             echo -e "\033[32mOK\033[0m"
             loaded=$((loaded + 1))
         else
-            if [ "$req" = "required" ]; then
-                echo -e "\033[31mFAILED\033[0m"
-                log_error "Failed to load required job: $label"
-                failed=$((failed + 1))
-            else
-                echo -e "\033[33mSKIPPED (optional)\033[0m"
-            fi
+            echo -e "\033[31mFAILED\033[0m"
+            echo "$out" | /usr/bin/sed 's/^/      /' >&2
+            failed=$((failed + 1))
         fi
     done
 
     echo
     if [ "$failed" -gt 0 ]; then
-        log_error "Stack bootstrap encountered $failed failure(s)."
+        log_error "Stack bootstrap encountered $failed failure(s); $loaded job(s) loaded."
         exit 1
     fi
-
     log_ok "Successfully bootstrapped $loaded job(s)."
     echo
     stack_status
 }
 
 # ------------------------------------------------------------------------------
-# Teardown / Down Command
+# down / purge
+#
+# `down` unloads and LEAVES the plist. `restart` is down-then-up, so if `down`
+# deleted the files a failed `up` would leave the machine with no agents at all
+# — the exact silent outage this script exists to prevent. Deleting is `purge`,
+# which you have to ask for by name.
 # ------------------------------------------------------------------------------
 stack_down() {
+    local remove="${1:-0}"
     echo "================================================================================"
-    echo "                rebalance OS — Tearing Down Background Stack                    "
+    if [ "$remove" = "1" ]; then
+        echo "                rebalance OS — Purging Background Stack                         "
+    else
+        echo "                rebalance OS — Tearing Down Background Stack                    "
+    fi
     echo "================================================================================"
-    local unloaded=0
 
-    for item in "${JOBS[@]}"; do
-        local label=$(echo "$item" | cut -d'|' -f1)
-        local dest="$HOME/Library/LaunchAgents/$label.plist"
-        local short_name=${label#"com.rebalance-os."}
-
-        if [ -f "$dest" ]; then
-            echo -n "  • Unloading $short_name... "
-            launchctl unload "$dest" 2>/dev/null || true
+    local count=0 name
+    for name in "${JOB_NAMES[@]}"; do
+        local dest
+        dest=$(plist_path "$name")
+        [ -f "$dest" ] || continue
+        printf "  • %-28s " "$name"
+        "$LAUNCHCTL_BIN" unload "$dest" 2>/dev/null || true
+        if [ "$remove" = "1" ]; then
             rm -f "$dest"
+            echo -e "\033[33mPURGED\033[0m"
+        else
             echo -e "\033[32mUNLOADED\033[0m"
-            unloaded=$((unloaded + 1))
         fi
+        count=$((count + 1))
     done
 
     echo
-    log_ok "Teardown complete: $unloaded job(s) removed from launchd."
+    if [ "$remove" = "1" ]; then
+        log_ok "Purge complete: $count managed job(s) unloaded and removed."
+    else
+        log_ok "Teardown complete: $count managed job(s) unloaded (plists kept)."
+    fi
+    log_info "Unmanaged ${LABEL_PREFIX}* plists were not touched."
 }
 
 # ------------------------------------------------------------------------------
-# Status Command
+# status
 # ------------------------------------------------------------------------------
 stack_status() {
+    refresh_launchctl_cache
     echo "================================================================================"
     echo "                     rebalance OS — Stack Status                                "
     echo "================================================================================"
-    printf "%-26s %-12s %-10s %-10s %-12s\n" "JOB" "TYPE" "PID" "LAST EXIT" "STATE"
+    echo "Target root: $REBALANCE_DIR"
+    echo
+    printf "%-28s %-8s %-10s %-14s %s\n" "JOB" "PID" "LAST EXIT" "STATE" "BOUND TO"
     echo "--------------------------------------------------------------------------------"
 
-    local launch_list
-    launch_list=$(launchctl list 2>/dev/null || true)
+    local unloaded=0 broken=0 name
+    for name in "${JOB_NAMES[@]}"; do
+        local dest row pid status state color root note
+        dest=$(plist_path "$name")
+        row=$(launchctl_row "$name")
+        root=$(bound_root "$dest")
+        note=""
+        [ -n "$root" ] && [ "$root" != "$REBALANCE_DIR" ] && note="$root"
 
-    for item in "${JOBS[@]}"; do
-        local label=$(echo "$item" | cut -d'|' -f1)
-        local short_name=${label#"com.rebalance-os."}
-        local req=$(echo "$item" | cut -d'|' -f3)
-
-        local line
-        line=$(echo "$launch_list" | grep "$label" || true)
-
-        if [ -z "$line" ]; then
-            if [ -f "$HOME/Library/LaunchAgents/$label.plist" ]; then
-                printf "%-26s %-12s %-10s %-10s \033[33m%-12s\033[0m\n" "$short_name" "$req" "-" "-" "UNLOADED"
+        if [ -z "$row" ]; then
+            if [ -f "$dest" ]; then
+                state="UNLOADED"; color="\033[1;33m"; unloaded=$((unloaded + 1))
             else
-                printf "%-26s %-12s %-10s %-10s \033[90m%-12s\033[0m\n" "$short_name" "$req" "-" "-" "NOT INSTALLED"
+                state="NOT INSTALLED"; color="\033[90m"
             fi
-        else
-            local pid=$(echo "$line" | awk '{print $1}')
-            local status=$(echo "$line" | awk '{print $2}')
-            local state="IDLE (OK)"
-            local color="\033[32m"
-
-            if [ "$pid" != "-" ]; then
-                state="RUNNING"
-                color="\033[1;32m"
-            elif [ "$status" != "0" ] && [ "$status" != "-" ]; then
-                state="ERROR ($status)"
-                color="\033[1;31m"
-            fi
-
-            printf "%-26s %-12s %-10s %-10s ${color}%-12s\033[0m\n" "$short_name" "$req" "$pid" "$status" "$state"
+            printf "%-28s %-8s %-10s ${color}%-14s\033[0m %s\n" "$name" "-" "-" "$state" "$note"
+            continue
         fi
+
+        pid=$(echo "$row" | /usr/bin/awk -F'\t' '{print $1}')
+        status=$(echo "$row" | /usr/bin/awk -F'\t' '{print $2}')
+        if [ "$pid" != "-" ]; then
+            state="RUNNING"; color="\033[1;32m"
+        elif [ "$status" != "0" ] && [ "$status" != "-" ]; then
+            state="ERROR ($status)"; color="\033[1;31m"; broken=$((broken + 1))
+        else
+            state="IDLE (OK)"; color="\033[32m"
+        fi
+        printf "%-28s %-8s %-10s ${color}%-14s\033[0m %s\n" "$name" "$pid" "$status" "$state" "$note"
     done
+
+    echo "--------------------------------------------------------------------------------"
+    printf "managed: %d   unloaded: %d   failing: %d\n" "${#JOB_NAMES[@]}" "$unloaded" "$broken"
+
+    # Unmanaged agents are shown, never hidden and never touched. The 3-Eyes
+    # plists live here: deferred, preserved, out of this script's reach.
+    local unmanaged=() f base suffix
+    for f in "$AGENTS_DIR/${LABEL_PREFIX}"*.plist; do
+        [ -f "$f" ] || continue
+        base=$(basename "$f" .plist)
+        suffix="${base#$LABEL_PREFIX}"
+        is_managed "$suffix" || unmanaged+=("$suffix")
+    done
+
+    if [ "${#unmanaged[@]}" -gt 0 ]; then
+        echo
+        echo "Unmanaged ${LABEL_PREFIX}* plists (not in SCHEDULER.md — never loaded, unloaded or"
+        echo "deleted by this script):"
+        for suffix in "${unmanaged[@]}"; do
+            local row state
+            row=$(launchctl_row "$suffix")
+            [ -n "$row" ] && state="loaded" || state="not loaded"
+            printf "  · %-40s %s\n" "$suffix" "$state"
+        done
+    fi
     echo "================================================================================"
 }
 
 # ------------------------------------------------------------------------------
 # Dispatcher
 # ------------------------------------------------------------------------------
+load_policy
+refresh_launchctl_cache
+
 cmd="${1:-status}"
+shift || true
+FORCE=0
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE=1 ;;
+        *) log_error "unknown option: $arg"; exit 2 ;;
+    esac
+done
 
 case "$cmd" in
-    up|boot|start)
-        stack_up
-        ;;
-    down|stop)
-        stack_down
-        ;;
-    restart|reload)
-        stack_down
-        echo
-        stack_up
-        ;;
-    status|ps)
-        stack_status
-        ;;
+    up|boot|start)  stack_up "$FORCE" ;;
+    down|stop)      stack_down 0 ;;
+    purge)          stack_down 1 ;;
+    restart|reload) stack_down 0; echo; stack_up "$FORCE" ;;
+    status|ps)      stack_status ;;
     doctor)
-        exec "$PYTHON_BIN" -m rebalance.doctor
+        if [ ! -x "$REBALANCE_CLI" ]; then
+            log_error "rebalance CLI not found at $REBALANCE_CLI"
+            log_error "Run: .venv/bin/pip install -e '.[dev]'"
+            exit 1
+        fi
+        exec "$REBALANCE_CLI" doctor
         ;;
-    test|verify)
-        validate_environment
-        ;;
+    verify|test)    validate_environment ;;
     *)
-        echo "Usage: $0 {up|down|restart|status|doctor|verify}"
-        exit 1
+        echo "Usage: $0 {up [--force]|down|restart|status|doctor|verify|purge}"
+        exit 2
         ;;
 esac

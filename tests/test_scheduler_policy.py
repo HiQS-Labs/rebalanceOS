@@ -260,6 +260,37 @@ class TestPlistTemplates(unittest.TestCase):
                 f"{job}: StartCalendarInterval diverged from SCHEDULER.md policy",
             )
 
+    def test_obsidian_daily_sync_fires_before_git_pulse_synthesis(self):
+        """The ordering dependency was enforced only by a comment (GH-175).
+
+        git-pulse-daily-synthesis appends its block to the same daily note and
+        must land AFTER the GH-112 AI Daily Summary block, so obsidian-daily-sync
+        has to fire first. test_cadence_matches_policy pins each job's clock time
+        to SCHEDULER.md independently, which means an edit that moved BOTH would
+        keep passing while silently inverting them. Assert the relationship, not
+        just the two values.
+
+        GH-59: git-pulse-daily-synthesis is the job that was missing from the
+        first stack.sh manifest, so installing it is exactly when an inversion
+        would first bite.
+        """
+
+        def only_fire_time(job):
+            intervals = _intervals(_parse(job))
+            self.assertEqual(
+                len(intervals), 1, f"{job}: expected a single daily fire time"
+            )
+            return intervals[0]["Hour"] * 60 + intervals[0]["Minute"]
+
+        earlier = only_fire_time("obsidian-daily-sync")
+        later = only_fire_time("git-pulse-daily-synthesis")
+        self.assertLess(
+            earlier,
+            later,
+            "obsidian-daily-sync must fire BEFORE git-pulse-daily-synthesis, or the "
+            "Git Pulse block lands above the AI Daily Summary block (SCHEDULER.md, GH-175)",
+        )
+
     def test_run_at_load_and_keep_alive(self):
         for job, spec in POLICY.items():
             plist = _parse(job)

@@ -1,0 +1,262 @@
+"""Behavioural tests for scripts/stack.sh (GH-59 Phase 1).
+
+The script is the single control plane for the launchd fleet, so its failure
+mode is unloading jobs and not bringing them back — precisely the silent outage
+GH-59 exists to fix. These tests pin the four properties that make it safe to
+run:
+
+1. its managed set IS SCHEDULER.md, byte for byte the same list doctor parses;
+2. anything outside that set is never unloaded or deleted (the three preserved
+   3-Eyes plists depend on this);
+3. `down` is non-destructive — only `purge` removes a plist;
+4. job lookup is an exact match, so `health-check` cannot pick up
+   `health-check-triage`'s launchctl row.
+
+They run without touching the real fleet: HOME is redirected to a tmpdir,
+STACK_LAUNCHCTL_OUTPUT supplies a fixed `launchctl list` table, and
+STACK_LAUNCHCTL_BIN replaces launchctl with a recording stub. All three are
+required. Redirecting HOME alone is NOT enough and an earlier draft of this
+file proved it the hard way: `launchctl unload <path>` resolves the job from the
+Label inside the file, so a fixture plist labelled com.rebalance-os.vault-sync
+in a temp HOME unloaded the REAL vault-sync on the developer's machine. The stub
+is the actual isolation boundary; the tmpdir only keeps the files tidy.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import unittest
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+STACK = REPO / "scripts" / "stack.sh"
+PREFIX = "com.rebalance-os."
+
+# A launchctl table covering the collision case: health-check and
+# health-check-triage differ only by suffix, and their rows disagree.
+#
+# The TRIAGE ROW IS DELIBERATELY FIRST. A substring match for "health-check"
+# hits both rows; if the longer label sorts second, a `grep … | head -1` picks
+# the right row by luck and the collision stays invisible. Ordering it first
+# makes both shapes of the bug — two rows into a one-row parse, and head -1
+# taking the wrong one — produce a wrong answer. Verified by reintroducing each
+# variant and watching this test fail.
+LAUNCHCTL_FIXTURE = "\n".join(
+    [
+        "PID\tStatus\tLabel",
+        f"-\t99\t{PREFIX}health-check-triage",
+        f"-\t0\t{PREFIX}health-check",
+        f"4242\t0\t{PREFIX}pulse-server",
+        f"-\t1\t{PREFIX}github-sync",
+        f"-\t0\t{PREFIX}3eyes.selfcheck",
+    ]
+)
+
+
+def make_launchctl_stub(home: Path) -> Path:
+    """A launchctl that records its arguments instead of touching the fleet."""
+    stub = home / "launchctl-stub.sh"
+    stub.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$HOME/launchctl-calls.log"\nexit 0\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    return stub
+
+
+def run_stack(*args: str, home: Path, extra_env: dict[str, str] | None = None):
+    env = dict(os.environ)
+    env["HOME"] = str(home)
+    env["STACK_LAUNCHCTL_OUTPUT"] = LAUNCHCTL_FIXTURE
+    env["STACK_LAUNCHCTL_BIN"] = str(make_launchctl_stub(home))
+    if extra_env:
+        env.update(extra_env)
+    return subprocess.run(
+        ["bash", str(STACK), *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(REPO),
+    )
+
+
+def strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+class StackScriptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self._tmp.name)
+        self.agents = self.home / "Library" / "LaunchAgents"
+        self.agents.mkdir(parents=True)
+        self.addCleanup(self._tmp.cleanup)
+
+    def write_plist(self, label_suffix: str, root: str = "/Users/noelsaw/rebalance-runtime") -> Path:
+        path = self.agents / f"{PREFIX}{label_suffix}.plist"
+        path.write_text(
+            "<?xml version='1.0' encoding='UTF-8'?>\n"
+            "<plist version='1.0'><dict>\n"
+            f"  <key>Label</key><string>{PREFIX}{label_suffix}</string>\n"
+            "  <key>ProgramArguments</key><array>\n"
+            f"    <string>{root}/scripts/{label_suffix.replace('-', '_')}.sh</string>\n"
+            "  </array>\n"
+            "</dict></plist>\n",
+            encoding="utf-8",
+        )
+        return path
+
+    # -- 1. the managed set is SCHEDULER.md ---------------------------------
+
+    def test_managed_set_matches_doctors_policy_parse(self):
+        """stack.sh and doctor must agree on the job list, or `down` has a
+        different idea of 'managed' than `doctor` has of 'required'."""
+        import sys
+
+        sys.path.insert(0, str(REPO / "src"))
+        from rebalance.doctor import _scheduler_policy_jobs
+
+        expected = set(_scheduler_policy_jobs(REPO / "SCHEDULER.md"))
+        self.assertTrue(expected, "SCHEDULER.md policy table parsed as empty")
+
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        table = out.split("BOUND TO", 1)[1]
+        table = table.split("managed:", 1)[0]
+        seen = {
+            line.split()[0]
+            for line in table.splitlines()
+            if line.strip() and not line.startswith("-")
+        }
+        self.assertEqual(seen, expected)
+
+    def test_status_reports_the_full_policy_count(self):
+        import sys
+
+        sys.path.insert(0, str(REPO / "src"))
+        from rebalance.doctor import _scheduler_policy_jobs
+
+        count = len(_scheduler_policy_jobs(REPO / "SCHEDULER.md"))
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        self.assertIn(f"managed: {count}", out)
+
+    # -- 2. unmanaged plists are shown but never touched --------------------
+
+    def test_unmanaged_plists_are_listed_separately(self):
+        self.write_plist("3eyes.selfcheck")
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        head, _, tail = out.partition("Unmanaged")
+        self.assertTrue(tail, "unmanaged section missing from status output")
+        self.assertNotIn("3eyes.selfcheck", head)
+        self.assertIn("3eyes.selfcheck", tail)
+
+    def test_purge_refuses_to_delete_an_unmanaged_plist(self):
+        """The negative control. The three deferred 3-Eyes plists are kept on
+        disk deliberately; a glob over com.rebalance-os.* would eat them."""
+        preserved = self.write_plist("3eyes.selfcheck")
+        managed = self.write_plist("vault-sync")
+
+        result = run_stack("purge", home=self.home)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        self.assertTrue(
+            preserved.exists(),
+            "purge deleted an unmanaged plist — 3-Eyes preservation is broken",
+        )
+        self.assertFalse(managed.exists(), "purge failed to remove a managed plist")
+        self.assertNotIn("3eyes", strip_ansi(result.stdout))
+
+    # -- 3. down is non-destructive ----------------------------------------
+
+    def test_down_unloads_but_keeps_the_plist(self):
+        """`restart` is down-then-up. If `down` deleted plists, a failed `up`
+        would leave the machine with no agents at all."""
+        managed = self.write_plist("vault-sync")
+        result = run_stack("down", home=self.home)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(
+            managed.exists(),
+            "down deleted a plist — a failed restart would strand the fleet",
+        )
+        self.assertIn("plists kept", strip_ansi(result.stdout))
+
+    # -- 4. exact-match job lookup -----------------------------------------
+
+    def test_health_check_does_not_absorb_the_triage_row(self):
+        """A substring grep matches both labels, returns two launchctl rows,
+        and reports garbage for each. Regression pin for defect #5."""
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        rows = {
+            line.split()[0]: line.split()
+            for line in out.splitlines()
+            if line.strip().startswith(("health-check", "pulse-server", "github-sync"))
+        }
+
+        self.assertIn("health-check", rows)
+        self.assertIn("health-check-triage", rows)
+        # health-check's fixture row is exit 0; triage's is 99. A substring
+        # match collapses them and loses one of the two.
+        self.assertEqual(rows["health-check"][2], "0")
+        self.assertEqual(rows["health-check-triage"][2], "99")
+        self.assertIn("ERROR", " ".join(rows["health-check-triage"]))
+        self.assertNotIn("ERROR", " ".join(rows["health-check"]))
+
+    def test_running_and_failing_states_are_distinguished(self):
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        for line in out.splitlines():
+            fields = line.split()
+            if fields[:1] == ["pulse-server"]:
+                self.assertEqual(fields[1], "4242")
+                self.assertIn("RUNNING", line)
+            if fields[:1] == ["github-sync"]:
+                self.assertIn("ERROR (1)", line)
+
+    # -- 5. the target-root guard ------------------------------------------
+
+    def test_status_reports_a_foreign_binding(self):
+        """`up` derives its root from its own location, so running it from the
+        wrong checkout migrates the whole fleet. status must make that visible
+        before anyone runs up."""
+        self.write_plist("vault-sync", root="/somewhere/else")
+        out = strip_ansi(run_stack("status", home=self.home).stdout)
+        self.assertIn("/somewhere/else", out)
+        self.assertIn(f"Target root: {REPO}", out)
+
+    # -- 6. the tests cannot reach the real fleet ---------------------------
+
+    def test_teardown_only_unloads_plists_inside_the_sandbox(self):
+        """Isolation pin. `launchctl unload <path>` reads the Label from the
+        file, so an unstubbed run here would unload the developer's real jobs —
+        which is exactly what happened before STACK_LAUNCHCTL_BIN existed. Assert
+        every unload target is under this test's HOME."""
+        self.write_plist("vault-sync")
+        self.write_plist("3eyes.selfcheck")
+        run_stack("down", home=self.home)
+
+        calls = (self.home / "launchctl-calls.log").read_text().splitlines()
+        unloads = [c for c in calls if c.startswith("unload ")]
+        self.assertTrue(unloads, "down never called launchctl unload")
+        for call in unloads:
+            target = call.split(" ", 1)[1]
+            self.assertTrue(
+                target.startswith(str(self.home)),
+                f"unload escaped the test sandbox: {target}",
+            )
+        self.assertFalse(
+            [c for c in unloads if "3eyes" in c],
+            "down tried to unload an unmanaged 3-Eyes job",
+        )
+
+    def test_usage_lists_every_dispatcher_command(self):
+        result = run_stack("nonsense-command", home=self.home)
+        self.assertEqual(result.returncode, 2)
+        usage = strip_ansi(result.stdout + result.stderr)
+        for cmd in ("up", "down", "restart", "status", "doctor", "verify", "purge"):
+            self.assertIn(cmd, usage)
+
+
+if __name__ == "__main__":
+    unittest.main()
