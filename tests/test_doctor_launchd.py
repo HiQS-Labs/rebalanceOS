@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from rebalance.doctor import OK, WARN, _check_launchd, _check_scheduler_liveness
+from rebalance.doctor import ERROR, FAIL, OK, WARN, _check_launchd, _check_scheduler_liveness
 from unittest.mock import patch, Mock
 
 
@@ -64,10 +64,19 @@ def test_missing_recent_run_is_stale_unknown_not_current_failure(tmp_path: Path)
     assert "last run exited" not in check.detail
 
 
-def test_job_without_structured_result_keeps_launchctl_behavior(tmp_path: Path) -> None:
+def test_job_without_structured_result_fails_on_nonzero_exit(tmp_path: Path) -> None:
+    """A job with no JSON outcome contract is graded from launchctl alone, and
+    a positive exit with no live PID is a FAIL as of GH-59.
+
+    Contrast with the daily-sync case below, which stays WARN: daily-sync has a
+    structured result that supersedes its sticky launchctl status (GH-146 Root
+    cause A), so when that contract is missing the honest reading is "unknown",
+    not "failed". Here there is no better source and launchctl is the answer.
+    """
     checks = _check_launchd("-\t1\tcom.rebalance-os.github-sync\n", log_dir=tmp_path / "logs", now=NOW)
 
-    assert checks[0].status == WARN
+    assert checks[0].status == FAIL
+    assert checks[0].severity == ERROR
     assert checks[0].detail == "last run exited with status 1"
 
 
