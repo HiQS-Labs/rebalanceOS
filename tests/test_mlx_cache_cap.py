@@ -74,7 +74,13 @@ def mock_mlx_cap():
     mock_embeddings.generate = mock_generate
     mock_embeddings.load = MagicMock(return_value=("mock_model", "mock_tokenizer"))
 
+    # GH-42: _load_model now gates on a real out-of-process Metal probe before it
+    # touches mlx at all. These tests replace mlx wholesale to exercise the CACHE
+    # logic that runs AFTER that gate, so the gate is stubbed open. Without this
+    # they pass on an Apple-Silicon dev box and fail everywhere else (CI/Linux),
+    # which is exactly how the gate first slipped through review.
     with (
+        patch.object(embedder, "metal_available", return_value=True),
         patch.object(mlx, "core", mock_core),
         patch.dict(sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}),
     ):
@@ -274,6 +280,10 @@ def test_degrades_safely_when_mlx_unavailable(caplog, propagating_logs):
     mock_embeddings.load = MagicMock(return_value=("mock_model", "mock_tokenizer"))
 
     with (
+        # This test is about mlx's METHODS raising (set_cache_limit, clear_cache,
+        # telemetry getters), not about the GH-42 device gate — stub the gate open
+        # so the degradation paths below are what is actually being exercised.
+        patch.object(embedder, "metal_available", return_value=True),
         patch.object(mlx, "core", broken),
         patch.dict(sys.modules, {"mlx.core": broken, "mlx_embeddings": mock_embeddings}),
     ):

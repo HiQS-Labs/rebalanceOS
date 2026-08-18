@@ -132,8 +132,7 @@ def _load_model(model_name: str) -> tuple:
 
     if not _require_metal():
         raise MLXUnavailableError(
-            "mlx/Metal is unavailable in this environment (no GPU device) — "
-            "cannot load the embedding model."
+            "mlx/Metal is unavailable in this environment (no GPU device) — cannot load the embedding model."
         )
 
     from mlx_embeddings import load
