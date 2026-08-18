@@ -24,6 +24,13 @@ job.
 | `obsidian-daily-sync` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/obsidian_daily_sync.sh` | `utils/obsidian_daily_sync.py` — Gemini daily-activity summary from the structured pulse snapshot | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block appended to `0. Today's Notes.md`; log in `~/Library/Logs/rebalance-os/` |
 | `git-pulse-daily-synthesis` | daily 18:30 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself; **must stay after `obsidian-daily-sync`** | `utils/git_pulse_daily_synthesis.sh` | `utils/git_pulse_daily_synthesis.py` — Gemini synthesis of `view.sh --today` multi-device git activity (GH-114) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) for the optional vault write | idempotent Git Pulse summary block appended to `0. Today's Notes.md` (if vault configured) AND/OR upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` |
 
+> **Do not put a literal `|` inside a cell of the table above, even escaped as
+> `\|`.** Two consumers split these rows on the pipe character —
+> `doctor._scheduler_policy_jobs` and `scripts/stack.sh`'s `load_policy` — and
+> neither implements Markdown escaping. A pipe inside a cell shifts every column
+> after it, which silently drops a job from the managed set rather than raising
+> an error. Write pipelines as prose, or name the wrapper script instead.
+
 All labels are prefixed `com.rebalance-os.`. Experimental/utility agents
 (`com.user.git-pulse`, `com.user.stickies2obsidian`) live in `experimental/`
 and `utils/stickies-to-obsidian/` with their own installers and are out of

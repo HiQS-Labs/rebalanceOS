@@ -71,6 +71,13 @@ def run_stack(*args: str, home: Path, extra_env: dict[str, str] | None = None):
     env["HOME"] = str(home)
     env["STACK_LAUNCHCTL_OUTPUT"] = LAUNCHCTL_FIXTURE
     env["STACK_LAUNCHCTL_BIN"] = str(make_launchctl_stub(home))
+    # Redirecting HOME also moves the canonical app-data path, so database
+    # resolution fails and validate_environment aborts BEFORE the target-root
+    # guard runs. Without this the guard tests pass vacuously — they see a
+    # non-zero exit from the wrong check. Point the DB somewhere resolvable.
+    db = home / "rebalance.db"
+    db.touch()
+    env["REBALANCE_DB"] = str(db)
     if extra_env:
         env.update(extra_env)
     return subprocess.run(
@@ -216,14 +223,80 @@ class StackScriptTests(unittest.TestCase):
 
     # -- 5. the target-root guard ------------------------------------------
 
-    def test_status_reports_a_foreign_binding(self):
+    def test_status_reports_a_foreign_binding_on_the_owning_row(self):
         """`up` derives its root from its own location, so running it from the
         wrong checkout migrates the whole fleet. status must make that visible
-        before anyone runs up."""
+        before anyone runs up — and on the RIGHT job's row: asserting the string
+        appears somewhere in the output would pass even if it were attributed to
+        the wrong job."""
         self.write_plist("vault-sync", root="/somewhere/else")
         out = strip_ansi(run_stack("status", home=self.home).stdout)
-        self.assertIn("/somewhere/else", out)
         self.assertIn(f"Target root: {REPO}", out)
+
+        rows = [ln for ln in out.splitlines() if ln.startswith("vault-sync ")]
+        self.assertEqual(len(rows), 1, f"expected one vault-sync row, got {rows}")
+        self.assertIn("/somewhere/else", rows[0])
+
+        others = [
+            ln
+            for ln in out.splitlines()
+            if "/somewhere/else" in ln and not ln.startswith("vault-sync ")
+        ]
+        self.assertFalse(others, f"foreign binding leaked onto other rows: {others}")
+
+    def test_up_refuses_when_the_fleet_is_bound_elsewhere(self):
+        self.write_plist("vault-sync", root="/somewhere/else")
+        result = run_stack("up", home=self.home)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bound to a different checkout", strip_ansi(result.stderr))
+
+    def test_unreadable_binding_counts_as_a_conflict(self):
+        """bound_root returns empty when no <string> looks like a checkout path.
+        Treating unknown as "ours" would make the migration guard fail OPEN,
+        which is the one direction a safety check must never fail."""
+        path = self.agents / f"{PREFIX}vault-sync.plist"
+        path.write_text(
+            "<?xml version='1.0'?><plist version='1.0'><dict>\n"
+            "<key>Label</key><string>com.rebalance-os.vault-sync</string>\n"
+            "<key>Program</key><string>/usr/local/bin/python</string>\n"
+            "</dict></plist>\n",
+            encoding="utf-8",
+        )
+        result = run_stack("up", home=self.home)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("binding unreadable", strip_ansi(result.stderr))
+
+    def test_status_survives_a_plist_with_no_string_values(self):
+        """`set -o pipefail` + a grep that matches nothing used to abort the
+        whole script from inside bound_root's command substitution."""
+        path = self.agents / f"{PREFIX}vault-sync.plist"
+        path.write_text(
+            "<?xml version='1.0'?><plist version='1.0'><dict>\n"
+            "<key>Nice</key><integer>5</integer>\n</dict></plist>\n",
+            encoding="utf-8",
+        )
+        result = run_stack("status", home=self.home)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("managed:", strip_ansi(result.stdout))
+
+    def test_restart_preflights_before_tearing_anything_down(self):
+        """restart is down-then-up, and up can abort in preflight. If the
+        preflight ran after the teardown, a failing check would leave the machine
+        with zero agents — the outage this script exists to prevent."""
+        self.write_plist("vault-sync", root="/somewhere/else")
+        result = run_stack("restart", home=self.home)
+
+        self.assertNotEqual(result.returncode, 0, "restart should refuse a foreign binding")
+        calls_log = self.home / "launchctl-calls.log"
+        calls = calls_log.read_text().splitlines() if calls_log.exists() else []
+        self.assertFalse(
+            [c for c in calls if c.startswith("unload ")],
+            f"restart unloaded jobs before its preflight failed: {calls}",
+        )
+        self.assertTrue(
+            (self.agents / f"{PREFIX}vault-sync.plist").exists(),
+            "restart removed a plist despite aborting",
+        )
 
     # -- 6. the tests cannot reach the real fleet ---------------------------
 

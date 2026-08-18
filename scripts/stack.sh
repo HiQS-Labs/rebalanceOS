@@ -93,7 +93,10 @@ plist_path() { echo "$AGENTS_DIR/${LABEL_PREFIX}$1.plist"; }
 # {{REBALANCE_DIR}} at least once, so this is defined for all of them.
 bound_root() {
     [ -f "$1" ] || return 0
-    /usr/bin/grep -o '<string>[^<]*</string>' "$1" 2>/dev/null \
+    # `|| true` is load-bearing: with `set -o pipefail`, a plist containing no
+    # <string> makes grep exit 1, which propagates out of the function and, via
+    # `root=$(bound_root ...)` under `set -e`, kills the whole script.
+    { /usr/bin/grep -o '<string>[^<]*</string>' "$1" 2>/dev/null || true; } \
         | /usr/bin/sed 's|<string>||; s|</string>||' \
         | /usr/bin/sed -nE 's#^(/.+)/(scripts|utils|\.venv|temp)/.*#\1#p' \
         | head -1
@@ -220,7 +223,12 @@ check_target_root() {
         dest=$(plist_path "$name")
         [ -f "$dest" ] || continue
         root=$(bound_root "$dest")
-        if [ -n "$root" ] && [ "$root" != "$REBALANCE_DIR" ]; then
+        if [ -z "$root" ]; then
+            # Unreadable binding. Treating "unknown" as "ours" would let a guard
+            # against fleet migration fail open, which is the one direction a
+            # safety check must never fail.
+            conflicts+=("$name -> (binding unreadable)")
+        elif [ "$root" != "$REBALANCE_DIR" ]; then
             conflicts+=("$name -> $root")
         fi
     done
@@ -243,15 +251,25 @@ check_target_root() {
 # ------------------------------------------------------------------------------
 # up
 # ------------------------------------------------------------------------------
+# Preflight is idempotent and remembers it passed, so `restart` can run it
+# BEFORE tearing anything down without paying for it twice.
+PREFLIGHT_DONE=0
+run_preflight() {
+    [ "$PREFLIGHT_DONE" = "1" ] && return 0
+    validate_environment || return 1
+    echo
+    check_target_root "${1:-0}" || return 1
+    PREFLIGHT_DONE=1
+    return 0
+}
+
 stack_up() {
     local force="${1:-0}"
     echo "================================================================================"
     echo "                rebalance OS — Bootstrapping Background Stack                   "
     echo "================================================================================"
 
-    validate_environment || exit 1
-    echo
-    check_target_root "$force" || exit 1
+    run_preflight "$force" || exit 1
     echo
 
     log_info "Installing and loading ${#JOB_NAMES[@]} LaunchAgents..."
@@ -413,7 +431,16 @@ case "$cmd" in
     up|boot|start)  stack_up "$FORCE" ;;
     down|stop)      stack_down 0 ;;
     purge)          stack_down 1 ;;
-    restart|reload) stack_down 0; echo; stack_up "$FORCE" ;;
+    restart|reload)
+        # Preflight FIRST. `restart` used to unload everything and only then
+        # discover that `up` could not run, leaving the machine with no agents
+        # at all — the exact silent outage this script exists to prevent.
+        run_preflight "$FORCE" || exit 1
+        echo
+        stack_down 0
+        echo
+        stack_up "$FORCE"
+        ;;
     status|ps)      stack_status ;;
     doctor)
         if [ ! -x "$REBALANCE_CLI" ]; then
