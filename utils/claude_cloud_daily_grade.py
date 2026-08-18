@@ -20,7 +20,7 @@ import datetime as dt
 import sys
 from pathlib import Path
 
-# Reuse the rollover module's vault config (same pattern as git_pulse_daily_synthesis).
+# Reuse the rollover module's vault config (same pattern as daily_synthesis).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from obsidian_daily_rollover import TODAY_FILE, vault_ready  # noqa: E402
 

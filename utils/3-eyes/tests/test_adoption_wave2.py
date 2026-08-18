@@ -20,8 +20,8 @@ ADOPTED = {
         "label": "com.rebalance-os.pulse-warning-watch",
         "calendar": [{"Minute": minute} for minute in (7, 22, 37, 52)],
     },
-    "obsidian-daily-sync": {
-        "label": "com.rebalance-os.obsidian-daily-sync",
+    "daily-synthesis": {
+        "label": "com.rebalance-os.daily-synthesis",
         "calendar": {"Hour": 18, "Minute": 20},
     },
     "obsidian-rollover": {

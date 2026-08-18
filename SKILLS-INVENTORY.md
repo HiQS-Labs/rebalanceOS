@@ -39,7 +39,7 @@ GH-106 discussion: another agent may be actively updating it).
 | `git-pulse-team-recap` | skill | Same, for a *team* recap covering everyone's activity on a remote repo | Rebalance |
 | `ask_self` | command | Query the ask-self RAG index for this repo | Rebalance |
 | `reingest` | command | Refresh the ask-self RAG index for this repo | Rebalance |
-| `git-pulse-daily-synthesis` | skill | Generate a daily Gemini summary of multi-device Git Pulse activity into today's Obsidian note | Rebalance |
+| `git-pulse-daily-synthesis` | skill | Generate the daily vault synthesis (pulse activity, then multi-device Git Pulse activity) into today's Obsidian note | Rebalance |
 | `rebalance` | skill | Morning "what am I working on" brief fusing the ranked next-actions verdict with a device-wide recent-git-activity scan | Rebalance |
 | `unlock-suite` | skill | Cross-repo issue triage — which open issues, closed first, most unblock the whole suite | Rebalance |
 

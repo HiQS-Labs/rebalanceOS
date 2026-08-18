@@ -59,10 +59,10 @@ exec = ".venv/bin/python"
 args = ["scripts/pulse_warning_watch.py", "--url", "http://127.0.0.1:8767/", "--log", "temp/pulse-warning-watch.jsonl", "--state", "temp/pulse-warning-watch.state.json"]
 description = "Incumbent Rebalance local pulse health-banner watcher."
 
-[commands.obsidian-daily-sync]
-exec = "utils/obsidian_daily_sync.sh"
+[commands.daily-synthesis]
+exec = "utils/daily_synthesis.sh"
 args = []
-description = "Incumbent Rebalance daily Obsidian activity-summary wrapper."
+description = "Incumbent Rebalance daily vault synthesis wrapper (pulse + git-pulse, GH-74)."
 
 [commands.obsidian-rollover]
 exec = "utils/obsidian_rollover.sh"

@@ -10,6 +10,29 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.6] - 2026-08-18
+
+### Changed
+
+- The two jobs that wrote to the bottom of the daily Obsidian note — one summarizing the day's
+  pulse activity, the other summarizing multi-device git activity — are now one job. They used
+  to be scheduled ten minutes apart for no reason but ordering: the second had to fire after the
+  first purely so its block landed below, and that guarantee lived entirely in two independent
+  launchd fire times staying in sync, which a sleep/wake catch-up could invert with nothing
+  erroring. Both syntheses now run in one process, in order, so the block order is a property of
+  the code instead of the scheduler. Same vault file, same two block markers, same optional CLIO
+  export — a device with the old two jobs installed needs to swap them for the merged one (see
+  UPGRADE.md).
+
+### Fixed
+
+- `scripts/health_issue_reporter.py` crashed with an unhandled exception when GitHub's hourly
+  rate limit was exhausted mid-run: the same HTTP 403 GitHub returns for a revoked token was
+  raised as an undifferentiated error, so a healthy, merely-throttled token looked like a crash
+  bug. Rate-limit exhaustion is now detected and the run backs off cleanly, logging the reset
+  window instead of dying on it — the health check that files GitHub issues no longer files one
+  against itself for the same reason twice.
+
 ## [0.73.5] - 2026-08-18
 
 ### Fixed

@@ -168,30 +168,20 @@ POLICY = {
         "wrapper_must_contain": ["obsidian_daily_rollover.py"],
         "doc_tokens": ["daily 00:40", "obsidian_rollover.sh"],
     },
-    "obsidian-daily-sync": {
-        # 18:20, not 18:00 (GH-175) — 18:00 collided with hourly pulse-sync.
-        # MUST stay before git-pulse-daily-synthesis; see its note below.
+    "daily-synthesis": {
+        # 18:20, not 18:00 (GH-175 — inherited from the obsidian-daily-sync half
+        # this job absorbed). GH-74 merged the former obsidian-daily-sync (18:20)
+        # and git-pulse-daily-synthesis (18:30) into one process, one job: the
+        # ordering dependency between the two blocks is now guaranteed by code
+        # (pulse block upserted before git-pulse block in the same run), not by
+        # keeping two launchd fire times in sync.
         "calendar": [{"Hour": 18, "Minute": 20}],
         # Loading should not fire an off-schedule summary write.
         "run_at_load": False,
         "keep_alive": False,
-        "wrapper": "utils/obsidian_daily_sync.sh",
-        "wrapper_must_contain": ["obsidian_daily_sync.py"],
-        "doc_tokens": ["daily 18:20", "obsidian_daily_sync.sh"],
-    },
-    "git-pulse-daily-synthesis": {
-        # 10 minutes after obsidian-daily-sync (18:20) so, when both destinations
-        # are configured, this block lands after the GH-112 AI Daily Summary block.
-        # ORDERING DEPENDENCY: this must fire AFTER obsidian-daily-sync. Moved
-        # 18:05 -> 18:30 with it in GH-175; changing either without the other
-        # inverts the order and the Git Pulse block lands above the AI summary.
-        "calendar": [{"Hour": 18, "Minute": 30}],
-        # Loading should not fire an off-schedule summary write.
-        "run_at_load": False,
-        "keep_alive": False,
-        "wrapper": "utils/git_pulse_daily_synthesis.sh",
-        "wrapper_must_contain": ["git_pulse_daily_synthesis.py"],
-        "doc_tokens": ["daily 18:30", "git_pulse_daily_synthesis.sh"],
+        "wrapper": "utils/daily_synthesis.sh",
+        "wrapper_must_contain": ["daily_synthesis.py"],
+        "doc_tokens": ["daily 18:20", "daily_synthesis.sh"],
     },
 }
 
@@ -206,8 +196,7 @@ INSTALLERS = {
     "health-check": "install_health_check_scheduler.sh",
     "health-check-triage": "install_health_check_triage_scheduler.sh",
     "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
-    "obsidian-daily-sync": "install_obsidian_daily_sync_scheduler.sh",
-    "git-pulse-daily-synthesis": "install_git_pulse_daily_synthesis_scheduler.sh",
+    "daily-synthesis": "install_daily_synthesis_scheduler.sh",
 }
 
 
@@ -259,35 +248,6 @@ class TestPlistTemplates(unittest.TestCase):
                 spec["calendar"],
                 f"{job}: StartCalendarInterval diverged from SCHEDULER.md policy",
             )
-
-    def test_obsidian_daily_sync_fires_before_git_pulse_synthesis(self):
-        """The ordering dependency was enforced only by a comment (GH-175).
-
-        git-pulse-daily-synthesis appends its block to the same daily note and
-        must land AFTER the GH-112 AI Daily Summary block, so obsidian-daily-sync
-        has to fire first. test_cadence_matches_policy pins each job's clock time
-        to SCHEDULER.md independently, which means an edit that moved BOTH would
-        keep passing while silently inverting them. Assert the relationship, not
-        just the two values.
-
-        GH-59: git-pulse-daily-synthesis is the job that was missing from the
-        first stack.sh manifest, so installing it is exactly when an inversion
-        would first bite.
-        """
-
-        def only_fire_time(job):
-            intervals = _intervals(_parse(job))
-            self.assertEqual(len(intervals), 1, f"{job}: expected a single daily fire time")
-            return intervals[0]["Hour"] * 60 + intervals[0]["Minute"]
-
-        earlier = only_fire_time("obsidian-daily-sync")
-        later = only_fire_time("git-pulse-daily-synthesis")
-        self.assertLess(
-            earlier,
-            later,
-            "obsidian-daily-sync must fire BEFORE git-pulse-daily-synthesis, or the "
-            "Git Pulse block lands above the AI Daily Summary block (SCHEDULER.md, GH-175)",
-        )
 
     def test_run_at_load_and_keep_alive(self):
         for job, spec in POLICY.items():

@@ -1239,7 +1239,7 @@ def get_pulse_config() -> dict[str, Any]:
       - git_pulse_clio_enabled: opt-in flag for the GH-114 git-pulse daily
         synthesis to ALSO (not instead of) upsert into a growing log file
         inside pulse_target_path, independent of whether the Obsidian vault
-        is configured. Default: False. See utils/git_pulse_daily_synthesis.py.
+        is configured. Default: False. See utils/daily_synthesis.py.
       - git_pulse_clio_subdir: subfolder within pulse_target_path for that
         log file (default: "CLIO").
       - git_pulse_clio_filename: filename of that log file within the

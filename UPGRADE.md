@@ -69,7 +69,7 @@ serves stale code indefinitely if you don't restart it:
 | `com.rebalance-os.pulse-server` | `KeepAlive` daemon — HTTP server on **:8767** that Focus 5 Float and the web pulse read from | **Must** be restarted — it holds its imported modules in memory and never re-execs on its own |
 
 Every other job (`daily-sync`, `github-sync`, `vault-sync`, `pulse-sync`,
-`pulse-web-sync`, `pulse-warning-watch`, `git-pulse-daily-synthesis`, the
+`pulse-web-sync`, `pulse-warning-watch`, `daily-synthesis`, the
 `obsidian-*` and `health-check*` jobs) is `KeepAlive=false` + `StartCalendarInterval`:
 it re-execs from scratch on its **next scheduled tick** and self-heals onto new code
 with no action. The kickstart loop in step 2 just makes that immediate instead of
@@ -418,6 +418,35 @@ re-rendered.
 > not address run-window *overlap* — `daily-sync` runs ~25–30 minutes from 06:30
 > and still spans `github-sync` at :45. That overlap was handled separately by
 > GH-131's bounded SQLite retry and is deliberately unchanged.
+
+### `obsidian-daily-sync` + `git-pulse-daily-synthesis` merged into `daily-synthesis` (GH-74)
+
+> **Required if this device still has the two old jobs installed.** `git pull`
+> does not remove or rename an already-installed plist — a device that ran the
+> GH-175 steps above keeps `com.rebalance-os.obsidian-daily-sync` and
+> `com.rebalance-os.git-pulse-daily-synthesis` loaded until you uninstall them.
+
+The two jobs existed only because the second had to fire 10 minutes after the
+first so its block landed below (an ordering dependency enforced by two launchd
+fire times, not by anything in the code). They're now one process — the pulse
+summary is upserted before the git-pulse summary in a single run, so the order
+no longer depends on scheduling at all. See `utils/daily_synthesis.py`'s module
+docstring for the full contract.
+
+```bash
+# 1. Uninstall the two old jobs.
+launchctl unload ~/Library/LaunchAgents/com.rebalance-os.obsidian-daily-sync.plist
+launchctl unload ~/Library/LaunchAgents/com.rebalance-os.git-pulse-daily-synthesis.plist
+rm ~/Library/LaunchAgents/com.rebalance-os.obsidian-daily-sync.plist
+rm ~/Library/LaunchAgents/com.rebalance-os.git-pulse-daily-synthesis.plist
+
+# 2. Install the merged job (fires at 18:20, same slot obsidian-daily-sync used).
+./scripts/install_daily_synthesis_scheduler.sh
+```
+
+Nothing else changes: same vault target, same two block markers/headings
+(so an existing "0. Today's Notes.md" with either block already in it keeps
+upserting in place), same optional CLIO export.
 
 ### Guarding non-Python jobs
 

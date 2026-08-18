@@ -10,7 +10,7 @@ learned belong there at ship time, not duplicated here). Contract lives in PROJE
 issues the release closes. The prose is not decoration: under the public repo's fresh single-commit
 history there is no issue tracker to resolve the numbers against, so a bare manifest reads as
 pointers to nothing. `Exit:` is the one observable that decides whether it shipped. Both stay on a
-single line. Issue state verified 2026-08-18 against HiQS-Suite/rebalanceOS, the live repo (#55 retires the old one).
+single line. Issue state verified 2026-08-14.
 
 > **`#nnn` and `GH-nnn` refer to this project's internal issue tracker.** They are retained as
 > historical labels, not links — in the public repository they do not resolve to anything, and that
@@ -35,9 +35,9 @@ Status: Draft
 Target Date: 2026-09-15
 Codename: Green Board
 Milestone:
-Description: The first release a stranger can clone and succeed with — published to a new public repository under its own organization, with install, onboarding and secret-scanning proven rather than assumed. #66 release-gate tracker (front-door, shakedown, TruffleHog), #67 working-directory-dependent tests. Both carry forward work the retiring repo tracked as #276 and #255; its #275, #273 and #242 were re-verified against this tree on 2026-08-18 and are already fixed here, and #178/#225 are confirmed stale — evidence in #66. 3-Eyes excluded by operator decision as diagnostics rather than core. Scope QA'd by cross-model relay 2026-08-15 (Approved r5), remap QA'd 2026-08-18.
-Exit: A clean clone on a machine that has never run rebalance completes the documented README Getting Started path end to end — install, onboarding, first pulse — with no undocumented step, and `rebalance doctor` then reports no FAIL. Verified on one Apple Silicon host — macOS-first launch by operator decision 2026-08-15; Linux/Windows are documented as work in progress rather than gated, after a Docker pre-flight showed stock Ubuntu images ship no `python3` at all and 22.04 cannot reach the 3.12 floor from its own archive. `/front-door`, `/shakedown` and a full-history TruffleHog scan are gates tracked in #66, evidence retained.
-GH_URL: https://github.com/HiQS-Suite/rebalanceOS/issues/66
+Description: The first release a stranger can clone and succeed with — published to a new public repository under its own organization, with install, onboarding and secret-scanning proven rather than assumed. #276 release-gate tracker (front-door, shakedown, TruffleHog), #275 README Step 1 hardcodes a Homebrew interpreter (RC blocker), #273 date parsing has two canonical hubs, #242 CLIO suites report a vacuous dual-interpreter pass, #255 working-directory-dependent tests. Scope QA'd by cross-model relay 2026-08-15 (Approved r5); #178 and #225 verified stale and closeable, 3-Eyes excluded by operator decision as diagnostics rather than core.
+Exit: A clean clone on a machine that has never run rebalance completes the documented README Getting Started path end to end — install, onboarding, first pulse — with no undocumented step, and `rebalance doctor` then reports no FAIL. Verified on one Apple Silicon host — macOS-first launch by operator decision 2026-08-15; Linux/Windows are documented as work in progress rather than gated, after a Docker pre-flight showed stock Ubuntu images ship no `python3` at all and 22.04 cannot reach the 3.12 floor from its own archive. `/front-door`, `/shakedown` and a full-history TruffleHog scan are gates tracked in #276, evidence retained.
+GH_URL: https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/275
 Front-door reviewed:
 Shakedown reviewed:
 License file: Yes
@@ -100,8 +100,8 @@ Status: Draft
 Target Date: 2027-02-15
 Codename: Fleet Engine
 Milestone:
-Description: Unified fleet collection, streamlined scheduler topology, shared presentation layer, and multi-signal auto-promotion. #29 shared SQL read layer and web app mount, #23 pulse/fleet collector stack consolidation, #22 Mac Studio scheduler jobs reload, #4 Mac Studio pulse collector conflict recovery, #1 sustained-activity auto-promotion engine.
-Exit: Pulse collection consolidated into 3 supervised launchd jobs; Mac Studio device heartbeat fresh (<1h) with zero doctor alerts; multi-signal 5-action auto-promotion operational with 20h burst guard.
+Description: Unified fleet collection, streamlined scheduler topology, shared presentation layer, and multi-signal auto-promotion. #29 shared SQL read layer and web app mount, #23 pulse/fleet collector stack consolidation, #22 Mac Studio scheduler jobs reload, #4 Mac Studio pulse collector conflict recovery, #1 sustained-activity auto-promotion engine, #74 consolidate the dual end-of-day LLM vault synthesis jobs into one pipeline.
+Exit: Pulse collection consolidated into 3 supervised launchd jobs; Mac Studio device heartbeat fresh (<1h) with zero doctor alerts; multi-signal 5-action auto-promotion operational with 20h burst guard; the 18:20/18:30 obsidian-daily-sync + git-pulse-daily-synthesis pair replaced by one launchd job that runs both syntheses in-process, so block order no longer depends on launchd scheduling.
 GH_URL:
 Front-door reviewed:
 Shakedown reviewed:
