@@ -26,6 +26,7 @@ twice.
 
 from __future__ import annotations
 
+import io
 import unittest
 import urllib.error
 from types import SimpleNamespace
@@ -240,3 +241,51 @@ class RemainingAttributionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SummaryReachesTheLogTests(unittest.TestCase):
+    """Instrumentation nobody can read is not instrumentation.
+
+    Discovered on a live run: `github-sync` ran 46 minutes, completed cleanly, computed a full
+    summary — and wrote none of it anywhere. The summary went out through `logger.info`, the
+    launchd wrappers configure no logging, so the effective level was WARNING and every line was
+    discarded inside the process. That had been true of the request attribution since it was
+    written, so it had never once appeared in a production log.
+    """
+
+    def setUp(self):
+        _http._JOB_ATTRIBUTION.clear()
+        clock = _Clock()
+        _patch_clock(self, clock)
+        self.clock = clock
+
+    def _run_one_request(self):
+        with patch.object(
+            _http.urllib.request, "urlopen", side_effect=lambda *a, **k: _FakeResponse(self.clock, seconds=1.0)
+        ):
+            _client().get("/user/repos")
+
+    def test_the_summary_reaches_stderr_when_logging_is_unconfigured(self):
+        """The production case: a launchd wrapper running `... >> "$LOG_FILE" 2>&1`."""
+        self._run_one_request()
+        with patch.object(_http.logger, "isEnabledFor", return_value=False):
+            with patch("sys.stderr", new=io.StringIO()) as captured:
+                _http._emit_job_summaries()
+        written = captured.getvalue()
+        self.assertIn("github_http_job_summary", written)
+        self.assertIn("total_seconds", written, "the payload, not just the label, has to land")
+
+    def test_nothing_is_duplicated_when_logging_is_configured(self):
+        """A caller that does configure INFO must not get the summary twice."""
+        self._run_one_request()
+        with patch.object(_http.logger, "isEnabledFor", return_value=True):
+            with patch("sys.stderr", new=io.StringIO()) as captured:
+                _http._emit_job_summaries()
+        self.assertEqual(captured.getvalue(), "")
+
+    def test_a_job_that_made_no_requests_stays_silent(self):
+        """Every process importing this module would otherwise emit an empty summary."""
+        with patch.object(_http.logger, "isEnabledFor", return_value=False):
+            with patch("sys.stderr", new=io.StringIO()) as captured:
+                _http._emit_job_summaries()
+        self.assertEqual(captured.getvalue(), "")

@@ -37,6 +37,7 @@ import json
 import logging
 import os
 import random
+import sys
 import threading
 import time
 import urllib.error
@@ -184,7 +185,17 @@ class _RequestAttribution:
             if not self.attempts or self._emitted_attempts == self.attempts:
                 return
             self._emitted_attempts = self.attempts
-        logger.info("github_http_job_summary %s", json.dumps(self.snapshot(), sort_keys=True))
+        payload = json.dumps(self.snapshot(), sort_keys=True)
+        logger.info("github_http_job_summary %s", payload)
+        # The summary is diagnostic output whose whole purpose is to be read after an unattended
+        # run, and going only through logger.info meant it never was: the launchd wrappers
+        # configure no logging, so the effective level is WARNING and every one of these was
+        # discarded in-process. A 46-minute github-sync completed with a full summary computed
+        # and not one line of it on disk. stderr is where the wrappers already point (they run
+        # the job with `>> "$LOG_FILE" 2>&1`), so this reaches the log without asking every
+        # caller to remember to configure logging first.
+        if not logger.isEnabledFor(logging.INFO):
+            print(f"github_http_job_summary {payload}", file=sys.stderr, flush=True)
 
 
 _JOB_ATTRIBUTION: dict[tuple[str, str], _RequestAttribution] = {}

@@ -10,6 +10,31 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.5] - 2026-08-18
+
+### Fixed
+
+- Diagnostic summaries for background GitHub work were being computed and then discarded. They
+  were written through the logging system at a level nothing had switched on, and the scheduled
+  jobs configure no logging at all, so every one was dropped inside the process that made it. A
+  forty-six minute sync completed cleanly with a full summary computed and not one line of it on
+  disk — and this had been true since the summaries were first added, so none had ever reached a
+  log. They now also go to the error stream, which is where the job wrappers already point.
+- A doctor test had a two-day shelf life and has now expired. It pinned a fixed date for its
+  fixture but let the program read the real clock, so its "synced an hour ago" became "synced
+  fifty-two hours ago" and fell outside the window it was testing. It failed for the first time
+  today and would have failed every day after. The clock is now pinned alongside the fixture,
+  which keeps the rule it actually checks — that a recent success hides a warning — instead of
+  loosening the assertion to match a calendar artifact.
+
+### Changed
+
+- The release ledger's next planned release pointed at issue numbers belonging to the repository
+  this project is retiring, so none of them resolved and the release had no verifiable scope.
+  Each was re-checked against the current tree rather than against the old tracker: four are
+  already fixed here and are recorded as such, two were confirmed stale, and the two that
+  represent real remaining work are carried over as new issues in the live tracker.
+
 ## [0.73.4] - 2026-08-18
 
 ### Fixed
