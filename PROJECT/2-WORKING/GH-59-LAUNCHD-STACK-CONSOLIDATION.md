@@ -4,13 +4,13 @@ status: "Draft"
 created: 2026-08-17
 updated: 2026-08-17
 owner: noel
-goal: "One control plane for the launchd fleet, doctor failures that actually fail, and a GitHub sync that fits inside its hourly budget."
+goal: "One control plane for the launchd fleet, and doctor failures that actually fail."
 gh_issue: 59
 related: [58, 60, 61, 62, 54]
 effort: 2
 complexity: 2
 risk: 2
-phases: 4
+phases: 3
 ratings_provisional: false
 roadmap_exempt: false
 ---
@@ -21,12 +21,12 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Authored proposals (#58–#62); drafted `scripts/stack.sh` (untracked); measured the live machine and both failing jobs against real logs. | Phase 0: commit `stack.sh`, repoint `pulse_target_path`, load the 3 unloaded agents. |
+| Phases 0-2 shipped: both failing jobs fixed, `stack.sh` is the control plane, and a failed job now makes `doctor` exit 1. Rate-limit attribution measured. | Open the PR. Phase 3 is not built — the measurement went against it (see Phase 3). |
 
 ## Quad Concepts
 - 12 installer scripts and no way to ask "is the stack up?" → one `scripts/stack.sh` control plane.
 - Two jobs broken for a day with nothing reporting it → crashed jobs grade `FAIL`, and `FAIL` is never suppressed.
-- An hourly GitHub crawl that costs more than an hour's rate-limit budget → hourly scans Band A, daily scans everything.
+- An hourly GitHub crawl assumed to blow its rate-limit budget → measured at ~24 requests per run, so the throttle was never built and the real problem (minutes-long single requests) is named instead.
 - A plan built on guesses → every claim below was checked against the live machine before it was written down.
 
 ## Table of contents
@@ -34,7 +34,7 @@ roadmap_exempt: false
 2. [Phase 0 — Stop the bleeding](#phase-0--stop-the-bleeding)
 3. [Phase 1 — Deterministic stack CLI (`scripts/stack.sh`)](#phase-1--deterministic-stack-cli-scriptsstacksh)
 4. [Phase 2 — Doctor failures that fail](#phase-2--doctor-failures-that-fail)
-5. [Phase 3 — GitHub sync inside its budget](#phase-3--github-sync-inside-its-budget)
+5. [Phase 3 — GitHub sync inside its budget — NOT BUILT](#phase-3--github-sync-inside-its-budget--not-built)
 6. [Out of scope](#out-of-scope)
 
 ---
@@ -51,8 +51,8 @@ table, and nothing else does.
 | E3 | **12** installer scripts — one per policy job. | `ls scripts/install_*.sh` |
 | E4 | `github-sync` and `pulse-sync` both report last exit `1`. | `launchctl list` |
 | E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `/Users/noelsaw/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. **Fixed and verified in Phase 0** — `reconcile_pulse_mirror` now returns OK and `publish_pulse` dry-run returns `ok=True`. | `temp/logs/pulse_sync_2026-08-17.log`, then re-run |
-| E6 | **`github-sync` fails on primary rate limiting.** Every failing run reports `remaining=0`. See the ledger below. | `temp/logs/github_sync_2026-08-17.log` |
-| E6a | **Attribution is NOT yet proven.** The ledger shows correlation, not that *this job* consumed the quota. `_http.py:95-129` states its `x-ratelimit-*` values are samples, not a per-job delta — a PAT can be shared, and a 50-minute run can cross a reset boundary. **Phase 0 measures it.** | `src/rebalance/ingest/_http.py:95-129` |
+| E6 | **`github-sync` fails on primary rate limiting.** Every failing run reports `remaining=0`. That much is certain. See the ledger below. | `temp/logs/github_sync_2026-08-17.log` |
+| E6a | **Attribution measured, and it went against the premise.** 21 min of a real run consumed **≤24** REST requests against a 12-min idle baseline of **1**. The hourly job does not exhaust the 5,000/hr budget. Its runtime is spent blocked in `poll()` on SSL reads from `api.github.com` — few, very slow requests. Phase 3 is therefore not built. | 30 s sampling of `GET /rate_limit`; `sample(1)` of the running process |
 | E7 | Rate limit at 21:32: `core` 4980/5000. The quota is burned and refilled, not permanently gone. | `GET /rate_limit` |
 | E8 | All **12** policy jobs have a `scripts/com.rebalance-os.*.plist.template`. `stack.sh up` can render the whole fleet today. | `bash scripts/stack.sh verify` |
 | E9 | All 11 installed plists are bound to **`~/rebalance-runtime`**, not this checkout. | `bash scripts/stack.sh status` (BOUND TO column) |
@@ -81,17 +81,15 @@ eight minutes later with nothing left and dies in ~80 seconds, the window resets
 and the cycle repeats. The 19:45 run is the interesting one — it **succeeded**, took 53 minutes, and
 was still followed by an exhausted window.
 
-That pattern is consistent with "the job is larger than its schedule", but it does not **prove** it
-(E6a). Two other explanations survive the ledger:
+That pattern is consistent with "the job is larger than its schedule" — which is what #62 concluded
+and what the first draft of this plan concluded too. **It is wrong.** The ledger shows correlation,
+not attribution: `_http.py:95-129` says these header values are samples rather than a per-job delta,
+a PAT can be shared, and a 50-minute run can cross a reset boundary.
 
-- another consumer shares this PAT and burns the quota independently;
-- a run crossing the hourly reset double-counts, making one job look like two.
-
-Both are cheap to rule out and expensive to get wrong — Phase 3's whole shape depends on which is
-true. Phase 0 measures `remaining` on a 30-second interval across a full scheduled run, with the
-baseline drift captured beforehand while nothing is running. If `remaining` is flat while idle and
-falls to zero only while `github_sync.sh` is alive, attribution is settled and Phase 3 proceeds. If
-it drains while idle, the fix is a dedicated PAT and Phase 3 is re-scoped.
+Measuring it (E6a) cost one hour of 30-second sampling and overturned the premise: the job uses
+about half a percent of the budget. The long runtimes are latency, not volume. Keep the ledger here
+because the `remaining=0` errors in it are real and still unexplained — but read it as *a symptom
+whose cause is not yet known*, not as evidence for a throttle.
 
 ### Prior art — build on these, do not duplicate them
 
@@ -122,15 +120,26 @@ Small changes that fix the actual outage, plus the one measurement Phase 3 depen
       checkouts. Verified: `reconcile_pulse_mirror` OK, `publish_pulse` dry-run `ok=True`.
 - [x] Load the 3 installed-but-unloaded agents (E2). Fleet is now 11 loaded, 0 dormant — this
       restores `health-check` today, before any refactor.
-- [ ] **Measure rate-limit attribution (E6a).** Sample `GET /rate_limit` every 30 s across a full
-      scheduled `github-sync` run, recording whether `github_sync.sh` is alive at each sample, with
-      at least 10 minutes of idle baseline beforehand. Three outcomes, three different Phase 3s:
+- [x] **Measure rate-limit attribution (E6a).** Done — `GET /rate_limit` every 30 s, with an idle
+      baseline first, across the 21:45 scheduled run. **Result below. None of the three predicted
+      outcomes occurred, and Phase 3 does not survive it.**
 
-      | Observation | Conclusion | Phase 3 |
+      | Window | Duration | REST `core` consumed |
       |---|---|---|
-      | flat while idle, drains only while the job runs | this job owns the burn | proceed as written |
-      | drains while idle | the PAT is shared | issue a dedicated PAT first; re-scope |
-      | drains faster than the job's own request count | retry amplification | fix the loop, not the schedule |
+      | idle, no job running | 12 min | **1** |
+      | `github-sync` running | 21 min | **≤ 24** |
+
+      The hourly job is not exhausting the 5,000/hr budget; it is using roughly half a percent of it.
+      What the sampling did surface is a different problem. Sampling the running process shows it
+      parked in `poll()` inside an SSL read from `api.github.com` (confirmed by resolving the peer
+      address — `172.182.252.137` *is* `api.github.com`, which is worth stating because it looks like
+      an unrelated Azure host). Its requests are **few and very slow**, not numerous. That is what
+      the 39–53 minute runtimes are made of.
+
+      So the premise behind #62 and behind this plan's own first draft — "hourly sync exhausts
+      5,000 requests in under 15 minutes" — is **not supported**. Throttling request volume would
+      not have helped, and shipping it would have buried the real signal under a fix that appeared
+      to work.
 
 - [ ] Record the outstanding unknown for triage: `mlx_embeddings` fails to import inside the launchd
       context and ends 4 of 13 runs after 40+ minutes. Separate defect, does not block this plan,
@@ -273,55 +282,45 @@ Explicitly **not** in scope:
 
 ---
 
-## Phase 3 — GitHub sync inside its budget
+## Phase 3 — GitHub sync inside its budget — NOT BUILT
 
-### Scope (GH-62, GH-54)
+**Deliberately not in this branch.** Phase 0 gated it on a measurement, the measurement came back
+against it, and the gate is being honoured rather than argued with.
 
-Two steps, smallest first. **Ship 3a and re-measure before writing any of 3b.**
+What the plan expected: the hourly crawl outgrows a 5,000/hr budget, so scope the hourly run to
+recently-active repos and add conditional requests.
 
-**Gated on Phase 0's attribution result.** If the measurement shows the PAT is shared or the burn is
-retry amplification, stop and re-scope — neither is fixed by anything below.
+What was measured: 21 minutes of a real scheduled run consumed **at most 24 REST requests**, against
+a 12-minute idle baseline of 1. The job is slow, not greedy — it sits blocked on SSL reads from
+`api.github.com` for tens of minutes at a time.
 
-**3a — Scope the hourly run (small, but not a config flip).**
+Three consequences:
 
-`active_bands` is an **output** of the scan, not an input to it: it is populated while processing
-already-fetched events (`github_scan.py:259-303`) and is never persisted — the insert stores
-`last_active_at` but no bands (`:493-529`). The hourly wrapper calls
-`refresh_index(db_path, scope=["github", "focus5"])` with no repo selector at all
-(`scripts/github_sync.sh:26-36`). So "hourly = Band A" cannot be expressed today, and this is real
-plumbing rather than a flag:
+1. **Band-A scoping would not fix the observed behaviour.** Fewer repos × the same
+   tens-of-minutes-per-request latency is still a job that overruns its hour. It would have looked
+   like an improvement (shorter runs, fewer calls) while leaving the cause untouched.
+2. **ETags would not either.** A `304` still costs the round trip that is actually slow. The win
+   they offer is quota, and quota is not the constraint.
+3. **The rate-limit errors in the ledger are still unexplained.** Every failing run really did report
+   `remaining=0`; that is not in doubt. What is now in doubt is *who spent it*. The idle baseline
+   rules out a background consumer over the 12 minutes observed, but not over a whole day, and
+   `daily-sync`'s full crawl has never been measured at all.
 
-- Derive the hourly repo set from persisted state — `last_active_at >= now - 7d` — which is the same
-  boundary Band A already means, read from a column that actually exists.
-- Pass it through the orchestrator's existing `repos` argument so the selector, not the collector,
-  decides scope.
-- Define the bootstrap case explicitly: an empty or absent `last_active_at` set (fresh database,
-  first run) must fall back to the full crawl once, not silently sync nothing.
-- Before the run, read the rate-limit sample `_http.py` already collects. If `remaining < 500`,
-  stop cleanly and report `OK (throttled)` — a *success* for pipeline and doctor purposes, not a
-  failure. A throttled skip is the system working.
-- The 06:30 `daily-sync` keeps the full crawl. It has the whole night's budget.
-- Then measure again: requests consumed and wall-clock for one hourly run.
+The honest next step is a separate investigation with its own evidence, not a throttle chosen before
+the cause is known. Two questions it should answer, in order:
 
-**3b — Conditional requests (only if 3a leaves us over budget).**
-- `If-None-Match` / `If-Modified-Since` in `_http.py` and the GitHub item fetchers. GitHub does not
-  charge rate limit for a `304`, which is the entire win.
-- ETags must persist across runs. Name the storage explicitly — a column on the existing scan state
-  is preferable to a new table — because that is the real schema change here.
-- `304` must mean *keep the existing rows*, distinct from *empty response*. Getting this wrong turns
-  a successful no-change sync into apparent data loss.
+- **Why is a single GitHub request taking minutes?** Instrument per-request wall time in `_http.py`
+  and log the slowest endpoints for one run. A hung read that eventually succeeds is invisible in
+  request counts and obvious in latency.
+- **Who actually spends the 5,000?** Sample `remaining` across a full day rather than one run,
+  including the 06:30 `daily-sync`. If it is `daily-sync`, throttling the *hourly* job was always
+  aimed at the wrong process.
 
-### QA Gate 3
-- 3a: a fixture proves the hourly path fetches only the derived recent set while the daily path
-  still crawls everything.
-- 3a: an empty `last_active_at` set falls back to a full crawl rather than syncing nothing.
-- 3a: one hourly run completes in under 3 minutes and consumes a measured, recorded number of
-  requests well under 5,000.
-- 3a: with `remaining` forced below 500, the job exits 0 and doctor shows `OK (throttled)`.
-- 3b (if built): a `304` on an unchanged repo is observed in the log, and the row count for that
-  repo is unchanged afterwards.
+Also still open and separate: `mlx_embeddings` fails to import inside the launchd context and ended
+4 of the 13 runs in the ledger after 40+ minutes.
 
----
+Nothing here is lost — #62 keeps its ETag proposal, which may well be worth doing later for its own
+reasons. It just should not be justified by a budget problem that measurement does not support.
 
 ## Out of scope
 
