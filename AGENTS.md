@@ -194,7 +194,10 @@ operator name from what it does, never from how it ships.
 ### 3-Eyes — DEFERRED (do not repair, do not operate)
 
 **3-Eyes is stood down as of 2026-08-17 by operator decision. Do not spend effort on it.** It is not
-this machine's sentinel any more, it is not run in CI, and its launchd jobs are unloaded. If you are
+this machine's sentinel any more, it is not run in CI, and its launchd jobs are unloaded and
+`launchctl disable`d (persisted in the per-user override db, survives reboot). That disable is
+the only thing keeping it off — a future `launchctl load -w` on its plists clears the disabled
+bit and would silently reactivate it, so do not run that against the 3-Eyes plists. If you are
 here because something pointed you at 3-Eyes, the correct action is to stop and do nothing.
 
 This is a **pause, not a deletion**: `utils/3-eyes/` and its tests, registry, and lint entry all stay
