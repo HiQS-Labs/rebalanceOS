@@ -97,7 +97,12 @@ def mock_mlx():
     mock_embeddings = MagicMock()
     mock_embeddings.generate = mock_generate
 
+    # GH-42: instrument_embedding_pass() only touches mlx when the Metal probe
+    # says a device is reachable. These tests assert the telemetry that runs
+    # inside that branch, so the gate is stubbed open — otherwise they only pass
+    # on a machine with a real GPU.
     with (
+        patch.object(embedder, "metal_available", return_value=True),
         patch.object(mlx, "core", mock_core),
         patch.dict(sys.modules, {"mlx.core": mock_core, "mlx_embeddings": mock_embeddings}),
     ):

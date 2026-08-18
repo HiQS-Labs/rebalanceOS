@@ -18,12 +18,36 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from rebalance.lib.metal_probe import metal_available
+
 logger = logging.getLogger(__name__)
 
 _current_run_id = None
 _current_entry_point = None
 _batch_count = 0
 _last_activity_time = 0.0
+
+
+class MLXUnavailableError(RuntimeError):
+    """Raised when mlx/Metal cannot be used in this process.
+
+    mlx aborts the whole process (uncaught C++ exception -> SIGABRT) rather than
+    raising a catchable Python error when no Metal GPU device is reachable --
+    e.g. headless, sandboxed, or virtualized macOS sessions (GH-42). We check
+    for that ahead of time via :func:`rebalance.lib.metal_probe.metal_available`,
+    which probes out-of-process so a crash there can't take the caller down
+    with it, and raise this instead.
+    """
+
+
+def _require_metal() -> bool:
+    available = metal_available()
+    if not available:
+        logger.warning(
+            "mlx/Metal is unavailable in this environment (no GPU device, or this "
+            "process lacks GPU access) — embeddings are disabled for this run."
+        )
+    return available
 
 
 def _get_caller_identity() -> str:
@@ -56,13 +80,14 @@ def instrument_embedding_pass(site_name: str) -> None:
         f"Embedding pass started: run_id={_current_run_id} entry_point={site_name} pid={os.getpid()} caller={caller}"
     )
 
-    try:
-        import mlx.core as mx
+    if metal_available():
+        try:
+            import mlx.core as mx
 
-        if hasattr(mx, "reset_peak_memory"):
-            mx.reset_peak_memory()
-    except Exception:
-        pass
+            if hasattr(mx, "reset_peak_memory"):
+                mx.reset_peak_memory()
+        except Exception:
+            pass
 
 
 from rebalance.lib import time_ops
@@ -104,6 +129,11 @@ def _load_model(model_name: str) -> tuple:
     global _cached_model, _cached_tokenizer, _cached_model_name, _cache_limit_set
     if _cached_model is not None and _cached_model_name == model_name:
         return _cached_model, _cached_tokenizer
+
+    if not _require_metal():
+        raise MLXUnavailableError(
+            "mlx/Metal is unavailable in this environment (no GPU device) — cannot load the embedding model."
+        )
 
     from mlx_embeddings import load
 
@@ -230,10 +260,15 @@ def embed_chunks(
 
         # Find chunks needing embedding
         if force_reembed:
+            rows = conn.execute("SELECT id, body FROM chunks").fetchall()
+            if rows:
+                # Make sure the model actually loads (GH-42 review: mlx/Metal
+                # unavailability must not destroy existing embeddings) before
+                # clearing them — this call is cheap once cached below.
+                _load_model(model_name)
             # Clear all embeddings and re-embed everything
             conn.execute("DELETE FROM embeddings")
             conn.commit()
-            rows = conn.execute("SELECT id, body FROM chunks").fetchall()
         else:
             # Only embed chunks not already in the embeddings table
             rows = conn.execute("""
