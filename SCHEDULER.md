@@ -21,8 +21,7 @@ job.
 | `health-check` | hourly at :10, around the clock | — (python direct) | `scripts/health_issue_reporter.py --close` (FAIL-only, no LLM) | GitHub token for issue filing | GitHub issues opened/closed on failing doctor checks |
 | `health-check-triage` | 3×/day at 08:25, 14:25, 20:25 | — (python direct) | `scripts/health_issue_reporter.py --warn --close --llm-triage --llm-daily-limit 8 --llm-max-per-run 5` | ANTHROPIC_API_KEY in rendered plist or keyring | LLM-triaged GitHub issues; quota circuit breakers CB-1/2/3 |
 | `obsidian-rollover` | daily 00:40 (or next wake); RunAtLoad must stay **false** | `utils/obsidian_rollover.sh` | `utils/obsidian_daily_rollover.py` | Full Disk Access via bash wrapper (TCC) | daily note rolled over; log in `~/Library/Logs/rebalance-os/` |
-| `obsidian-daily-sync` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/obsidian_daily_sync.sh` | `utils/obsidian_daily_sync.py` — Gemini daily-activity summary from the structured pulse snapshot | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block appended to `0. Today's Notes.md`; log in `~/Library/Logs/rebalance-os/` |
-| `git-pulse-daily-synthesis` | daily 18:30 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself; **must stay after `obsidian-daily-sync`** | `utils/git_pulse_daily_synthesis.sh` | `utils/git_pulse_daily_synthesis.py` — Gemini synthesis of `view.sh --today` multi-device git activity (GH-114) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) for the optional vault write | idempotent Git Pulse summary block appended to `0. Today's Notes.md` (if vault configured) AND/OR upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` |
+| `daily-synthesis` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/daily_synthesis.sh` | `utils/daily_synthesis.py` — Gemini daily-activity summary from the structured pulse snapshot, then Gemini synthesis of `view.sh --today` multi-device git activity (GH-114), in that order, one process (GH-74) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block, then idempotent Git Pulse summary block, appended to `0. Today's Notes.md` (if vault configured) AND/OR the Git Pulse block upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` |
 
 > **Do not put a literal `|` inside a cell of the table above, even escaped as
 > `\|`.** Two consumers split these rows on the pipe character —
@@ -50,14 +49,17 @@ since GH-175 **no two jobs share a minute**:
 :25 health-check-triage (08/14/20 only)
 :45 github-sync (writes github raw only)
 06:30 daily-sync (writes everything, incl. github → semantic backfill)
-00:40 obsidian-rollover      18:20 obsidian-daily-sync      18:30 git-pulse-daily-synthesis
+00:40 obsidian-rollover      18:20 daily-synthesis
 ```
 
-- **`obsidian-daily-sync` → `git-pulse-daily-synthesis` is an ORDERING
-  DEPENDENCY, not just a stagger.** When both destinations are configured, the
-  Git Pulse block must land *after* the GH-112 AI Daily Summary block. Both were
-  moved together in GH-175 (18:00→18:20 and 18:05→18:30); moving one without the
-  other inverts the order and puts the Git Pulse block above the AI summary.
+- **`daily-synthesis` used to be two jobs** (`obsidian-daily-sync` at 18:20,
+  `git-pulse-daily-synthesis` at 18:30) with an ORDERING DEPENDENCY between
+  them: when both destinations were configured, the Git Pulse block had to
+  land *after* the GH-112 AI Daily Summary block, enforced only by the second
+  job firing 10 minutes after the first (GH-175) — a sleep/wake catch-up could
+  invert that. GH-74 merged them into one process: the pulse summary is
+  upserted first, then the git-pulse summary, in one read-modify-write, so the
+  order is guaranteed by the code, not by two independent launchd fire times.
 
 - **pulse-web-sync moved off :00 for correctness, not tidiness** (GH-175). It is
   a derived read-only stage over what `pulse-sync` writes at :00; sharing that

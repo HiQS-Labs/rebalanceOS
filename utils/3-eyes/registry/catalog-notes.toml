@@ -89,9 +89,9 @@ system = "rebalance"
 desc = "Pulse warning watcher"
 status = "to-adopt"
 
-[agent."com.rebalance-os.obsidian-daily-sync"]
+[agent."com.rebalance-os.daily-synthesis"]
 system = "rebalance"
-desc = "Obsidian daily sync"
+desc = "Daily vault synthesis (pulse + Git Pulse; GH-74 merge)"
 status = "to-adopt"
 
 [agent."com.rebalance-os.obsidian-rollover"]

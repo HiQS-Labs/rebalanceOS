@@ -100,8 +100,8 @@ Status: Draft
 Target Date: 2027-02-15
 Codename: Fleet Engine
 Milestone:
-Description: Unified fleet collection, streamlined scheduler topology, shared presentation layer, and multi-signal auto-promotion. #29 shared SQL read layer and web app mount, #23 pulse/fleet collector stack consolidation, #22 Mac Studio scheduler jobs reload, #4 Mac Studio pulse collector conflict recovery, #1 sustained-activity auto-promotion engine.
-Exit: Pulse collection consolidated into 3 supervised launchd jobs; Mac Studio device heartbeat fresh (<1h) with zero doctor alerts; multi-signal 5-action auto-promotion operational with 20h burst guard.
+Description: Unified fleet collection, streamlined scheduler topology, shared presentation layer, and multi-signal auto-promotion. #29 shared SQL read layer and web app mount, #23 pulse/fleet collector stack consolidation, #22 Mac Studio scheduler jobs reload, #4 Mac Studio pulse collector conflict recovery, #1 sustained-activity auto-promotion engine, #74 consolidate the dual end-of-day LLM vault synthesis jobs into one pipeline.
+Exit: Pulse collection consolidated into 3 supervised launchd jobs; Mac Studio device heartbeat fresh (<1h) with zero doctor alerts; multi-signal 5-action auto-promotion operational with 20h burst guard; the 18:20/18:30 obsidian-daily-sync + git-pulse-daily-synthesis pair replaced by one launchd job that runs both syntheses in-process, so block order no longer depends on launchd scheduling.
 GH_URL:
 Front-door reviewed:
 Shakedown reviewed:

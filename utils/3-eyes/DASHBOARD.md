@@ -4,7 +4,7 @@
 
 One optional, always-safe local job supervisor (GH-195). This file is a generated mirror of the TOML registry — **the jobs below are exactly what `registry/jobs.d/*.toml` declares.**
 
-- **Registry fingerprint:** `667e6f8297c3`
+- **Registry fingerprint:** `ca801a5a74dd`
 - **Jobs defined:** 12
 - **Registry valid:** ✅ yes
 - **Full machine inventory** (managed + observe-only + to-adopt): `CATALOG.md` — generated (gitignored, machine-specific) from `registry/catalog-notes.toml`; run `python -m three_eyes catalog --write`. Fleet health: `python -m three_eyes health`.
@@ -18,8 +18,8 @@ One optional, always-safe local job supervisor (GH-195). This file is a generate
 | `collector-health` | yes | launchd every 1800s | `collector-observe` | pdda-inbox, notify | single-instance, ≤8GB, trip@3 | llm 5/run, 8/day |
 | `daily-digest` | yes | launchd calendar {'Hour': 7, 'Minute': 15} | `daily-digest` | notify, log-only | single-instance, ≤12GB, trip@3 | llm 1/run, 8/day |
 | `daily-sync` | yes | launchd calendar {'Hour': 6, 'Minute': 30} | `daily-sync` | log-only | single-instance, trip@3 | — |
+| `daily-synthesis` | yes | launchd calendar {'Hour': 18, 'Minute': 20} | `daily-synthesis` | log-only | single-instance, ≤8GB, trip@3 | — |
 | `github-sync` | yes | launchd calendar [{'Hour': 6, 'Minute': 45}, {'Hour': 7, 'Minute': 45}, {'Hour': 8, 'Minute': 45}, {'Hour': 9, 'Minute': 45}, {'Hour': 10, 'Minute': 45}, {'Hour': 11, 'Minute': 45}, {'Hour': 12, 'Minute': 45}, {'Hour': 13, 'Minute': 45}, {'Hour': 14, 'Minute': 45}, {'Hour': 15, 'Minute': 45}, {'Hour': 16, 'Minute': 45}, {'Hour': 17, 'Minute': 45}, {'Hour': 18, 'Minute': 45}, {'Hour': 19, 'Minute': 45}, {'Hour': 20, 'Minute': 45}, {'Hour': 21, 'Minute': 45}, {'Hour': 22, 'Minute': 45}, {'Hour': 23, 'Minute': 45}] | `github-sync` | log-only | single-instance, trip@3 | — |
-| `obsidian-daily-sync` | yes | launchd calendar {'Hour': 18, 'Minute': 20} | `obsidian-daily-sync` | log-only | single-instance, ≤8GB, trip@3 | — |
 | `obsidian-rollover` | yes | launchd calendar {'Hour': 0, 'Minute': 40} | `obsidian-rollover` | log-only | single-instance, ≤8GB, trip@3 | — |
 | `pulse-sync` | yes | launchd calendar [{'Hour': 6, 'Minute': 0}, {'Hour': 7, 'Minute': 0}, {'Hour': 8, 'Minute': 0}, {'Hour': 9, 'Minute': 0}, {'Hour': 10, 'Minute': 0}, {'Hour': 11, 'Minute': 0}, {'Hour': 12, 'Minute': 0}, {'Hour': 13, 'Minute': 0}, {'Hour': 14, 'Minute': 0}, {'Hour': 15, 'Minute': 0}, {'Hour': 16, 'Minute': 0}, {'Hour': 17, 'Minute': 0}, {'Hour': 18, 'Minute': 0}, {'Hour': 19, 'Minute': 0}, {'Hour': 20, 'Minute': 0}, {'Hour': 21, 'Minute': 0}, {'Hour': 22, 'Minute': 0}, {'Hour': 23, 'Minute': 0}] | `pulse-sync` | log-only | single-instance, ≤8GB, trip@3 | — |
 | `pulse-warning-watch` | yes | launchd calendar [{'Minute': 7}, {'Minute': 22}, {'Minute': 37}, {'Minute': 52}] | `pulse-warning-watch` | log-only | single-instance, ≤8GB, trip@3 | — |
@@ -33,8 +33,8 @@ One optional, always-safe local job supervisor (GH-195). This file is a generate
 - **`collector-health`** — Parse daily_sync telemetry and emit a finding when collectors degrade (GH-146: exit codes lie; sync_outcome is the signal).
 - **`daily-digest`** — Once-daily ranked report of what broke, what matters, and what to ignore across the whole fleet.
 - **`daily-sync`** — Run the Rebalance daily index sync at the incumbent 06:30 local schedule.
+- **`daily-synthesis`** — Write the daily vault synthesis (pulse summary + Git Pulse summary) at 18:20 local.
 - **`github-sync`** — Run the Rebalance GitHub sync hourly at :45 from 06:45 through 23:45 local.
-- **`obsidian-daily-sync`** — Write the daily Obsidian activity summary at 18:20 local.
 - **`obsidian-rollover`** — Roll over Obsidian daily notes at 00:40 local.
 - **`pulse-sync`** — Publish the Rebalance pulse hourly on the hour from 06:00 through 23:00 local.
 - **`pulse-warning-watch`** — Check the local pulse health banner every 15 minutes at :07, :22, :37, and :52.

@@ -1,0 +1,23 @@
+# 3-Eyes adoption of the daily vault synthesis (GH-195 P8 Wave 2; renamed GH-74).
+#
+# GH-74 merged the two jobs this catalog entry used to describe separately
+# (obsidian-daily-sync at 18:20, git-pulse-daily-synthesis at 18:30 — the
+# latter was never itself 3-Eyes-catalogued) into one process, one launchd
+# job. This entry is a rename only: `enabled`/`routes` are unchanged from the
+# incumbent obsidian-daily-sync entry, so this does not change what 3-Eyes
+# manages or observes.
+
+id = "daily-synthesis"
+command = "daily-synthesis"
+description = "Write the daily vault synthesis (pulse summary + Git Pulse summary) at 18:20 local."
+enabled = true
+routes = ["log-only"]
+supersedes = ["com.rebalance-os.daily-synthesis", "com.rebalance-os.obsidian-daily-sync"]
+
+[schedule.launchd]
+StartCalendarInterval = { Hour = 18, Minute = 20 }
+
+[breakers]
+single_instance = true
+max_rss_gb = 8
+trip_after_failures = 3

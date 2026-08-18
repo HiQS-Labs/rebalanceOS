@@ -9,6 +9,8 @@ from rebalance.doctor import (
     FAIL,
     OK,
     WARN,
+    _DeviceScope,
+    _DEVICE_SCOPE_REGISTRY,
     _check_pulse_collectors,
     _check_scheduler_liveness,
 )
@@ -80,20 +82,27 @@ def test_intermittent_laptop_window_differs_from_always_on_collector() -> None:
 def test_device_scoped_job_stays_informational_even_with_a_stale_plist() -> None:
     """GH-59: a laptop that does not own a job must not go red over a leftover plist.
 
-    `git-pulse-daily-synthesis` is scoped to noels-mbp-16-m1-pro. Phase 2 made
-    "plist present but not loaded" a FAIL, using the plist as this machine's
-    install record — so a plist left behind by a repo move or a restored backup
-    on a NON-owner device is exactly the case that could turn that laptop's
-    doctor gate red for a job it was never supposed to run. The device-scope
-    branch must win, and it must win *before* the local-plist branch is reached.
+    A device-scoped job. Phase 2 made "plist present but not loaded" a FAIL,
+    using the plist as this machine's install record — so a plist left behind
+    by a repo move or a restored backup on a NON-owner device is exactly the
+    case that could turn that laptop's doctor gate red for a job it was never
+    supposed to run. The device-scope branch must win, and it must win
+    *before* the local-plist branch is reached.
+
+    GH-74: the production job this originally exercised (git-pulse-daily-
+    synthesis) was merged into the unscoped daily-synthesis and no longer
+    carries a _DEVICE_SCOPE_REGISTRY entry, so this test injects a synthetic
+    one via patch.dict — the mechanism itself still needs live coverage even
+    though the real job that used to demonstrate it is gone.
     """
-    with TemporaryDirectory() as tmp:
+    example_scope = {("scheduler", "example-scoped-job"): _DeviceScope(frozenset({"noels-mbp-16-m1-pro"}))}
+    with TemporaryDirectory() as tmp, patch.dict(_DEVICE_SCOPE_REGISTRY, example_scope):
         root = Path(tmp)
-        policy = _write_policy(root, ["git-pulse-daily-synthesis"])
+        policy = _write_policy(root, ["example-scoped-job"])
         agents = root / "LaunchAgents"
         agents.mkdir()
         # The stale plist: present on disk, absent from launchctl.
-        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text("x", encoding="utf-8")
+        (agents / "com.rebalance-os.example-scoped-job.plist").write_text("x", encoding="utf-8")
 
         checks = _check_scheduler_liveness(
             policy,
@@ -111,12 +120,13 @@ def test_device_scoped_job_with_a_stale_plist_still_fails_on_its_OWNER() -> None
     """The other half: on the machine that DOES own the job, the same stale
     plist is a real failure. Without this, the test above could pass simply
     because the plist signal never fires."""
-    with TemporaryDirectory() as tmp:
+    example_scope = {("scheduler", "example-scoped-job"): _DeviceScope(frozenset({"noels-mbp-16-m1-pro"}))}
+    with TemporaryDirectory() as tmp, patch.dict(_DEVICE_SCOPE_REGISTRY, example_scope):
         root = Path(tmp)
-        policy = _write_policy(root, ["git-pulse-daily-synthesis"])
+        policy = _write_policy(root, ["example-scoped-job"])
         agents = root / "LaunchAgents"
         agents.mkdir()
-        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text("x", encoding="utf-8")
+        (agents / "com.rebalance-os.example-scoped-job.plist").write_text("x", encoding="utf-8")
 
         checks = _check_scheduler_liveness(
             policy,

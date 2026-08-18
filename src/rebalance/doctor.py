@@ -99,10 +99,9 @@ _DEVICE_SCOPE_REGISTRY: dict[tuple[str, str], _DeviceScope] = {
         "pulse_collector",
         "noels-mac-studio",
     ): _DeviceScope(frozenset({"noels-mac-studio"})),
-    (
-        "scheduler",
-        "git-pulse-daily-synthesis",
-    ): _DeviceScope(frozenset({"noels-mbp-16-m1-pro"})),
+    # GH-74: git-pulse-daily-synthesis (scoped to noels-mbp-16-m1-pro) merged into
+    # daily-synthesis, which absorbs obsidian-daily-sync's unscoped (every-device)
+    # expectation — so the merged job intentionally carries no scope entry here.
 }
 
 
