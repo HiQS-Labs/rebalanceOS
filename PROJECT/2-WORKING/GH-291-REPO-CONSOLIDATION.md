@@ -124,7 +124,26 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
 - [ ] Diff config files that exist in both but differ (`.mcp.json` is 268B new vs
       387B old): reconcile intentionally — the new tracked version wins unless it
       drops a server the runtime needs.
-- [ ] Rebuild and test the clone the way the README documents —
+- [x] ✅ **Clone rebuilt and suite green, 2026-08-17.** Built on **Python 3.13**,
+      matching the live runtime venv — not the 3.14 that `python3` resolves to on
+      this machine, and not the 3.14 venv the clone happened to be carrying.
+      `python3.13 -m venv .venv && .venv/bin/pip install -e ".[calendar,server,dev]"`,
+      then `.venv/bin/python -m pytest tests/ utils/3-eyes/tests -q`:
+      **2049 passed, 3 skipped, 10 xfailed, 0 failed** (116s).
+      What the run caught, which is the whole reason this gate exists:
+      - 2 failures in `utils/3-eyes/tests/test_adoption_wave3.py` that pass in the
+        retiring folder. Cause: the tests assert against
+        `registry/jobs.local.d/*.toml`, which is **gitignored machine-local state**
+        present only in the old folder. Two consequences, both handled — the
+        carry-over list gained the 3-eyes overlay entries above, and the tests now
+        skip when the overlay is absent instead of failing (this is also why CI was
+        red on both branches; the code was fine).
+      - Verified the skip guard does not hide the contract: all 4 tests still run
+        and pass in the retiring folder, where the overlay exists.
+      - Still red in CI and **not** caused by the swap: 3 failures in
+        `utils/3-eyes/tests/test_breaker_semantics_p6.py`, which pass locally on
+        both trees. CI-environment-specific; tracked separately.
+- [x] Original step, for the record — Rebuild and test the clone the way the README documents —
       `python3 -m venv .venv && .venv/bin/pip install -e ".[calendar,server]"`,
       then `.venv/bin/python -m pytest tests/ utils/3-eyes/tests -q` (the CI
       invocation). Must be green **before** the swap so cutover failures can
@@ -169,9 +188,26 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
         `DIAGRAM.md`, `APACHE-LICENSE-2.0.txt` (superseded by `LICENSE` — skip)
       - Tool state: `.tick/`, `.aider/`, `.gemini/`, `.xyz/`, `.ona/`,
         `.pdda-gh-state.tsv`, `ask-self` index artifacts
-      - `.claude/settings.json` — machine-local permission allowlist, deliberately
-        untracked in the public repo (decision D1, #276): carry the retired copy
-        over verbatim; the local runtime wants it and nothing else restores it
+      - `.claude/settings.local.json` — machine-local permission allowlist,
+        deliberately untracked in the public repo (decision D1, #276): carry the
+        retired copy over verbatim; the local runtime wants it and nothing else
+        restores it. **Corrected 2026-08-17:** this plan previously named
+        `.claude/settings.json`, which does not exist in the retiring folder —
+        following the list literally would have carried nothing.
+      - `.claude/skills/release/SKILL.md` — machine-local skill, absent from the
+        new clone
+      - **3-eyes machine-local overlay — found by the Phase 1 test run, absent
+        from every earlier draft of this list:**
+        - `utils/3-eyes/registry/jobs.local.d/*.toml` (9 files) — the adopted-job
+          overlay. Gitignored by design: these hold absolute machine paths that
+          must never enter the committed registry. Without them the fleet
+          silently loses 9 adopted job definitions, `skill-sync` among them.
+        - `utils/3-eyes/registry/commands.local.allow` — the local command
+          allowlist those jobs are executed through
+        - `utils/3-eyes/config/runtime.env`
+        - `utils/3-eyes/CATALOG.md`
+      - `PROJECT/.scrub-list.json` (`PROJECT/PDDA-ACTIVITY.jsonl` already exists
+        in the new clone — diff, don't clobber)
       - `.claude/` (commands, skills) — diff first; merge anything the new clone's
         copy lacks
       - Symlinks: `git-pulse-sync -> ~/git-pulse-sync`,

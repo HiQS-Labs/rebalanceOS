@@ -5,12 +5,29 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from three_eyes import breakers, dashboard, registry
 
 
 THREE_EYES_DIR = Path(__file__).resolve().parents[1]
 REGISTRY_DIR = THREE_EYES_DIR / "registry"
 LOCAL_DIR = REGISTRY_DIR / "jobs.local.d"
+
+# `jobs.local.d/*.toml` is gitignored by design — the overlay exists to keep
+# absolute, machine-specific paths out of the committed registry (see the
+# README in that directory). So the two tests that assert on adopted jobs can
+# only pass on a machine that has actually adopted them. Asserting
+# unconditionally made them fail on every fresh clone and on every CI run,
+# which is how CI came to be red on both branches while the code was fine — a
+# permanently-failing test teaches everyone to ignore the suite.
+_needs_local_overlay = pytest.mark.skipif(
+    not any(LOCAL_DIR.glob("*.toml")),
+    reason=(
+        "no machine-local job overlay in utils/3-eyes/registry/jobs.local.d/ "
+        "(gitignored by design) — nothing to check the adoption contract against"
+    ),
+)
 
 ADOPTED = {
     "prompt-log-to-md": {
@@ -52,6 +69,7 @@ def _jobs(*, include_local: bool):
     return {job.id: job for job in registry.load_jobs(REGISTRY_DIR, include_local=include_local)}
 
 
+@_needs_local_overlay
 def test_wave3_jobs_are_local_only_and_replace_the_live_agents():
     local_jobs = _jobs(include_local=True)
     committed_jobs = _jobs(include_local=False)
@@ -63,6 +81,7 @@ def test_wave3_jobs_are_local_only_and_replace_the_live_agents():
         assert expected["label"] in job.supersedes
 
 
+@_needs_local_overlay
 def test_wave3_schedules_exactly_match_live_plists():
     jobs = _jobs(include_local=True)
 
