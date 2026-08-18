@@ -10,6 +10,51 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.2] - 2026-08-17
+
+### Fixed
+- **Embedding no longer destroys the whole process when there is no usable
+  graphics device.** In a session without access to one — a headless login, a
+  sandboxed automation run, a virtual machine — the embedding library did not
+  return an error, it terminated the process outright. Nothing could catch or
+  log that, so every other piece of work in the same run was lost with it, and
+  the surrounding code that already degrades gracefully never got the chance to.
+  The check for a usable device now happens in a separate process, where a
+  failure is a result rather than a fatal event, and an ordinary catchable error
+  is raised instead. This was not hypothetical: it had been terminating real
+  automation runs.
+- **The morning-brief helper can now find the collector it ships with.** Its
+  documented command contained a placeholder that the reader was expected to
+  replace with a value nothing told them, so the instruction failed as written
+  no matter where it was run from. It now works out its own location — covering
+  both places it can be installed, links to elsewhere, paths containing spaces,
+  and being invoked from an unrelated directory — and says what it looked for
+  when nothing matches, rather than failing obscurely.
+- **The setup instructions no longer send a newcomer down routes that do not
+  exist.** Examples still named the folder the project was cloned into before it
+  was renamed. The code-intelligence section promised an immediate answer with
+  no setup and no keys, when the index it queries is not distributed and the
+  queries need a key. The desktop-extension metadata advertised a version many
+  releases old, the wrong repository, and a tool list carrying two entries that
+  no longer exist while omitting thirteen that do. The architecture overview
+  pointed at a document that no longer exists and named a licence the project
+  does not use.
+
+### Added
+- **A first-run check that needs no credentials.** Installation now ends with a
+  single command confirming it worked, before any vault, token, or sign-in step.
+  A newcomer finds out whether the basics are sound at the point where it is
+  cheap to fix, instead of discovering it three steps later inside an unrelated
+  failure. A short pointer at the top of the introduction leads straight there;
+  the real path previously began only after two hundred and fifty lines of
+  background.
+- **A re-runnable board for the state of the front door.** Every defect found in
+  the onboarding review now has a deterministic check behind it, gathered into
+  one command that prints nothing while the front door is healthy and one line
+  naming the regression when it is not. Each check was first confirmed to fire
+  against the state before the fix, so a silent board means the checks ran and
+  found nothing — not that they quietly failed to look.
+
 ## [0.73.1] - 2026-08-17
 
 ### Fixed
