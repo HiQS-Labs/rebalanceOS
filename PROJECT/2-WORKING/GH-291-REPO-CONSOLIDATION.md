@@ -1,6 +1,8 @@
 # GH-291 — Repo Consolidation: One Folder, One Public Repo
 
-**Issue:** https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/291
+**Issue:** https://github.com/HiQS-Suite/rebalanceOS/issues/55
+*(mirrored from `Hypercart-Dev-Tools/rebalance-OS#291`, now closed with a pointer —
+cross-org transfer is not possible, so mirror-and-close is the pattern)*
 **Created:** 2026-08-15
 **Buffer window:** 7 days (cutover day + 7 before anything is deleted or archived)
 **Live copy:** this runbook is mirrored into `HiQS-Suite/rebalanceOS` at the same path —
