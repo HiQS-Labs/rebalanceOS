@@ -32,7 +32,7 @@ to keep them deterministic.
 from __future__ import annotations
 
 import atexit
-from collections import Counter
+from collections import Counter, defaultdict
 import json
 import logging
 import os
@@ -85,13 +85,14 @@ class _RequestAttribution:
         self.rate_limit_last: dict[str, str | int] | None = None
         self.rate_limit_reset_epochs: set[str] = set()
         self._emitted_attempts = 0
-        # GH-59 follow-up. This class counted requests and never timed them, and the whole
-        # cost of the failing job turned out to live in the untimed dimension: sampling a
-        # full run showed it spending tens of minutes blocked in a single SSL read while
-        # consuming at most 24 of 5,000 REST requests. Few, very slow calls are invisible in
-        # a count and obvious in a duration, so the counts alone actively misled — they said
-        # the job was doing almost nothing, which was true and not the point.
-        self.endpoint_seconds: Counter[str] = Counter()
+        # GH-59 follow-up. This class counted requests and never timed them, and the cost of
+        # the failing job lives in the untimed dimension: the process was observed blocked in
+        # a single SSL read for tens of minutes. Few, very slow calls are invisible in a count
+        # and obvious in a duration, so counts alone actively misled — they made the job look
+        # near-idle while it overran its hour.
+        # A plain dict rather than a Counter: Counter is typed to integer values, and these
+        # are seconds. The count-shaped containers above are genuinely Counters.
+        self.endpoint_seconds: dict[str, float] = defaultdict(float)
         self.endpoint_seconds_max: dict[str, float] = {}
         self.total_seconds = 0.0
         self.slowest: list[dict[str, Any]] = []
