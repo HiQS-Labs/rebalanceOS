@@ -31,7 +31,7 @@ new code checked out while every *running* surface still executes the old code.
 Run the steps below after every pull to bring the live device fully onto new code.
 
 ```bash
-cd /path/to/rebalance-OS
+cd /path/to/rebalanceOS
 git pull
 
 # 1. Re-sync the Python runtime — entry points, dependencies, version metadata.
@@ -127,7 +127,7 @@ the sidecar — only a SHA-256 fingerprint.
 ## Steps (run on each device)
 
 ```bash
-cd /path/to/rebalance-OS
+cd /path/to/rebalanceOS
 git pull
 .venv/bin/pip install -e ".[embeddings,calendar]"   # run after every pull — deps/entry points change with new collectors
                                                     # (see "Refresh a running device after git pull" above for the full

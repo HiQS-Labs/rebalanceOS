@@ -72,7 +72,7 @@ That layout avoids the macOS protected-folder problem for unattended background 
    Example:
    ```bash
    git clone <your rebalance-OS remote>
-   cd rebalance-OS/experimental/git-pulse
+   cd rebalanceOS/experimental/git-pulse
    ```
 
 2. Make sure git can push to your private sync repo from this Mac before installing.
@@ -285,7 +285,7 @@ echo 0 > ~/.config/git-pulse/last-run
 **Changed the code under `experimental/git-pulse/` but launchd is still running old behavior?**
 Re-run:
 ```bash
-cd /path/to/rebalance-OS/experimental/git-pulse
+cd /path/to/rebalanceOS/experimental/git-pulse
 ./install.sh
 ```
 If the code checkout lives under `~/Documents`, the installed launchers are copied into `~/bin`, not live symlinks.

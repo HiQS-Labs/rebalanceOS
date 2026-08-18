@@ -222,7 +222,7 @@ its schedule — no separate job is needed. If you run rebalance without those
 launchd jobs, automate the full refresh via cron:
 
 ```
-0 * * * * cd /path/to/rebalance-OS && .venv/bin/rebalance refresh --no-publish
+0 * * * * cd /path/to/rebalanceOS && .venv/bin/rebalance refresh --no-publish
 ```
 
 On `mcp` mode, ask your agent to refresh whenever you want fresh email.

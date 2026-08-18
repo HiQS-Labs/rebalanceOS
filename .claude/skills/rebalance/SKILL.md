@@ -57,14 +57,67 @@ source / evidence / why), `computed_at`, and `model_used`.
 
 ### Step 2 — Collect device-wide git activity (deterministic, read-only)
 
-Run the bundled collector (invoke with `bash`; it needs no execute bit and is CWD-independent
-because it scans absolute roots):
+Run the bundled collector. Invoke it with `bash` (it needs no execute bit), and resolve its
+directory with the locator below rather than guessing a path — the skill installs to different
+places (project `.claude/skills/`, user `~/.claude/skills/`, or a symlink into either), and the
+session's CWD is usually somewhere else entirely.
+
+Paste this locator first, once per session:
 
 ```bash
-bash "<skill_dir>/collect.sh"
+# >>> rebalance-skill-locator >>>
+rebalance_skill_dir() {
+  _rsd_ok() { [ -f "$1/SKILL.md" ] && [ -f "$1/collect.sh" ]; }
+
+  # 1. Explicit override always wins.
+  if [ -n "${REBALANCE_SKILL_DIR:-}" ]; then
+    if _rsd_ok "$REBALANCE_SKILL_DIR"; then (cd "$REBALANCE_SKILL_DIR" && pwd -P); return 0; fi
+    echo "rebalance: REBALANCE_SKILL_DIR has no SKILL.md + collect.sh: $REBALANCE_SKILL_DIR" >&2
+    return 1
+  fi
+
+  # 2. Project install — walk up from CWD, so a nested CWD still finds the repo's copy.
+  _rsd_d=$(pwd -P)
+  while :; do
+    if _rsd_ok "$_rsd_d/.claude/skills/rebalance"; then
+      (cd "$_rsd_d/.claude/skills/rebalance" && pwd -P); return 0
+    fi
+    [ "$_rsd_d" = "/" ] && break
+    _rsd_d=$(dirname "$_rsd_d")
+  done
+
+  # 3. User install.
+  if _rsd_ok "$HOME/.claude/skills/rebalance"; then
+    (cd "$HOME/.claude/skills/rebalance" && pwd -P); return 0
+  fi
+
+  echo "rebalance: could not locate the rebalance skill. Looked for" >&2
+  echo "  .claude/skills/rebalance/{SKILL.md,collect.sh} from $(pwd -P) upward," >&2
+  echo "  then \$HOME/.claude/skills/rebalance. Set REBALANCE_SKILL_DIR to override." >&2
+  return 1
+}
+# <<< rebalance-skill-locator <<<
 ```
 
-Where `<skill_dir>` is this SKILL.md's directory. Optional knobs (defaults are the standard):
+Then run the collector:
+
+```bash
+# >>> rebalance-collect-invocation >>>
+if REBALANCE_SKILL="$(rebalance_skill_dir)"; then
+  bash "$REBALANCE_SKILL/collect.sh"
+else
+  false   # keep the non-zero status without killing an interactive shell
+fi
+# <<< rebalance-collect-invocation <<<
+```
+
+`cd … && pwd -P` resolves symlinked installs to their real path, both checks are quoted so a
+path with spaces is fine, and requiring **both** `SKILL.md` and `collect.sh` means a partial or
+decoy directory fails loudly instead of silently resolving. The `else false` is deliberate:
+`|| exit 1` would close the reader's terminal when pasted interactively, so the failure stays
+non-zero and actionable (the locator already explained itself on stderr) without ending the
+session. The scan itself is still CWD-independent — it walks absolute roots. Optional knobs
+(defaults are the standard):
 
 - `LSAG_WINDOW_DAYS=7` — "recent" horizon for commits and warm/active classification.
 - `LSAG_DIRTY_GRACE_DAYS=30` — uncommitted changes only count as activity if the repo was
