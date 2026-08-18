@@ -131,3 +131,50 @@ class SemanticQueryCommandRenderingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QueryCommandRenderingTests(unittest.TestCase):
+    """`rebalance query` (vault-only semantic search) — the sibling crash Agy caught in QA.
+
+    `query_cmd` calls the same `semantic_index.query()` as `semantic-query`, with the same
+    hybrid RRF fusion, so a vault-only FTS hit has the same `similarity_score=None` case. This
+    file's sibling fix patched `semantic-query` and `ask` but missed this third call site —
+    found by an /relay-xyz review of the original fix, not by the original diagnosis.
+    """
+
+    def _invoke(self, results):
+        with (
+            patch("rebalance.ingest.semantic_index.query", return_value=results),
+            patch("rebalance.cli.query.resolve_database_path", return_value="/dev/null"),
+        ):
+            return runner.invoke(app, ["query", "anything"])
+
+    def test_a_vault_hit_with_no_similarity_score_no_longer_crashes(self):
+        rows = [
+            {
+                "source_type": "vault",
+                "doc_kind": "chunk",
+                "title": "Some Note",
+                "body_preview": "...",
+                "metadata": {},
+                "similarity_score": None,
+            }
+        ]
+        out = self._invoke(rows)
+        self.assertEqual(out.exit_code, 0, out.output)
+        self.assertIn("n/a", out.output)
+
+    def test_a_normal_scored_vault_hit_still_renders_the_score(self):
+        rows = [
+            {
+                "source_type": "vault",
+                "doc_kind": "chunk",
+                "title": "Some Note",
+                "body_preview": "...",
+                "metadata": {},
+                "similarity_score": 0.777,
+            }
+        ]
+        out = self._invoke(rows)
+        self.assertEqual(out.exit_code, 0, out.output)
+        self.assertIn("0.777", out.output)

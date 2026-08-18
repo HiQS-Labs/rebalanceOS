@@ -37,7 +37,13 @@ def query_cmd(
     for i, r in enumerate(results, 1):
         metadata = r["metadata"]
         heading = f" > {metadata['heading']}" if metadata.get("heading") else ""
-        typer.echo(f"{i}. [{r['similarity_score']:.3f}] {r['title']}{heading}")
+        # Same crash as `semantic-query` (cli/semantic.py) and the same cause: a vault-only hit
+        # from the lexical (FTS) leg of the hybrid search has no vector distance and so no
+        # score, by design. Caught by /relay-xyz QA (agy) on the sibling fix — this command
+        # calls the same query() and was never patched alongside it.
+        score = r.get("similarity_score")
+        score_str = f"{score:.3f}" if score is not None else "n/a"
+        typer.echo(f"{i}. [{score_str}] {r['title']}{heading}")
         typer.echo(f"   {metadata.get('file_path', '')}")
         typer.echo(f"   {r['body_preview'][:120]}...")
         typer.echo()
