@@ -277,9 +277,7 @@ class TestPlistTemplates(unittest.TestCase):
 
         def only_fire_time(job):
             intervals = _intervals(_parse(job))
-            self.assertEqual(
-                len(intervals), 1, f"{job}: expected a single daily fire time"
-            )
+            self.assertEqual(len(intervals), 1, f"{job}: expected a single daily fire time")
             return intervals[0]["Hour"] * 60 + intervals[0]["Minute"]
 
         earlier = only_fire_time("obsidian-daily-sync")

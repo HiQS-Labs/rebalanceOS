@@ -93,9 +93,7 @@ def test_device_scoped_job_stays_informational_even_with_a_stale_plist() -> None
         agents = root / "LaunchAgents"
         agents.mkdir()
         # The stale plist: present on disk, absent from launchctl.
-        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text(
-            "x", encoding="utf-8"
-        )
+        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text("x", encoding="utf-8")
 
         checks = _check_scheduler_liveness(
             policy,
@@ -118,9 +116,7 @@ def test_device_scoped_job_with_a_stale_plist_still_fails_on_its_OWNER() -> None
         policy = _write_policy(root, ["git-pulse-daily-synthesis"])
         agents = root / "LaunchAgents"
         agents.mkdir()
-        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text(
-            "x", encoding="utf-8"
-        )
+        (agents / "com.rebalance-os.git-pulse-daily-synthesis.plist").write_text("x", encoding="utf-8")
 
         checks = _check_scheduler_liveness(
             policy,

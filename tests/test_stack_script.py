@@ -137,11 +137,7 @@ class StackScriptTests(unittest.TestCase):
         out = strip_ansi(run_stack("status", home=self.home).stdout)
         table = out.split("BOUND TO", 1)[1]
         table = table.split("managed:", 1)[0]
-        seen = {
-            line.split()[0]
-            for line in table.splitlines()
-            if line.strip() and not line.startswith("-")
-        }
+        seen = {line.split()[0] for line in table.splitlines() if line.strip() and not line.startswith("-")}
         self.assertEqual(seen, expected)
 
     def test_status_reports_the_full_policy_count(self):
@@ -241,11 +237,7 @@ class StackScriptTests(unittest.TestCase):
         self.assertEqual(len(rows), 1, f"expected one vault-sync row, got {rows}")
         self.assertIn("/somewhere/else", rows[0])
 
-        others = [
-            ln
-            for ln in out.splitlines()
-            if "/somewhere/else" in ln and not ln.startswith("vault-sync ")
-        ]
+        others = [ln for ln in out.splitlines() if "/somewhere/else" in ln and not ln.startswith("vault-sync ")]
         self.assertFalse(others, f"foreign binding leaked onto other rows: {others}")
 
     def test_up_refuses_when_the_fleet_is_bound_elsewhere(self):
@@ -275,8 +267,7 @@ class StackScriptTests(unittest.TestCase):
         whole script from inside bound_root's command substitution."""
         path = self.agents / f"{PREFIX}vault-sync.plist"
         path.write_text(
-            "<?xml version='1.0'?><plist version='1.0'><dict>\n"
-            "<key>Nice</key><integer>5</integer>\n</dict></plist>\n",
+            "<?xml version='1.0'?><plist version='1.0'><dict>\n<key>Nice</key><integer>5</integer>\n</dict></plist>\n",
             encoding="utf-8",
         )
         result = run_stack("status", home=self.home)
@@ -375,9 +366,7 @@ class StackScriptTests(unittest.TestCase):
         )
         self.write_plist("vault-sync")
 
-        result = run_stack(
-            "up", home=self.home, extra_env={"STACK_POLICY_DOC": str(policy)}
-        )
+        result = run_stack("up", home=self.home, extra_env={"STACK_POLICY_DOC": str(policy)})
 
         self.assertNotEqual(result.returncode, 0, "up accepted a missing template")
         self.assertIn("no-such-job", strip_ansi(result.stderr))

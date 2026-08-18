@@ -123,9 +123,7 @@ class SchedulerLivenessTests(unittest.TestCase):
 
     def test_loaded_jobs_produce_no_check_either_way(self):
         (self.agents / "com.rebalance-os.health-check.plist").write_text("x", encoding="utf-8")
-        checks = self._checks(
-            "-\t0\tcom.rebalance-os.github-sync\n-\t0\tcom.rebalance-os.health-check\n"
-        )
+        checks = self._checks("-\t0\tcom.rebalance-os.github-sync\n-\t0\tcom.rebalance-os.health-check\n")
         self.assertEqual(checks, [])
 
     def test_purging_a_plist_downgrades_the_failure(self):
@@ -149,9 +147,7 @@ class PulseConfigGradingTests(unittest.TestCase):
     def test_configured_but_missing_target_fails(self):
         """The literal pulse-sync outage: pulse_target_path named a directory
         that had been archived away."""
-        check = self._pulse(
-            {"github_login": "noelsaw1", "pulse_target_path": "/nonexistent/git-pulse-sync"}
-        )
+        check = self._pulse({"github_login": "noelsaw1", "pulse_target_path": "/nonexistent/git-pulse-sync"})
         self.assertEqual(check.status, FAIL)
         self.assertEqual(check.severity, ERROR)
 
