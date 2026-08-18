@@ -12,14 +12,18 @@ Run with:
 
 from __future__ import annotations
 
+import email.message
 import importlib
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
@@ -616,6 +620,110 @@ class TestGitHubInteraction(unittest.TestCase):
         methods = [c[0] for c in calls]
         self.assertEqual(methods, ["POST", "PATCH"])  # comment then state change
         self.assertEqual(calls[1][2]["state"], "closed")
+
+
+# ===========================================================================
+# 6b. Rate-limit backoff — a 403 quota exhaustion must back off, not crash
+#
+# Root cause (agent2agent discussion #861532, 2026-08-18): _request() turned
+# every HTTPError, including a 403 from GitHub's hourly quota being
+# exhausted, into a bare RuntimeError with only one catch site (ensure_label's
+# 404 check) — so a rate-limited run crashed with an unhandled traceback,
+# which is what health-check-triage's sticky exit 1 turned out to be. A real
+# permission-denied 403 (bad token scope) must NOT be swept into the same
+# backoff path — that's a credential problem, not a quota one — so the
+# negative-control tests below pin that distinction.
+# ===========================================================================
+
+
+def _http_error(code: int, body: bytes, headers: dict[str, str] | None = None) -> urllib.error.HTTPError:
+    msg = email.message.Message()
+    for k, v in (headers or {}).items():
+        msg[k] = v
+    return urllib.error.HTTPError("https://api.github.com/x", code, "err", msg, io.BytesIO(body))
+
+
+class TestRateLimitBackoff(unittest.TestCase):
+    def test_is_rate_limit_response_true_when_header_zero(self) -> None:
+        exc = SimpleNamespace(code=403, headers={"x-ratelimit-remaining": "0"})
+        self.assertTrue(hr._is_rate_limit_response(exc, '{"message": "forbidden"}'))
+
+    def test_is_rate_limit_response_true_from_body_when_header_missing(self) -> None:
+        exc = SimpleNamespace(code=403, headers={})
+        self.assertTrue(hr._is_rate_limit_response(exc, '{"message": "API rate limit exceeded for user ID 1."}'))
+
+    def test_is_rate_limit_response_false_for_plain_403(self) -> None:
+        """Negative control: a real permission-denied 403 must not be treated as a
+        rate limit — exactly the ambiguity #861532 exists to resolve."""
+        exc = SimpleNamespace(code=403, headers={})
+        self.assertFalse(hr._is_rate_limit_response(exc, '{"message": "Resource not accessible by integration"}'))
+
+    def test_is_rate_limit_response_false_for_non_403(self) -> None:
+        exc = SimpleNamespace(code=404, headers={"x-ratelimit-remaining": "0"})
+        self.assertFalse(hr._is_rate_limit_response(exc, "not found"))
+
+    def test_reset_epoch_parsed_from_header(self) -> None:
+        exc = SimpleNamespace(headers={"x-ratelimit-reset": "1700000000"})
+        self.assertEqual(hr._reset_epoch_from_headers(exc), 1700000000)
+
+    def test_reset_epoch_none_when_header_missing(self) -> None:
+        exc = SimpleNamespace(headers={})
+        self.assertIsNone(hr._reset_epoch_from_headers(exc))
+
+    def test_reset_epoch_none_when_header_unparseable(self) -> None:
+        exc = SimpleNamespace(headers={"x-ratelimit-reset": "not-a-number"})
+        self.assertIsNone(hr._reset_epoch_from_headers(exc))
+
+    def test_format_reset_reports_unknown_without_epoch(self) -> None:
+        self.assertIn("unknown", hr.format_rate_limit_reset(None))
+
+    def test_format_reset_includes_iso_timestamp(self) -> None:
+        formatted = hr.format_rate_limit_reset(1700000000)
+        self.assertIn("2023-11-14T22:13:20Z", formatted)
+
+    def test_request_raises_rate_limit_error_on_403_quota_exhausted(self) -> None:
+        exc = _http_error(
+            403,
+            b'{"message": "API rate limit exceeded for user ID 1."}',
+            {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1700000000"},
+        )
+        with patch.object(hr.urllib.request, "urlopen", side_effect=exc):
+            with self.assertRaises(hr.GitHubRateLimitExceeded) as ctx:
+                hr._request("GET", "/user/repos", "tok")
+        self.assertEqual(ctx.exception.reset_epoch, 1700000000)
+
+    def test_request_raises_plain_runtimeerror_on_403_without_rate_limit_signal(self) -> None:
+        """A genuine permission 403 (bad scope) must stay a plain RuntimeError —
+        not get treated as backoff-able."""
+        exc = _http_error(403, b'{"message": "Resource not accessible by integration"}')
+        with patch.object(hr.urllib.request, "urlopen", side_effect=exc):
+            with self.assertRaises(RuntimeError) as ctx:
+                hr._request("GET", "/user/repos", "tok")
+        self.assertNotIsInstance(ctx.exception, hr.GitHubRateLimitExceeded)
+
+    def test_request_raises_plain_runtimeerror_on_404(self) -> None:
+        exc = _http_error(404, b'{"message": "Not Found"}')
+        with patch.object(hr.urllib.request, "urlopen", side_effect=exc):
+            with self.assertRaises(RuntimeError) as ctx:
+                hr._request("GET", "/repos/x/labels/y", "tok")
+        self.assertNotIsInstance(ctx.exception, hr.GitHubRateLimitExceeded)
+
+    def test_run_github_sync_propagates_rate_limit_instead_of_swallowing(self) -> None:
+        """The crash this fix targets: a 403 mid-sync must surface as
+        GitHubRateLimitExceeded out of _run_github_sync, not a bare RuntimeError
+        or a silently skipped call — that's what main() catches to back off."""
+        checks = [_make_check("db", status="error")]
+        run_log = hr.RunLog("run-rl", {})
+        args = SimpleNamespace(repo="o/r", dry_run=False, dedup_days=30, warn=False, close=False, llm_triage=False)
+
+        def _fake_request(method, path, token, payload=None):
+            if method == "GET" and "/labels/" in path:
+                return {}  # ensure_label: label already exists, no rate limit here
+            raise hr.GitHubRateLimitExceeded("boom", reset_epoch=1700000000)
+
+        with patch.object(hr, "_request", side_effect=_fake_request):
+            with self.assertRaises(hr.GitHubRateLimitExceeded):
+                hr._run_github_sync("tok", args, checks, run_log, _now_str())
 
 
 # ===========================================================================

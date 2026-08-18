@@ -191,6 +191,48 @@ def increment_quota() -> int:
 GITHUB_API = "https://api.github.com"
 
 
+class GitHubRateLimitExceeded(RuntimeError):
+    """A 403 caused by quota exhaustion, not a credential/permission failure.
+
+    Agent2Agent discussion #861532 (2026-08-18) reconciled why `health-check-triage`
+    crashed while doctor's own auth log showed 0 failures: GitHub returns 403 for
+    both "token lacks scope" and "hourly quota exhausted" — the token here was
+    fully valid, so this is the latter. Kept distinct from plain RuntimeError so
+    callers can back off instead of treating it as a broken credential.
+    """
+
+    def __init__(self, message: str, reset_epoch: int | None = None) -> None:
+        super().__init__(message)
+        self.reset_epoch = reset_epoch
+
+
+def _is_rate_limit_response(exc: urllib.error.HTTPError, body_text: str) -> bool:
+    if exc.code != 403:
+        return False
+    if exc.headers.get("x-ratelimit-remaining") == "0":
+        return True
+    return "rate limit exceeded" in body_text.lower()
+
+
+def _reset_epoch_from_headers(exc: urllib.error.HTTPError) -> int | None:
+    value = exc.headers.get("x-ratelimit-reset")
+    try:
+        return int(value) if value is not None else None
+    except ValueError:
+        return None
+
+
+def format_rate_limit_reset(reset_epoch: int | None) -> str:
+    """Human-readable reset time for a rate-limit message. No epoch → say so plainly."""
+    if reset_epoch is None:
+        return "unknown reset time — GitHub did not send x-ratelimit-reset"
+    from datetime import datetime, timezone
+
+    reset_dt = datetime.fromtimestamp(reset_epoch, tz=timezone.utc)
+    seconds_left = max(0, int((reset_dt - now_utc()).total_seconds()))
+    return f"{reset_dt.strftime('%Y-%m-%dT%H:%M:%SZ')} (~{seconds_left // 60}m from now)"
+
+
 def _request(method: str, path: str, token: str, payload: dict | None = None) -> dict | list:
     url = f"{GITHUB_API}{path}"
     body = json.dumps(payload).encode() if payload else None
@@ -210,6 +252,11 @@ def _request(method: str, path: str, token: str, payload: dict | None = None) ->
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         body_text = exc.read().decode(errors="replace")
+        if _is_rate_limit_response(exc, body_text):
+            raise GitHubRateLimitExceeded(
+                f"GitHub API {method} {url} → 403 (rate limit exceeded): {body_text}",
+                reset_epoch=_reset_epoch_from_headers(exc),
+            ) from exc
         raise RuntimeError(f"GitHub API {method} {url} → {exc.code}: {body_text}") from exc
 
 
@@ -602,93 +649,27 @@ def _resolve_token() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# GitHub sync — file/refresh/close issues for this run's checks
+#
+# Split out of main() so the rate-limit backoff has one clear boundary: every
+# GitHub-mutating call for this run happens inside here, so wrapping this one
+# call in a try/except is sufficient to catch a mid-run 403 quota exhaustion
+# without a scattered try/except per call site.
 # ---------------------------------------------------------------------------
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument(
-        "--also-pulse",
-        action="store_true",
-        help="Deprecated; rebalance doctor already includes collector checks.",
-    )
-    parser.add_argument("--warn", action="store_true", help="File issues for WARN findings too (default: FAIL only)")
-    parser.add_argument("--close", action="store_true", help="Close issues whose checks have recovered")
-    parser.add_argument("--llm-triage", action="store_true", help="Ask an LLM whether each finding is worth filing")
-    parser.add_argument("--llm-provider", default="gemini", choices=["gemini", "openai-compat"])
-    parser.add_argument("--llm-model", default="", metavar="MODEL")
-    parser.add_argument("--llm-base-url", default="", metavar="URL")
-    parser.add_argument(
-        "--llm-daily-limit", type=int, default=8, metavar="N", help="Max LLM API calls per UTC day (default: 8). CB-2."
-    )
-    parser.add_argument(
-        "--llm-max-per-run",
-        type=int,
-        default=5,
-        metavar="N",
-        help="Max LLM calls in this invocation (default: 5). CB-3.",
-    )
-    parser.add_argument("--dedup-days", type=int, default=30, metavar="N")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--repo", default=REPO, metavar="OWNER/REPO")
-    args = parser.parse_args()
+def _run_github_sync(
+    token: str,
+    args: argparse.Namespace,
+    checks: list[dict],
+    run_log: RunLog,
+    now_str: str,
+) -> tuple[int, int, int, int]:
+    """Ensure the label, fetch existing issues, then file/refresh/close per check.
 
-    now_str = now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
-    run_log = RunLog(
-        now_str,
-        {
-            "repo": args.repo,
-            "warn": args.warn,
-            "close": args.close,
-            "llm_triage": args.llm_triage,
-            "llm_provider": args.llm_provider,
-            "llm_model": args.llm_model or os.environ.get("HEALTH_LLM_MODEL", ""),
-            "llm_daily_limit": args.llm_daily_limit,
-            "llm_max_per_run": args.llm_max_per_run,
-            "dry_run": args.dry_run,
-        },
-    )
-
-    print(f"rebalance health issue reporter — {now_str}")
-    print(f"  repo:             {args.repo}")
-    print(f"  file:             {'FAIL+WARN' if args.warn else 'FAIL only'}")
-    print(f"  llm-triage:       {'yes' if args.llm_triage else 'no'}")
-    if args.llm_triage:
-        remaining = quota_remaining(args.llm_daily_limit)
-        disabled = bool(os.environ.get("HEALTH_LLM_DISABLE"))
-        print(
-            f"  llm quota today:  {remaining}/{args.llm_daily_limit} remaining"
-            + (" [CB-1: DISABLED via env]" if disabled else "")
-        )
-        print(f"  llm max/run:      {args.llm_max_per_run}  [CB-3]")
-        # CB-1 check: hard kill switch
-        if disabled:
-            run_log.add_cb("CB-1: HEALTH_LLM_DISABLE")
-            print("  [CB-1] HEALTH_LLM_DISABLE=1 — LLM triage will be skipped")
-        # Gemini key check (fail early with a clear message)
-        from rebalance.ingest.config import get_gemini_api_key
-
-        if args.llm_provider == "gemini" and not get_gemini_api_key():
-            print("\n  Warning: GEMINI_API_KEY is not set.")
-            print("  Set it with:  export GEMINI_API_KEY=<your-key>")
-            print("  LLM triage will degrade gracefully to 'file' for all checks.\n")
-    print(f"  dry-run:          {'yes' if args.dry_run else 'no'}")
-    print(f"  log:              {LOG_FILE.relative_to(_REPO_ROOT)}")
-    print()
-
-    # --- Collect checks ---
-    print("Running rebalance doctor...")
-    checks = run_doctor_checks()
-    if args.also_pulse:
-        print("  --also-pulse is redundant; collector checks come from rebalance doctor")
-    print(f"  {len(checks)} check(s) collected")
-    for c in checks:
-        run_log.add_check(c)
-    print()
-
-    # --- GitHub state ---
-    token = _resolve_token()
+    Returns (filed, closed, skipped, triaged_skip). Raises GitHubRateLimitExceeded
+    if any call hits a 403 quota-exhaustion response — the caller backs off.
+    """
     ensure_label(token, args.repo, args.dry_run)
     print("Fetching health issues from GitHub...")
     if args.dry_run:
@@ -809,6 +790,111 @@ def main() -> int:
             print(f"  CLOSED ok    {check['name']}  (was #{already_open['number']})")
             run_log.add_action("closed", check["name"], already_open["number"])
             closed += 1
+
+    return filed, closed, skipped, triaged_skip
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--also-pulse",
+        action="store_true",
+        help="Deprecated; rebalance doctor already includes collector checks.",
+    )
+    parser.add_argument("--warn", action="store_true", help="File issues for WARN findings too (default: FAIL only)")
+    parser.add_argument("--close", action="store_true", help="Close issues whose checks have recovered")
+    parser.add_argument("--llm-triage", action="store_true", help="Ask an LLM whether each finding is worth filing")
+    parser.add_argument("--llm-provider", default="gemini", choices=["gemini", "openai-compat"])
+    parser.add_argument("--llm-model", default="", metavar="MODEL")
+    parser.add_argument("--llm-base-url", default="", metavar="URL")
+    parser.add_argument(
+        "--llm-daily-limit", type=int, default=8, metavar="N", help="Max LLM API calls per UTC day (default: 8). CB-2."
+    )
+    parser.add_argument(
+        "--llm-max-per-run",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Max LLM calls in this invocation (default: 5). CB-3.",
+    )
+    parser.add_argument("--dedup-days", type=int, default=30, metavar="N")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--repo", default=REPO, metavar="OWNER/REPO")
+    args = parser.parse_args()
+
+    now_str = now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+    run_log = RunLog(
+        now_str,
+        {
+            "repo": args.repo,
+            "warn": args.warn,
+            "close": args.close,
+            "llm_triage": args.llm_triage,
+            "llm_provider": args.llm_provider,
+            "llm_model": args.llm_model or os.environ.get("HEALTH_LLM_MODEL", ""),
+            "llm_daily_limit": args.llm_daily_limit,
+            "llm_max_per_run": args.llm_max_per_run,
+            "dry_run": args.dry_run,
+        },
+    )
+
+    print(f"rebalance health issue reporter — {now_str}")
+    print(f"  repo:             {args.repo}")
+    print(f"  file:             {'FAIL+WARN' if args.warn else 'FAIL only'}")
+    print(f"  llm-triage:       {'yes' if args.llm_triage else 'no'}")
+    if args.llm_triage:
+        remaining = quota_remaining(args.llm_daily_limit)
+        disabled = bool(os.environ.get("HEALTH_LLM_DISABLE"))
+        print(
+            f"  llm quota today:  {remaining}/{args.llm_daily_limit} remaining"
+            + (" [CB-1: DISABLED via env]" if disabled else "")
+        )
+        print(f"  llm max/run:      {args.llm_max_per_run}  [CB-3]")
+        # CB-1 check: hard kill switch
+        if disabled:
+            run_log.add_cb("CB-1: HEALTH_LLM_DISABLE")
+            print("  [CB-1] HEALTH_LLM_DISABLE=1 — LLM triage will be skipped")
+        # Gemini key check (fail early with a clear message)
+        from rebalance.ingest.config import get_gemini_api_key
+
+        if args.llm_provider == "gemini" and not get_gemini_api_key():
+            print("\n  Warning: GEMINI_API_KEY is not set.")
+            print("  Set it with:  export GEMINI_API_KEY=<your-key>")
+            print("  LLM triage will degrade gracefully to 'file' for all checks.\n")
+    print(f"  dry-run:          {'yes' if args.dry_run else 'no'}")
+    print(f"  log:              {LOG_FILE.relative_to(_REPO_ROOT)}")
+    print()
+
+    # --- Collect checks ---
+    print("Running rebalance doctor...")
+    checks = run_doctor_checks()
+    if args.also_pulse:
+        print("  --also-pulse is redundant; collector checks come from rebalance doctor")
+    print(f"  {len(checks)} check(s) collected")
+    for c in checks:
+        run_log.add_check(c)
+    print()
+
+    # --- GitHub state ---
+    token = _resolve_token()
+    try:
+        filed, closed, skipped, triaged_skip = _run_github_sync(token, args, checks, run_log, now_str)
+    except GitHubRateLimitExceeded as exc:
+        reset_str = format_rate_limit_reset(exc.reset_epoch)
+        run_log.add_cb("CB-5: GitHub rate limit exceeded")
+        print()
+        print("GitHub rate limit exceeded — backing off instead of crashing.")
+        print(f"  {exc}")
+        print(f"  resets: {reset_str}")
+        print("  no further issues filed/closed this run; the next scheduled run will retry.")
+        run_log.flush(dry_run=args.dry_run)
+        print(f"Run logged → {LOG_FILE.relative_to(_REPO_ROOT)}")
+        return 1
 
     print()
     triage_note = f", {triaged_skip} triage-skipped" if args.llm_triage else ""
