@@ -163,7 +163,12 @@ def semantic_query_cmd(
         repo_label = f" {metadata.get('repo_full_name')}" if metadata.get("repo_full_name") else ""
         html_url = metadata.get("html_url") or ""
         updated_local = format_local(result.get("updated_at"), "%Y-%m-%d %H:%M %Z", tz=local_tz())
-        typer.echo(f"{i}. [{result['similarity_score']:.3f}] {result['source_type']}:{result['doc_kind']}{repo_label}")
+        # A doc that only matched the lexical (FTS) leg of the hybrid search, never the
+        # vector leg, carries no distance and so no similarity score by design (see
+        # semantic_index._rrf_fuse's docstring) — not a data bug, so format it, not crash.
+        score = result.get("similarity_score")
+        score_str = f"{score:.3f}" if score is not None else "n/a"
+        typer.echo(f"{i}. [{score_str}] {result['source_type']}:{result['doc_kind']}{repo_label}")
         typer.echo(f"   {result['title']}{heading}")
         if updated_local:
             typer.echo(f"   Local Time: {updated_local}")

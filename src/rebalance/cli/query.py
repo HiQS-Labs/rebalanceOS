@@ -119,9 +119,16 @@ def ask_cmd(
     if result.github_semantic_context:
         typer.echo("\n--- Relevant GitHub Artifacts ---")
         for item in result.github_semantic_context[:8]:
+            # `metadata` is where repo_full_name/item_type/source_number actually live —
+            # querier._build_prompt already reads it this way (the LLM prompt path never
+            # crashed); this CLI printer read them as top-level keys instead and raised
+            # KeyError on every call that returned a GitHub hit, since the initial commit.
+            md = item.get("metadata") or {}
+            score = item.get("similarity_score")
+            score_str = f"{score:.3f}" if score is not None else "n/a"
             typer.echo(
-                f"  {item['repo_full_name']} {item['source_type']} #{item['source_number']} "
-                f"[{item['similarity_score']:.3f}] {item['title']}"
+                f"  {md.get('repo_full_name', '?')} {md.get('item_type', item.get('source_type', '?'))} "
+                f"#{md.get('source_number', '?')} [{score_str}] {item.get('title', '')}"
             )
 
     if result.calendar_context:
