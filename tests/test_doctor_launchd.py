@@ -49,10 +49,20 @@ def test_recent_degraded_run_is_distinct_from_failure(tmp_path: Path) -> None:
     assert "failed" not in check.detail
 
 
-def test_recent_fatal_run_warns(tmp_path: Path) -> None:
+def test_recent_fatal_run_fails(tmp_path: Path) -> None:
+    """GH-59: daily-sync's own structured result saying it died is a FAIL.
+
+    This is the high-confidence branch. Contrast with
+    test_unrecognised_daily_log_keeps_legacy_launchctl_behavior and
+    test_missing_recent_run_is_stale_unknown_not_current_failure below, which
+    stay WARN: there the contract is absent and the honest reading is "unknown".
+    GH-146 Root cause A drew that line; "unknown" and "it told us it died" are
+    not the same claim.
+    """
     check = _daily_check(tmp_path, "fatal")
 
-    assert check.status == WARN
+    assert check.status == FAIL
+    assert check.severity == ERROR
     assert "failed fatally" in check.detail
 
 

@@ -677,8 +677,11 @@ def _check_scheduler_liveness(
                         name,
                         FAIL,
                         "installed on this device but NOT loaded in launchd",
-                        f"`launchctl load ~/Library/LaunchAgents/com.rebalance-os.{job}.plist`, "
-                        "or `bash scripts/stack.sh up` to reload the whole stack",
+                        f"`launchctl load -w ~/Library/LaunchAgents/com.rebalance-os.{job}.plist` "
+                        "(-w is required if the job was disabled; plain `load` reports success "
+                        "and does nothing), or `bash scripts/stack.sh up` for the whole stack. "
+                        "If this plist is left over from a repo move or a restored backup and "
+                        "the job is not wanted here, `bash scripts/stack.sh purge` removes it.",
                     )
                 )
                 continue
@@ -754,9 +757,14 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
         if outcome == "fatal":
+            # FAIL (GH-59). This is the high-confidence branch: daily-sync's own
+            # structured result says it failed. The missing-contract fallback
+            # below deliberately stays WARN because there it means "unknown" —
+            # the distinction GH-146 Root cause A drew — and "unknown" is not
+            # the same claim as "it told us it died".
             return Check(
                 "launchd:daily-sync",
-                WARN,
+                FAIL,
                 f"{source} failed fatally",
                 "inspect temp/logs/daily_sync_*.log for the structured error result",
             )
@@ -1006,7 +1014,10 @@ def _check_launchd(
                     f"launchd:{short}",
                     FAIL,
                     f"last run exited with status {status_val}",
-                    "inspect temp/logs/ for this job's error output",
+                    "inspect temp/logs/ for this job's error output. This status is sticky: "
+                    "launchctl keeps it until launchd reruns the job, so running the wrapper "
+                    "by hand will not clear it — use "
+                    f"`launchctl kickstart -k gui/$(id -u)/com.rebalance-os.{short}`",
                 )
             )
 

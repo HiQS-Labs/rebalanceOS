@@ -39,7 +39,7 @@ from rebalance.doctor import (
     _check_pulse,
     _check_scheduler_liveness,
 )
-from rebalance.health import visible_problem_checks
+from rebalance.health import compute_health_status, visible_problem_checks
 
 NOW = datetime(2026, 8, 17, 21, 0, tzinfo=timezone.utc)
 POLICY = "| Job (label suffix) |\n|---|---|\n| `github-sync` |\n| `health-check` |\n"
@@ -199,6 +199,29 @@ class SuppressionInvariantTests(unittest.TestCase):
         fail = Check("sleuth", FAIL, "collector crashed")
         visible = visible_problem_checks([fail], self._status(timedelta(minutes=5)), NOW)
         self.assertEqual([c.status for c in visible], [FAIL])
+
+    def test_a_real_failing_job_reaches_a_FAIL_verdict(self):
+        """End to end, from the launchctl row to the verdict `doctor` exits on.
+
+        The tests above use synthetic Checks to isolate the reconciler. That is
+        the right unit boundary, but it cannot catch a regression that stops
+        `_check_launchd` producing FAIL in the first place — the two halves
+        would each pass while the machine went quiet again. This asserts the
+        whole path on the literal row the outage produced.
+        """
+        checks = _check_launchd(
+            "-\t1\tcom.rebalance-os.github-sync\n",
+            log_dir=Path("/nonexistent"),
+            now=NOW,
+        )
+        health = compute_health_status(checks, {}, NOW, notice_patterns=[])
+
+        self.assertEqual(health.verdict, FAIL)
+        self.assertIn(
+            "launchd:github-sync",
+            [c.name for c in health.problems],
+            "a failing job must be a problem, not a demoted notice",
+        )
 
 
 if __name__ == "__main__":
