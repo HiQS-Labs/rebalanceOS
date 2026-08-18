@@ -81,8 +81,13 @@ jobs:
           git config --global user.name "rebalance-OS CI"
           git config --global init.defaultBranch main
 
+      # 3-Eyes is deferred (2026-08-17, operator decision) — its tests are NOT run
+      # here. It is documented alpha and outside the supported core, and gating the
+      # core suite on it meant an unsupported component could hold up supported work.
+      # The code stays in the tree; this is a pause, not a removal. To resume, add
+      # `utils/3-eyes/tests` back to this line.
       - name: Run tests
-        run: python -m pytest tests/ utils/3-eyes/tests -q
+        run: python -m pytest tests/ -q
 
       # HiQS runs as its OWN pytest process, not appended to the line above.
       # It is a standalone package with its own pyproject, destined for
@@ -95,11 +100,9 @@ jobs:
       - name: HiQS suite (isolated — standalone package)
         run: python -m pytest HiQS/tests -q
 
-      - name: 3-Eyes dashboard is in sync with the registry (GH-195)
-        run: python -m three_eyes.dashboard --check
-        working-directory: utils/3-eyes
-        env:
-          PYTHONPATH: ${{ github.workspace }}/utils/3-eyes
+      # The 3-Eyes registry/dashboard sync check was removed here on 2026-08-17 for
+      # the same reason as its test run above. Restoring it means re-adding a step
+      # that runs `python -m three_eyes.dashboard --check` from `utils/3-eyes`.
 
       - name: Check for raw datetime parsing (use parse_calendar_dt)
         run: |
