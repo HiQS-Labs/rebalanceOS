@@ -10,6 +10,46 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.1] - 2026-08-17
+
+### Fixed
+- **The health check no longer calls a Google credential healthy when it cannot be
+  used.** It reported a stored login as present and fine while every calendar and
+  email sync was failing outright, because the credential had been issued by an
+  OAuth client that was later deleted — the login really was stored, but nothing
+  could be done with it. Presence was the wrong question. The check now compares
+  the client identity recorded inside the stored login against the client the
+  system is actually configured with, and warns with the exact re-authorisation
+  command when they disagree, or when a login exists but no client is configured
+  at all. It still makes no network call, so it stays as cheap as before.
+- **A test that could only pass on one machine no longer fails everywhere else.**
+  It asserted against job definitions that are deliberately kept out of version
+  control because they contain absolute, machine-specific paths, so it passed for
+  the person who had them and failed on every fresh clone and every automated
+  run. It now skips when those definitions are absent and still checks the full
+  contract when they are present. This had been reported as a code failure for
+  some time; the code was fine.
+- **A stale claim that credentials were deliberately hidden from secret scanners
+  has been removed from the login setup documentation.** The practice it described
+  had already been abandoned, but the text still recommended it — and it is worth
+  naming why it was abandoned: the scanner reported the project clean while a
+  working credential was published. A scanner that has been deliberately blinded
+  is worse than no scanner, because it manufactures confidence.
+- **Automation transcripts are no longer committed.** Every review and automation
+  run was writing its full transcript into version control, which is the source of
+  several hundred megabytes of history. New transcripts stay on the operator's
+  machine. The existing history is untouched and still needs a separate,
+  coordinated cleanup.
+- **Private runtime content can no longer reach the public remote by accident.**
+  Several files that live in a working copy at runtime — a personal memory file,
+  working phase notes, a generated diagram — were not covered by the ignore rules,
+  so a routine commit could have carried them out. They are covered now.
+
+### Changed
+- **`main` is no longer the default branch; day-to-day work lands on the
+  development branch,** matching how the project has actually been worked for
+  some time. Open contributions were retargeted so nothing lands off to the side.
+
 ## [0.73.0] - 2026-08-17
 
 ### Changed

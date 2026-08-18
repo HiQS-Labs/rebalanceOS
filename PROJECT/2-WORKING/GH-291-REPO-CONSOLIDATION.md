@@ -9,24 +9,31 @@ the folder swap replaces the old tree wholesale. Edit the new repo's copy from P
 
 ## Why
 
-Two ~90% identical folders of the same project sit on this machine, and two public
-repos exist remotely. No snapshot/mirror pipeline between them is being maintained.
+> **Superseded in part, 2026-08-17.** The two-folder picture below was true when
+> this plan was written and is no longer. There are **three** directories, and the
+> one that runs is neither of the two named here. See Phase 2R.
 
-| | Old | New |
-|---|---|---|
-| Local path | `/Users/noelsaw/Documents/rebalance-OS` | `/Users/noelsaw/Documents/GH Repos/rebalanceOS` |
-| Remote | `Hypercart-Dev-Tools/rebalance-OS` | `HiQS-Suite/rebalanceOS` |
-| History | 1,566 commits | 1 commit (0.69.2 initial public release) |
-| Runtime | All 14 `com.rebalance-os.*` launchd jobs point here; live dbs, logs, venv | Nothing runs from here |
+| | Retiring | Dev clone | **Runtime** |
+|---|---|---|---|
+| Local path | `~/Documents/rebalance-OS` | `~/Documents/GH Repos/rebalanceOS` | **`~/rebalance-runtime`** |
+| Remote | `Hypercart-Dev-Tools/rebalance-OS` | `HiQS-Suite/rebalanceOS` | `HiQS-Suite/rebalanceOS` |
+| History | 1,566 commits | full | full |
+| Runtime | nothing runs from here | nothing runs from here | **all 14 `com.rebalance-os.*` jobs** |
+
+The runtime clone was created deliberately by the other maintainer as a stable
+pinned base while the new repo was moving quickly. It is not an accident to be
+undone; it is the home, by operator decision of 2026-08-17.
 
 ## Goals
 
-1. **One folder**: `/Users/noelsaw/Documents/rebalance-OS` survives, carrying the
-   new repo's git identity. The path is kept because every launchd plist,
-   symlink, MCP config, and Obsidian/`.claude` reference already points at it —
-   the swap needs **zero plist edits**.
-2. **Collectors error-free**: all 14 jobs run clean after cutover (deterministic
-   check: 3-eyes fleet health).
+1. ~~**One folder**~~ → **One runtime, one public repo, and a dev tree that is
+   explicitly not the runtime.** `~/rebalance-runtime` is the on-device home.
+   The original goal assumed every plist pointed at `~/Documents/rebalance-OS`
+   so the path could be kept and the swap would need zero plist edits; measured
+   2026-08-17, no plist references that path at all.
+2. **Collectors error-free**: all 14 jobs run clean. *3-eyes is paused as the
+   deterministic check by operator decision 2026-08-17 — use `launchctl list`
+   exit statuses and the per-job logs instead.*
 3. **One public repo**: `HiQS-Suite/rebalanceOS`. Old repo gets a README pointer,
    then is archived on GitHub (issues + commits remain readable forever).
 4. **Zero private-data leakage**: the surviving folder keeps private runtime
@@ -153,7 +160,66 @@ repos exist remotely. No snapshot/mirror pipeline between them is being maintain
 
 **Gate:** new clone is green and its gitignore is believed complete.
 
-## Phase 2 — Cutover (Day 0/1, low-activity window, ~1 hr)
+## Phase 2 — Cutover — ❌ SUPERSEDED 2026-08-17, do not execute
+
+> **The folder swap this phase describes must not be run.** Its premise was that
+> all 14 launchd plists pointed at `~/Documents/rebalance-OS`, so keeping that path
+> meant "zero plist edits". Measured 2026-08-17: **no plist references either
+> folder.** Every `com.rebalance-os.*` job points at `~/rebalance-runtime`, a third
+> clone of `HiQS-Suite/rebalanceOS` created deliberately by the other maintainer as
+> a stable pinned base while the new repo was moving quickly. Swapping the two
+> `Documents/` folders today would change nothing about what launchd executes.
+>
+> **Operator decision, 2026-08-17: `~/rebalance-runtime` is the on-device home
+> until further notice.** The original steps are kept below, struck through, only
+> so the reasoning behind the change is legible.
+
+### Phase 2R — Reconcile against the real topology
+
+The goal is unchanged — one runtime, one public repo — but the shape is now three
+directories with distinct jobs, and only one of them is load-bearing:
+
+| Path | Role | Disposition |
+|---|---|---|
+| `~/rebalance-runtime` | **the runtime.** All 14 plists execute from here | Keep. This is the home. |
+| `~/Documents/GH Repos/rebalanceOS` | dev clone (`development`) | Keep as the working tree, or fold into the runtime clone — operator's call |
+| `~/Documents/rebalance-OS` | the retiring `Hypercart-Dev-Tools` tree | Retire, but only after the checks below |
+
+- [x] Runtime venv repaired 2026-08-17. It was built without the embeddings extra,
+      so the hourly vault sync and the semantic backfill had been failing every run
+      since the clone went live — the module simply was not installed. Reinstalling
+      with the calendar, server and embeddings extras cleared it; the vault and
+      semantic scopes then returned no errors, and the job now exits 0.
+- [ ] GitHub sync on the runtime clone still fails every run — **not** a swap or
+      config problem, and **not** transient as first read. The token consumes its
+      entire 5000/hour allowance every hour (`used=5129`, `5000`, `5002` in the
+      day's logs), so the job is rate-limited before it starts. Cause is scan
+      breadth (138 auto-discovered repos, hourly, no conditional requests) and
+      needs a real reduction in call volume. Filed as #54; not a blocker for the
+      topology work.
+- [ ] **Do not delete `~/Documents/rebalance-OS` yet.** It holds the only copies on
+      this machine of several gitignored, machine-local files — the 3-eyes job
+      overlay and its command allowlist, the 3-eyes runtime env and catalog, and
+      the local agent permission allowlist. Copies were parked outside both trees
+      on 2026-08-17 under `~/relay-system/rebalanceOS-legacy/`, but they have not
+      been placed into the runtime clone.
+- [ ] Decide whether the dev clone and the runtime clone stay separate. Separate is
+      defensible — a pinned runtime is a real pattern and is why it was built — but
+      it needs a written promotion trigger, or the runtime silently drifts behind
+      `development` the way it already had. (It was 12 commits behind on the
+      morning of 2026-08-17 and was brought current the same day.)
+- [ ] Repoint or retire `com.neochro.vscode-mem-attribute`, the one remaining
+      LaunchAgent that still names `~/Documents/rebalance-OS`.
+- [ ] Restate Goal 1. "One folder" is no longer the target; the honest target is
+      **one runtime, one public repo, and a dev tree that is explicitly not the
+      runtime.** If that is the end state, this issue is no longer a consolidation
+      and should be retitled.
+
+### Original Phase 2 steps — superseded, retained for the record
+
+<details>
+<summary>The folder-swap procedure as originally written (do not execute)</summary>
+
 
 - [ ] Capture the healthy loaded set BEFORE stopping anything (this is the
       restart target — measured, not asserted):
@@ -240,6 +306,8 @@ Pulse server answering on 8767.
 
 **Rollback (any time until Phase 4 deletion):** bootout jobs → swap the two folder
 names back → bootstrap jobs. Total exposure ~5 minutes.
+
+</details>
 
 ## Phase 3 — Verify (Day 1 → Day 7)
 
