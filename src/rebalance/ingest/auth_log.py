@@ -26,7 +26,9 @@ calendar
   token_refresh_failed  — refresh attempt raised an exception
 github
   token_validated       — PAT validated against /user; includes login + scopes
-  token_invalid         — PAT validation returned non-200 (bad/expired token)
+  token_invalid         — PAT validation was REJECTED (bad/expired/unauthorized token)
+  rate_limited          — PAT validation could not be completed because GitHub was
+                          throttling; the credential is untested, not bad
   auth_failed           — a live API call was rejected (401) mid-collection
 gmail
   adc_missing           — no Application Default Credentials found
@@ -62,6 +64,14 @@ from rebalance.lib.time_ops import now_iso
 
 # Events that mean a collector lost or lacked access. Used by readers (the web
 # dashboard, doctor) to surface the most recent failure per source.
+#
+# `rate_limited` is deliberately NOT here. Membership asserts that a credential is
+# broken and needs re-authenticating, and a throttled request asserts nothing about
+# the credential at all — the observed log alternated `token_invalid` (status 403)
+# with `token_validated` hour by hour for one healthy PAT, which is not a shape a
+# genuinely revoked token can produce. Losing access is still reported, by the
+# events that actually mean it: a revoked PAT answers 401 and lands in
+# `token_invalid`, and a job that cannot finish lands in `job_failed`.
 FAILURE_EVENTS: frozenset[str] = frozenset(
     {
         # calendar
@@ -194,6 +204,18 @@ def log_github_token_validated(login: str, scopes: list[str]) -> None:
 
 def log_github_token_invalid(status: int, error: str = "") -> None:
     _append("github", "token_invalid", {"status": status, "error": error})
+
+
+def log_github_rate_limited(status: int, *, remaining: str = "", reset: str = "") -> None:
+    """Validation was throttled, so the token's validity is unknown rather than bad.
+
+    ``reset`` is GitHub's ``x-ratelimit-reset`` (a Unix timestamp) and ``remaining`` its
+    ``x-ratelimit-remaining``. Both are carried through because the bare status was the whole
+    problem with the entry this replaces: an operator reading ``token_invalid {"status": 403,
+    "error": ""}`` has no way to tell a revoked credential from a throttled one, and the
+    obvious remedy — reissuing a perfectly good PAT — does not help.
+    """
+    _append("github", "rate_limited", {"status": status, "remaining": remaining, "reset": reset})
 
 
 def log_github_auth_failed(status: int, endpoint: str = "") -> None:
