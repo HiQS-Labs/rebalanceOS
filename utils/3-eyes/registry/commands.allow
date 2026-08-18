@@ -62,7 +62,7 @@ description = "Incumbent Rebalance local pulse health-banner watcher."
 [commands.daily-synthesis]
 exec = "utils/daily_synthesis.sh"
 args = []
-description = "Incumbent Rebalance daily vault synthesis wrapper (pulse + git-pulse, GH-74)."
+description = "Incumbent Rebalance daily vault synthesis wrapper (pulse + Git Pulse, GH-74)."
 
 [commands.obsidian-rollover]
 exec = "utils/obsidian_rollover.sh"

@@ -9,7 +9,7 @@
 
 id = "daily-synthesis"
 command = "daily-synthesis"
-description = "Write the daily vault synthesis (pulse summary + git-pulse summary) at 18:20 local."
+description = "Write the daily vault synthesis (pulse summary + Git Pulse summary) at 18:20 local."
 enabled = true
 routes = ["log-only"]
 supersedes = ["com.rebalance-os.daily-synthesis", "com.rebalance-os.obsidian-daily-sync"]

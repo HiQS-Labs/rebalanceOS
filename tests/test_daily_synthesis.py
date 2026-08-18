@@ -515,3 +515,74 @@ class TestOrdering:
         assert "Yesterday's pulse text" in out  # untouched pulse block preserved
         assert out.index(ds.PULSE_MARKER_START) < out.index(ds.GIT_PULSE_MARKER_START)
         assert "Fresh git pulse text" in out
+
+
+class TestNormalizeBlockOrder:
+    """Codex GH-74 QA r1 Blocker 1: upsert_marked_block only ever replaces a
+    block IN PLACE, so a note that already has the two blocks reversed (the
+    exact sleep/wake inversion of the old two-launchd-job system) stayed
+    reversed forever without this repair pass."""
+
+    def test_noop_when_neither_block_present(self):
+        content = "manual notes only\n"
+        assert ds.normalize_block_order(content) == content
+
+    def test_noop_when_only_pulse_present(self):
+        content = "manual\n\n" + ds.build_pulse_block("text", GEN_AT)
+        assert ds.normalize_block_order(content) == content
+
+    def test_noop_when_only_git_pulse_present(self):
+        content = "manual\n\n" + ds.build_git_pulse_block("text", GEN_AT)
+        assert ds.normalize_block_order(content) == content
+
+    def test_noop_when_already_in_order(self):
+        content = (
+            "manual\n\n"
+            + ds.build_pulse_block("pulse text", GEN_AT)
+            + "\n"
+            + ds.build_git_pulse_block("git text", GEN_AT)
+        )
+        assert ds.normalize_block_order(content) == content
+
+    def test_repairs_reversed_order(self):
+        reversed_content = (
+            "manual\n\n"
+            + ds.build_git_pulse_block("git text", GEN_AT)
+            + "\n"
+            + ds.build_pulse_block("pulse text", GEN_AT)
+        )
+        out = ds.normalize_block_order(reversed_content)
+        assert out.index(ds.PULSE_MARKER_START) < out.index(ds.GIT_PULSE_MARKER_START)
+        # content survives the strip-and-reinsert, verbatim
+        assert "pulse text" in out
+        assert "git text" in out
+        assert "manual" in out
+        assert out.count(ds.PULSE_MARKER_START) == 1
+        assert out.count(ds.GIT_PULSE_MARKER_START) == 1
+
+    def test_run_repairs_pre_existing_reversed_block_order(self, tmp_path, monkeypatch):
+        """End-to-end: a note that already has the blocks reversed (e.g. from a
+        stale run under the old two-job system before this merge shipped) comes
+        out correctly ordered after one run — even with no new content to write,
+        proving the repair itself (not new synthesis) is what triggers the save."""
+        target = tmp_path / "0. Today's Notes.md"
+        reversed_content = (
+            "manual\n\n"
+            + ds.build_git_pulse_block("stale git text", GEN_AT)
+            + "\n"
+            + ds.build_pulse_block("stale pulse text", GEN_AT)
+        )
+        target.write_text(reversed_content, encoding="utf-8")
+        monkeypatch.setattr(ds, "TODAY_FILE", target)
+        monkeypatch.setattr(ds, "vault_ready", lambda: True)
+        monkeypatch.setattr(ds, "collect_pulse_activity", lambda: {"x": 1})
+        monkeypatch.setattr(ds, "synthesize_pulse", lambda a: None)  # no new content this run
+        monkeypatch.setattr(ds, "collect_git_pulse_activity", lambda: (None, 1))  # collector unavailable
+        with patch("rebalance.ingest.config.get_pulse_config", return_value={"git_pulse_clio_enabled": False}):
+            rc = ds.run(now=datetime(2026, 7, 4, 19, 0))
+
+        assert rc == 0
+        out = target.read_text(encoding="utf-8")
+        assert out.index(ds.PULSE_MARKER_START) < out.index(ds.GIT_PULSE_MARKER_START)
+        assert "stale pulse text" in out
+        assert "stale git text" in out

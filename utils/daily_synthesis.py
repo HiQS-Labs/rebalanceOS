@@ -253,6 +253,60 @@ def upsert_git_pulse_block(content: str, summary: str, generated_at: datetime) -
     )
 
 
+def _extract_full_block(content: str, marker_start: str, marker_end: str) -> str | None:
+    """The full sentinel block (markers + body) verbatim, including its
+    trailing newline, or None if either marker is absent."""
+    if marker_start not in content or marker_end not in content:
+        return None
+    start = content.index(marker_start)
+    end = content.index(marker_end, start) + len(marker_end)
+    if content[end : end + 1] == "\n":
+        end += 1
+    return content[start:end]
+
+
+def _strip_marked_block(content: str, marker_start: str, marker_end: str) -> str:
+    """Remove an existing sentinel block (markers + body) entirely. Companion
+    to upsert_marked_block's in-place replace, used only to normalize a
+    pre-existing block ordering (see normalize_block_order) before the
+    extracted block text is re-appended in the correct position."""
+    if marker_start not in content or marker_end not in content:
+        return content
+    before = content.split(marker_start, 1)[0].rstrip("\n")
+    tail = content.rsplit(marker_end, 1)[1].lstrip("\n")
+    if before and tail:
+        return f"{before}\n\n{tail}"
+    return before or tail
+
+
+def normalize_block_order(content: str) -> str:
+    """If both vault blocks already exist but the git-pulse block sits ABOVE
+    the pulse block — a stale ordering inherited from the old two-launchd-job
+    system, or the exact sleep/wake inversion GH-74 exists to eliminate —
+    move the EXISTING block bytes (verbatim; no fabricated new timestamp) so
+    they land pulse-then-git-pulse, the same fixed point a brand-new day's
+    note converges to. upsert_marked_block only ever replaces a block IN
+    PLACE, so without this pass an already-reversed pair stays reversed
+    forever, and it must actively relocate them (not merely delete) since a
+    run that generates no new summary content would otherwise never
+    re-append what it stripped (Codex GH-74 QA r1 Blocker 1). No-op when
+    either block is absent or they're already in order."""
+    pulse_at = content.find(PULSE_MARKER_START)
+    git_pulse_at = content.find(GIT_PULSE_MARKER_START)
+    if pulse_at == -1 or git_pulse_at == -1 or git_pulse_at >= pulse_at:
+        return content
+    pulse_block = _extract_full_block(content, PULSE_MARKER_START, PULSE_MARKER_END)
+    git_pulse_block = _extract_full_block(content, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END)
+    # Both markers were just confirmed present above (pulse_at/git_pulse_at != -1).
+    assert pulse_block is not None and git_pulse_block is not None
+    stripped = _strip_marked_block(content, PULSE_MARKER_START, PULSE_MARKER_END)
+    stripped = _strip_marked_block(stripped, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END)
+    # Neither marker remains in `stripped`, so both calls take the tested
+    # append-at-bottom path in upsert_marked_block — pulse first, git-pulse second.
+    fixed = upsert_marked_block(stripped, pulse_block, PULSE_MARKER_START, PULSE_MARKER_END)
+    return upsert_marked_block(fixed, git_pulse_block, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END)
+
+
 def _clio_markers(date_str: str) -> tuple[str, str]:
     return (
         f"<!-- Git Pulse Daily Summary {date_str} Start -->",
@@ -431,6 +485,11 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
 
     content = TODAY_FILE.read_text(encoding="utf-8") if vault_write_ready else ""
     original_content = content
+    if vault_write_ready:
+        # Repair a pre-existing reversed block pair BEFORE the change-check below, so
+        # the fix persists even on a run that generates no new summary content itself
+        # (content != original_content must see the repair, not just new synthesis).
+        content = normalize_block_order(content)
 
     # --- Step 1: pulse summary (must land FIRST — see module docstring) --------
     # Vault-only destination (unlike git-pulse below, it has no CLIO alternate) —

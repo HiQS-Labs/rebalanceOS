@@ -91,7 +91,7 @@ status = "to-adopt"
 
 [agent."com.rebalance-os.daily-synthesis"]
 system = "rebalance"
-desc = "Daily vault synthesis (pulse + git-pulse; GH-74 merge)"
+desc = "Daily vault synthesis (pulse + Git Pulse; GH-74 merge)"
 status = "to-adopt"
 
 [agent."com.rebalance-os.obsidian-rollover"]

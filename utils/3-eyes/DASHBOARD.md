@@ -4,7 +4,7 @@
 
 One optional, always-safe local job supervisor (GH-195). This file is a generated mirror of the TOML registry — **the jobs below are exactly what `registry/jobs.d/*.toml` declares.**
 
-- **Registry fingerprint:** `30332204021b`
+- **Registry fingerprint:** `ca801a5a74dd`
 - **Jobs defined:** 12
 - **Registry valid:** ✅ yes
 - **Full machine inventory** (managed + observe-only + to-adopt): `CATALOG.md` — generated (gitignored, machine-specific) from `registry/catalog-notes.toml`; run `python -m three_eyes catalog --write`. Fleet health: `python -m three_eyes health`.
@@ -33,7 +33,7 @@ One optional, always-safe local job supervisor (GH-195). This file is a generate
 - **`collector-health`** — Parse daily_sync telemetry and emit a finding when collectors degrade (GH-146: exit codes lie; sync_outcome is the signal).
 - **`daily-digest`** — Once-daily ranked report of what broke, what matters, and what to ignore across the whole fleet.
 - **`daily-sync`** — Run the Rebalance daily index sync at the incumbent 06:30 local schedule.
-- **`daily-synthesis`** — Write the daily vault synthesis (pulse summary + git-pulse summary) at 18:20 local.
+- **`daily-synthesis`** — Write the daily vault synthesis (pulse summary + Git Pulse summary) at 18:20 local.
 - **`github-sync`** — Run the Rebalance GitHub sync hourly at :45 from 06:45 through 23:45 local.
 - **`obsidian-rollover`** — Roll over Obsidian daily notes at 00:40 local.
 - **`pulse-sync`** — Publish the Rebalance pulse hourly on the hour from 06:00 through 23:00 local.
