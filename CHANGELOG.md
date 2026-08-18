@@ -10,6 +10,62 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.73.3] - 2026-08-17
+
+### Added
+- **One command now shows and controls every scheduled background job.** Bringing
+  the fleet up, taking it down, restarting it, or simply asking "is anything
+  broken?" previously meant knowing which of twelve separate installer scripts to
+  run — and there was no way to ask that last question at all. A single control
+  command now does all of it, and takes its list of jobs from the scheduling
+  policy document that already governs them rather than keeping a second copy
+  that can drift apart. That drift was not hypothetical: the first draft kept its
+  own list and had already lost a job from it. Anything outside the policy —
+  including a subsystem that was deliberately stood down and kept on disk — is
+  shown but never started, stopped or deleted.
+
+### Fixed
+- **Two hourly background jobs had been failing for a full day and nothing said
+  so.** The status publisher was pointed at a folder that had since been archived
+  away, so it failed every hour and reported only a warning. Warnings do not
+  change the health check's verdict, the verdict is what decides its exit code,
+  and the issue filer only files on failures — so three mechanisms that were all
+  working correctly stayed silent because one grade was too low. A scheduled job
+  that ran and failed is now a failure, and the alarm rings on its own.
+- **Missing configuration is now told apart from broken configuration.** A
+  publisher whose destination has been set and no longer exists is a failure; one
+  that was never configured on this machine stays quiet. The same distinction now
+  applies to scheduled jobs: one this machine installed and has since lost is a
+  failure, while one it never installed is not, so a fresh install and a machine
+  that deliberately runs only part of the fleet both stay green.
+- **The health check no longer hides a failure behind a recent success.** A
+  recent successful sync could mask a warning, which is intended. It must never
+  mask a failure — an hourly job that succeeds on the hour and crashes at
+  quarter past is exactly the case that would otherwise go unnoticed again.
+- **Restarting the background stack can no longer leave it stopped.** Restart
+  stopped everything and then started it again, but the checks that can refuse to
+  start ran only in the second half — so a refusal left the machine with nothing
+  running, which is the outage this work exists to prevent. Everything that can
+  refuse now runs before anything is stopped.
+- **A malformed job definition no longer takes a working job down with it.** The
+  old sequence stopped the job, wrote the new definition over the good one, and
+  only then checked whether it was valid. Definitions are now written aside and
+  validated first, and the whole set is validated before anything is stopped at
+  all, so a bad one is caught while everything is still running.
+- **Commands that stop or delete jobs now check they belong here.** Job
+  definitions record an absolute location, so they belong to one working copy.
+  Starting the fleet from a different copy already refused to take it over, but
+  stopping or deleting it did not — the more damaging of the two. All of them now
+  refuse unless told explicitly to proceed, and an unreadable record counts as
+  someone else's rather than being assumed to be ours.
+- **Deleting a job now refuses when it could not be stopped first.** Removing its
+  definition while it is still running orphans it from the only record that it
+  was ever installed, after which the health check reports it as absent while it
+  continues to run.
+- **Two jobs whose names share a prefix are no longer confused for each other.**
+  The status listing matched names by substring, so the shorter name also matched
+  the longer one and both rows were read as one.
+
 ## [0.73.2] - 2026-08-17
 
 ### Fixed

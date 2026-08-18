@@ -17,7 +17,7 @@ tests or real `doctor` runs (GH-278).
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from rebalance.doctor import ERROR, FAIL, NOTICE, OK, WARN, WARNING, _check_launchd
+from rebalance.doctor import ERROR, FAIL, NOTICE, OK, _check_launchd
 
 
 def _one(snapshot: str, log_dir: Path | None = None):
@@ -81,7 +81,13 @@ def test_clean_states_are_ok(tmp_path) -> None:
 
 def test_crash_looping_daemon_is_flagged_despite_live_pid(tmp_path) -> None:
     """GH-160: a KeepAlive job repeatedly crashing and being relaunched must
-    eventually WARN even though every poll catches it mid-live-PID."""
+    eventually degrade even though every poll catches it mid-live-PID.
+
+    GH-59 raised this from WARN to FAIL. A job that exited once is FAIL, so a job
+    crash-looping three times could not stay a lesser grade without the scale
+    reading backwards. WHEN it fires is untouched — the PID-identity requirement
+    below is exactly what GH-146/GH-160 tuned.
+    """
     log_dir = tmp_path / "logs"
     base = datetime(2026, 1, 1, tzinfo=timezone.utc)
     label = "com.rebalance-os.pulse-server"

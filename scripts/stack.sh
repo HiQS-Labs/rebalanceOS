@@ -266,9 +266,14 @@ check_target_root() {
 PREFLIGHT_DONE=0
 run_preflight() {
     [ "$PREFLIGHT_DONE" = "1" ] && return 0
-    validate_environment || return 1
-    echo
+    # Ownership BEFORE readiness. "Am I allowed to touch this fleet?" does not
+    # depend on a virtualenv or on plutil, and answering it second meant the
+    # environment check spoke first: on a Linux CI runner `up` reported a missing
+    # .venv for a fleet it was never entitled to adopt, and the guard never ran.
+    # Wrong message on any machine, and untestable off macOS.
     check_target_root "${1:-0}" || return 1
+    echo
+    validate_environment || return 1
     PREFLIGHT_DONE=1
     return 0
 }
