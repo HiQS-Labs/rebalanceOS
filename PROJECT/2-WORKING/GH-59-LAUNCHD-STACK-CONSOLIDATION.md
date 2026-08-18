@@ -52,7 +52,7 @@ table, and nothing else does.
 | E4 | `github-sync` and `pulse-sync` both report last exit `1`. | `launchctl list` |
 | E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `/Users/noelsaw/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. **Fixed and verified in Phase 0** — `reconcile_pulse_mirror` now returns OK and `publish_pulse` dry-run returns `ok=True`. | `temp/logs/pulse_sync_2026-08-17.log`, then re-run |
 | E6 | **`github-sync` fails on primary rate limiting.** Every failing run reports `remaining=0`. That much is certain. See the ledger below. | `temp/logs/github_sync_2026-08-17.log` |
-| E6a | **Attribution measured, and it went against the premise.** 21 min of a real run consumed **≤24** REST requests against a 12-min idle baseline of **1**. The hourly job does not exhaust the 5,000/hr budget. Its runtime is spent blocked in `poll()` on SSL reads from `api.github.com` — few, very slow requests. Phase 3 is therefore not built. | 30 s sampling of `GET /rate_limit`; `sample(1)` of the running process |
+| E6a | ~~**Attribution measured, and it went against the premise.** 21 min of a real run consumed **≤24** REST requests against a 12-min idle baseline of **1**.~~ **WITHDRAWN 2026-08-18** — measured with `GET /rate_limit`, since shown not to report the bucket that gates requests (see the correction under Phase 3). The latency half survives: the runtime is spent blocked in `poll()` on SSL reads from `api.github.com`, observed directly in the process. | 30 s sampling of `GET /rate_limit` (invalid); `sample(1)` of the running process (valid) |
 | E7 | Rate limit at 21:32: `core` 4980/5000. The quota is burned and refilled, not permanently gone. | `GET /rate_limit` |
 | E8 | All **12** policy jobs have a `scripts/com.rebalance-os.*.plist.template`. `stack.sh up` can render the whole fleet today. | `bash scripts/stack.sh verify` |
 | E9 | All 11 installed plists are bound to **`~/rebalance-runtime`**, not this checkout. | `bash scripts/stack.sh status` (BOUND TO column) |
@@ -315,6 +315,48 @@ the cause is known. Two questions it should answer, in order:
 - **Who actually spends the 5,000?** Sample `remaining` across a full day rather than one run,
   including the 06:30 `daily-sync`. If it is `daily-sync`, throttling the *hourly* job was always
   aimed at the wrong process.
+
+### Correction, 2026-08-18 — the E6a measurement used an invalid instrument
+
+Both questions above are now instrumented (`_http.py` records per-attempt wall time, the slowest
+endpoints, and the lowest `remaining` seen with the endpoint that saw it, in the job summary it
+already emits). Building that turned up something that changes the standing of this whole section.
+
+`GET /rate_limit` does not report the bucket that actually gates requests. Measured directly,
+seconds apart, repeated three times with identical results:
+
+| Probe | `used` | `remaining` | `reset` |
+|---|---|---|---|
+| `GET /rate_limit` → `resources.core` | 47 | 4953 | 07:00:09 UTC |
+| `GET /user` → `403`, `x-ratelimit-resource: core` | **5000** | **0** | **06:55:04 UTC** |
+
+Two different reset epochs, so these are two different buckets — not a propagation lag between one
+counter and its enforcement. The body of the 403 is the primary-limit message ("API rate limit
+exceeded for user ID 56978803"), not the secondary-limit one, so the enforced core budget genuinely
+was exhausted while `/rate_limit` reported it 99% free.
+
+**E6a was measured entirely with `GET /rate_limit` sampling.** That instrument is now known not to
+track the enforced limit, so the finding it produced — "≤24 requests in 21 minutes, the job is not
+greedy" — does not stand. It is withdrawn, not reversed: nothing here shows the job *is* greedy
+either, and the latency observation from `sample(1)` was a direct process observation and survives
+independently.
+
+What this does and does not change:
+
+- **Phase 3 stays unbuilt.** It was a throttle chosen before the cause was known, and that is still
+  true — the withdrawal removes a reason to reject it, not a reason to build it.
+- **E6 stands.** `remaining=0` in the failing runs was always real, and this confirms the enforced
+  bucket does reach zero.
+- **#62's premise is reopened**, neither proved nor disproved. It must be re-measured against
+  response headers on real requests, which is what the new `remaining_min` /
+  `remaining_min_endpoint` fields capture on every run automatically.
+- **No shipped code was affected.** Nothing in `src/` ever queried `/rate_limit`; only the ad-hoc
+  sampler used during this run did.
+
+The general lesson, since this is the second time it has bitten in this project: a measurement is
+only as good as the proof that the instrument observes the thing being enforced. `launchctl unload`
+resolving by label rather than path was the same mistake in a different domain — an isolation
+mechanism that looked like it constrained the system and did not.
 
 Also still open and separate: `mlx_embeddings` fails to import inside the launchd context and ended
 4 of the 13 runs in the ledger after 40+ minutes.
