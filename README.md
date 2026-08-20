@@ -6,6 +6,13 @@
 **Status: Beta.** Shipping weekly. We tell you what's real, and what isn't yet — see
 [Maturity](#maturity) below for the parts that aren't.
 
+> **Project history before 2026-08-16 lives in the archived predecessor repo:
+> [Hypercart-Dev-Tools/rebalance-OS](https://github.com/Hypercart-Dev-Tools/rebalance-OS)**
+> (2026-03-28 → 2026-08-17). This repository was started fresh at the move to the
+> HiQS-Suite org, so its `git log` covers only the period since. For earlier
+> commits, blame, releases, or planning documents referenced by `CHANGELOG.md` and
+> `ROADMAP.md`, look there.
+
 ### Just want to install it?
 
 Go straight to **[Getting Started](#getting-started)** — everything between here and

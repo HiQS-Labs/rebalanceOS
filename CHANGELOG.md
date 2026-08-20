@@ -3123,3 +3123,30 @@ Running the collector once post-install (manually or by waiting for the next hou
 - Added initial MCP server scaffold with `list_projects(status="active")` tool.
 - Added template file: `templates/project-registry.template.md`.
 - Updated `README.md` with initial scaffold status and developer bootstrap commands.
+
+---
+
+## Predecessor repository — history before 2026-08-16
+
+Entries above this line predate **this** repository. `HiQS-Suite/rebalanceOS` was
+started fresh when the project moved to the HiQS-Suite org, so its git history
+begins **2026-08-16** even though the changelog reaches back to March 2026.
+
+Everything earlier — commits, blame, tags, releases, closed issues and PRs, and
+the `PROJECT/` planning documents that many entries above still link to — lives
+in the archived predecessor:
+
+**https://github.com/Hypercart-Dev-Tools/rebalance-OS** (2026-03-28 → 2026-08-17,
+default branch `development`, now archived and read-only)
+
+Two practical consequences:
+
+1. **`git log` / `git blame` in this repo cannot answer questions about earlier
+   work.** A file "absent from history" here has very likely simply not been
+   carried across. Check the predecessor before concluding a thing never existed —
+   that mistake was made and published once already
+   ([#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88)).
+2. **Many relative links in this file and in `ROADMAP.md` point at `PROJECT/`
+   docs that were not migrated.** 124 of them resolve in the predecessor repo, 116
+   at the identical path. They are recoverable, not lost. Tracked in
+   [#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88).

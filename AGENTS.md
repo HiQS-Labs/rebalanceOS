@@ -4,6 +4,8 @@
 
 > **Before making any empirical claim — including "I tested it and it didn't help" — read [SOP.md](SOP.md).** Measurements that get cited must be published as a campaign in [`TESTS-RESULTS/`](./TESTS-RESULTS/); an unverifiable small test is worse than none.
 
+> **`git log` does not reach this project's full history.** This repo's history begins **2026-08-16**; everything before that lives in the archived predecessor **[Hypercart-Dev-Tools/rebalance-OS](https://github.com/Hypercart-Dev-Tools/rebalance-OS)** (2026-03-28 → 2026-08-17, branch `development`). Blame, provenance, and "when did this change" questions must be answered there for anything older, and many `PROJECT/` docs that CHANGELOG and ROADMAP still reference exist only in that repo — see [#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88). Do **not** conclude a file "never existed" from this repo's history alone.
+
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 
