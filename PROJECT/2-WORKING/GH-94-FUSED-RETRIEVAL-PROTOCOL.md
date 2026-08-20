@@ -1,6 +1,6 @@
 ---
 title: Fused hybrid retrieval — end-to-end measurement protocol
-status: v1 REJECTED at review — C1 is unrunnable as specified; see §12 (GH-94)
+status: PAUSED by operator decision 2026-08-20 — not scheduled; see §0 (GH-94)
 gh_issue: 94
 created: 2026-08-20
 branch: feat/gh94-fused-hybrid-measurement
@@ -12,6 +12,39 @@ goal: >
 ---
 
 # GH-94 — fused hybrid retrieval, measured end-to-end
+
+## 0. ⏸ PAUSED — operator decision, 2026-08-20. Do not restart this without being asked.
+
+**Decision: measurement of the fused retrieval path is deferred indefinitely. Retrieval
+quality is assessed through everyday use instead.** Recorded by the repo operator, not
+inferred by an agent.
+
+**Rationale, in the operator's terms:** the remaining work — hand-building ~25 lexical-hard
+queries with established ground truth — is a research exercise whose cost is not justified
+by the decision it would inform. Everyday use is the accepted signal.
+
+**This is not an open question awaiting an answer, and it is not a gap to be helpfully
+closed.** An agent reading §§1–12 will find a fully specified, well-reviewed experiment and
+a live-looking "what v2 must do" list. That list is **suspended**, not pending. Proposing
+this work again, re-deriving it under a new issue number, or treating the shipped
+configuration as unvalidated because of it, all re-litigate a decision already made.
+
+**What is settled and needs no further work:**
+- BGE-small (`BAAI/bge-small-en-v1.5`) is the canonical embedding model. Not revisited.
+- The query-side instruction prefix stays. It is measured at the component level
+  (0.5716 → 0.7507 MRR@10, p=0.0137) and there is no evidence of end-to-end harm.
+- Hybrid RRF fusion stays on with `k=60`.
+
+**Reopen only if** a concrete retrieval failure is observed in everyday use — a specific
+query returning a wrong or missing document that matters — **and** it is traced to ranking
+rather than to ingest, coverage, or a stale index. Curiosity is not a trigger.
+
+**What remains useful from this document**, requiring no new measurement: §12.2's
+descriptive finding, computed from existing GH-81 data, that for 25 of 39 queries keyword
+search alone already returns the correct document first. That bounds how much any
+vector-side tuning could ever matter on this corpus, and it is the practical reason the
+pause is reasonable rather than merely expedient.
+
 
 > **This protocol is frozen before any scoring runs.** The decision rule in §7 is written
 > in advance precisely so it cannot be chosen after seeing results. Deviations get
