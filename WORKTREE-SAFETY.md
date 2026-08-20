@@ -477,4 +477,4 @@ working tree — applied to the far more mundane act of undoing your own one-lin
 - [git-init](https://git-scm.com/docs/git-init) — confirms re-running `init` on an existing repo is safe/non-clobbering
 - [git-fsck](https://git-scm.com/docs/git-fsck) — integrity check, first step after any suspected `.git` corruption
 - [git-gc](https://git-scm.com/docs/git-gc) — documents the `--prune=now` concurrency risk cited in §6
-- Related: [Temp Directory Safety Guide](./temp-dir-safety.md) — for the `mktemp` failure mode that can cascade into worktree destruction
+- Related: Temp Directory Safety Guide — for the `mktemp` failure mode that can cascade into worktree destruction

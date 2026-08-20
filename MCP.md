@@ -2,7 +2,7 @@
 
 > Canonical reference for the rebalance MCP server: layer roles, live and planned tool surface, server configuration, and host adapter setup.
 
-- For project execution decisions and onboarding sequence, see [PROJECT.md](./PROJECT.md).
+- For project execution decisions and onboarding sequence, see PROJECT.md.
 - For marketing overview, see [README.md](./README.md).
 
 ---
@@ -69,7 +69,7 @@ Returns projects from the `project_registry` table.
 
 Shows GitHub commit/PR/issue activity per project over a rolling window.
 
-**Prerequisite:** run `rebalance github-scan` via CLI first to populate the `github_activity` table. See [PROJECT.md — Step 6](./PROJECT.md) for setup.
+**Prerequisite:** run `rebalance github-scan` via CLI first to populate the `github_activity` table. See PROJECT.md — Step 6 for setup.
 
 | Param | Type | Default | Description |
 |---|---|---|---|
@@ -273,7 +273,7 @@ Pulls Slack reminders from the Sleuth Web API and mirrors them into SQLite.
 
 ## Live Tool Surface — Onboarding
 
-These tools move onboarding out of the CLI and into any MCP-capable host, so an agent can drive the setup flow conversationally. See [PROJECT.md — Onboarding User Story](./PROJECT.md) for the sequence and UX rationale.
+These tools move onboarding out of the CLI and into any MCP-capable host, so an agent can drive the setup flow conversationally. See PROJECT.md — Onboarding User Story for the sequence and UX rationale.
 
 | Tool | Description | Params | Returns | Depends on |
 |---|---|---|---|---|

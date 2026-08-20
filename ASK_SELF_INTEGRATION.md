@@ -115,7 +115,7 @@ The architecture-narrative generator (the "How it fits together" section in `ARC
 | `ASK_SELF_QWEN_BATCH_SIZE` | `8` | Texts per `model.encode()` call. Raise on CPU or MLX; keep at 8 on MPS. |
 | `ASK_SELF_QWEN_MAX_TOKENS` | `2048` | Chunks above this (4-char estimate) are silently truncated before embedding. Prevents hangs on large changelogs or generated files. |
 
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for the full Mac MPS hang runbook and other common failure modes.
+See TROUBLESHOOTING.md for the full Mac MPS hang runbook and other common failure modes.
 
 Concrete fully-local harness snippet (Mac — recommended):
 

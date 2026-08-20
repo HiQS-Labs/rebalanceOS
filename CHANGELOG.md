@@ -2375,7 +2375,7 @@ No DB or vault migration is required — only the install paths above change beh
 ### Added
 
 - `src/rebalance/paths.py::migrate_database_to_canonical()` — idempotent migration that moves `rebalance.db` plus its `-wal` and `-shm` sidecars to the canonical location, and clears the user-config `database_path` field when it was pointing at the just-migrated source. Run via `python -m rebalance.paths --migrate` (add `--dry-run` to preview).
-- Phase 0 of the Mac SwiftUI Dashboard port landed under `experimental/mac-dashboard/` — Xcode app project (xcodegen-generated) consuming `HypercartMacOSDashboard` and GRDB. Renders 23 GitHub-balance rows from the live SQLite in ~69 ms on the canonical path. See [PROJECT/2-WORKING/MAC-DASHBOARD-PORT.md](PROJECT/2-WORKING/MAC-DASHBOARD-PORT.md) for findings.
+- Phase 0 of the Mac SwiftUI Dashboard port landed under `experimental/mac-dashboard/` — Xcode app project (xcodegen-generated) consuming `HypercartMacOSDashboard` and GRDB. Renders 23 GitHub-balance rows from the live SQLite in ~69 ms on the canonical path. See [MAC-DASHBOARD-PORT.md in the archived predecessor repo](https://github.com/Hypercart-Dev-Tools/rebalance-OS/blob/development/PROJECT/4-MISC/MAC-DASHBOARD-PORT.md) for findings.
 
 ## [0.27.1] - 2026-05-12
 
@@ -3052,7 +3052,7 @@ Running the collector once post-install (manually or by waiting for the next hou
 
 ## 2026-03-28 (onboarding sequence)
 
-- Expanded [PROJECT.md](PROJECT.md) with a reusable `Onboarding User Story Sequence` for first-run VS Code + AI agent setup.
+- Expanded PROJECT.md with a reusable `Onboarding User Story Sequence` for first-run VS Code + AI agent setup.
 - Defined first-run detection rules for missing/blank config, missing registry, and invalid stored GitHub PAT.
 - Documented target onboarding bootstrap flow:
   - review README

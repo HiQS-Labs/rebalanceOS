@@ -51,8 +51,8 @@ network-source requirement and the requirement to license derivative works under
 the AGPL — so you can keep your modifications and surrounding product closed.
 
 It does **not** grant trademark rights to "rebalance" or "Neochrome" (see
-[`NOTICE`](./NOTICE)), and it does not change the licensing of the third-party
-dependencies rebalance incorporates (see [`THIRD-PARTY.md`](./THIRD-PARTY.md)).
+`NOTICE`), and it does not change the licensing of the third-party
+dependencies rebalance incorporates (see `THIRD-PARTY.md`).
 
 ## How to get one
 
@@ -74,7 +74,7 @@ all contributed code to grant them — a contribution accepted under the AGPL
 alone could not be included in a commercially licensed build.
 
 The inbound terms that make this work are in
-[`CONTRIBUTING.md`](./CONTRIBUTING.md). In short: contributors keep their
+`CONTRIBUTING.md`. In short: contributors keep their
 copyright and license their work under the AGPL like everyone else, and
 additionally grant Neochrome the right to include it under other license terms.
 Nothing is assigned away.

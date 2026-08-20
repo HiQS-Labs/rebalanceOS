@@ -2,7 +2,7 @@
 
 Developer how-to for adding a new data source to rebalance-OS through the plugin
 (`SourceModule`) contract. For the *why / when* — roadmap, decisions, deferred
-work — see [PROJECT/2-WORKING/PLUGINS.md](PROJECT/2-WORKING/PLUGINS.md). This
+work — see [the archived plan doc](https://github.com/Hypercart-Dev-Tools/rebalance-OS/blob/development/PROJECT/4-MISC/PLUGINS.md). This
 guide supersedes the older "Adding a New Source" recipe in
 [ARCHITECTURE.md](ARCHITECTURE.md), which predates the registry contract.
 
@@ -200,7 +200,7 @@ refresh_index(scope=["<source>"])
 
 ## See also
 
-- **Roadmap / decisions / deferred work:** [PROJECT/2-WORKING/PLUGINS.md](PROJECT/2-WORKING/PLUGINS.md)
+- **Roadmap / decisions / deferred work:** [PLUGINS.md in the archived predecessor repo](https://github.com/Hypercart-Dev-Tools/rebalance-OS/blob/development/PROJECT/4-MISC/PLUGINS.md)
 - **Migration discipline:** [db/migrations/README.md](src/rebalance/ingest/db/migrations/README.md)
 - **System architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Worked example:** `src/rebalance/ingest/figma.py`, `db/migrations/0004_add_figma_comments.sql`, `tests/test_figma_source_module.py`
