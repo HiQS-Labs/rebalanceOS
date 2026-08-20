@@ -390,7 +390,7 @@ fork them:
 - [ROADMAP-SIGNAL-SCAN.md](../1-INBOX/PDDA-INTEGRATION/ROADMAP-SIGNAL-SCAN.md) — adds a *new `roadmap` collector*
   (a source). This plan instead *grades the health of existing sources*. Complementary: a future
   `roadmap` source would get `recent_row_count_7d` for free.
-- [GEMINI-WHATS-NEXT-VAULT.md](../1-INBOX/GEMINI-WHATS-NEXT-VAULT.md) / [SIGNAL-GENERATION/](../../../2-WORKING/SIGNAL-GENERATION) —
+- [GEMINI-WHATS-NEXT-VAULT.md](../1-INBOX/GEMINI-WHATS-NEXT-VAULT.md) / [SIGNAL-GENERATION/](../2-WORKING/SIGNAL-GENERATION) —
   the *synthesis/ranking* plane. This contract feeds it trust metadata; it is not a second ranker.
 - [WATCHLIST-COVERAGE-GUARD.md](../3-COMPLETED/WATCHLIST-COVERAGE-GUARD.md) — already guards *repo
   roster* drop-off via the focus5-snapshot pattern. Reuse its snapshot/anomaly idiom for volume

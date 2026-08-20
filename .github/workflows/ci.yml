@@ -33,6 +33,22 @@ jobs:
       - name: Format check
         run: ruff format --check .
 
+  # GH-92. GH-88 found 136 broken relative links in tracked docs (ROADMAP.md alone
+  # held 107) and 45% breakage overall, none of which any test could catch -- a doc
+  # link is never exercised, so nothing fails until someone audits. This holds the
+  # count at zero and blocks committed machine-local paths, which have leaked twice.
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check documentation links
+        run: python3 scripts/check_doc_links.py
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 10
