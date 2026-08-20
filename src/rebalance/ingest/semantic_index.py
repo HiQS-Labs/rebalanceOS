@@ -79,6 +79,38 @@ def _default_embed_texts(texts: list[str], model_name: str) -> list[list[float]]
     return _embed_batch(model, tokenizer, texts)
 
 
+# BGE's documented retrieval recipe is ASYMMETRIC: prefix the query, leave the
+# passage alone. Applying it to passages too would invalidate the whole index,
+# so it lives here on the query path and nowhere else.
+BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
+
+
+def _query_embed_text(query_text: str, model_name: str) -> str:
+    """Apply the model's query-side instruction prefix, if it has one.
+
+    Measured, not assumed. An earlier attempt at this was reverted on a 5-query
+    spot check with no ground truth that appeared to show a regression; the
+    GH-81 bake-off then re-ran it properly against 39 queries with hand-verified
+    targets and a paired Wilcoxon test, and the prefix won decisively:
+
+        MRR@10  0.5716 -> 0.7507      Recall@1  0.410 -> 0.667
+        14 queries improved, 0 regressed, 25 tied, p=0.0137 (Holm-corrected)
+
+    Without it, plain BGE scored *below* a plain SQLite FTS5 baseline on the
+    same corpus (0.5716 vs 0.6816) — the prefix is not a tuning nicety, it is
+    the difference between the vector index earning its keep and not.
+
+    See PROJECT/2-WORKING/GH-81-BAKEOFF/RESULTS.md for the full run.
+
+    Gated on the model name because the instruction is BGE-specific: other
+    models have their own (Qwen3 uses an "Instruct:/Query:" form) or none, and
+    applying the wrong one is worse than applying nothing.
+    """
+    if "bge" in model_name.lower():
+        return BGE_QUERY_INSTRUCTION + query_text
+    return query_text
+
+
 def _content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -757,7 +789,11 @@ def query(
     """
     selected_sources = normalize_sources(source_filter)
     embed_fn = embed_texts or _default_embed_texts
-    query_vec = _vec_to_bytes(embed_fn([query_text], model_name)[0])
+    # Only the VECTOR side gets the instruction prefix. The FTS5 lexical leg
+    # below is handed the raw query_text — feeding it the prefix would inject
+    # eight meaningless high-frequency terms into the match and wreck the
+    # lexical ranking that RRF is about to fuse in.
+    query_vec = _vec_to_bytes(embed_fn([_query_embed_text(query_text, model_name)], model_name)[0])
     # Fetch a deeper pool per retriever so RRF has material to fuse.
     pool = max(top_k * 4, 24) if hybrid else top_k
 

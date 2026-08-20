@@ -1,0 +1,236 @@
+[
+ {
+  "qid": "A01",
+  "set": "A",
+  "query": "how are display names kept unique when two different repos share the same slug",
+  "target_doc_id": 27712
+ },
+ {
+  "qid": "A02",
+  "set": "A",
+  "query": "why record the throttling headers instead of just the status code when GitHub refuses a request",
+  "target_doc_id": 381653
+ },
+ {
+  "qid": "A03",
+  "set": "A",
+  "query": "where do we store a repository's default branch and its open issue count",
+  "target_doc_id": 19833
+ },
+ {
+  "qid": "A04",
+  "set": "A",
+  "query": "how do I stop a directory from being walked for Focus 5",
+  "target_doc_id": 22977
+ },
+ {
+  "qid": "A05",
+  "set": "A",
+  "query": "what decides the folder that credentials get written to",
+  "target_doc_id": 23061
+ },
+ {
+  "qid": "A06",
+  "set": "A",
+  "query": "how do we avoid applying the same write twice after a timeout and a retry",
+  "target_doc_id": 23712
+ },
+ {
+  "qid": "A07",
+  "set": "A",
+  "query": "what sources does the work scope actually cover",
+  "target_doc_id": 21645
+ },
+ {
+  "qid": "A08",
+  "set": "A",
+  "query": "why trim the suffix off a Google client identifier before showing it",
+  "target_doc_id": 369178
+ },
+ {
+  "qid": "A09",
+  "set": "A",
+  "query": "why is coverage only ever allowed to improve and never be downgraded",
+  "target_doc_id": 35766
+ },
+ {
+  "qid": "A10",
+  "set": "A",
+  "query": "where does the Gemini credential come from and in what order are the options tried",
+  "target_doc_id": 19311
+ },
+ {
+  "qid": "A11",
+  "set": "A",
+  "query": "what does the ranked view fall back to when the language model returns nothing",
+  "target_doc_id": 22709
+ },
+ {
+  "qid": "A12",
+  "set": "A",
+  "query": "proposal to share one telemetry format between the fuzzing loop and the variation runner",
+  "target_doc_id": 443652
+ },
+ {
+  "qid": "A13",
+  "set": "A",
+  "query": "a config file setting to turn off streaming was being silently ignored",
+  "target_doc_id": 296829
+ },
+ {
+  "qid": "A14",
+  "set": "A",
+  "query": "a skill file is so long that every session pays to load it",
+  "target_doc_id": 415121
+ },
+ {
+  "qid": "A15",
+  "set": "A",
+  "query": "the setup instructions fail for anyone who does not have Homebrew",
+  "target_doc_id": 308300
+ },
+ {
+  "qid": "A16",
+  "set": "A",
+  "query": "documentation only pull request bringing the deep research branch up to date",
+  "target_doc_id": 24566
+ },
+ {
+  "qid": "A17",
+  "set": "A",
+  "query": "a mocked pager never terminated and allocated memory until the host died",
+  "target_doc_id": 143535
+ },
+ {
+  "qid": "A18",
+  "set": "A",
+  "query": "the pre-advance gate reports failures that belong to its parent process",
+  "target_doc_id": 206128
+ },
+ {
+  "qid": "A19",
+  "set": "A",
+  "query": "review asking for one unrelated file to come out before a UI selection fix can merge",
+  "target_doc_id": 183984
+ },
+ {
+  "qid": "A20",
+  "set": "A",
+  "query": "indexes left behind by deleted directories are consuming gigabytes",
+  "target_doc_id": 279823
+ },
+ {
+  "qid": "A21",
+  "set": "A",
+  "query": "an existing ignore rule halts a long run partway through",
+  "target_doc_id": 216372
+ },
+ {
+  "qid": "A22",
+  "set": "A",
+  "query": "making the OpenAI credential optional when provisioning a workspace",
+  "target_doc_id": 18312
+ },
+ {
+  "qid": "A23",
+  "set": "A",
+  "query": "benchmark scores for running devstral locally through ollama",
+  "target_doc_id": 321546
+ },
+ {
+  "qid": "A24",
+  "set": "A",
+  "query": "verification results for sandboxed script execution and timeout containment",
+  "target_doc_id": 443650
+ },
+ {
+  "qid": "A25",
+  "set": "A",
+  "query": "unresolved questions about email flow naming to settle at the client kickoff",
+  "target_doc_id": 24803
+ },
+ {
+  "qid": "A26",
+  "set": "A",
+  "query": "notes on speeding up the WordPress database tool dashboard",
+  "target_doc_id": 24869
+ },
+ {
+  "qid": "A27",
+  "set": "A",
+  "query": "which clients are on WooCommerce and which one has an iPhone app",
+  "target_doc_id": 24875
+ },
+ {
+  "qid": "A28",
+  "set": "A",
+  "query": "vendor pitch for automating SOC 2 and ISO 27001 compliance",
+  "target_doc_id": 24830
+ },
+ {
+  "qid": "A29",
+  "set": "A",
+  "query": "request for a second navigation bar visible only to signed-in users",
+  "target_doc_id": 21017
+ },
+ {
+  "qid": "B01",
+  "set": "B",
+  "query": "gemini api key resolution order",
+  "target_doc_id": 19311
+ },
+ {
+  "qid": "B02",
+  "set": "B",
+  "query": "secret store path",
+  "target_doc_id": 23061
+ },
+ {
+  "qid": "B03",
+  "set": "B",
+  "query": "focus5 scan root remove",
+  "target_doc_id": 22977
+ },
+ {
+  "qid": "B04",
+  "set": "B",
+  "query": "github rate limit 403 logging",
+  "target_doc_id": 381653
+ },
+ {
+  "qid": "B05",
+  "set": "B",
+  "query": "path coverage ratchet",
+  "target_doc_id": 35766
+ },
+ {
+  "qid": "B06",
+  "set": "B",
+  "query": "reminders idempotency request id",
+  "target_doc_id": 23712
+ },
+ {
+  "qid": "B07",
+  "set": "B",
+  "query": "readme homebrew python hardcoded",
+  "target_doc_id": 308300
+ },
+ {
+  "qid": "B08",
+  "set": "B",
+  "query": "SKILL.md too long split",
+  "target_doc_id": 415121
+ },
+ {
+  "qid": "B09",
+  "set": "B",
+  "query": "stale project indexes disk usage",
+  "target_doc_id": 279823
+ },
+ {
+  "qid": "B10",
+  "set": "B",
+  "query": "validate.sh marathon environment",
+  "target_doc_id": 206128
+ }
+]
