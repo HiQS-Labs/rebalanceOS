@@ -31,7 +31,7 @@ roadmap_exempt: false
 
 ## Table of contents
 1. [Phase 0 — Prior Art & Empirical Spike Findings](#phase-0--prior-art--empirical-spike-findings)
-2. [Phase 1 — Embedding Engine Migration (Qwen3 → BGE-Small)](#phase-1--embedding-engine-migration-qwen3--bge-small)
+2. [Phase 1 — Embedding Engine Migration (`Qwen/Qwen3-Embedding-0.6B` → `BAAI/bge-small-en-v1.5`)](#phase-1--embedding-engine-migration-qwenqwen3-embedding-06b--baaibge-small-en-v15)
 3. [Phase 2 — Scheduler & Process Renaming (`vault-sync` → `obsidian-vault-embeddings`)](#phase-2--scheduler--process-renaming-vault-sync--obsidian-vault-embeddings)
 4. [Phase 3 — Database Vector Migration & End-to-End Verification](#phase-3--database-vector-migration--end-to-end-verification)
 
@@ -59,7 +59,7 @@ A live benchmark was conducted using Hugging Face sentence-transformers on Apple
 
 ---
 
-## Phase 1 — Embedding Engine Migration (Qwen3 → BGE-Small)
+## Phase 1 — Embedding Engine Migration (`Qwen/Qwen3-Embedding-0.6B` → `BAAI/bge-small-en-v1.5`)
 
 - [x] Update `src/rebalance/ingest/embedder.py`:
   - Replace `mlx-embeddings` Qwen loader with `SentenceTransformer("BAAI/bge-small-en-v1.5")`.
@@ -94,7 +94,7 @@ A live benchmark was conducted using Hugging Face sentence-transformers on Apple
 
 ## Phase 3 — Database Vector Migration & End-to-End Verification
 
-- [x] Run initial re-embedding pass with BGE-Small over existing `semantic_documents` (51,770 documents embedded in 251s).
+- [x] Run initial re-embedding pass with `BAAI/bge-small-en-v1.5` over existing `semantic_documents` (51,770 documents embedded in 251s).
 - [x] Verify `semantic_query` MCP tool and CLI `rebalance query` return accurate, ranked results.
 - [x] Run `rebalance doctor` and verify `launchd:obsidian-vault-embeddings` and vector health are green.
 

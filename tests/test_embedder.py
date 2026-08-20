@@ -1,4 +1,9 @@
-"""Unit tests for the SentenceTransformers BGE-Small embedding pipeline."""
+"""Unit tests for the `BAAI/bge-small-en-v1.5` (384-dim) embedding pipeline.
+
+"BGE-Small" alone is ambiguous: `small` is the size tier and `v1.5` is the
+release version, so the full repo ID is the only unambiguous name. See
+docs/EMBEDDING-MODELS.md.
+"""
 
 from __future__ import annotations
 

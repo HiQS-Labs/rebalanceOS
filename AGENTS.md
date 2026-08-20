@@ -2,6 +2,8 @@
 
 > **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](./ROUTER.md) — canonical there, deliberately not restated here.
 
+> **Before making any empirical claim — including "I tested it and it didn't help" — read [SOP.md](./SOP.md).** Measurements that get cited must be published as a campaign in [`TESTS-RESULTS/`](./TESTS-RESULTS/); an unverifiable small test is worse than none.
+
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 
@@ -13,7 +15,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 >
 > - **Setup / health / "why is X empty?"** → run `rebalance doctor` (it names the exact remediation, e.g. a missing calendar OAuth token → `scripts/setup_calendar_oauth.py`). Don't grep for setup scripts.
 > - **Orientation** → [ARCHITECTURE.md](ARCHITECTURE.md) (Signal Sources table, Source→Table fanout, "Adding a New Source"). Read it at session start.
-> - **`querier.py`** is the read-side orchestrator (retrieval + synthesis); `index_ops.py` is the source/refresh orchestrator. Both consume the same source set — the direction to make `doctor`, the morning brief, and `querier` all iterate the one registry is in [PROJECT/2-WORKING/P1-MODULE-REGISTRY.md](PROJECT/2-WORKING/P1-MODULE-REGISTRY.md).
+> - **`querier.py`** is the read-side orchestrator (retrieval + synthesis); `index_ops.py` is the source/refresh orchestrator. Both consume the same source set, and the standing direction is for `doctor`, the morning brief, and `querier` to all iterate that one registry — [`COLLECTORS` in index_ops.py](src/rebalance/ingest/index_ops.py) — rather than keep private source lists. (This used to link a `P1-MODULE-REGISTRY.md` plan doc; that file was never committed and does not exist in any commit, so the code is the reference.)
 
 **Connection.** The repo ships two equivalent configs: [.vscode/mcp.json](.vscode/mcp.json) for VS Code agents and [.mcp.json](.mcp.json) at the repo root for tools that look there. Both launch `.venv/bin/python -m rebalance.mcp_server` over stdio with `REBALANCE_DB` set to the repo's `rebalance.db`.
 
