@@ -3146,7 +3146,11 @@ Two practical consequences:
    carried across. Check the predecessor before concluding a thing never existed —
    that mistake was made and published once already
    ([#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88)).
-2. **Many relative links in this file and in `ROADMAP.md` point at `PROJECT/`
-   docs that were not migrated.** 124 of them resolve in the predecessor repo, 116
-   at the identical path. They are recoverable, not lost. Tracked in
-   [#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88).
+2. **The `PROJECT/` docs this file and `ROADMAP.md` referenced but which were
+   never migrated have been recovered.** They live in
+   `PROJECT/4-MISC/ARCHIVED-PREDECESSOR/`, restored from the predecessor under
+   [#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88), which took broken
+   relative links in tracked files from 136 to 0. Read them as history: a stated
+   status describes the predecessor repo at archive time, not this repo today.
+   A few second-order references inside those documents deliberately point back
+   at the predecessor on GitHub rather than at local files.
