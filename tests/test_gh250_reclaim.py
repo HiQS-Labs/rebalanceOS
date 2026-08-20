@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "utils" / "gh250" / "reclaim.py"
-DIM = 1024
+from rebalance.ingest.embedder import EMBEDDING_DIM as DIM
 
 
 def _vec(seed: int = 1) -> bytes:

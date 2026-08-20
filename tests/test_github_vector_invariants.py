@@ -33,18 +33,22 @@ class VectorInvariantsTests(unittest.TestCase):
             self.assertEqual(check.status, OK)
 
     def test_hand_inserted_vector_fails_orphan_check(self):
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path) as conn:
             # 1. Insert an orphaned vector into github_embeddings
-            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
+            gh.upsert_github_embedding(conn, 999, struct.pack(f"{EMBEDDING_DIM}f", *([0.0] * EMBEDDING_DIM)))
             conn.commit()
 
         checks = _check_orphaned_vectors(self.db_path)
         gh_check = next(c for c in checks if c.name == "orphaned vectors:github")
         self.assertEqual(gh_check.status, FAIL)
         self.assertIn("1 orphaned vectors", gh_check.detail)
-        self.assertIn("4096 bytes", gh_check.detail)
+        self.assertIn(f"{EMBEDDING_DIM * 4} bytes", gh_check.detail)
 
     def test_deleted_document_fails_orphan_check(self):
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path) as conn:
             # Insert a doc and its vector
             doc_id = gh.insert_github_document(
@@ -60,7 +64,7 @@ class VectorInvariantsTests(unittest.TestCase):
                 updated_at="2026-05-20",
                 fetched_at="2026-05-20",
             )
-            gh.upsert_github_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
+            gh.upsert_github_embedding(conn, doc_id, struct.pack(f"{EMBEDDING_DIM}f", *([0.0] * EMBEDDING_DIM)))
 
             # Now delete the document
             conn.execute("DELETE FROM github_documents WHERE id = ?", (doc_id,))
@@ -70,7 +74,7 @@ class VectorInvariantsTests(unittest.TestCase):
         gh_check = next(c for c in checks if c.name == "orphaned vectors:github")
         self.assertEqual(gh_check.status, FAIL)
         self.assertIn("1 orphaned vectors", gh_check.detail)
-        self.assertIn("4096 bytes", gh_check.detail)
+        self.assertIn(f"{EMBEDDING_DIM * 4} bytes", gh_check.detail)
 
     def test_backlog_sawtooth_guard_does_not_fail(self):
         with db_connection(self.db_path) as conn:
@@ -97,6 +101,8 @@ class VectorInvariantsTests(unittest.TestCase):
         self.assertIn("1 unembedded documents pending", check.detail)
 
     def test_semantic_orphan_check(self):
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path) as conn:
             # Insert a doc and its vector
             doc_id = sem.insert_semantic_document(
@@ -112,7 +118,7 @@ class VectorInvariantsTests(unittest.TestCase):
                 created_at="2026-05-20",
                 updated_at="2026-05-20",
             )
-            sem.insert_semantic_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
+            sem.insert_semantic_embedding(conn, doc_id, struct.pack(f"{EMBEDDING_DIM}f", *([0.0] * EMBEDDING_DIM)))
             # Delete the doc
             conn.execute("DELETE FROM semantic_documents WHERE id = ?", (doc_id,))
             conn.commit()
@@ -121,22 +127,26 @@ class VectorInvariantsTests(unittest.TestCase):
         sem_check = next(c for c in checks if c.name == "orphaned vectors:semantic")
         self.assertEqual(sem_check.status, FAIL)
         self.assertIn("1 orphaned vectors", sem_check.detail)
-        self.assertIn("4096 bytes", sem_check.detail)
+        self.assertIn(f"{EMBEDDING_DIM * 4} bytes", sem_check.detail)
 
     def test_semantic_hand_inserted_fails_orphan_check(self):
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path) as conn:
-            sem.insert_semantic_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
+            sem.insert_semantic_embedding(conn, 999, struct.pack(f"{EMBEDDING_DIM}f", *([0.0] * EMBEDDING_DIM)))
             conn.commit()
 
         checks = _check_orphaned_vectors(self.db_path)
         sem_check = next(c for c in checks if c.name == "orphaned vectors:semantic")
         self.assertEqual(sem_check.status, FAIL)
         self.assertIn("1 orphaned vectors", sem_check.detail)
-        self.assertIn("4096 bytes", sem_check.detail)
+        self.assertIn(f"{EMBEDDING_DIM * 4} bytes", sem_check.detail)
 
     def test_database_bloat_reports_nonzero_size(self):
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path) as conn:
-            gh.upsert_github_embedding(conn, 999, struct.pack("1024f", *([0.0] * 1024)))
+            gh.upsert_github_embedding(conn, 999, struct.pack(f"{EMBEDDING_DIM}f", *([0.0] * EMBEDDING_DIM)))
             conn.commit()
             size = gh.table_byte_size(conn, "github_embeddings")
             self.assertGreater(size, 0)

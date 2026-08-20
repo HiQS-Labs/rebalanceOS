@@ -14,6 +14,9 @@ from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_sche
 from rebalance.ingest.semantic_index import backfill_semantic_documents, embed_pending, query
 
 
+from rebalance.ingest.embedder import EMBEDDING_DIM
+
+
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -22,7 +25,7 @@ def _fake_embed_texts(texts: list[str], _model_name: str) -> list[list[float]]:
     vectors: list[list[float]] = []
     for text in texts:
         lowered = text.lower()
-        vec = [0.0] * 1024
+        vec = [0.0] * EMBEDDING_DIM
         if "nonce" in lowered:
             vec[0] = 1.0
         elif "oauth" in lowered:

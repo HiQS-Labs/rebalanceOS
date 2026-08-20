@@ -20,6 +20,7 @@ KNOWN_WRITERS=(
     "com.rebalance-os.daily-sync"
     "com.rebalance-os.3eyes.collector-health"
     "com.rebalance-os.vault-sync"
+    "com.rebalance-os.obsidian-vault-embeddings"
     "com.rebalance-os.pulse-web-sync"
     "com.rebalance-os.daily-synthesis"
     "com.rebalance-os.obsidian-rollover"
@@ -45,6 +46,7 @@ get_3eyes_id() {
         com.rebalance-os.pulse-sync) echo "pulse-sync" ;;
         com.rebalance-os.daily-sync) echo "daily-sync" ;;
         com.rebalance-os.vault-sync) echo "vault-sync" ;;
+        com.rebalance-os.obsidian-vault-embeddings) echo "obsidian-vault-embeddings" ;;
         com.rebalance-os.pulse-web-sync) echo "pulse-web-sync" ;;
         com.rebalance-os.daily-synthesis) echo "daily-synthesis" ;;
         com.rebalance-os.obsidian-rollover) echo "obsidian-rollover" ;;

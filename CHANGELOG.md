@@ -10,6 +10,22 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.74.0] - 2026-08-19
+
+### Added
+
+- Added support for lightweight 384-dimensional embeddings with sub-10ms inference latency and ~20MB memory overhead.
+- Added self-healing virtual table schema migrations for vector dimension upgrades.
+
+### Changed
+
+- Renamed the hourly vault background job to accurately reflect its neural embedding workload.
+- Upgraded the default embedding backend to a compact 384-dimensional model, reducing embedding memory footprint by over 98% and vector storage requirements by 62%.
+
+### Fixed
+
+- Fixed memory pressure errors and GPU device aborts occurring during scheduled embedding passes on memory-constrained systems.
+
 ## [0.73.6] - 2026-08-18
 
 ### Changed

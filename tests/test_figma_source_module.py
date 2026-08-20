@@ -31,12 +31,15 @@ class _FakeFigmaClient:
         return self.comments_by_file[file_key]
 
 
+from rebalance.ingest.embedder import EMBEDDING_DIM
+
+
 def _fake_embed_texts(texts: list[str], _model_name: str) -> list[list[float]]:
-    """Deterministic 1024-dim vectors keyed on a marker word — no mlx loads."""
+    """Deterministic vectors keyed on a marker word."""
     vectors: list[list[float]] = []
     for text in texts:
         lowered = text.lower()
-        vec = [0.0] * 1024
+        vec = [0.0] * EMBEDDING_DIM
         if "checkout" in lowered:
             vec[0] = 1.0
         else:

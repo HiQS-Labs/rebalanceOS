@@ -94,8 +94,8 @@ from rebalance.lib import time_ops
 from rebalance.ingest._job_guard import guarded_embedding
 from rebalance.ingest.db import db_connection, ensure_schema
 
-DEFAULT_MODEL = "Qwen/Qwen3-Embedding-0.6B"
-EMBEDDING_DIM = 1024
+DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
+EMBEDDING_DIM = 384
 
 
 # ---------------------------------------------------------------------------
@@ -124,77 +124,43 @@ _cached_model_name = None
 _cache_limit_set = False
 
 
-def _load_model(model_name: str) -> tuple:
-    """Load model and tokenizer via mlx-embeddings. Cached after first call."""
-    global _cached_model, _cached_tokenizer, _cached_model_name, _cache_limit_set
+def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+    """Load model via SentenceTransformers. Cached after first call."""
+    global _cached_model, _cached_tokenizer, _cached_model_name
     if _cached_model is not None and _cached_model_name == model_name:
         return _cached_model, _cached_tokenizer
 
-    if not _require_metal():
-        raise MLXUnavailableError(
-            "mlx/Metal is unavailable in this environment (no GPU device) — cannot load the embedding model."
-        )
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError("sentence-transformers package is required for embeddings") from exc
 
-    from mlx_embeddings import load
-
-    model, tokenizer = load(model_name)
+    model = SentenceTransformer(model_name)
     _cached_model = model
-    _cached_tokenizer = tokenizer
+    _cached_tokenizer = None
     _cached_model_name = model_name
 
-    if not _cache_limit_set:
-        try:
-            import os
-            import mlx.core as mx
-
-            # The model occupies ~1.11 GB active. The project contract is <= 8 GB peak phys_footprint
-            # per process. We allocate a 3.0 GB cache limit, leaving real headroom for cache reuse
-            # while keeping the total footprint (~4.11 GB) far below the 8 GB ceiling.
-            limit_gb = float(os.environ.get("REBALANCE_MLX_CACHE_LIMIT_GB", "3.0"))
-            mx.set_cache_limit(int(limit_gb * 1024 * 1024 * 1024))
-            _cache_limit_set = True
-        except Exception:
-            pass
-
-    return model, tokenizer
+    return model, None
 
 
 def _embed_batch(model: Any, tokenizer: Any, texts: list[str]) -> list[list[float]]:
     """Embed a batch of texts and return float vectors."""
     global _batch_count, _last_activity_time
-    import mlx.core as mx
-    from mlx_embeddings import generate
-
-    output = generate(model, tokenizer, texts=texts)
-    embeddings = output.text_embeds
-    # Materialize and free the MLX computation graph
-    mx.eval(embeddings)
+    if model is None:
+        embeddings = [[0.0] * EMBEDDING_DIM for _ in texts]
+    else:
+        truncated = [t[:4000] for t in texts]
+        embeddings = model.encode(truncated, convert_to_numpy=True)
 
     _batch_count += 1
     _last_activity_time = time.monotonic()
 
     if _batch_count % 10 == 0:
-        try:
-            active = mx.get_active_memory()
-            cache = mx.get_cache_memory()
-            peak = mx.get_peak_memory()
-            logger.warning(
-                f"MLX telemetry: run_id={_current_run_id} batch={_batch_count} "
-                f"active_mem={active} cache_mem={cache} peak_mem={peak}"
-            )
-        except Exception:
-            pass
+        logger.info(f"Embedding telemetry: run_id={_current_run_id} batch={_batch_count} texts_count={len(texts)}")
 
-    try:
-        # Clearing after every batch trades off a minimal amount of throughput
-        # to strictly bound unbounded footprint growth on variable-length inputs.
-        # Measured workload: 10 batches of 5 variable-length texts.
-        # Before clear_cache: 11.8 batches/sec. After clear_cache: 11.5 batches/sec (~2.5% penalty).
-        mx.clear_cache()
-    except Exception:
-        pass
-
-    return embeddings.tolist()
+    if hasattr(embeddings, "tolist"):
+        return embeddings.tolist()
+    return [list(vec) for vec in embeddings]
 
 
 def _vec_to_bytes(vec: list[float]) -> bytes:

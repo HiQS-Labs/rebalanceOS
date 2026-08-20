@@ -1,19 +1,15 @@
-"""GH-42 — embedder must fail the model load, not abort the process, when
-Metal is unavailable.
+"""GH-81 — embedder works seamlessly on CPU / Metal without MLX crashes.
 
-mlx aborts (SIGABRT) rather than raising when it can't reach a GPU device,
-e.g. headless/sandboxed/virtualized macOS sessions. The fix is to probe for
-Metal out-of-process (rebalance.lib.metal_probe.metal_available, shared with
-tests/conftest.py's GH-250 skip marker) before ever calling into
-mlx_embeddings, and raise a normal, catchable exception instead.
+SentenceTransformers runs reliably on both CPU and Apple Silicon Metal without
+aborts or SIGABRT exceptions.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from rebalance.ingest import embedder
-from rebalance.ingest.embedder import MLXUnavailableError, _load_model
+from rebalance.ingest.embedder import _load_model
 
 
 @pytest.fixture(autouse=True)
@@ -27,13 +23,14 @@ def _reset_embedder_state():
     embedder._current_entry_point = prior_entry_point
 
 
-def test_load_model_raises_catchable_error_when_metal_unavailable():
-    """No Metal device -> a normal exception, never a crash. This also proves
-    the mlx_embeddings.load() call (where the real abort lives) is never
-    reached: _load_model raises before that import line runs."""
-    with patch.object(embedder, "metal_available", return_value=False):
-        with pytest.raises(MLXUnavailableError):
-            _load_model("test_model")
+def test_load_model_succeeds_even_when_metal_unavailable():
+    """SentenceTransformer loads on CPU without requiring Metal GPU."""
+    mock_st = MagicMock()
+    with patch("sentence_transformers.SentenceTransformer", return_value=mock_st):
+        with patch.object(embedder, "metal_available", return_value=False):
+            model, tokenizer = _load_model("mock_model")
+            assert model is mock_st
+            assert tokenizer is None
 
 
 def test_instrument_embedding_pass_skips_mlx_when_metal_unavailable():

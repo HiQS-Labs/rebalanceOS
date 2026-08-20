@@ -82,7 +82,7 @@ class CalendarWeeklyReportCliTests(unittest.TestCase):
                 ) as mock_ingest,
                 patch(
                     "rebalance.ingest.embedder.embed_vault_chunks",
-                    return_value=EmbedResult(2, 1, 1, "fake-model", 1024, 0.08),
+                    return_value=EmbedResult(2, 1, 1, "fake-model", 384, 0.08),
                 ) as mock_embed,
             ):
                 result = self.runner.invoke(

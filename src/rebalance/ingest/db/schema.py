@@ -71,10 +71,18 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_title)")
 
     try:
+        row = conn.execute("SELECT value FROM embedding_meta WHERE key = 'embedding_dim'").fetchone()
+        if row and str(row[0]) != "384":
+            conn.execute("DROP TABLE IF EXISTS embeddings")
+            conn.execute("INSERT OR REPLACE INTO embedding_meta (key, value) VALUES ('embedding_dim', '384')")
+    except Exception:
+        pass
+
+    try:
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS embeddings USING vec0(
                 chunk_id INTEGER PRIMARY KEY,
-                embedding float[1024]
+                embedding float[384]
             )
         """)
     except sqlite3.DatabaseError:
@@ -86,6 +94,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             value   TEXT NOT NULL
         )
     """)
+    conn.execute("INSERT OR IGNORE INTO embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
     conn.commit()
 
@@ -123,9 +132,20 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_semantic_docs_source_table ON semantic_documents(source_type, source_table)"
     )
     try:
+        row = conn.execute("SELECT value FROM semantic_embedding_meta WHERE key = 'embedding_dim'").fetchone()
+        if row and str(row[0]) != "384":
+            conn.execute("DROP TABLE IF EXISTS semantic_embeddings")
+            conn.execute(
+                "UPDATE semantic_documents SET embedded_hash = NULL, embedded_model_version = NULL, embedded_at = NULL"
+            )
+            conn.execute("INSERT OR REPLACE INTO semantic_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
+    except Exception:
+        pass
+
+    try:
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS semantic_embeddings USING vec0(
-                embedding float[1024]
+                embedding float[384]
             )
         """)
     except sqlite3.DatabaseError:
@@ -137,6 +157,7 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
             value   TEXT NOT NULL
         )
     """)
+    conn.execute("INSERT OR IGNORE INTO semantic_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
     # Phase 1 hybrid retrieval: an FTS5 lexical index over title+body, beside the
     # vec0 ANN index. A standalone FTS5 table (keeps its own copy of title+body —
@@ -542,10 +563,19 @@ def _ensure_github_knowledge_schema(conn: sqlite3.Connection) -> None:
     )
 
     try:
+        row = conn.execute("SELECT value FROM github_embedding_meta WHERE key = 'embedding_dim'").fetchone()
+        if row and str(row[0]) != "384":
+            conn.execute("DROP TABLE IF EXISTS github_embeddings")
+            conn.execute("UPDATE github_documents SET embedded_hash = NULL")
+            conn.execute("INSERT OR REPLACE INTO github_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
+    except Exception:
+        pass
+
+    try:
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS github_embeddings USING vec0(
                 doc_id INTEGER PRIMARY KEY,
-                embedding float[1024]
+                embedding float[384]
             )
         """)
     except sqlite3.DatabaseError:
@@ -557,6 +587,7 @@ def _ensure_github_knowledge_schema(conn: sqlite3.Connection) -> None:
             value   TEXT NOT NULL
         )
     """)
+    conn.execute("INSERT OR IGNORE INTO github_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
 
 def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
