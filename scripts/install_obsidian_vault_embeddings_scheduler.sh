@@ -15,6 +15,31 @@ source "$(cd "$(dirname "$0")" && pwd)/lib/install_common.sh"
 echo "Installing rebalance OS hourly obsidian vault embeddings scheduler..."
 echo "  REBALANCE_DIR=$REBALANCE_DIR"
 
+# GH-81 renamed this job from `vault-sync`. A rename in git is not a rename on
+# the machine: the OLD plist stays loaded in launchd until something unloads it.
+# Dropping `vault-sync` from SCHEDULER.md also drops it from stack.sh's managed
+# set (stack.sh reads that table as its manifest), so `stack.sh down`/`purge`
+# list it as unmanaged and will not take it down either. Left alone the operator
+# ends up running BOTH jobs — and both fire at :15 doing the same vault+semantic
+# write, which is exactly the same-minute collision SCHEDULER.md's freshness
+# model forbids (GH-175).
+#
+# Retire it here, before the replacement is installed. Idempotent: every step is
+# a no-op once the old job is gone, so reinstalling is safe.
+_legacy_label="com.rebalance-os.vault-sync"
+_legacy_plist="$HOME/Library/LaunchAgents/$_legacy_label.plist"
+if "$LAUNCHCTL_BIN" list "$_legacy_label" > /dev/null 2>&1 || [ -f "$_legacy_plist" ]; then
+    echo "  Retiring superseded job $_legacy_label (renamed to obsidian-vault-embeddings in GH-81)"
+    "$LAUNCHCTL_BIN" unload "$_legacy_plist" 2>/dev/null || true
+    rm -f "$_legacy_plist"
+    if "$LAUNCHCTL_BIN" list "$_legacy_label" > /dev/null 2>&1; then
+        echo "  WARNING: $_legacy_label is still registered after unload — remove it manually:" >&2
+        echo "    launchctl bootout gui/\$UID/$_legacy_label" >&2
+    else
+        echo "  Retired $_legacy_label"
+    fi
+fi
+
 rb_install_launchd_job "com.rebalance-os.obsidian-vault-embeddings" "scripts/obsidian_vault_embeddings.sh"
 
 echo
