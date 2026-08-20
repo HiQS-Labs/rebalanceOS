@@ -41,9 +41,20 @@ rather than to ingest, coverage, or a stale index. Curiosity is not a trigger.
 
 **What remains useful from this document**, requiring no new measurement: §12.2's
 descriptive finding, computed from existing GH-81 data, that for 25 of 39 queries keyword
-search alone already returns the correct document first. That bounds how much any
-vector-side tuning could ever matter on this corpus, and it is the practical reason the
-pause is reasonable rather than merely expedient.
+search alone already returns the correct document first.
+
+**That result must not be over-read, and an earlier version of this section did over-read
+it.** A third reviewer (Codex, relay `gh94-pause-challenge`) rejected the claim that it
+"bounds how much vector-side tuning could matter": the query set was hand-built to be
+answerable and is plausibly biased toward keyword-friendly tasks, so it cannot establish
+limited headroom for real retrieval generally. It supports *deprioritising* vector tuning.
+It does not prove the ceiling is low.
+
+The same run shows why. On the **lexical-hard slice (n=5), FTS5 scores 0.0 MRR@10 and
+0.0 recall@10 — it finds nothing at all**, while BGE + prefix scores 0.600. Where keyword
+search works it usually wins outright; where it fails it fails completely, and the vector
+index is the only thing serving those queries. The 25-of-39 figure describes the easy
+majority, not the cohort that depends on embeddings.
 
 
 > **This protocol is frozen before any scoring runs.** The decision rule in §7 is written
