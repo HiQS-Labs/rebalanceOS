@@ -41,6 +41,30 @@ This **retracts** [the earlier conclusion on this issue](https://github.com/HiQS
 The change is one line in `semantic_index.query()` — prefix the query text with
 `"Represent this sentence for searching relevant passages: "`. **Passages must NOT be re-embedded**: BGE's recipe is query-side only, and this run confirms it empirically against an unprefixed corpus.
 
+#### This contradicts BGE's own guidance, and that is worth stating
+
+The model in use is **`BAAI/bge-small-en-v1.5`** — the v1.5 release, not the
+original v1 (confirmed from `embedder.py:97`, from the sidecar's recorded
+`model` field, and from the downloaded snapshot on disk). That matters, because
+[BGE's documentation](https://bge-model.com/bge/bge_v1_v1.5.html) says v1.5 was
+released specifically to *"enhance its retrieval ability **without** instruction
+and alleviate the issue of the similarity distribution."*
+
+So the vendor's position is that v1.5 needs the query instruction **less** than
+v1 did. Our measurement says that on this corpus it still helps a great deal —
+MRR@10 +0.179, Recall@1 +0.257, 14 wins and 0 losses.
+
+Both can be true: "needs it less" is not "does not benefit from it", and v1.5's
+headline improvement was on MTEB-style benchmarks, not on a 90%-GitHub
+engineering corpus with question-shaped queries. But the honest framing is that
+**this result is empirical and local, not a vendor-endorsed default.** It is
+adopted because it was measured here, on this data — and the per-query ranks are
+published so the claim can be rechecked rather than taken on trust.
+
+It also partly explains the earlier wrong call: reading "v1.5 works without
+instruction" makes a small negative spot-check look like confirmation. It was
+not; it was 5 queries of noise.
+
 ### 2. Keep BGE over Qwen. The GH-81 migration was correct.
 
 Qwen is **worse** than BGE, not better (0.469 vs 0.572), and the gap is not significant either way (p=1.00). With the prefix applied to both, BGE still leads (0.751 vs 0.605). Rule 3's revert condition is not met and is not close.
@@ -54,6 +78,18 @@ Qwen also costs more on every secondary axis:
 | gemini | 3072 | 126.3 MB | 141 s (100 API calls) | 34.2 ms | n/a |
 
 **20× the embed time for lower quality.** GH-81 stands.
+
+To be precise about what this does and does not say: this is **not** a
+"bigger model, but the footprint isn't worth it" trade-off. Qwen loses on
+**both** axes simultaneously — it is less accurate *and* more expensive. There
+is no operating point at which choosing it here is defensible on this evidence.
+A footprint argument would only arise if Qwen had won on quality; it did not.
+
+The caveat that keeps this honest: Qwen ran at a 4,096-token cap rather than its
+native 32,768 (native exhausted MPS memory), so its long-document handling is
+under-tested. That affected 14 of 10,000 documents (0.14%), and Qwen *truncated
+less* than BGE did (0.14% vs 12.92%) — so on the truncation axis Qwen was
+handicapped less than the model that beat it. The cap does not explain the gap.
 
 ### 3. Do NOT adopt Gemini. Rule 4 fires but resolves to "no".
 
