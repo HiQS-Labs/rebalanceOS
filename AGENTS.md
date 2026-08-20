@@ -2,6 +2,8 @@
 
 > **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](./ROUTER.md) — canonical there, deliberately not restated here.
 
+> **Before making any empirical claim — including "I tested it and it didn't help" — read [SOP.md](./SOP.md).** Measurements that get cited must be published as a campaign in [`TESTS-RESULTS/`](./TESTS-RESULTS/); an unverifiable small test is worse than none.
+
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 

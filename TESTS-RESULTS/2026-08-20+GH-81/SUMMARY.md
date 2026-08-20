@@ -1,9 +1,22 @@
-# GH-81 embeddings bake-off — results
+# Embeddings Bake-Off Run Summary: GH-81 (2026-08-20)
 
-**Run date:** 2026-08-20 · **Protocol:** [`../GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md`](../GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md) (QA-approved by agy, 3 rounds, before any lane was scored)
-**Corpus:** 10,000 documents sampled from the live 52,178-document index, source proportions preserved (github 90.3%, vault 5.0%, code 3.2%, figma 1.3%, email 0.2%)
-**Queries:** 39 — 29 natural-language (Set A) + 10 operator-style keyword (Set B), all targets established by reading the document
-**Machine:** Mac Studio, MPS, local lanes; Gemini via hosted API
+- **Date:** 2026-08-20
+- **Tracking Issue:** [#81](https://github.com/HiQS-Suite/rebalanceOS/issues/81)
+- **Active Working Doc:** [`PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md`](../../PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md) — protocol, QA-approved and **frozen before any lane was scored**
+- **Shipped As:** [PR #87](https://github.com/HiQS-Suite/rebalanceOS/pull/87)
+- **Campaign Duration:** ~25 min of compute (bge 50 s · qwen 1000 s · gemini 141 s / 100 API calls) + scoring
+- **Total Measurements:** 234 (39 queries × 6 lanes)
+- **Systems Under Test:** `BAAI/bge-small-en-v1.5` (384d, local) · `Qwen/Qwen3-Embedding-0.6B` (1024d, local) · `gemini-embedding-001` (3072d, hosted) · SQLite FTS5 baseline
+- **Corpus:** 10,000 docs sampled from the live 52,178-doc index, source proportions preserved
+- **Machine:** Mac Studio, MPS (local lanes)
+- **Output Files:**
+  - [`per_query_results.jsonl`](per_query_results.jsonl) — 234 records, the auditable primitive: every aggregate below is derivable from it
+  - [`lane_metrics.jsonl`](lane_metrics.jsonl) — 30 records (6 lanes × 5 slices)
+  - [`pairwise_tests.jsonl`](pairwise_tests.jsonl) — 15 records, Wilcoxon signed-rank + Holm
+  - [`scoring-run-console.txt`](scoring-run-console.txt) — raw stdout of the run that produced every number here
+  - [`queries.json`](queries.json) — the frozen 39-query set with hand-established targets
+  - [`scripts/`](scripts/) — `embed_local.py`, `embed_gemini.py`, `score.py`, as run
+  - [`qa/`](qa/) — the two third-party review transcripts, verbatim
 
 ---
 
@@ -112,7 +125,7 @@ Rule 5b does **not** fire, and that is what saves the semantic index: on the `le
 
 Read together: **the vector index is not beating keyword search at keyword search — it is covering the queries keyword search cannot answer at all.** Neither retriever alone dominates; they are complementary.
 
-**Important scope correction.** That is an argument for hybrid retrieval — and rebalanceOS *already ships hybrid retrieval*. `semantic_index.query()` defaults to `hybrid=True` and fuses the vector ranking with an FTS5 lexical ranking through RRF ([`semantic_index.py:745`](../../../src/rebalance/ingest/semantic_index.py#L745), fused at [`:786`](../../../src/rebalance/ingest/semantic_index.py#L786)).
+**Important scope correction.** That is an argument for hybrid retrieval — and rebalanceOS *already ships hybrid retrieval*. `semantic_index.query()` defaults to `hybrid=True` and fuses the vector ranking with an FTS5 lexical ranking through RRF ([`semantic_index.py:745`](../../src/rebalance/ingest/semantic_index.py#L745), fused at [`:786`](../../src/rebalance/ingest/semantic_index.py#L786)).
 
 So this bake-off measured the **vector component in isolation**, not the retrieval path production actually serves. Two consequences, stated plainly because they bound every claim above:
 
@@ -125,7 +138,7 @@ This correction was caught while implementing the fix, after the results table w
 
 1. **n=39 overall, n=5 on `lexical-hard`.** The subset splits are indicative, not conclusive. The prefix result (14 wins, 0 losses) is robust; the FTS comparisons are not.
 2. **10k corpus is a 5.2× downsample.** Absolute scores read higher than production would. Only ordering is claimed.
-3. **No blinding.** One person authored the queries, ran the lanes and wrote this. Mitigations are procedural only: the decision rule and query set were frozen before scoring, and `results.json` publishes per-query ranks for independent recheck.
+3. **No blinding.** One person authored the queries, ran the lanes and wrote this. Mitigations are procedural only: the decision rule and query set were frozen before scoring, and `per_query_results.jsonl` publishes per-query ranks for independent recheck.
 4. **Single-target ground truth** penalises a lane that retrieves a different-but-equally-valid document. Applies equally to all lanes.
 5. **Deviation from protocol §3.3:** Qwen ran at a 4,096-token cap rather than its native 32,768 — allocating the native window exhausted MPS memory. Measured cost: 14 of 10,000 documents (0.14%) truncated. BGE truncated 12.92% at its native 512.
 6. **Target selection was screened for distinctiveness.** The first sample was dominated by near-duplicate boilerplate (repetitive prompt-log chunks, generic commit messages) that cannot serve as single-target ground truth. Documents were de-duplicated on a normalised body prefix. This biases the query set toward *distinctive* documents and likely inflates every lane's absolute score.
@@ -141,4 +154,4 @@ GOOGLE_CLOUD_PROJECT=... GEMINI_SECRET_NAME=... \
 python temp/bakeoff/score.py
 ```
 
-Scripts and the frozen query set are in this directory; `results.json` carries every per-query rank for all six lanes. Sidecar databases live under `temp/bakeoff/` (gitignored, regenerable).
+Scripts and the frozen query set are in this directory; `per_query_results.jsonl` carries every per-query rank for all six lanes. Sidecar databases live under `temp/bakeoff/` (gitignored, regenerable).
