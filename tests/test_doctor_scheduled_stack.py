@@ -52,17 +52,17 @@ class ScheduledStackCheckoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             agents = Path(tmp)
             _write(agents, "pulse-server", "/Users/x/Documents/rebalance-OS/scripts/pulse_server.sh")
-            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
             checks = _check_scheduled_stack_checkout(agents)
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].status, WARN)
         self.assertIn("pulse-server", checks[0].detail)
-        self.assertNotIn("vault-sync", checks[0].detail)
+        self.assertNotIn("obsidian-vault-embeddings", checks[0].detail)
 
     def test_all_jobs_in_this_checkout_is_ok(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             agents = Path(tmp)
-            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
             _write(agents, "github-sync", str(REPO_ROOT / "scripts" / "github_sync.sh"))
             checks = _check_scheduled_stack_checkout(agents)
         self.assertEqual(len(checks), 1)
@@ -109,11 +109,11 @@ class DeclaredRuntimeRootTests(unittest.TestCase):
             self.assertIn("declared runtime root", checks[0].detail)
 
             # Job in THIS checkout now counts as drift — the declaration wins.
-            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
             with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
                 checks = _check_scheduled_stack_checkout(agents)
             self.assertEqual(checks[0].status, WARN)
-            self.assertIn("vault-sync", checks[0].detail)
+            self.assertIn("obsidian-vault-embeddings", checks[0].detail)
 
     def test_missing_declaration_falls_back_to_running_checkout(self) -> None:
         from unittest.mock import patch
@@ -123,7 +123,7 @@ class DeclaredRuntimeRootTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             agents = Path(tmp) / "agents"
             agents.mkdir()
-            _write(agents, "vault-sync", str(REPO_ROOT / "scripts" / "vault_sync.sh"))
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
             with patch.object(doctor, "RUNTIME_ROOT_FILE", Path(tmp) / "absent"):
                 checks = _check_scheduled_stack_checkout(agents)
             self.assertEqual(checks[0].status, OK)

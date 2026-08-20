@@ -240,10 +240,13 @@ def _fake_github_api(url: str) -> object:
     raise AssertionError(f"Unexpected GitHub API URL in test: {url}")
 
 
+from rebalance.ingest.embedder import EMBEDDING_DIM, DEFAULT_MODEL
+
+
 def _fake_embed_texts(texts: list[str], _model_name: str) -> list[list[float]]:
     vectors: list[list[float]] = []
     for text in texts:
-        vec = [0.0] * 1024
+        vec = [0.0] * EMBEDDING_DIM
         lowered = text.lower()
         if "nonce" in lowered:
             vec[0] = 1.0
@@ -470,7 +473,7 @@ class GitHubKnowledgeTests(unittest.TestCase):
                         "Body",
                         "hash",
                         "hash",
-                        "Qwen/Qwen3-Embedding-0.6B|1024",
+                        f"{DEFAULT_MODEL}|{EMBEDDING_DIM}",
                         "2026-04-28T00:00:00Z",
                         "{}",
                         "2026-04-28T00:00:00Z",
@@ -480,11 +483,11 @@ class GitHubKnowledgeTests(unittest.TestCase):
                 semantic_doc_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
                 conn.execute(
                     "INSERT INTO github_embeddings (doc_id, embedding) VALUES (?, ?)",
-                    (doc_id, _vec_to_bytes([0.0] * 1024)),
+                    (doc_id, _vec_to_bytes([0.0] * EMBEDDING_DIM)),
                 )
                 conn.execute(
                     "INSERT INTO semantic_embeddings (rowid, embedding) VALUES (?, ?)",
-                    (semantic_doc_id, _vec_to_bytes([0.0] * 1024)),
+                    (semantic_doc_id, _vec_to_bytes([0.0] * EMBEDDING_DIM)),
                 )
                 conn.commit()
 

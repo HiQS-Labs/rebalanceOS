@@ -164,7 +164,7 @@ class StackScriptTests(unittest.TestCase):
         """The negative control. The three deferred 3-Eyes plists are kept on
         disk deliberately; a glob over com.rebalance-os.* would eat them."""
         preserved = self.write_plist("3eyes.selfcheck")
-        managed = self.write_plist("vault-sync")
+        managed = self.write_plist("obsidian-vault-embeddings")
 
         result = run_stack("purge", home=self.home)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -181,7 +181,7 @@ class StackScriptTests(unittest.TestCase):
     def test_down_unloads_but_keeps_the_plist(self):
         """`restart` is down-then-up. If `down` deleted plists, a failed `up`
         would leave the machine with no agents at all."""
-        managed = self.write_plist("vault-sync")
+        managed = self.write_plist("obsidian-vault-embeddings")
         result = run_stack("down", home=self.home)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(
@@ -229,19 +229,21 @@ class StackScriptTests(unittest.TestCase):
         before anyone runs up — and on the RIGHT job's row: asserting the string
         appears somewhere in the output would pass even if it were attributed to
         the wrong job."""
-        self.write_plist("vault-sync", root="/somewhere/else")
+        self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         out = strip_ansi(run_stack("status", home=self.home).stdout)
         self.assertIn(f"Target root: {REPO}", out)
 
-        rows = [ln for ln in out.splitlines() if ln.startswith("vault-sync ")]
-        self.assertEqual(len(rows), 1, f"expected one vault-sync row, got {rows}")
+        rows = [ln for ln in out.splitlines() if ln.startswith("obsidian-vault-embeddings ")]
+        self.assertEqual(len(rows), 1, f"expected one obsidian-vault-embeddings row, got {rows}")
         self.assertIn("/somewhere/else", rows[0])
 
-        others = [ln for ln in out.splitlines() if "/somewhere/else" in ln and not ln.startswith("vault-sync ")]
+        others = [
+            ln for ln in out.splitlines() if "/somewhere/else" in ln and not ln.startswith("obsidian-vault-embeddings ")
+        ]
         self.assertFalse(others, f"foreign binding leaked onto other rows: {others}")
 
     def test_up_refuses_when_the_fleet_is_bound_elsewhere(self):
-        self.write_plist("vault-sync", root="/somewhere/else")
+        self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         result = run_stack("up", home=self.home)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("bound to a different checkout", strip_ansi(result.stderr))
@@ -250,10 +252,10 @@ class StackScriptTests(unittest.TestCase):
         """bound_root returns empty when no <string> looks like a checkout path.
         Treating unknown as "ours" would make the migration guard fail OPEN,
         which is the one direction a safety check must never fail."""
-        path = self.agents / f"{PREFIX}vault-sync.plist"
+        path = self.agents / f"{PREFIX}obsidian-vault-embeddings.plist"
         path.write_text(
             "<?xml version='1.0'?><plist version='1.0'><dict>\n"
-            "<key>Label</key><string>com.rebalance-os.vault-sync</string>\n"
+            "<key>Label</key><string>com.rebalance-os.obsidian-vault-embeddings</string>\n"
             "<key>Program</key><string>/usr/local/bin/python</string>\n"
             "</dict></plist>\n",
             encoding="utf-8",
@@ -265,7 +267,7 @@ class StackScriptTests(unittest.TestCase):
     def test_status_survives_a_plist_with_no_string_values(self):
         """`set -o pipefail` + a grep that matches nothing used to abort the
         whole script from inside bound_root's command substitution."""
-        path = self.agents / f"{PREFIX}vault-sync.plist"
+        path = self.agents / f"{PREFIX}obsidian-vault-embeddings.plist"
         path.write_text(
             "<?xml version='1.0'?><plist version='1.0'><dict>\n<key>Nice</key><integer>5</integer>\n</dict></plist>\n",
             encoding="utf-8",
@@ -278,7 +280,7 @@ class StackScriptTests(unittest.TestCase):
         """restart is down-then-up, and up can abort in preflight. If the
         preflight ran after the teardown, a failing check would leave the machine
         with zero agents — the outage this script exists to prevent."""
-        self.write_plist("vault-sync", root="/somewhere/else")
+        self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         result = run_stack("restart", home=self.home)
 
         self.assertNotEqual(result.returncode, 0, "restart should refuse a foreign binding")
@@ -289,7 +291,7 @@ class StackScriptTests(unittest.TestCase):
             f"restart unloaded jobs before its preflight failed: {calls}",
         )
         self.assertTrue(
-            (self.agents / f"{PREFIX}vault-sync.plist").exists(),
+            (self.agents / f"{PREFIX}obsidian-vault-embeddings.plist").exists(),
             "restart removed a plist despite aborting",
         )
 
@@ -300,7 +302,7 @@ class StackScriptTests(unittest.TestCase):
         file, so an unstubbed run here would unload the developer's real jobs —
         which is exactly what happened before STACK_LAUNCHCTL_BIN existed. Assert
         every unload target is under this test's HOME."""
-        self.write_plist("vault-sync")
+        self.write_plist("obsidian-vault-embeddings")
         self.write_plist("3eyes.selfcheck")
         run_stack("down", home=self.home)
 
@@ -324,7 +326,7 @@ class StackScriptTests(unittest.TestCase):
         """`up` refusing to ADOPT a foreign fleet while `down` was free to STOP
         it was the wrong way round: unloading jobs this clone does not own is
         the worse outcome of the two."""
-        self.write_plist("vault-sync", root="/somewhere/else")
+        self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         result = run_stack("down", home=self.home)
 
         self.assertNotEqual(result.returncode, 0)
@@ -334,7 +336,7 @@ class StackScriptTests(unittest.TestCase):
         self.assertFalse([c for c in calls if c.startswith("unload ")], calls)
 
     def test_purge_refuses_a_fleet_bound_elsewhere(self):
-        plist = self.write_plist("vault-sync", root="/somewhere/else")
+        plist = self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         result = run_stack("purge", home=self.home)
 
         self.assertNotEqual(result.returncode, 0)
@@ -343,7 +345,7 @@ class StackScriptTests(unittest.TestCase):
     def test_force_still_allows_a_deliberate_teardown(self):
         """The guard must be an interlock, not a wall — --force is the escape
         hatch, and it has to actually work."""
-        self.write_plist("vault-sync", root="/somewhere/else")
+        self.write_plist("obsidian-vault-embeddings", root="/somewhere/else")
         result = run_stack("down", "--force", home=self.home)
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = (self.home / "launchctl-calls.log").read_text().splitlines()
@@ -360,11 +362,11 @@ class StackScriptTests(unittest.TestCase):
         policy.write_text(
             "| Job (label suffix) | Cadence | Wrapper |\n"
             "|---|---|---|\n"
-            "| `vault-sync` | hourly | `scripts/vault_sync.sh` |\n"
+            "| `obsidian-vault-embeddings` | hourly | `scripts/vault_sync.sh` |\n"
             "| `no-such-job` | hourly | — |\n",
             encoding="utf-8",
         )
-        self.write_plist("vault-sync")
+        self.write_plist("obsidian-vault-embeddings")
 
         result = run_stack("up", home=self.home, extra_env={"STACK_POLICY_DOC": str(policy)})
 

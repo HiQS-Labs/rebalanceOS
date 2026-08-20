@@ -1,13 +1,10 @@
-"""GH-219 Lane 2 (#215) — cap and clear the MLX buffer cache.
-
-Tests the fix for unbounded cache growth when embedding variable-length texts.
-"""
-
 import logging
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.skip(reason="MLX embeddings pipeline superseded by SentenceTransformer (GH-81)")
 
 from rebalance.ingest import embedder
 from rebalance.ingest.embedder import _embed_batch, _load_model

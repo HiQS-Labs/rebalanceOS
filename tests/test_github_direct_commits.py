@@ -246,11 +246,13 @@ class DirectCommitEmbeddingPruningTests(unittest.TestCase):
 
     def _embed_all_pending(self) -> int:
         """Stand in for the embedder: give every pending document a vector."""
+        from rebalance.ingest.embedder import EMBEDDING_DIM
+
         with db_connection(self.db_path, ensure_github_schema) as conn:
             pending = gh.github_documents_pending_embed(conn, min_chars=0)
             for row in pending:
                 doc_id = row["id"]
-                gh.upsert_github_embedding(conn, doc_id, b"\x00" * (1024 * 4))
+                gh.upsert_github_embedding(conn, doc_id, b"\x00" * (EMBEDDING_DIM * 4))
                 gh.mark_github_document_embedded(conn, doc_id)
             conn.commit()
         return len(pending)

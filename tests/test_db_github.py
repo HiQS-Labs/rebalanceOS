@@ -313,7 +313,7 @@ class GitHubHelperTests(unittest.TestCase):
             pending = gh.github_documents_pending_embed(conn, 40)
             self.assertEqual([r["id"] for r in pending], [doc_id])
 
-            gh.upsert_github_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
+            gh.upsert_github_embedding(conn, doc_id, struct.pack("384f", *([0.0] * 384)))
             gh.mark_github_document_embedded(conn, doc_id)
             gh.set_github_embedding_meta(conn, "model_name", "test-model")
             conn.commit()
@@ -333,7 +333,7 @@ class GitHubHelperTests(unittest.TestCase):
             self.assertEqual(len(gh.github_documents_pending_embed(conn, 40)), 1)
 
     def test_search_github_documents(self) -> None:
-        vec = struct.pack("1024f", *([0.1] * 1024))
+        vec = struct.pack("384f", *([0.1] * 384))
         with db_connection(self.db_path, ensure_github_schema) as conn:
             R = "Org/repo"
             doc_id = gh.insert_github_document(
@@ -378,7 +378,7 @@ class GitHubHelperTests(unittest.TestCase):
                 updated_at="2026-05-20",
                 fetched_at="2026-05-20",
             )
-            gh.upsert_github_embedding(conn, doc_id, struct.pack("1024f", *([0.0] * 1024)))
+            gh.upsert_github_embedding(conn, doc_id, struct.pack("384f", *([0.0] * 384)))
             conn.commit()
 
             # Case-insensitive repo match.

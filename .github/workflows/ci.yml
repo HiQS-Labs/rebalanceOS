@@ -49,7 +49,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
@@ -69,7 +69,17 @@ jobs:
           # the web-surface tests need it. pytest: the suite is pytest-run
           # locally and some modules are pytest-style (unittest discover
           # can't collect them, and one imports pytest at module scope).
-          pip install -e ".[calendar,server]" pytest
+          # embeddings extra: tests/test_embedder*.py patch sentence_transformers,
+          # which requires it to be importable (GH-81). It pulls torch, which is
+          # why the job timeout above is 25 rather than 10 minutes.
+          #
+          # Install torch from PyTorch's CPU index FIRST. On Linux, plain
+          # `pip install torch` resolves to the CUDA build — several GB of
+          # nvidia-* wheels this runner has no GPU to use. Satisfying the
+          # requirement up front with the CPU wheel keeps the install small;
+          # the line below then finds torch already present.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest
           # HiQS is a standalone package with its own pyproject, and the step below runs its
           # suite. That step was added without this line, so it had never once passed: every
           # run since died collecting four test modules on `No module named 'numpy'`, which

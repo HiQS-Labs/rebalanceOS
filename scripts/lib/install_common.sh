@@ -29,6 +29,12 @@ LAUNCHCTL_BIN="${STACK_LAUNCHCTL_BIN:-${LAUNCHCTL_BIN:-launchctl}}"
 RB_INSTALL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="$(cd "$RB_INSTALL_LIB_DIR/.." && pwd)"
 REBALANCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "${HOME:-}/.config/rebalance/runtime-root" ]; then
+    _declared_root="$(head -n 1 "${HOME:-}/.config/rebalance/runtime-root" | tr -d '[:space:]')"
+    if [ -n "$_declared_root" ] && [ -d "$_declared_root" ]; then
+        REBALANCE_DIR="$_declared_root"
+    fi
+fi
 PYTHON_BIN="$REBALANCE_DIR/.venv/bin/python"
 
 # Escape '/' and '&' so a path is safe as a sed replacement string.

@@ -12,7 +12,7 @@ job.
 | Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs |
 |---|---|---|---|---|---|
 | `daily-sync` | daily 06:30 + RunAtLoad (boot/login catch-up) | `scripts/daily_sync.sh` | `refresh_index(db_path)` — default recipe: all raw sources + code/semantic/sync | vault path, GitHub token, calendar/sleuth auth as configured | SQLite knowledge base fully refreshed; dashboard note write-back |
-| `vault-sync` | hourly at :15, 06:15–23:15 | `scripts/vault_sync.sh` | `refresh_index(db_path, scope=["vault", "semantic"])` | `vault_path` in temp/rbos.config | vault raw tables + semantic index fresh within the hour |
+| `obsidian-vault-embeddings` | hourly at :15, 06:15–23:15 | `scripts/obsidian_vault_embeddings.sh` | `refresh_index(db_path, scope=["vault", "semantic"])` | `vault_path` in temp/rbos.config | vault raw tables + semantic index fresh within the hour |
 | `github-sync` | hourly at :45, 06:45–23:45 | `scripts/github_sync.sh` | `refresh_index(db_path, scope=["github", "focus5"])` | GitHub token (keyring/config) for github; Focus 5 needs none | github raw tables fresh (semantic backfill deferred to daily-sync); Focus 5 roster recomputed hourly |
 | `pulse-sync` | hourly at :00, 06:00–23:00 | `scripts/pulse_sync.sh` | `publish_pulse(db_path, dry_run=False, push=True)` | pulse_* keys in temp/rbos.config; local clone at pulse_target_path | markdown status page pushed to private repo (only when changed) |
 | `pulse-web-sync` | every 30 min at :08/:38, 06:00–23:38 | `scripts/pulse_web_sync.sh` | `scripts/pulse_web.py` | `vault_path` in temp/rbos.config (locates "0. Goals.md") | `web/pulse.html` regenerated atomically (local only, no network) |
@@ -45,7 +45,7 @@ since GH-175 **no two jobs share a minute**:
 :07 pulse-warning-watch      :22      :37      :52
 :08 pulse-web-sync (reads)   :38
 :10 health-check
-:15 vault-sync (writes vault + semantic)
+:15 obsidian-vault-embeddings (writes vault + semantic)
 :25 health-check-triage (08/14/20 only)
 :45 github-sync (writes github raw only)
 06:30 daily-sync (writes everything, incl. github → semantic backfill)
@@ -65,13 +65,13 @@ since GH-175 **no two jobs share a minute**:
   a derived read-only stage over what `pulse-sync` writes at :00; sharing that
   minute risked rendering from half-written state. :08 puts it clearly after.
 - **pulse-warning-watch moved off the quarter hours** — on :00/:15/:30/:45 it
-  collided with `pulse-sync`, `vault-sync`, `pulse-web-sync` and `github-sync` in
+  collided with `pulse-sync`, `obsidian-vault-embeddings`, `pulse-web-sync` and `github-sync` in
   turn. Same 15-minute cadence, no shared minute.
 - This is *same-minute* de-confliction only. It does **not** address run-window
   overlap: `daily-sync` runs ~25–30 min from 06:30 and still spans `github-sync`
   at :45. That overlap is handled by GH-131's bounded SQLite retry.
 
-- **vault-sync includes the `semantic` scope intentionally** — vault ingest
+- **obsidian-vault-embeddings includes the `semantic` scope intentionally** — vault ingest
   alone only updates raw tables; the semantic backfill+embed is what makes a
   note edited at 10:05 searchable by 10:16.
 - **github-sync intentionally excludes `semantic`** — hourly embedding of

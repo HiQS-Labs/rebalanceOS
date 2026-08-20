@@ -56,13 +56,13 @@ POLICY = {
         ],
         "doc_tokens": ["daily 06:30", "refresh_index(db_path)"],
     },
-    "vault-sync": {
+    "obsidian-vault-embeddings": {
         "calendar": _hourly(15),
         "run_at_load": False,
         "keep_alive": False,
-        "wrapper": "scripts/vault_sync.sh",
+        "wrapper": "scripts/obsidian_vault_embeddings.sh",
         "wrapper_must_contain": [
-            'rb_job_init "vault-sync" 14',
+            'rb_job_init "obsidian-vault-embeddings" 14',
             'scope=["vault", "semantic"]',
         ],
         "doc_tokens": ["hourly at :15", '["vault", "semantic"]'],
@@ -187,7 +187,7 @@ POLICY = {
 
 INSTALLERS = {
     "daily-sync": "install_scheduler.sh",
-    "vault-sync": "install_vault_scheduler.sh",
+    "obsidian-vault-embeddings": "install_obsidian_vault_embeddings_scheduler.sh",
     "github-sync": "install_github_scheduler.sh",
     "pulse-sync": "install_pulse_scheduler.sh",
     "pulse-web-sync": "install_pulse_web_scheduler.sh",

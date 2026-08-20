@@ -24,6 +24,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.skip(reason="MLX embeddings pipeline superseded by SentenceTransformer (GH-81)")
+
 from rebalance.ingest import embedder
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "rebalance" / "ingest"
