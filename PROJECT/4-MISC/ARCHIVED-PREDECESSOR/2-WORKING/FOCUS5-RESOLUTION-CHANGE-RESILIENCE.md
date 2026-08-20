@@ -30,7 +30,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| **Planning only (2026-07-06).** Root-caused: `buildPanel()` sets `panel.setFrameAutosaveName("Focus5FloatPanel.v5")` and only calls `panel.center()` when `panel.frame.origin == .zero` ([Focus5FloatApp.swift:201-204](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift#L201)). Nothing observes `NSApplication.didChangeScreenParametersNotification`, so on a resolution change the panel keeps its old absolute frame — which can land fully or partially off the resized screen, with no path back short of a reboot resetting window-server state. | Start **Phase 1**: install a screen-parameters observer that re-clamps the panel into the current `visibleFrame`. |
+| **Planning only (2026-07-06).** Root-caused: `buildPanel()` sets `panel.setFrameAutosaveName("Focus5FloatPanel.v5")` and only calls `panel.center()` when `panel.frame.origin == .zero` ([Focus5FloatApp.swift:201-204](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift#L201)). Nothing observes `NSApplication.didChangeScreenParametersNotification`, so on a resolution change the panel keeps its old absolute frame — which can land fully or partially off the resized screen, with no path back short of a reboot resetting window-server state. | Start **Phase 1**: install a screen-parameters observer that re-clamps the panel into the current `visibleFrame`. |
 
 ## Table of contents
 
@@ -57,12 +57,12 @@ disproportionate remedy for a routine display change.
 
 ### Root cause
 
-- `buildPanel()` ([Focus5FloatApp.swift:151](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift#L151))
+- `buildPanel()` ([Focus5FloatApp.swift:151](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift#L151))
   configures the panel and its autosave name, but registers **no** observer for
   `NSApplication.didChangeScreenParametersNotification`.
 - The only re-centering guard (`if panel.frame.origin == .zero { panel.center() }`)
   runs once at build time and never again.
-- `togglePanelWidth()` ([ContentView.swift:195](../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L195))
+- `togglePanelWidth()` ([ContentView.swift:195](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L195))
   and `showPanel()` also do no on-screen validation before display.
 
 ## Approach

@@ -114,7 +114,7 @@ optimization.** Fix that inversion and (1)–(3) all become recoverable.
   It then **quarantines** (not deletes) the copy under `.clio-reconciled/`.
 - **Verify-after-write:** after `mv`, read the note back and confirm the just-emitted IDs
   are present before advancing the cursor.
-- **Coupled Swift change:** [PromptLogReader.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/PromptLogReader.swift)
+- **Coupled Swift change:** [PromptLogReader.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/PromptLogReader.swift)
   parses positionally, so after splitting the body into lines it must **drop any line
   starting with `<!--`** *before* the positional inner loop runs (agy's nit: a simple
   pre-filter keeps the positional logic untouched and tolerates both legacy no-ID and new

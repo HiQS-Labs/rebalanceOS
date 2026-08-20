@@ -80,7 +80,7 @@ Invoked by launchd every N minutes (configured during `install.sh`). On each run
 
 **Device identity** (two fields, two purposes):
 - `device_id` — friendly slug derived from `scutil --get ComputerName`, lowercased, slug-normalized. Used for filenames (`pulse-<device_id>.md`) and display. Can change across renames and slug-rule updates.
-- `hardware_uuid` — stable hardware-backed identifier (macOS `IOPlatformUUID` via `ioreg`, Linux `/etc/machine-id` fallback). Survives renames, slug changes, and OS reinstalls on the same hardware. Written to `devices/<device_id>.yaml` on every `collect.sh` run (`schema_version: 2`). The [Phase 1 SQLite layer](../../PROJECT/1-INBOX/P1-SQLITE.md) keys canonical dedup off `hardware_uuid`, with the slug as a display-only fallback for pre-UUID observations.
+- `hardware_uuid` — stable hardware-backed identifier (macOS `IOPlatformUUID` via `ioreg`, Linux `/etc/machine-id` fallback). Survives renames, slug changes, and OS reinstalls on the same hardware. Written to `devices/<device_id>.yaml` on every `collect.sh` run (`schema_version: 2`). The [Phase 1 SQLite layer](../../PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/P1-SQLITE.md) keys canonical dedup off `hardware_uuid`, with the slug as a display-only fallback for pre-UUID observations.
 
 **Pulse file format:** UTC-only. Local time is computed downstream at render time — see the view/recap notes below for the actual (not ideal) timezone behavior.
 
@@ -184,7 +184,7 @@ The team pipeline is currently all-manual. A scheduled team scan is future work.
 
 ## Future: SQLite history layer
 
-Planning doc: [P1-SQLITE.md](../../PROJECT/1-INBOX/P1-SQLITE.md).
+Planning doc: [P1-SQLITE.md](../../PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/P1-SQLITE.md).
 
 The Phase 0 spike ([sqlite_spike.py](sqlite_spike.py)) proves ingest is trivially fast and FTS5 + `sqlite-vec` are both available. Phase 1 introduces a `commit_observations` table at `~/Library/Application Support/git-pulse/history.sqlite` that ingests `pulse-*.md`, `reports/*.tsv`, and `team-pulses/*.tsv` as first-class sources. Recap rendering and retrieval eventually read from this layer instead of re-parsing TSVs.
 

@@ -42,7 +42,7 @@ phases: 4
 
 | What was just completed | What's next |
 |---|---|
-| **Promoted + Phase 0 spike run (2026-07-01).** Opened [issue #101](https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/101), `git mv`d this doc to `2-WORKING/GH-101-SIGNAL-QUALITY-CONTRACT.md`, parked its pointer in `ROADMAP.md`. **Phase 0 verified against live code + live DB** (findings in §Phase 0 below): `get_index_status` at [index_ops.py:224](../../src/rebalance/ingest/index_ops.py#L224) **CONFIRMED**; `_safe_max` per-table freshness **CONFIRMED**; `_safe_count_where` primitive exists at [index_ops.py:174](../../src/rebalance/ingest/index_ops.py#L174), used for apple_reminders at [L273](../../src/rebalance/ingest/index_ops.py#L273) **CONFIRMED**; no `sync_state` table (0 hits repo-wide) **CONFIRMED**. **REFUTED:** `payload["freshness"]` is *not* an empty dict ready to hold labels — it is initialized empty at [L236](../../src/rebalance/ingest/index_ops.py#L236) but **overwritten with the semantic-drift dict at [L385](../../src/rebalance/ingest/index_ops.py#L385)**; Phase 2 must merge into it, not assume it is free. `vault` make-or-break confirmed (outside `_PEEKABLE_SOURCES`). | **Phase 1 shipped 2026-07-03** — `recent_row_count_7d` added to all 8 sources in `get_index_status`; new seeded test covers correct counts + the zero-volume case; `pytest tests/` 1278 passed / 10 skipped; `rebalance doctor` clean. **Run Phase 2 next.** |
+| **Promoted + Phase 0 spike run (2026-07-01).** Opened [issue #101](https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/101), `git mv`d this doc to `2-WORKING/GH-101-SIGNAL-QUALITY-CONTRACT.md`, parked its pointer in `ROADMAP.md`. **Phase 0 verified against live code + live DB** (findings in §Phase 0 below): `get_index_status` at [index_ops.py:224](../../../../src/rebalance/ingest/index_ops.py#L224) **CONFIRMED**; `_safe_max` per-table freshness **CONFIRMED**; `_safe_count_where` primitive exists at [index_ops.py:174](../../../../src/rebalance/ingest/index_ops.py#L174), used for apple_reminders at [L273](../../../../src/rebalance/ingest/index_ops.py#L273) **CONFIRMED**; no `sync_state` table (0 hits repo-wide) **CONFIRMED**. **REFUTED:** `payload["freshness"]` is *not* an empty dict ready to hold labels — it is initialized empty at [L236](../../../../src/rebalance/ingest/index_ops.py#L236) but **overwritten with the semantic-drift dict at [L385](../../../../src/rebalance/ingest/index_ops.py#L385)**; Phase 2 must merge into it, not assume it is free. `vault` make-or-break confirmed (outside `_PEEKABLE_SOURCES`). | **Phase 1 shipped 2026-07-03** — `recent_row_count_7d` added to all 8 sources in `get_index_status`; new seeded test covers correct counts + the zero-volume case; `pytest tests/` 1278 passed / 10 skipped; `rebalance doctor` clean. **Run Phase 2 next.** |
 
 ---
 
@@ -99,7 +99,7 @@ code is **better than that**, which shrinks the work:
 | Pillar | Real state today | Evidence (file:line) |
 |---|---|---|
 | **Structured** | Enforced at the storage boundary; malformed writes don't land. | source schemas / type affinities |
-| **Fresh** | **Already derived per-table**, not from a missing `sync_state`. `get_index_status` computes a per-source last-timestamp via `_safe_max(conn, table, col)`. | [index_ops.py:244-302](../../src/rebalance/ingest/index_ops.py#L244-L302) |
+| **Fresh** | **Already derived per-table**, not from a missing `sync_state`. `get_index_status` computes a per-source last-timestamp via `_safe_max(conn, table, col)`. | [index_ops.py:244-302](../../../../src/rebalance/ingest/index_ops.py#L244-L302) |
 | **Attested** | Asserted only — rows carry source IDs/URLs, but synthesis is not structurally required to cite them. | (out of scope for v1) |
 | **Relevant** | Structurally weak — relevance is query-time; no signal when important rows were silently omitted. | (the GH-81 class) |
 
@@ -108,13 +108,13 @@ code is **better than that**, which shrinks the work:
 1. **No `sync_state` table exists** (`grep` → 0 hits). Freshness is *already* per-source, so Phase 1
    does not need new freshness plumbing — only a second metric beside the existing counts.
 2. **The 7-day-window primitive already exists**: `_safe_count_where(conn, table, predicate)` is used
-   today for `apple_reminders` active-count ([index_ops.py:273](../../src/rebalance/ingest/index_ops.py#L273)).
+   today for `apple_reminders` active-count ([index_ops.py:273](../../../../src/rebalance/ingest/index_ops.py#L273)).
    `recent_row_count_7d` is one call to it with a `timestamp > now-7d` predicate.
-3. **`payload["freshness"]` is an initialized empty dict** ([index_ops.py:236](../../src/rebalance/ingest/index_ops.py#L236)) —
+3. **`payload["freshness"]` is an initialized empty dict** ([index_ops.py:236](../../../../src/rebalance/ingest/index_ops.py#L236)) —
    the natural, DRY home for the derived `status`/`reason` labels, rather than a parallel structure.
 
 There is also a ready-made **source → content-timestamp** map to reuse: `_PEEKABLE_SOURCES`
-([index.py:193](../../src/rebalance/mcp/tools/index.py#L193)) already pins each source to the column
+([index.py:193](../../../../src/rebalance/mcp/tools/index.py#L193)) already pins each source to the column
 that means "when this row's data is about / arrived" (`calendar_events→start_time`,
 `email_messages→received_at`, `github_activity→scanned_at`, …). Volume must be counted on the
 **content** timestamp, not the **sync** timestamp — otherwise "synced 2 min ago, 0 useful rows"
@@ -186,12 +186,12 @@ the per-source window/column choices.
 
 Checklist:
 
-- [ ] Read `get_index_status` end-to-end ([index_ops.py:224](../../src/rebalance/ingest/index_ops.py#L224)):
+- [ ] Read `get_index_status` end-to-end ([index_ops.py:224](../../../../src/rebalance/ingest/index_ops.py#L224)):
       confirm the per-source dict shape and whether anything already populates `payload["freshness"]`.
-- [ ] Confirm `_safe_count_where` ([index_ops.py:273](../../src/rebalance/ingest/index_ops.py#L273))
+- [ ] Confirm `_safe_count_where` ([index_ops.py:273](../../../../src/rebalance/ingest/index_ops.py#L273))
       can express `WHERE <ts_col> > <now-7d>` cheaply for each core source (index present? full scan?).
 - [ ] Pin the content-timestamp column per source against `_PEEKABLE_SOURCES`
-      ([index.py:193](../../src/rebalance/mcp/tools/index.py#L193)); note where `vault` differs (its
+      ([index.py:193](../../../../src/rebalance/mcp/tools/index.py#L193)); note where `vault` differs (its
       rows live in `vault_files`/`chunks`, not the peekable set).
 - [ ] Decide which sources need a custom window vs. the default rolling 7-day count.
 - [ ] Produce one concrete `recent_row_count_7d` + derived `status` example for `vault`, `github`,
@@ -220,17 +220,17 @@ Read the exact lines. Each claim below is CONFIRMED / REFUTED / UNVERIFIED again
 
 | Claim (as drafted) | Verdict | Evidence (file:line read) |
 |---|---|---|
-| `index_status()` → `get_index_status()` is the surface; read-only per-source snapshot. | **CONFIRMED** | `get_index_status(database_path)` defined [index_ops.py:224](../../src/rebalance/ingest/index_ops.py#L224); docstring "Read-only. Safe to call frequently" L225-228. |
-| Per-source freshness is derived per-table via `_safe_max(conn, table, col)`, not from a `sync_state` table. | **CONFIRMED** | `_safe_max` = `SELECT MAX(col)` [index_ops.py:166](../../src/rebalance/ingest/index_ops.py#L166); used per source e.g. `vault.last_ingested_at` L247, `github.activity_last_scanned_at` L255, `calendar.last_fetched_at` L262, `sleuth.last_synced_at` L268. |
-| A `_safe_count_where` 7-day-window primitive already exists. | **CONFIRMED** | Defined `SELECT COUNT(*) FROM {table} WHERE {where}` at [index_ops.py:174](../../src/rebalance/ingest/index_ops.py#L174) (the *definition*; the sketch cited L273, which is a *use* site). Live-used for `apple_reminders.active` (`is_active=1 AND is_completed=0`) at [index_ops.py:273](../../src/rebalance/ingest/index_ops.py#L273). A `WHERE <ts_col> > <cutoff>` predicate is expressible with the same helper, no code change. |
+| `index_status()` → `get_index_status()` is the surface; read-only per-source snapshot. | **CONFIRMED** | `get_index_status(database_path)` defined [index_ops.py:224](../../../../src/rebalance/ingest/index_ops.py#L224); docstring "Read-only. Safe to call frequently" L225-228. |
+| Per-source freshness is derived per-table via `_safe_max(conn, table, col)`, not from a `sync_state` table. | **CONFIRMED** | `_safe_max` = `SELECT MAX(col)` [index_ops.py:166](../../../../src/rebalance/ingest/index_ops.py#L166); used per source e.g. `vault.last_ingested_at` L247, `github.activity_last_scanned_at` L255, `calendar.last_fetched_at` L262, `sleuth.last_synced_at` L268. |
+| A `_safe_count_where` 7-day-window primitive already exists. | **CONFIRMED** | Defined `SELECT COUNT(*) FROM {table} WHERE {where}` at [index_ops.py:174](../../../../src/rebalance/ingest/index_ops.py#L174) (the *definition*; the sketch cited L273, which is a *use* site). Live-used for `apple_reminders.active` (`is_active=1 AND is_completed=0`) at [index_ops.py:273](../../../../src/rebalance/ingest/index_ops.py#L273). A `WHERE <ts_col> > <cutoff>` predicate is expressible with the same helper, no code change. |
 | There is **no `sync_state` table**. | **CONFIRMED** | `grep -rniE "sync_state"` → **0 matches** across `src/` and all `*.py`/`*.sql` in the repo (graphify-out excluded). |
-| `vault` is the make-or-break case (rows live in `vault_files`/`chunks`, outside `_PEEKABLE_SOURCES`). | **CONFIRMED** | `_PEEKABLE_SOURCES` [index.py:193](../../src/rebalance/mcp/tools/index.py#L193) has **no** `vault*` key; `get_index_status` reads vault from `vault_files`/`chunks` (L245-248). `peek_source` cannot reach vault; a bespoke count on `vault_files`/`chunks` is required for Phase 1. |
+| `vault` is the make-or-break case (rows live in `vault_files`/`chunks`, outside `_PEEKABLE_SOURCES`). | **CONFIRMED** | `_PEEKABLE_SOURCES` [index.py:193](../../../../src/rebalance/mcp/tools/index.py#L193) has **no** `vault*` key; `get_index_status` reads vault from `vault_files`/`chunks` (L245-248). `peek_source` cannot reach vault; a bespoke count on `vault_files`/`chunks` is required for Phase 1. |
 
 **Correction the spike found (REFUTED — must be carried into Phase 2):**
 
 - The sketch/status claimed `payload["freshness"]` is "an initialized empty dict ready to hold derived
-  labels." **REFUTED.** It is initialized empty at [index_ops.py:236](../../src/rebalance/ingest/index_ops.py#L236),
-  but at [index_ops.py:385](../../src/rebalance/ingest/index_ops.py#L385) the function does
+  labels." **REFUTED.** It is initialized empty at [index_ops.py:236](../../../../src/rebalance/ingest/index_ops.py#L236),
+  but at [index_ops.py:385](../../../../src/rebalance/ingest/index_ops.py#L385) the function does
   `payload["freshness"] = drift`, **overwriting** it with a semantic-drift dict
   (`vault_chunks_missing_from_semantic`, `github_documents_missing_from_semantic`,
   `semantic_documents_pending_embed` — built L346-385). Live proof: `index_status` returns
@@ -239,7 +239,7 @@ Read the exact lines. Each claim below is CONFIRMED / REFUTED / UNVERIFIED again
   sub-key), not assume it is a free home — writing there naively would clobber the existing drift signal.
 
 **Content-timestamp column per source (checklist item 3) — locked from `_PEEKABLE_SOURCES`
-([index.py:193](../../src/rebalance/mcp/tools/index.py#L193)) + `get_index_status` (L244-302):**
+([index.py:193](../../../../src/rebalance/mcp/tools/index.py#L193)) + `get_index_status` (L244-302):**
 
 | Source | Content-ts column for `recent_row_count_7d` | Window decision | Note (verified) |
 |---|---|---|---|
@@ -308,7 +308,7 @@ maintainer as three tooling gaps found live (reviewer-schema/runtime mismatch, u
 
 - Derive `status` (`ok`/`warn`/`degraded`) + `reason` per source into `payload["freshness"]` from
   (a) staleness vs. the source's window and (b) zero/collapsed `recent_row_count_7d`.
-- Add **one** `doctor` warning path ([cli/__init__.py:114](../../src/rebalance/cli/__init__.py#L114))
+- Add **one** `doctor` warning path ([cli/__init__.py:114](../../../../src/rebalance/cli/__init__.py#L114))
   that prints the degraded sources with their `reason`. No new screen, no new job.
 
 **QA gate:** test feeds a fresh-but-empty source and asserts `status == "degraded"` with a non-empty
@@ -390,7 +390,7 @@ fork them:
 - [ROADMAP-SIGNAL-SCAN.md](../1-INBOX/PDDA-INTEGRATION/ROADMAP-SIGNAL-SCAN.md) — adds a *new `roadmap` collector*
   (a source). This plan instead *grades the health of existing sources*. Complementary: a future
   `roadmap` source would get `recent_row_count_7d` for free.
-- [GEMINI-WHATS-NEXT-VAULT.md](../1-INBOX/GEMINI-WHATS-NEXT-VAULT.md) / [SIGNAL-GENERATION/](../2-WORKING/SIGNAL-GENERATION/) —
+- [GEMINI-WHATS-NEXT-VAULT.md](../1-INBOX/GEMINI-WHATS-NEXT-VAULT.md) / [SIGNAL-GENERATION/](../../../2-WORKING/SIGNAL-GENERATION) —
   the *synthesis/ranking* plane. This contract feeds it trust metadata; it is not a second ranker.
 - [WATCHLIST-COVERAGE-GUARD.md](../3-COMPLETED/WATCHLIST-COVERAGE-GUARD.md) — already guards *repo
   roster* drop-off via the focus5-snapshot pattern. Reuse its snapshot/anomaly idiom for volume

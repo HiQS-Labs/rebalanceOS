@@ -32,10 +32,10 @@ which is what produced the `<rank>. <title>` placeholder titles. Fixed all three
 
 | # | Change | Where |
 |---|---|---|
-| Task 1a | Paid-key **file resolver** added to the key chain (env `GEMINI_API_KEY_FILE` → `gemini_key_file` config → default `~/secrets/gemini-paid-key.txt`); multi-line files handled — extracts the `AIza…` line past the project-id line. | [config.py](../../src/rebalance/ingest/config.py) `get_gemini_api_key` / `_gemini_key_from_file` / `_pick_api_key` |
-| (root cause) | `DEFAULT_GEMINI_MODEL` `gemini-2.0-flash` → **`gemini-2.5-flash`** (current; repo-consistent with note_builder/dashboard); ranking call given 2048-token headroom. | [querier.py](../../src/rebalance/ingest/querier.py), [next_actions.py](../../src/rebalance/ingest/next_actions.py) |
+| Task 1a | Paid-key **file resolver** added to the key chain (env `GEMINI_API_KEY_FILE` → `gemini_key_file` config → default `~/secrets/gemini-paid-key.txt`); multi-line files handled — extracts the `AIza…` line past the project-id line. | [config.py](../../../../src/rebalance/ingest/config.py) `get_gemini_api_key` / `_gemini_key_from_file` / `_pick_api_key` |
+| (root cause) | `DEFAULT_GEMINI_MODEL` `gemini-2.0-flash` → **`gemini-2.5-flash`** (current; repo-consistent with note_builder/dashboard); ranking call given 2048-token headroom. | [querier.py](../../../../src/rebalance/ingest/querier.py), [next_actions.py](../../../../src/rebalance/ingest/next_actions.py) |
 | Task 1b | Parser **rejects echoed-template placeholders** (`<rank>. <title>` titles dropped → deterministic fallback; `<…>` field values ignored). Defense-in-depth so a weak fallback can never surface placeholder junk again. | `next_actions._parse_ranked_synthesis` + `_title_is_placeholder`/`_value_is_placeholder` |
-| Task 2 | **Vault render sink** — `render_next_actions_markdown` + `write_next_actions_to_vault` write the SAME ranked output to `Dashboards/What To Do Next.md` (single-writer banner), wired into the `refresh_index` precompute hook (gated on `update_dashboard_note` + resolved vault). | `next_actions.py`, [index_ops.py](../../src/rebalance/ingest/index_ops.py) |
+| Task 2 | **Vault render sink** — `render_next_actions_markdown` + `write_next_actions_to_vault` write the SAME ranked output to `Dashboards/What To Do Next.md` (single-writer banner), wired into the `refresh_index` precompute hook (gated on `update_dashboard_note` + resolved vault). | `next_actions.py`, [index_ops.py](../../../../src/rebalance/ingest/index_ops.py) |
 
 **Live verification (real paid key, real DB):** `rank_next_actions` returned `model_used=gemini-2.5-flash`,
 **0 placeholder titles**, real titles; `Dashboards/What To Do Next.md` written. **Full suite 1202 passed /
@@ -49,13 +49,13 @@ prod since a key resolves.
 ## Cross-links (don't rebuild)
 
 - **Owning engine:** [P2-TEAM-CALENDAR-SIGNAL.md](../2-WORKING/SIGNAL-GENERATION/P2-TEAM-CALENDAR-SIGNAL.md)
-  — the shared `rank_next_actions` core ([next_actions.py](../../src/rebalance/ingest/next_actions.py)),
-  the `/whats-next` route ([web.py](../../src/rebalance/web.py)), the `ranked_next_actions` precompute
+  — the shared `rank_next_actions` core ([next_actions.py](../../../../src/rebalance/ingest/next_actions.py)),
+  the `/whats-next` route ([web.py](../../../../src/rebalance/web.py)), the `ranked_next_actions` precompute
   cache (migration 0006), and the Gemini→Qwen `_synthesize_with_fallback` adapter (decision #5)
   already exist. Both deliverables below extend that engine — they are not a competing plan.
 - **Vault-as-dashboard contract:** [P1-SIGNAL.md](https://github.com/Hypercart-Dev-Tools/rebalance-OS/blob/development/PROJECT/1-INBOX/P1-SIGNAL.md) — "generated markdown
   becomes the dashboard; human notes stay human-owned"; single-writer contract for generated files.
-- **Gemini key resolver:** `get_gemini_api_key()` ([config.py](../../src/rebalance/ingest/config.py)) —
+- **Gemini key resolver:** `get_gemini_api_key()` ([config.py](../../../../src/rebalance/ingest/config.py)) —
   current chain is Python-SDK → `GEMINI_API_KEY`/`GOOGLE_API_KEY` env → `gcloud secrets versions access`.
 
 ## Why now (verified state, 2026-06-29)

@@ -88,8 +88,8 @@ Enable the Gmail API once in your Google Cloud project, then run the browser
 consent flow.
 
 **You supply the OAuth client.** rebalance does not bundle one — see
-[GOOGLE_CALENDAR.md → Step 1](./GOOGLE_CALENDAR.md) for the five-step Cloud Console
-walkthrough, or [`google_oauth_client.example.json`](./google_oauth_client.example.json)
+[GOOGLE_CALENDAR.md → Step 1](GOOGLE_CALENDAR.md) for the five-step Cloud Console
+walkthrough, or [`google_oauth_client.example.json`](google_oauth_client.example.json)
 for the expected file shape. The same Desktop-app client backs both Calendar and Gmail,
 so if you already did this for Calendar there is nothing more to do here. Save it as
 `~/secrets/google_oauth_client.json` or set `GOOGLE_OAUTH_CLIENT_FILE`.

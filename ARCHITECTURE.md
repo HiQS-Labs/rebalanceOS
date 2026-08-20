@@ -1,9 +1,9 @@
 # rebalance OS — ARCHITECTURE.md
 
-> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](./ROUTER.md) — canonical there, deliberately not restated here.
+> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
 
 
-> How data flows through the system. For execution decisions see the [PROJECT/](./PROJECT/) docs — canonical detail for a specific effort, governed by [PROJECT/PDDA.md](./PROJECT/PDDA.md) — for tool specs see [MCP.md](./MCP.md), for the *why* behind these decisions see [GUIDING-PRINCIPLES.md](./GUIDING-PRINCIPLES.md).
+> How data flows through the system. For execution decisions see the [PROJECT/](PROJECT) docs — canonical detail for a specific effort, governed by [PROJECT/PDDA.md](PROJECT/PDDA.md) — for tool specs see [MCP.md](MCP.md), for the *why* behind these decisions see [GUIDING-PRINCIPLES.md](GUIDING-PRINCIPLES.md).
 
 > **New maintainer? Start with [Maintainer Orientation](#maintainer-orientation-start-here)** — the load-bearing symbols, the two hubs, where to start reading, and one end-to-end trace. **This doc is load-bearing, not decorative:** `audit_modules` (the `audit_modules` MCP tool / [scripts/audit_modules.py](scripts/audit_modules.py)) and the PDDA gate enforce that collectors, render modules, and scheduled jobs stay documented here — update ARCHITECTURE.md in the *same PR* as any structural change.
 
@@ -46,7 +46,7 @@ Every `refresh_index` run is **incremental** — nothing is re-downloaded from s
 
 A few caps to know about up-front:
 
-- **Email** is capped at the **newest 100 inbox messages per run** today (Phase 1, shipped 2026-05-12) — default filter `in:inbox`, overridable via `gmail_query_filter` in `temp/rbos.config`. Not "important and starred." See [PROJECT/1-INBOX/EMAIL-INGEST.md](PROJECT/1-INBOX/EMAIL-INGEST.md).
+- **Email** is capped at the **newest 100 inbox messages per run** today (Phase 1, shipped 2026-05-12) — default filter `in:inbox`, overridable via `gmail_query_filter` in `temp/rbos.config`. Not "important and starred." See [PROJECT/1-INBOX/EMAIL-INGEST.md](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/EMAIL-INGEST.md).
 - **Calendar** refetches a **30-day back / 7-day forward window** by default; a 365-day backfill is available on demand via the CLI.
 - **GitHub activity** is bounded by the GitHub Events API's own ~30-day retention.
 - **Vault, sleuth, embeddings** are unbounded — they cover everything they can see.
@@ -67,7 +67,7 @@ The system has **two** central things with *opposite* roles. Conflating them is 
   [src/rebalance/ingest/index_ops.py](src/rebalance/ingest/index_ops.py) reach **out** into every collector. This is the
   one intended write/refresh entry point. New ingestion work registers here (`register_collector(Collector(...))`).
 - **Persistence base — fan-IN.** [src/rebalance/paths.py](src/rebalance/paths.py)::`resolve_database_path()` (answers *which* DB file)
-  → `db_connection()` in [src/rebalance/ingest/db/](src/rebalance/ingest/db/) (answers *how* to open it). Everything reaches **down** to these.
+  → `db_connection()` in [src/rebalance/ingest/db/](src/rebalance/ingest/db) (answers *how* to open it). Everything reaches **down** to these.
 
 They compose in a single hop (`refresh_index() → db_connection()`). Keeping orchestration and persistence in
 **separate** nodes is *why the codebase has no god-object* despite `db_connection()` being the single most-connected
@@ -116,7 +116,7 @@ A `rebalance refresh` (or the `refresh_index` MCP tool) flows through real symbo
 
 ## Signal Sources
 
-Raw incoming sources have a priority, a collector module, and a target table. The table below is the canonical field spec; for per-effort execution detail see the [PROJECT/](./PROJECT/) docs, and for current status see [ROADMAP.md](./ROADMAP.md).
+Raw incoming sources have a priority, a collector module, and a target table. The table below is the canonical field spec; for per-effort execution detail see the [PROJECT/](PROJECT) docs, and for current status see [ROADMAP.md](ROADMAP.md).
 
 | Priority | Source | Collector | Storage | Vectorized | Status |
 |----------|--------|-----------|---------|------------|--------|
@@ -239,7 +239,7 @@ Env-file paths resolve via [src/rebalance/paths.py](src/rebalance/paths.py)::`re
 
 > **The current preferred way to add a source is the collector / `SourceModule`
 > contract — see [src/rebalance/ingest/index_ops.py](src/rebalance/ingest/index_ops.py)
-> and the developer guide [PLUGINS.md](./PLUGINS.md).** It covers the registry
+> and the developer guide [PLUGINS.md](PLUGINS.md).** It covers the registry
 > descriptor, the optional `semantic_docs` provider, secrets/keyring, numbered
 > migrations, and tests, with Figma as the worked example. The steps below are
 > the practical recipe for the built-in sources.
@@ -367,7 +367,7 @@ Every source is incremental, but the meaning of "incremental" depends on what th
 - **Embeddings** — *hash delta.* Chunks (vault) or documents (GitHub corpus) without a corresponding embeddings row get embedded. A model-version change recorded in `embedding_meta` / `github_embedding_meta` triggers a full re-embed of that corpus.
 - **Calendar** — *window refetch.* Keyed by Google event ID with `INSERT OR REPLACE`. Re-sync overwrites existing events and adds new ones within the requested window (default 30d back / 7d forward; 365d on demand for backfill). No auto-deletion — events removed upstream stay in the local DB until manually pruned.
 - **Sleuth reminders** — *full refetch + column-diff.* Keyed by `reminder_id`. Column-level diff against the stored row decides insert/update/unchanged; `first_seen_at` is set on insert and never overwritten; `last_seen_at` and `last_synced_at` refresh on every sync. Missing reminders are NOT deleted — terminal states (`completed`, `canceled`) remain as history.
-- **Email (Gmail)** — *window refetch, count-bounded.* Keyed by Gmail `message_id` with upsert. Each run pulls the newest 100 messages matching the configured filter (default `in:inbox`, override via `gmail_query_filter` in `temp/rbos.config`). Phase 1 stores metadata + Gmail snippet only — no full body, no historical backfill, no auto-delete. See [PROJECT/1-INBOX/EMAIL-INGEST.md](PROJECT/1-INBOX/EMAIL-INGEST.md).
+- **Email (Gmail)** — *window refetch, count-bounded.* Keyed by Gmail `message_id` with upsert. Each run pulls the newest 100 messages matching the configured filter (default `in:inbox`, override via `gmail_query_filter` in `temp/rbos.config`). Phase 1 stores metadata + Gmail snippet only — no full body, no historical backfill, no auto-delete. See [PROJECT/1-INBOX/EMAIL-INGEST.md](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/EMAIL-INGEST.md).
 
 ---
 
@@ -529,7 +529,7 @@ Tools are registered in [src/rebalance/mcp/server.py](src/rebalance/mcp/server.p
 | Sync | `publish_pulse` | Render today+yesterday activity to markdown and push to private pulse repo |
 | Hygiene | `audit_modules` | Run [scripts/audit_modules.py](scripts/audit_modules.py) and return the structured JSON result. Verifies that ingest collectors / render modules / scheduled-job infrastructure are documented in ARCHITECTURE.md and CHANGELOG.md, and that recent commits' file changes appear in the latest CHANGELOG version section. Supports `init=True` to snapshot the baseline lockfile and `include_uncommitted=True` for a pre-commit working-tree preview |
 
-Tool specs (params, returns, dependencies): see [MCP.md](./MCP.md).
+Tool specs (params, returns, dependencies): see [MCP.md](MCP.md).
 
 ---
 
@@ -652,5 +652,5 @@ scripts/                   — Operator entry points (not part of the importable
 Copyright 2025-2026 Hypercart DBA Neochrome, Inc.
 
 rebalance is dual-licensed, matching the rest of the HiQS suite. **AGPL-3.0-only** is the
-default and covers nearly every use — see [`LICENSE`](./LICENSE). A commercial license is
-available for use that AGPL-3.0 does not fit; see [`LICENSE-COMMERCIAL.md`](./LICENSE-COMMERCIAL.md).
+default and covers nearly every use — see [`LICENSE`](LICENSE). A commercial license is
+available for use that AGPL-3.0 does not fit; see [`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md).

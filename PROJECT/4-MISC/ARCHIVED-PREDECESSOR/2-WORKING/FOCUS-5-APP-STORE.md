@@ -26,7 +26,7 @@ rollout_rule: "Each phase must leave a buildable, launchable app or a green `xco
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 0-R Sandboxed Re-spike PASSED (2026-07-01).** All five Phase 0-R remediation gates + all five Phase 0 QA gates now observed, not asserted, via a codesigned `.app` under `com.apple.security.app-sandbox`: `Process`→git empirically blocked (`xcrun: error: cannot be used within an App Sandbox.`), in-process **libgit2 1.7.2** returns the full typed fact set (incl. last-commit timestamp) on a permitted path, security-scoped bookmark round-trip verified in-sandbox. Evidence: [`macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md`](../../macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md); reproducer `build-and-run-sandboxed.sh`. **Key finding:** the SwiftGit2 SPM shortcut is iOS-only for macOS — Phase 2 must produce a macOS-sliced libgit2. | **Phase 1 — Native Contract & Data Model.** Phase 0/0-R are closed; freeze the native v1 entities (`RepoSnapshot`, `FocusRoster`, `OffRosterWarning`, `RankingMode`, `AppSettings`, `GrantedRoot`). Carry two Phase-0-R follow-ups forward: (a) source a **macOS-sliced libgit2** (Phase 2), (b) `restoreBookmark()` must call `stopAccessingSecurityScopedResource()`. |
+| **Phase 0-R Sandboxed Re-spike PASSED (2026-07-01).** All five Phase 0-R remediation gates + all five Phase 0 QA gates now observed, not asserted, via a codesigned `.app` under `com.apple.security.app-sandbox`: `Process`→git empirically blocked (`xcrun: error: cannot be used within an App Sandbox.`), in-process **libgit2 1.7.2** returns the full typed fact set (incl. last-commit timestamp) on a permitted path, security-scoped bookmark round-trip verified in-sandbox. Evidence: [`macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md`](../../../../macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md); reproducer `build-and-run-sandboxed.sh`. **Key finding:** the SwiftGit2 SPM shortcut is iOS-only for macOS — Phase 2 must produce a macOS-sliced libgit2. | **Phase 1 — Native Contract & Data Model.** Phase 0/0-R are closed; freeze the native v1 entities (`RepoSnapshot`, `FocusRoster`, `OffRosterWarning`, `RankingMode`, `AppSettings`, `GrantedRoot`). Carry two Phase-0-R follow-ups forward: (a) source a **macOS-sliced libgit2** (Phase 2), (b) `restoreBookmark()` must call `stopAccessingSecurityScopedResource()`. |
 
 ## Table of Contents
 
@@ -165,7 +165,7 @@ Why this is the right track for the App Store build:
 ### QA gate — Remediation
 
 > **PASSED 2026-07-01** (re-spike by the marathon MARATHON-A lane). Full evidence in
-> [`macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md`](../../macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md);
+> [`macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md`](../../../../macOS/Apps/Focus5Native/PHASE-0-R-FINDINGS.md);
 > one-command reproducer: `macOS/Apps/Focus5Native/build-and-run-sandboxed.sh`.
 > Machine context: Swift 6.2.4 / Xcode 26.3, ad-hoc codesign (no Developer ID
 > identity present — ad-hoc still enforces the App Sandbox locally).
@@ -173,7 +173,7 @@ Why this is the right track for the App Store build:
 - [x] **Sandboxed build exists:** spike runs as a codesigned `.app` with `com.apple.security.app-sandbox` + `files.user-selected.read-write` embedded/confirmed — not `swift run`. Sub-finding: a bare Mach-O CLI carrying the sandbox entitlement SIGTRAPs in `_libsecinit_appsandbox` before `main`; the sandbox requires a real `.app` bundle/container — so App Store packaging must be a bundle.
 - [x] **Kill criterion observed, not asserted:** `Process` → git run **inside** the sandbox fails verbatim with `xcrun: error: cannot be used within an App Sandbox.` (`/usr/bin/git` is an xcrun shim; xcrun refuses inside the sandbox). Empirically dead, not reasoned.
 - [x] **Embedded path proven viable:** in-process **libgit2 1.7.2** returns the full fact set on a permitted path (`branch=main ahead=0 behind=0 modified=1 untracked=1 dirty=true lastCommitUnix=…`, incl. last-commit timestamp); returns empty on a non-granted path — proving the file boundary, not the library, is the constraint. **Caveat:** linked via Xcode's internal arm64 `libgit2.dylib` as a spike stand-in — see the reversal-cost note at the Phase 0 decision; **not shippable as-is**.
-- [x] **Structured facts, not raw text:** typed `RepoFacts` extracted in-process ([`Sources/Focus5Core/GitProbe.swift:11`](../../macOS/Apps/Focus5Native/Sources/Focus5Core/GitProbe.swift#L11)), not a raw `git status` string dump.
+- [x] **Structured facts, not raw text:** typed `RepoFacts` extracted in-process ([`Sources/Focus5Core/GitProbe.swift:11`](../../../../macOS/Apps/Focus5Native/Sources/Focus5Core/GitProbe.swift#L11)), not a raw `git status` string dump.
 - [x] **Proof artifact written back:** exact A/B/C results, date, and machine context recorded in `PHASE-0-R-FINDINGS.md`; the line 124–125 decision is re-confirmed against the empirical result (with the macOS-libgit2 reversal-cost note added below).
 - [x] Phase 0-R passed → Status "What's next" advances to **Phase 1**. **Non-blocking follow-up carried to Phase 2:** `Focus5Native.swift` `restoreBookmark()` still omits `stopAccessingSecurityScopedResource()`.
 

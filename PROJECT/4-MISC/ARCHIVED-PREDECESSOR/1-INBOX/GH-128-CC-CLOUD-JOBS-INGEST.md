@@ -46,7 +46,7 @@ the rebalance/HiQS index. This captures the ingest path so that work can be coun
   - **Live proof (2026-07-14):** 4 web sessions, all `review_ready`, 0 running, 0 failed —
     `HIQS pipeline signal unification`, `Collector freshness content validation`,
     `GitHub issue 52 bugs and dials`, `PDDA - review GH 37`.
-- **Deliverable:** [`scripts/cc_cloud_jobs.py`](../../scripts/cc_cloud_jobs.py) — stdlib-only,
+- **Deliverable:** [`scripts/cc_cloud_jobs.py`](../../../../scripts/cc_cloud_jobs.py) — stdlib-only,
   `--day/--since/--all`, raw JSON → gitignored `temp/cc-cloud-jobs/`, then synthesized summary.
 
 ## API reference

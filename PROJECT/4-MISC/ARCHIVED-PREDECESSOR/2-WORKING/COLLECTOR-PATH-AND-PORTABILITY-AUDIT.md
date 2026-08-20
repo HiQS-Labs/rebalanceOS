@@ -181,7 +181,7 @@ Audit conclusion:
 
 Export/publish surfaces outside the orchestrator (not an ingest bypass, but worth tracking):
 
-- MCP `publish_pulse` ([src/rebalance/mcp/tools/index.py](../../src/rebalance/mcp/tools/index.py)) exports the pulse directly, outside `refresh_index`. It is export-class (sibling to the `sync` stage), so it belongs in the export picture (Phase 2) rather than the ingest bypass list above.
+- MCP `publish_pulse` ([src/rebalance/mcp/tools/index.py](../../../../src/rebalance/mcp/tools/index.py)) exports the pulse directly, outside `refresh_index`. It is export-class (sibling to the `sync` stage), so it belongs in the export picture (Phase 2) rather than the ingest bypass list above.
 
 ### 4. Semantic ownership is inconsistent
 

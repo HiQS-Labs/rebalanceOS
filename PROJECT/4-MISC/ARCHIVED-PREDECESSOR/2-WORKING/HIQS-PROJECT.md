@@ -1455,7 +1455,7 @@ have been misread as a model-quality result).
 ## 16. PDDA compliance and the governance boundary
 
 This plan is a `PROJECT/2-WORKING` doc in the rebalance-OS repo, so it is governed
-by [`PROJECT/PDDA.md`](../PDDA.md) — frontmatter, the exact two-column `## Status`
+by [`PROJECT/PDDA.md`](../../../PDDA.md) — frontmatter, the exact two-column `## Status`
 table, a table of contents listing every phase, a QA gate after every phase,
 spike findings written back into the doc, repo-relative paths only, and a
 `ROADMAP.md` pointer. All of those are present above.

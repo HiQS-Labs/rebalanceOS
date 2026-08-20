@@ -62,7 +62,7 @@ Ponytail ladder applied:
    Buckets = `GROUP BY client over projects`. Derived, not stored.
 2. **Stdlib?** `collections.defaultdict` does the grouping.
 3. **Already-installed dependency?** The Gemini adapter
-   (`_synthesize_with_fallback` in [next_actions.py](../../src/rebalance/ingest/next_actions.py))
+   (`_synthesize_with_fallback` in [next_actions.py](../../../../src/rebalance/ingest/next_actions.py))
    and the project inference pass already exist — reuse both.
 4. **Deterministic free win first.** Most clients ARE the GitHub owner/org, which
    `project_inference.py` already parses (`anthropics/claude-code` → owner `anthropics`).

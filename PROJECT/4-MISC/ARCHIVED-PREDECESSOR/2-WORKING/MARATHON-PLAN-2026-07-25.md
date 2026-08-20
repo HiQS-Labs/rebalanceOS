@@ -26,7 +26,7 @@ goal: >
 
 # Marathon Plan 2026-07-25 — pre-pre-flight sequenced queue
 
-> Derived from [ROADMAP.md](../../ROADMAP.md) · policy `quick-wins` · weights {eff:2,cx:1,risk:2,dep:3,zone:1} · gh=live.
+> Derived from [ROADMAP.md](../../../../ROADMAP.md) · policy `quick-wins` · weights {eff:2,cx:1,risk:2,dep:3,zone:1} · gh=live.
 > The roadmap says **what/why**; this says **what is still real and in what order**. Execution
 > detail still lives in each `PROJECT/**` doc — this is a scheduling overlay.
 
@@ -118,4 +118,4 @@ Per lane, the existing pipeline applies — no new control plane:
 
 ---
 
-*Generated from [ROADMAP.md](../../ROADMAP.md) (source of truth). Re-run `.xyz/utils/marathon-plan.sh` after editing the ledger.*
+*Generated from [ROADMAP.md](../../../../ROADMAP.md) (source of truth). Re-run `.xyz/utils/marathon-plan.sh` after editing the ledger.*

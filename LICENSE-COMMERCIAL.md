@@ -5,7 +5,7 @@ only the first.
 
 ## Which license applies to you
 
-**The AGPL-3.0-only license in [`LICENSE`](./LICENSE) applies by default, and it is
+**The AGPL-3.0-only license in [`LICENSE`](LICENSE) applies by default, and it is
 almost certainly all you need.** It costs nothing and it is a real open-source
 license — you may use, study, modify, self-host, and redistribute rebalance.
 
@@ -30,7 +30,7 @@ You may want a commercial license if:
 ## What the AGPL actually requires
 
 The obligation people most often miss is **section 13, "Remote Network
-Interaction"**. Plain-language summary — the binding text is in [`LICENSE`](./LICENSE):
+Interaction"**. Plain-language summary — the binding text is in [`LICENSE`](LICENSE):
 
 > If you modify rebalance and let users interact with your modified version
 > remotely over a network, you must prominently offer those users the complete
@@ -82,7 +82,7 @@ Nothing is assigned away.
 ---
 
 This document is a plain-language summary offered for orientation. It is not
-legal advice, and where it differs from the text of [`LICENSE`](./LICENSE) or a
+legal advice, and where it differs from the text of [`LICENSE`](LICENSE) or a
 signed commercial agreement, those control.
 
 Copyright (c) 2023-2026 Neochrome. All rights reserved.

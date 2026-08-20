@@ -156,7 +156,7 @@ WAL-mode-safe access, not just noting it.
 
 ## 4. Layer 3 — launchd job supervisor (GH-195) current state
 
-**Working doc:** [`PROJECT/2-WORKING/GH-195-UNIFIED-SENTINEL.md`](../../../../PROJECT/2-WORKING/GH-195-UNIFIED-SENTINEL.md)
+**Working doc:** [`PROJECT/2-WORKING/GH-195-UNIFIED-SENTINEL.md`](../../../../PROJECT/4-MISC/ARCHIVED-PREDECESSOR/2-WORKING/GH-195-UNIFIED-SENTINEL.md)
 — status *"Active — P0–P4 shipped; Gemma system-instructions surface built"*. Read it before changing
 Layer 3 behavior; it holds the phasing, the load-bearing safety invariants, and the collector-health
 domain knowledge. Next functional scope: the real collector-health observer — log parsing and

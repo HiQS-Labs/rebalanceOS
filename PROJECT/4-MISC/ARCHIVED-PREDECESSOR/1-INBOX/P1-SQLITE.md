@@ -222,7 +222,7 @@ Timebox: half-day (the prior 1–2 hour target was unrealistic given the checkli
 
 ### Spike Deliverables
 
-- [x] A minimal ingest script at [experimental/git-pulse/sqlite_spike.py](../../experimental/git-pulse/sqlite_spike.py)
+- [x] A minimal ingest script at [experimental/git-pulse/sqlite_spike.py](../../../../experimental/git-pulse/sqlite_spike.py)
 - [x] A scratch SQLite file at `~/Library/Application Support/git-pulse/history.sqlite`
 - [x] A result summary added back into this plan doc (below)
 

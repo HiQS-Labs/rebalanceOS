@@ -54,10 +54,10 @@ Current operator-local state on Noel's machine:
 
 Current implementation entry points:
 
-- [src/rebalance/ingest/gmail.py](../../src/rebalance/ingest/gmail.py)
-- [src/rebalance/ingest/index_ops.py](../../src/rebalance/ingest/index_ops.py)
-- [src/rebalance/ingest/semantic_index.py](../../src/rebalance/ingest/semantic_index.py)
-- [tests/test_email_ingest.py](../../tests/test_email_ingest.py)
+- [src/rebalance/ingest/gmail.py](../../../../src/rebalance/ingest/gmail.py)
+- [src/rebalance/ingest/index_ops.py](../../../../src/rebalance/ingest/index_ops.py)
+- [src/rebalance/ingest/semantic_index.py](../../../../src/rebalance/ingest/semantic_index.py)
+- [tests/test_email_ingest.py](../../../../tests/test_email_ingest.py)
 
 ## Setup checklist
 

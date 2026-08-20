@@ -85,17 +85,17 @@ one new one — with a graceful fallback to the current `vscode://` URI when the
 `code` binary can't be found.
 
 Touch points (already located):
-- [ContentView.swift:286](../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L286) — the "Open ↗" button, currently `open(card.vscodeUrl)`.
-- [ContentView.swift:376](../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L376) — the `open(_:)` helper (`NSWorkspace.shared.open`).
-- [Models.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Models.swift) — `RepoCard.localPath` is already on the model; `vscodeUrl` stays as the fallback.
+- [ContentView.swift:286](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L286) — the "Open ↗" button, currently `open(card.vscodeUrl)`.
+- [ContentView.swift:376](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L376) — the `open(_:)` helper (`NSWorkspace.shared.open`).
+- [Models.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Models.swift) — `RepoCard.localPath` is already on the model; `vscodeUrl` stays as the fallback.
 
 - [x] Add `localPath` use to the launch path: the button calls
-      `VSCodeLauncher.launch(repoPath:fallbackURL:)` instead of `open(card.vscodeUrl)`. → [ContentView.swift:286](../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L286)
+      `VSCodeLauncher.launch(repoPath:fallbackURL:)` instead of `open(card.vscodeUrl)`. → [ContentView.swift:286](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L286)
 - [x] Resolve the `code` binary from a fixed candidate list — first that exists
       wins: `/opt/homebrew/bin/code`, `/usr/local/bin/code`,
       `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`
       (plus a `VSCODE_BIN` override + login-shell `which`, mirroring `ServerLauncher`,
-      since a GUI app inherits no shell PATH). Helper `resolveBinary() -> String?` (nil ⇒ none). → [VSCodeLauncher.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/VSCodeLauncher.swift)
+      since a GUI app inherits no shell PATH). Helper `resolveBinary() -> String?` (nil ⇒ none). → [VSCodeLauncher.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/VSCodeLauncher.swift)
 - [x] Launch with a **direct argv** `Process`: `executableURL` = resolved binary,
       `arguments = [repoPath]`. No `/bin/sh -c`, no string escaping. Runs off the
       main thread (`DispatchQueue.global`).
@@ -115,7 +115,7 @@ Touch points (already located):
       click still opens the repo via the `vscode://` fallback.
 - [x] Self-check on the pure logic (binary resolution + argv assembly) —
       `FOCUS5_VSCODETEST=1 swift run Focus5Float` asserts the candidate order +
-      argv shape (`["<folder>"]`, no `-n`/`-r`), fails on regression. **Run: `VSCODETEST OK — argv=["/repos/demo repo"] candidates=3`.** → [SelfTest.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/SelfTest.swift)
+      argv shape (`["<folder>"]`, no `-n`/`-r`), fails on regression. **Run: `VSCODETEST OK — argv=["/repos/demo repo"] candidates=3`.** → [SelfTest.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/SelfTest.swift)
 - [x] Diagnosable: launch log line present (`os.Logger` category `vscode`);
       one-shot launch, **no retry loop**.
 - [x] Blast: undo = revert `VSCodeLauncher.swift` + 2 one-line call-site edits (Easy).
@@ -136,15 +136,15 @@ never from a client-supplied path.
 > blast radius for a cosmetic window-management gain. Decide before coding.
 
 Touch points (already located):
-- [web.py:466](../../src/rebalance/web.py#L466) / [web.py:476](../../src/rebalance/web.py#L476) — card renders `button_link(..., href=vscode_url)`.
-- [web_components.py:65](../../src/rebalance/web_components.py#L65) — `button_link()` (the `<a>` helper).
-- [focus5_scan.py:808](../../src/rebalance/ingest/focus5_scan.py#L808) — `vscode_url()`; the scan already owns the repo→`local_path` mapping (the allowlist).
+- [web.py:466](../../../../src/rebalance/web.py#L466) / [web.py:476](../../../../src/rebalance/web.py#L476) — card renders `button_link(..., href=vscode_url)`.
+- [web_components.py:65](../../../../src/rebalance/web_components.py#L65) — `button_link()` (the `<a>` helper).
+- [focus5_scan.py:808](../../../../src/rebalance/ingest/focus5_scan.py#L808) — `vscode_url()`; the scan already owns the repo→`local_path` mapping (the allowlist).
 
 - [x] Add a `POST /api/focus5/open` handler that takes a **repo identifier**
       (the card's `repo_full_name`-or-`local_path` identity), looks up its
       `local_path` from the **server's own scanned-repo set** (`_focus5_open_allowlist`,
       union of the Focus 5 + Dirty Five rosters), and rejects any id not in that
-      set (404). The client never sends a path. → [web.py](../../src/rebalance/web.py) `focus5_open_repo`
+      set (404). The client never sends a path. → [web.py](../../../../src/rebalance/web.py) `focus5_open_repo`
 - [x] Run the launch with a **direct argv** subprocess:
       `subprocess.run([code_bin, local_path])` — `shell=False`, argv list, no
       string interpolation, `timeout=15`. `code_bin` resolved from the same fixed
@@ -199,7 +199,7 @@ Touch points (already located):
   Direct argv `Process`/`subprocess` is shorter *and* removes the entire
   quoting/injection failure class. The escaping helper is not needed.
 - **No new repo→path mapping or config.** Both phases reuse the scan's existing
-  `local_path` data ([focus5_scan.py:808](../../src/rebalance/ingest/focus5_scan.py#L808)).
+  `local_path` data ([focus5_scan.py:808](../../../../src/rebalance/ingest/focus5_scan.py#L808)).
 - **No Sandbox/entitlements work** for Focus 5 Float — it is already ad-hoc
   signed with no sandbox, so `Process` is already permitted. The research's
   "Phase 1: disable App Sandbox" is a no-op here.

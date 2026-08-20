@@ -59,11 +59,11 @@ the bottom-note already uses). Small, additive, reversible — no new tab, no sc
 ## Current shape (grounded)
 
 - **Picker:** `openFilePicker()` sets `panel.allowedContentTypes = [UTType.json]` and title "Select
-  Telemetry JSON File" ([Focus5Model.swift:141](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5Model.swift#L141)).
+  Telemetry JSON File" ([Focus5Model.swift:141](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5Model.swift#L141)).
 - **Load:** `telemetryFileURL.didSet` → `refreshTelemetry()`, which reads `Data(contentsOf:)` and
   `JSONDecoder().decode([TelemetryEntry].self)`, setting `telemetryEntries` or `telemetryLoadError`.
 - **Render:** `telemetryContent` shows a no-file state, an error state, an empty state, or the
-  `TelemetryRowView` list ([ContentView.swift:265](../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L265)).
+  `TelemetryRowView` list ([ContentView.swift:265](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/ContentView.swift#L265)).
 - **Existing markdown:** `noteContent` (the vault `focus5.md`) is already rendered in-app — the .md
   viewer should reuse that renderer, not invent a second one.
 

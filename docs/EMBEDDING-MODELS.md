@@ -55,7 +55,7 @@ material ("BGE's model card", "BGE's documented recipe"), where no specific
 checkpoint is being identified.
 
 `bge`, `bge-asym`, `qwen` etc. in
-[`TESTS-RESULTS/`](../TESTS-RESULTS/) are **lane identifiers** for a specific
+[`TESTS-RESULTS/`](../TESTS-RESULTS) are **lane identifiers** for a specific
 experiment, not model names. Each campaign's `SUMMARY.md` maps them to full repo
 IDs.
 
@@ -107,7 +107,7 @@ corpus-local result, not a vendor-endorsed default.** Anyone porting it elsewher
 should re-measure.
 
 Full run, threats to validity, and per-query records:
-[`TESTS-RESULTS/2026-08-20+GH-81/`](../TESTS-RESULTS/2026-08-20+GH-81/).
+[`TESTS-RESULTS/2026-08-20+GH-81/`](../TESTS-RESULTS/2026-08-20+GH-81).
 
 ## History
 

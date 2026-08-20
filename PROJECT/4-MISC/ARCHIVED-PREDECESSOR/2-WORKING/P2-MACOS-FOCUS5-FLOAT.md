@@ -54,19 +54,19 @@ Maximize reuse of the existing SwiftUI scaffolding in `macOS/` (`TextReplacement
 **Existing macOS app — `macOS/TextReplacementStudio`** (reusable scaffolding):
 - SwiftPM only (no Xcode project). Swift tools 5.10, **macOS 14.0+**. Deps: GRDB 6.29+, SwiftyJSON 5.0.2+, swift-argument-parser 1.3+.
 - Targets: `TextReplacementCore` (library), `TextReplacementStudio` (SwiftUI app), `TextReplacementCLI`, tests.
-- [Theme.swift](../../macOS/Apps/TextReplacementStudio/Theme.swift) — full design-token system (light/dark colors, 8pt `Space`, `Radius`, SF Pro/Mono type ramp, `spring` animation). **Copy verbatim.**
-- [StudioComponents.swift](../../macOS/Apps/TextReplacementStudio/Views/StudioComponents.swift) — `KeyCap`, `GroupTag` (dot + label chip), `StudioToggle`. **Directly reusable for badges/status dots.**
-- [ToastView.swift](../../macOS/Apps/TextReplacementStudio/Views/ToastView.swift) — bottom capsule overlay w/ auto-dismiss. Reusable for "refreshed" / "server offline" feedback.
-- [StudioModel.swift](../../macOS/Apps/TextReplacementStudio/StudioModel.swift) — `@Observable` + `@MainActor` model; heavy I/O via `Task.detached`; derived computed props. **Pattern to clone.**
-- [TextReplacementStudioApp.swift](../../macOS/Apps/TextReplacementStudio/TextReplacementStudioApp.swift) — standard `WindowGroup` (NOT floating / not menu-bar). The floating-panel + `NSStatusItem` layer is **net-new** work.
-- [make-app.sh](../../macOS/make-app.sh) — `swift build -c release` → assembles `.app`, writes `Info.plist`, ad-hoc `codesign --force --deep`, installs to `/Applications`. **Adapt (new bundle id, exec name, `LSUIElement` for menu-bar agent).**
+- [Theme.swift](../../../../macOS/Apps/TextReplacementStudio/Theme.swift) — full design-token system (light/dark colors, 8pt `Space`, `Radius`, SF Pro/Mono type ramp, `spring` animation). **Copy verbatim.**
+- [StudioComponents.swift](../../../../macOS/Apps/TextReplacementStudio/Views/StudioComponents.swift) — `KeyCap`, `GroupTag` (dot + label chip), `StudioToggle`. **Directly reusable for badges/status dots.**
+- [ToastView.swift](../../../../macOS/Apps/TextReplacementStudio/Views/ToastView.swift) — bottom capsule overlay w/ auto-dismiss. Reusable for "refreshed" / "server offline" feedback.
+- [StudioModel.swift](../../../../macOS/Apps/TextReplacementStudio/StudioModel.swift) — `@Observable` + `@MainActor` model; heavy I/O via `Task.detached`; derived computed props. **Pattern to clone.**
+- [TextReplacementStudioApp.swift](../../../../macOS/Apps/TextReplacementStudio/TextReplacementStudioApp.swift) — standard `WindowGroup` (NOT floating / not menu-bar). The floating-panel + `NSStatusItem` layer is **net-new** work.
+- [make-app.sh](../../../../macOS/make-app.sh) — `swift build -c release` → assembles `.app`, writes `Info.plist`, ad-hoc `codesign --force --deep`, installs to `/Applications`. **Adapt (new bundle id, exec name, `LSUIElement` for menu-bar agent).**
 
 **Web "Focus 5" feature** (data source to project):
-- Server-rendered **FastAPI**, route `GET /focus-5` in [src/rebalance/web.py](../../src/rebalance/web.py) (HTML only — **no JSON endpoint today**).
-- Data fn: `summarize_focus5(db)` in [src/rebalance/ingest/focus5_scan.py](../../src/rebalance/ingest/focus5_scan.py). Returns:
+- Server-rendered **FastAPI**, route `GET /focus-5` in [src/rebalance/web.py](../../../../src/rebalance/web.py) (HTML only — **no JSON endpoint today**).
+- Data fn: `summarize_focus5(db)` in [src/rebalance/ingest/focus5_scan.py](../../../../src/rebalance/ingest/focus5_scan.py). Returns:
   `{ roster: [≤5 cards], off_roster_warnings: [...], computed_at, ranking_mode, summary:{discovered, roster_size, off_roster_attention} }`.
 - **Card fields:** `position`, `rank_reason`, `repo_name`, `repo_full_name`, `local_path`, `branch`, `upstream`, `ahead`, `behind`, `modified_count`, `untracked_count`, `is_dirty`, `last_commit_at`, `my_last_commit_ts`, `vscode_url`, `newest_pr:{number,title,state,html_url,is_draft,is_merged}`, `recent_activity:[{sha,subject,committed_at}]`, `health_available`.
-- Persistence: SQLite tables `focus5_roster` + `focus5_repo_signals` ([migration 0003](../../src/rebalance/ingest/db/migrations/0003_focus5_roster.sql)). Tree health (dirty/branch/ahead/behind) is **re-probed live** on each page load — not cached.
+- Persistence: SQLite tables `focus5_roster` + `focus5_repo_signals` ([migration 0003](../../../../src/rebalance/ingest/db/migrations/0003_focus5_roster.sql)). Tree health (dirty/branch/ahead/behind) is **re-probed live** on each page load — not cached.
 - Ranking modes (pure fns): `recent_activity` (default), `dirty_first` ("Dirty Five"), `my_work`, `any_touch`. Manual re-scan via `sync_focus5(db)`.
 - Served by `rebalance serve` (default `http://localhost:8787`). Design tokens single-sourced in `web_components.RB_TOKENS_CSS`.
 
@@ -74,7 +74,7 @@ Maximize reuse of the existing SwiftUI scaffolding in `macOS/` (`TextReplacement
 
 **Transport: a strictly read-only (GET) JSON endpoint, served local-only; the app is a pull-only client.**
 
-Add `GET /focus-5.json` to [src/rebalance/web.py](../../src/rebalance/web.py) returning `summarize_focus5(db, mode=...)` verbatim (`?view=dirty` is a read-only re-rank param — it re-sorts already-collected signals, it does not rebuild them). The Swift app fetches it with `URLSession` + `Codable` on a poll interval and on a manual refresh, then maps it to view state. The app **only ever issues GET** against this route.
+Add `GET /focus-5.json` to [src/rebalance/web.py](../../../../src/rebalance/web.py) returning `summarize_focus5(db, mode=...)` verbatim (`?view=dirty` is a read-only re-rank param — it re-sorts already-collected signals, it does not rebuild them). The Swift app fetches it with `URLSession` + `Codable` on a poll interval and on a manual refresh, then maps it to view state. The app **only ever issues GET** against this route.
 
 Why this over the alternatives:
 - **vs. HTML scraping `/focus-5`** — brittle, re-breaks on every CSS/markup change. Rejected.
@@ -113,13 +113,13 @@ Why this over the alternatives:
 
 > De-risk the three unknowns (JSON contract shape + an *interactive* non-activating floating panel + the read/write boundary) before writing any real UI. The hardest risk is interaction, not appearance.
 
-- [x] Add `GET /focus-5.json` to [src/rebalance/web.py](../../src/rebalance/web.py) → `focus5_json()`: read-only, honors `?view=dirty`, returns the empty contract (200, not 404) on missing DB.
+- [x] Add `GET /focus-5.json` to [src/rebalance/web.py](../../../../src/rebalance/web.py) → `focus5_json()`: read-only, honors `?view=dirty`, returns the empty contract (200, not 404) on missing DB.
 - [x] Confirmed roster ≤ 5 with fields populated — live DB dump shows a real card with all 28 fields, plus the route tests.
-- [x] **Field classification done** → [CONTRACT.md](../../macOS/Apps/Focus5Float/CONTRACT.md). Local-only: `local_path`, `vscode_url`, `device_id`. Sensitive/PII: `remote_url`, `recent_activity[].author_email`. A remote/Lovable mirror needs a separate sanitized projection — explicitly not this route.
+- [x] **Field classification done** → [CONTRACT.md](../../../../macOS/Apps/Focus5Float/CONTRACT.md). Local-only: `local_path`, `vscode_url`, `device_id`. Sensitive/PII: `remote_url`, `recent_activity[].author_email`. A remote/Lovable mirror needs a separate sanitized projection — explicitly not this route.
 - [x] **Rebuild path decided → DEFERRED.** `/focus-5.json` is GET-only/read-only; no `POST /focus-5/sync` in v1; refresh = re-pull. Recorded in CONTRACT.md + Open Question 1.
-- [x] Tests added to [tests/test_focus5_scan.py](../../tests/test_focus5_scan.py) `WebRouteTests` (full-stack, where route tests live): contract keys, ≤ 5, card keys, dirty re-rank, missing-DB empty shape, **and GET triggers no scan + no roster write** (rows compared before/after). → **90 passed**.
-- [x] Froze the **Swift `Codable` contract** (`Focus5Response` / `RepoCard` / `NewestPR` / `Commit` / `OffRosterWarning`) in [CONTRACT.md](../../macOS/Apps/Focus5Float/CONTRACT.md), nullable fields noted, snake_case decoding documented.
-- [x] Spike written + **run by operator** (2026-06-23): non-activating `.floating` `NSPanel`, draggable, all-Spaces + fullScreenAuxiliary → [FloatPanelSpike.swift](../../macOS/Apps/Focus5Float/spike/FloatPanelSpike.swift) (`swiftc -typecheck` clean). Renders the stacked-card layout; panel shows without activating the app.
+- [x] Tests added to [tests/test_focus5_scan.py](../../../../tests/test_focus5_scan.py) `WebRouteTests` (full-stack, where route tests live): contract keys, ≤ 5, card keys, dirty re-rank, missing-DB empty shape, **and GET triggers no scan + no roster write** (rows compared before/after). → **90 passed**.
+- [x] Froze the **Swift `Codable` contract** (`Focus5Response` / `RepoCard` / `NewestPR` / `Commit` / `OffRosterWarning`) in [CONTRACT.md](../../../../macOS/Apps/Focus5Float/CONTRACT.md), nullable fields noted, snake_case decoding documented.
+- [x] Spike written + **run by operator** (2026-06-23): non-activating `.floating` `NSPanel`, draggable, all-Spaces + fullScreenAuxiliary → [FloatPanelSpike.swift](../../../../macOS/Apps/Focus5Float/spike/FloatPanelSpike.swift) (`swiftc -typecheck` clean). Renders the stacked-card layout; panel shows without activating the app.
 - [x] **Interaction spike (the real risk) — CONFIRMED.** Operator ran it; the segmented control responded live in the non-activating panel (label flipped Focus 5 ⇄ Dirty Five), proving controls route events without a focus round-trip. The toggle now also visibly swaps the card stack (proves re-render on state change). _Residual nice-to-have: an explicit clip of first-click + right-click menu over a true-fullscreen frontmost app; not blocking Phase 1._
 - [x] `NSStatusItem` menu-bar toggle implemented + working (F5 item toggles the panel; also shows on launch).
 - [x] **Decision recorded:** transport = read-only local JSON endpoint; rebuild = deferred POST; GRDB fallback deferred. JSON also carries `device_id` / `head_reflog_ts` / `index_mtime_ts`, which the Swift model intentionally omits (unused; `Codable` ignores unknown keys).
@@ -192,7 +192,7 @@ Why this over the alternatives:
 - [x] `ContentView` content: vertical `ScrollView` → `LazyVStack` of `RepoCardView`, `Theme.Space` rhythm, `Theme.spring` for expand/collapse.
 - [x] `RepoCardView` collapsed: `KeyCap` `#1` position badge, repo name, `StatusDot` (green=clean / red=dirty / grey=no-signal), drift `↑{ahead} ↓{behind}` + `{modified}M {untracked}U`, rank reason, **Open ↗** button + chevron.
 - [x] Tap expands into the web card's sub-sections: **Tree health** (dot + clean/modified+untracked + branch + drift), **Newest PR** (#num title + state, opens `html_url`; explicit fallback for no-PR / non-GitHub / no-remote), **Recent activity** (commits w/ `sha · Nago`, email omitted).
-- [x] Relative-time helper `RelTime.ago()` + `isOlderThan()` ([Time.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Time.swift)) for commit/`computed_at` timestamps.
+- [x] Relative-time helper `RelTime.ago()` + `isOlderThan()` ([Time.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Time.swift)) for commit/`computed_at` timestamps.
 - [x] In-panel header: ranking-mode **segmented control** (🎯 Focus 5 / 🧹 Dirty Five → `model.setMode`), **refresh** button (↻), **⚠ stale** badge (`computed_at` > 24h), `offline` badge, "N repos · updated Nago".
 - [x] Off-roster warnings as a **collapsible footer** ("N outside top 5 need attention").
 - [x] Empty/zero-roster, loading, and failed states all render gracefully (distinct Focus 5 vs Dirty Five empty copy; actionable offline message).
@@ -237,18 +237,18 @@ Why this over the alternatives:
 
 > Make it a real installable app the operator runs daily.
 
-- [x] Adapt `make-app.sh`: bundle id `me.neochro.Focus5Float`, exec `Focus5Float`, `Info.plist` with `LSUIElement=true`, ad-hoc `codesign --force --deep`, install to `/Applications`. → [make-app.sh](../../macOS/Apps/Focus5Float/make-app.sh); installed + launched + verified running against the live server.
+- [x] Adapt `make-app.sh`: bundle id `me.neochro.Focus5Float`, exec `Focus5Float`, `Info.plist` with `LSUIElement=true`, ad-hoc `codesign --force --deep`, install to `/Applications`. → [make-app.sh](../../../../macOS/Apps/Focus5Float/make-app.sh); installed + launched + verified running against the live server.
 - [~] App icon — **wiring done, artwork pending.** `make-app.sh` auto-picks `Resources/AppIcon.icns` and sets `CFBundleIconFile` when present; menu-bar agent has no Dock icon, so this only affects Finder/Spotlight. Artwork in progress (Figma Make). Drop the exported `.icns` and re-run `make-app.sh`.
-- [x] Launch-at-login toggle (`SMAppService.mainApp`) — F5 right-click menu item "Launch at Login" with a live checkmark; register/unregister with graceful failure logging (no-op from `swift run`, works from the installed `.app`). → [Focus5FloatApp.swift](../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift).
+- [x] Launch-at-login toggle (`SMAppService.mainApp`) — F5 right-click menu item "Launch at Login" with a live checkmark; register/unregister with graceful failure logging (no-op from `swift run`, works from the installed `.app`). → [Focus5FloatApp.swift](../../../../macOS/Apps/Focus5Float/Sources/Focus5Float/Focus5FloatApp.swift).
 - [~] Settings surface — **descoped (YAGNI).** Server base URL is `FOCUS5_BASE_URL` (env, loopback-gated); launch-at-login lives in the menu. A full settings window + poll-interval/Dock-toggle controls are not built for a single-operator menu-bar tool; revisit only if a second user needs them.
-- [x] `macOS/Apps/Focus5Float/README.md`: build (`./make-app.sh`), run, prerequisites (`rebalance serve` must be running), launch-at-login, icon, self-checks, and the `/focus-5.json` contract. → [README.md](../../macOS/Apps/Focus5Float/README.md).
+- [x] `macOS/Apps/Focus5Float/README.md`: build (`./make-app.sh`), run, prerequisites (`rebalance serve` must be running), launch-at-login, icon, self-checks, and the `/focus-5.json` contract. → [README.md](../../../../macOS/Apps/Focus5Float/README.md).
 - [x] Update `macOS/README.md` to list the second app; notes copied (not shared) UI assets and its own `make-app.sh`.
 - [x] `rebalance doctor` + `pytest tests/` run before committing (per ROUTER.md); doc-hygiene via `utils/pdda-run.sh`.
 
 ### QA Checklist — Phase 5
 
 - [x] **Install truth:** `./make-app.sh` produces an `.app` installed to `/Applications` (release build, ad-hoc signed, `codesign -v` OK), launched + verified — not just `swift run`.
-- [x] **Front door:** [README.md](../../macOS/Apps/Focus5Float/README.md) goes clone → running app; the "`rebalance serve` must be running" prerequisite is stated up front.
+- [x] **Front door:** [README.md](../../../../macOS/Apps/Focus5Float/README.md) goes clone → running app; the "`rebalance serve` must be running" prerequisite is stated up front.
 - [x] **DRY (docs):** `macOS/README.md` points to the app README (no duplicated getting-started); the contract has one source of truth (`CONTRACT.md`).
 - [~] **Launch-at-login:** code registers/unregisters via `SMAppService` with a live menu checkmark. _Operator: confirm it appears in System Settings → General → Login Items and survives reboot._
 - [x] **Observability:** `os_log` subsystem `me.neochro.Focus5Float` / category `panel` (incl. launch-at-login enable/disable/failure) — documented in the README.

@@ -65,7 +65,7 @@ fully finish, and (b) whether there's velocity on a given project? **Yes to both
 those two files.**
 
 Both files are rendered output: the `AI Daily Summary` block is Gemini prose synthesized from
-`collect_pulse_snapshot()` ([pulse.py:520](../../src/rebalance/ingest/pulse.py#L520)), and the
+`collect_pulse_snapshot()` ([pulse.py:520](../../../../src/rebalance/ingest/pulse.py#L520)), and the
 `Git Pulse Daily Summary` block is Gemini prose over the same day's git activity
 (`utils/git_pulse_daily_synthesis.py`). Asking an LLM to re-read that prose and infer streak/stall
 state would be summarizing a summary — lossier and more expensive than reading the structured data
@@ -85,8 +85,8 @@ the base signal:
   mirroring GH-101's "not a new table in v1" precedent.
 - **Possible-stall flag:** repo had activity yesterday, zero activity today, **and** still has ≥1 open
   GitHub issue/PR referencing it (checked against real issue state via the existing
-  `github_scan`/`github_watch` collectors — [github_watch.py:227](../../src/rebalance/ingest/github_watch.py#L227)
-  `watched_repo_is_active_work()`, [github_scan.py:747](../../src/rebalance/ingest/github_scan.py#L747)
+  `github_scan`/`github_watch` collectors — [github_watch.py:227](../../../../src/rebalance/ingest/github_watch.py#L227)
+  `watched_repo_is_active_work()`, [github_scan.py:747](../../../../src/rebalance/ingest/github_scan.py#L747)
   `is_idle`). This is a **flag, never a claim** — "went quiet with an open issue" is evidence a human or
   the ranker can weigh, not a verdict that work is unfinished (a repo can go quiet because it shipped
   and the issue just hasn't been closed yet).
@@ -127,7 +127,7 @@ work on" nudge, which is cheap to avoid by just watching it for a couple weeks f
 
 Only after a stated observation window with a concrete litmus (see Phase 2) does it become one more
 low-tier candidate in `_operator_candidates()`
-([next_actions.py:497](../../src/rebalance/ingest/next_actions.py#L497)), reusing the existing tier
+([next_actions.py:497](../../../../src/rebalance/ingest/next_actions.py#L497)), reusing the existing tier
 system (sleuth/assigned(0) > github items(1) > calendar(2) > commits(3) > comments(4) > vault(5)) rather
 than inventing a parallel scoring path.
 

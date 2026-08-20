@@ -49,7 +49,7 @@ rollout_rule: >
 ## Problem
 
 The watched-repos set — `get_watched_repos()`
-([src/rebalance/ingest/index_ops.py:511](../../src/rebalance/ingest/index_ops.py#L511)) — is a
+([src/rebalance/ingest/index_ops.py:511](../../../../src/rebalance/ingest/index_ops.py#L511)) — is a
 **dynamically recomputed union** of four sources minus an ignore list:
 
 ```
@@ -58,8 +58,8 @@ watched = (project_repos ∪ activity_repos ∪ pushed_repos ∪ external_repos)
 
 Two of those sources are **rolling time windows**: `_activity_repos()` keys on
 `scan_date >= date('now','-{since_days} days')` (default 14d,
-[index_ops.py:424](../../src/rebalance/ingest/index_ops.py#L424)) and `_pushed_repos()` keys on
-`pushed_at >= cutoff` ([index_ops.py:460](../../src/rebalance/ingest/index_ops.py#L460)). A repo
+[index_ops.py:424](../../../../src/rebalance/ingest/index_ops.py#L424)) and `_pushed_repos()` keys on
+`pushed_at >= cutoff` ([index_ops.py:460](../../../../src/rebalance/ingest/index_ops.py#L460)). A repo
 held *only* by a window drops off the roster the instant the window slides past its last
 push/activity — and because the set is **never persisted**, the drop leaves **no trace**: no
 log line, no diff, nothing to diagnose after the fact.
@@ -78,14 +78,14 @@ minimal additive layer that already has three precedents in this repo:
 
 1. **Persist a canonical snapshot** of the resolved watched set on every github sync — the
    same snapshot-to-DB pattern as `focus5_repo_signals`
-   ([src/rebalance/ingest/focus5_scan.py](../../src/rebalance/ingest/focus5_scan.py)), written by a
+   ([src/rebalance/ingest/focus5_scan.py](../../../../src/rebalance/ingest/focus5_scan.py)), written by a
    **single writer** in the path that already calls `get_watched_repos()`.
 2. **Diff against the prior snapshot** with a pure function — same isolate-the-logic stance
    as the focus5 `resolve_recency` / `rank_recent_activity` pure functions.
 3. **Emit reductions to the existing log surface** — `auth_log.log_event(...)`
-   ([src/rebalance/ingest/auth_log.py:129](../../src/rebalance/ingest/auth_log.py#L129)), already
+   ([src/rebalance/ingest/auth_log.py:129](../../../../src/rebalance/ingest/auth_log.py#L129)), already
    rendered by the `/auth-log` web screen
-   ([src/rebalance/web.py:909](../../src/rebalance/web.py#L909)) and already used by the launchd
+   ([src/rebalance/web.py:909](../../../../src/rebalance/web.py#L909)) and already used by the launchd
    `log_job_*` helpers — so no new screen and no new event plumbing.
 4. **Run unattended for free** by piggybacking the hourly `com.rebalance-os.github-sync`
    job (the same lever focus5's roster refresh used — commit `53286a3`), so **no new launchd
@@ -110,7 +110,7 @@ to the computed watch set.
 > and record any concerning reduction — data layer only.
 
 - [x] **Additive migration `0009_watched_repos_snapshot.sql`** (next free number — `0008` is
-      the latest, [src/rebalance/ingest/db/migrations/](../../src/rebalance/ingest/db/migrations/)).
+      the latest, [src/rebalance/ingest/db/migrations/](../../../../src/rebalance/ingest/db/migrations)).
       A `watched_repos_snapshot` table keyed by `(snapshot_ts, repo)` with the resolving
       `bucket`(s) (`project`/`activity`/`pushed`/`external`) recorded per repo, so a later
       reduction can name *what kind* of coverage was lost. `CREATE TABLE IF NOT EXISTS`,
@@ -118,20 +118,20 @@ to the computed watch set.
 - [x] **Pure `diff_watched_set(prev: set, curr: set) -> {added, removed}`** in
       `index_ops.py` (or a small `watchlist_guard.py` sibling) — no I/O, fully unit-testable.
 - [x] **Single writer** hooked into the github sync path where `get_watched_repos()` already
-      runs (`_refresh_github`, [index_ops.py:571](../../src/rebalance/ingest/index_ops.py#L571),
+      runs (`_refresh_github`, [index_ops.py:571](../../../../src/rebalance/ingest/index_ops.py#L571),
       reached via `_github_adapter` / `refresh_index(scope=["github"])`). It: (a) reads the
       latest prior snapshot, (b) writes the new snapshot, (c) diffs, (d) classifies removals.
 - [x] **Pin a canonical window (agy r1 [Should]).** `refresh_index` defaults `since_days=30`
-      ([index_ops.py:1040](../../src/rebalance/ingest/index_ops.py#L1040)) but the watched-set
-      windows default to `14` ([index_ops.py:424](../../src/rebalance/ingest/index_ops.py#L424),
-      [:460](../../src/rebalance/ingest/index_ops.py#L460)). If the snapshot reflected the
+      ([index_ops.py:1040](../../../../src/rebalance/ingest/index_ops.py#L1040)) but the watched-set
+      windows default to `14` ([index_ops.py:424](../../../../src/rebalance/ingest/index_ops.py#L424),
+      [:460](../../../../src/rebalance/ingest/index_ops.py#L460)). If the snapshot reflected the
       *caller's* `since_days`, a 30-day sync vs a 14-day sync would diff against each other and
       manufacture **phantom** reductions/additions. The writer therefore calls
       `get_watched_repos(db, since_days=14)` with a **fixed canonical window**, independent of
       the triggering sync's window.
 - [x] **Run only on a clean sync (agy r1 [Should]).** A github sync that raises partway could
       leave a *truncated* set and record a **false** reduction. The snapshot+diff runs at the
-      **end of `_refresh_github`** ([index_ops.py:571](../../src/rebalance/ingest/index_ops.py#L571)),
+      **end of `_refresh_github`** ([index_ops.py:571](../../../../src/rebalance/ingest/index_ops.py#L571)),
       only when the adapter completed without raising — never in a `finally`/error path.
 - [x] **Classify removals** so the alarm is signal, not noise: a removed repo whose last-known
       bucket set includes `project`/`external` (durable monitoring *intent*) → **concerning**
@@ -140,7 +140,7 @@ to the computed watch set.
       the last-known bucket set" (agy r1 confirmed this resolves the ambiguity). See Open
       Question 1.
 - [x] **Exclude intentional ignores (agy r1 [Should]).** A repo the operator just added to
-      `github_ignored_repos` ([config.py:870](../../src/rebalance/ingest/config.py#L870)) leaves
+      `github_ignored_repos` ([config.py:870](../../../../src/rebalance/ingest/config.py#L870)) leaves
       the watched set and would look like a reduction. The differ filters removed repos through
       `get_github_ignored_repos()` and **suppresses** the alert for any now-ignored repo (an
       intentional opt-out is not a coverage loss).
@@ -151,7 +151,7 @@ to the computed watch set.
       `auth_log.log_event("github", "watched_repos_reduced", {...})` with per-repo
       `{repo, last_bucket, ...}`; add a typed helper
       `log_watched_repos_reduced(...)` next to the `log_job_*` helpers
-      ([auth_log.py:282](../../src/rebalance/ingest/auth_log.py#L282)) so the vocabulary lives
+      ([auth_log.py:282](../../../../src/rebalance/ingest/auth_log.py#L282)) so the vocabulary lives
       in one place (DRY).
 - [x] **Baseline-safe:** first-ever run (no prior snapshot) writes the baseline and emits
       **no** reduction event — diffing begins on the second sync.
@@ -179,17 +179,17 @@ to the computed watch set.
 
 > Originally a separate phase; the ponytail pass collapsed it to **one line**.
 > `/auth-log` already renders any event via `_EVENT_BADGE.get(event, ("neutral", event))`
-> ([src/rebalance/web.py:200](../../src/rebalance/web.py#L200)), so `watched_repos_reduced`
+> ([src/rebalance/web.py:200](../../../../src/rebalance/web.py#L200)), so `watched_repos_reduced`
 > surfaced on the screen the moment Phase 1 emitted it — no Phase 2 code was required for it
 > to be visible.
 
 - [x] **Badge the event** — added one `_EVENT_BADGE` entry
-      ([src/rebalance/web.py:44](../../src/rebalance/web.py#L44)):
+      ([src/rebalance/web.py:44](../../../../src/rebalance/web.py#L44)):
       `"watched_repos_reduced": ("warn", "⚠ watched repos reduced")`, upgrading the fallback
       neutral chip to a red warn chip. The event is only emitted on a *concerning* drop, so a
       single warn variant is correct (no per-row info/warn split needed).
 - [x] **Render test** — `test_watched_repos_reduced_renders_warn_badge`
-      ([tests/test_web_auth_log.py](../../tests/test_web_auth_log.py)) seeds the event and
+      ([tests/test_web_auth_log.py](../../../../tests/test_web_auth_log.py)) seeds the event and
       asserts the `⚠ watched repos reduced` warn badge **and** the dropped repo
       (`BinoidCBD/LTVera-Pandas`) render on `GET /auth-log`.
 
@@ -228,7 +228,7 @@ to the computed watch set.
   pruning** — 30-day retention `DELETE` (resolved Open Q2).
 - **Phase 1 implementation (2026-06-26)** — shipped: migration
   `0009_watched_repos_snapshot.sql`; new isolated module
-  [src/rebalance/ingest/watchlist_guard.py](../../src/rebalance/ingest/watchlist_guard.py)
+  [src/rebalance/ingest/watchlist_guard.py](../../../../src/rebalance/ingest/watchlist_guard.py)
   (`diff_watched_set` + `classify_removal` pure helpers; `snapshot_and_detect` single writer);
   `log_watched_repos_reduced` typed helper in `auth_log.py`; and the clean-sync-only hook at the
   end of `_refresh_github`. Tests: `tests/test_watchlist_guard.py` (16 — pure diff/classify

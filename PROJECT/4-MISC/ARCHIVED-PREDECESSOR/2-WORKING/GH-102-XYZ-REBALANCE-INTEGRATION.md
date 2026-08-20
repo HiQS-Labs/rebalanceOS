@@ -38,7 +38,7 @@ phases: 6
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 1 Reb-side landed (2026-07-03).** Promoted to `2-WORKING`; Phase 0 discovery written back (see [§Phase 0 Findings](#phase-0--findings-2026-07-03)). **Reb half of seam #2 built:** committed `.xyz-pin` at repo root (pins XYZ harness `c829000`, the commit Phase 0 was verified against), a `read_pin()` reader ([xyz_pin.py](../../src/rebalance/xyz_pin.py)), and a `doctor` check that surfaces it — an absent pin is a clean OK (invariant 1, mutual independence), a pin missing `commit=` warns. Gates green: `pytest tests/` **1264 passed**; `rebalance doctor` shows `xyz pin — xyz harness pinned @ c829000bad5e`; new `tests/test_xyz_pin.py` (6 cases). | **XYZ-side `xyz-sync check` (deferred to the `xyz-3-agents-swarm` repo)** — extends the existing `xyz-sync.sh` / `find-harness.sh` drift surface to diff the machine-local install's `source_commit` against Reb's committed `.xyz-pin`. Then **lock the one open Phase 0 sub-decision** (harness-root opt-in/dedup rule). **Phase 2 (seam #1) stays gated on GH-101** landing `recent_row_count_7d` + `status`/`reason`. **Newly added: Phase 5 (seam #4 — per-issue disposition overlay)** — opens with a 5.0 contract-lock spike, held un-fired in MARATHON-2026-07-06-B pending operator go + confirmation XYZ can emit a deterministic (non-Gemini) disposition export. |
+| **Phase 1 Reb-side landed (2026-07-03).** Promoted to `2-WORKING`; Phase 0 discovery written back (see [§Phase 0 Findings](#phase-0--findings-2026-07-03)). **Reb half of seam #2 built:** committed `.xyz-pin` at repo root (pins XYZ harness `c829000`, the commit Phase 0 was verified against), a `read_pin()` reader ([xyz_pin.py](../../../../src/rebalance/xyz_pin.py)), and a `doctor` check that surfaces it — an absent pin is a clean OK (invariant 1, mutual independence), a pin missing `commit=` warns. Gates green: `pytest tests/` **1264 passed**; `rebalance doctor` shows `xyz pin — xyz harness pinned @ c829000bad5e`; new `tests/test_xyz_pin.py` (6 cases). | **XYZ-side `xyz-sync check` (deferred to the `xyz-3-agents-swarm` repo)** — extends the existing `xyz-sync.sh` / `find-harness.sh` drift surface to diff the machine-local install's `source_commit` against Reb's committed `.xyz-pin`. Then **lock the one open Phase 0 sub-decision** (harness-root opt-in/dedup rule). **Phase 2 (seam #1) stays gated on GH-101** landing `recent_row_count_7d` + `status`/`reason`. **Newly added: Phase 5 (seam #4 — per-issue disposition overlay)** — opens with a 5.0 contract-lock spike, held un-fired in MARATHON-2026-07-06-B pending operator go + confirmation XYZ can emit a deterministic (non-Gemini) disposition export. |
 
 ---
 
@@ -63,7 +63,7 @@ phases: 6
 
 > **Thesis:** XYZ and Rebalance already carry the substrate for every seam that matters —
 > `registry.tsv` stamps installs, GH-75 gives XYZ per-phase `updatedAt`+`health`, and Reb's
-> collector registry ([index_ops.py:95](../../src/rebalance/ingest/index_ops.py#L95)) already
+> collector registry ([index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95)) already
 > ingests heterogeneous sources. **Integration is shims over existing rails, not new plumbing.**
 > Build the cheapest reversible seam first (#2), let the deep-work signal (#1) prove it earns a
 > place in the ranking, and only then build the bidirectional return path (#3).
@@ -118,7 +118,7 @@ Each seam states Mechanism · Owner split · Cost · Reversibility (the duel's c
 These map to Phases 1–3 respectively.
 
 ### #1 · `xyz` collector → Rebalance signal plane  *(merged run-monitor + session-health)* → **Phase 2**
-- **Mechanism:** XYZ emits `XYZ.json` per harness root (marathon/session state, already carrying GH-75 `updatedAt`+`health`); Rebalance adds one `register_collector("xyz", …)` ([index_ops.py:95](../../src/rebalance/ingest/index_ops.py#L95) pattern) snapshotting it into a table keyed off the GH-101 freshness/degraded fields — no new Reb observability plumbing; DASHBOARD/pulse + "what to do next" read it as a deep-work signal.
+- **Mechanism:** XYZ emits `XYZ.json` per harness root (marathon/session state, already carrying GH-75 `updatedAt`+`health`); Rebalance adds one `register_collector("xyz", …)` ([index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95) pattern) snapshotting it into a table keyed off the GH-101 freshness/degraded fields — no new Reb observability plumbing; DASHBOARD/pulse + "what to do next" read it as a deep-work signal.
 - **⚠ Correction (consult 2026-07-03):** today's `XYZ.json` (GH-75) is a **completion log written on terminal exit**, not a per-phase heartbeat. A *live in-flight* deep-work signal is therefore an **XYZ-side prerequisite** (new active-state emitter), not a free read. Phase 0 decides: reframe #1 to "recently-completed marathons" (works on today's file) or require the emitter. Owner split below reflects the *target*, gated on that decision.
 - **Owner split:** XYZ owns emitting `XYZ.json` (+ an active-state emitter *if* Phase 0 chooses the live-signal path) / Reb owns the collector + signal semantics + health.
 - **Cost:** shim each side (one registration + a reader).
@@ -193,8 +193,8 @@ build against a locked interface instead of a guessed one.
       `xyz-sync check` extends that surface (or scopes to non-vendored installs), does not fork a second
       channel. ✔
 - [x] **Confirm the Reb ingestion seam is real.** `register_collector` at
-      [index_ops.py:95](../../src/rebalance/ingest/index_ops.py#L95), live registrations L1505–1513,
-      dispatched by `refresh_index` [index_ops.py:1095](../../src/rebalance/ingest/index_ops.py#L1095).
+      [index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95), live registrations L1505–1513,
+      dispatched by `refresh_index` [index_ops.py:1095](../../../../src/rebalance/ingest/index_ops.py#L1095).
       A file-backed `Collector("xyz", _xyz_adapter, requires=…)` is the correct extension point. ✔
 - [x] **Confirm GH-101 dependency direction.** #1 keys health off GH-101's `recent_row_count_7d` +
       `status`/`reason`; Phase 2 stays gated on GH-101 Phase 1–2 landing them. ✔
@@ -282,10 +282,10 @@ mechanism — the columns exist — so it is a subcommand, not new infrastructur
       "harness drift" warning; exit non-zero (contract locked in Phase 0). On match, exit clean.
 - [ ] **No auto-update.** The tool *reports*; updates land manually via PR — matching Reb's
       `doctor` + `pytest` + `pdda` gate discipline. No network fetch that mutates the install.
-- [x] **Reb pin surface — committed, not machine-local.** ✔ **DONE** — committed [`.xyz-pin`](../../.xyz-pin)
+- [x] **Reb pin surface — committed, not machine-local.** ✔ **DONE** — committed [`.xyz-pin`](../../../../.xyz-pin)
       at repo root records `commit=c829000…` + `pinned_at`; a fresh clone is reproducible (`registry.tsv`,
-      machine-local, is the *install* side of the diff). Read by [`xyz_pin.read_pin()`](../../src/rebalance/xyz_pin.py)
-      and surfaced by `_check_xyz_pin` in [doctor.py](../../src/rebalance/doctor.py). Update stays a human PR.
+      machine-local, is the *install* side of the diff). Read by [`xyz_pin.read_pin()`](../../../../src/rebalance/xyz_pin.py)
+      and surfaced by `_check_xyz_pin` in [doctor.py](../../../../src/rebalance/doctor.py). Update stays a human PR.
 - [ ] **No duplicate drift channel.** Per Phase 0, `xyz-sync check` reuses/extends the existing
       `find-harness.sh` / `xyz-sync.sh` drift surface or is scoped to non-vendored installs — it does
       not stand up a second, overlapping drift path.
@@ -331,7 +331,7 @@ emitted file on the XYZ side. **Do not start until GH-101 has landed `recent_row
       **atomically** (temp file + rename) so Reb's concurrent sync crons never read a half-written file
       and false-flag `degraded`.
 - [ ] **`register_collector("xyz", _xyz_adapter, requires=(…))`** added to Reb following the
-      existing pattern at [index_ops.py:95](../../src/rebalance/ingest/index_ops.py#L95) /
+      existing pattern at [index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95) /
       registrations L1505–1513; the adapter reads `XYZ.json` and snapshots it into a table.
 - [ ] **Health keyed off GH-101 fields.** The snapshot carries freshness/degraded status derived
       from the GH-101 contract fields — a stale/absent `XYZ.json` reads as `degraded`, not silently
@@ -370,7 +370,7 @@ emitted file on the XYZ side. **Do not start until GH-101 has landed `recent_row
 
 The bidirectional close: Reb's ranked "what to do next" emits cross-repo tick lanes so Reb
 *priorities* seed XYZ marathon queues. **Medium cost — net-new `roadmap_signals` table** (ROADMAP
-Phase-5, [ROADMAP.md:34-35](../../ROADMAP.md#L34)). Only build if Phase 2 demonstrates the forward
+Phase-5, [ROADMAP.md:34-35](../../../../ROADMAP.md#L34)). Only build if Phase 2 demonstrates the forward
 telemetry earns its place in the ranking; otherwise stop — a one-way telemetry link is a complete,
 useful outcome on its own.
 
@@ -567,7 +567,7 @@ the emit does **not** demonstrably exist yet — today XYZ ships session-health 
 - [ ] **Priority inference (observe-only).** Disposition surfaces an *inferred* `priority_tier` in
       `doctor` / the report to fill the flat-tier gap — it never writes `project_registry`.
 - [ ] **Diagram.** Add an `xyz` collector node to
-      [ARCHITECTURE/system-diagram.html](../../ARCHITECTURE/system-diagram.html) (dispatched by
+      [ARCHITECTURE/system-diagram.html](../../../../ARCHITECTURE/system-diagram.html) (dispatched by
       `refresh_index`, upserts an overlay onto `github_items`) so the architecture render reflects the source.
 - [ ] **Absent-export behavior.** No export = no overlay = normal (invariant 3) — never a crash or a
       degraded-health false positive.
@@ -649,9 +649,9 @@ the emit does **not** demonstrably exist yet — today XYZ ships session-health 
 
 - **Depends on:** [GH-101 signal-quality contract](../4-MISC/GH-101-SIGNAL-QUALITY-CONTRACT.md)
   (supplies #1's freshness/degraded health fields — Phase 2 is sequenced after GH-101 Phase 1–2),
-  the collector registry (`register_collector` at [index_ops.py:95](../../src/rebalance/ingest/index_ops.py#L95),
-  dispatched by `refresh_index` at [index_ops.py:1095](../../src/rebalance/ingest/index_ops.py#L1095)),
-  and the ROADMAP Phase-5 `roadmap_signals` note ([ROADMAP.md:34-35](../../ROADMAP.md#L34), for #3).
+  the collector registry (`register_collector` at [index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95),
+  dispatched by `refresh_index` at [index_ops.py:1095](../../../../src/rebalance/ingest/index_ops.py#L1095)),
+  and the ROADMAP Phase-5 `roadmap_signals` note ([ROADMAP.md:34-35](../../../../ROADMAP.md#L34), for #3).
 - **XYZ-side prerequisites:** the emitted state file + per-phase `updatedAt` heartbeat (GH-75), the
   `registry.tsv` `source_commit` + `tick_version` columns (#2), and the tick-lane consumer (#3).
   **Seam #4 adds one more:** a deterministic per-issue disposition export from `hq` / `rollup.sh`

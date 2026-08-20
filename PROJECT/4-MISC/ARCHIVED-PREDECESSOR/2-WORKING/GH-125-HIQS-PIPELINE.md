@@ -108,7 +108,7 @@ phases: 5
 
 ## North star — decisions made against GUIDING-PRINCIPLES.md
 
-[GUIDING-PRINCIPLES.md](../../GUIDING-PRINCIPLES.md) is the decision-making north star for this plan.
+[GUIDING-PRINCIPLES.md](../../../../GUIDING-PRINCIPLES.md) is the decision-making north star for this plan.
 Where Ponytail ("least code") and the principles pull in different directions, the principles win —
 the appendix fixes the priority order explicitly:
 
@@ -155,7 +155,7 @@ The resolution is *sequencing*, not a bigger Phase 1:
   Abstracting before the instances exist is the speculative-generality Ponytail rung-1 forbids.
 - **Phase 3 collapses it** against a `candidates=` provider on the existing `Collector` descriptor —
   a direct mirror of the `semantic_docs=` provider **already** in
-  [index_ops.py](../../src/rebalance/ingest/index_ops.py) (`Collector.semantic_docs`,
+  [index_ops.py](../../../../src/rebalance/ingest/index_ops.py) (`Collector.semantic_docs`,
   `register_collector()`, `_semantic_doc_providers()`). Figma already reaches the semantic index that
   way. This is the **second use of an existing seam, not a new abstraction** — which is why it satisfies
   Principle 6 (*"prefer reusing or extending what exists over adding new"*) and Ponytail simultaneously.
@@ -181,18 +181,18 @@ actually powers the `/whats-next` page.
 
 | Surface | Entry point | Sources it sees | Sources it misses |
 |---|---|---|---|
-| Broad synthesis | [querier.py:509](../../src/rebalance/ingest/querier.py#L509) `ask()` | project registry, GitHub activity, GitHub semantic, vault, vault activity, calendar, temporal | **Sleuth, Gmail, Figma** |
-| Ranked "what next" | [next_actions.py](../../src/rebalance/ingest/next_actions.py) `rank_next_actions()` | Sleuth, GitHub (items/commits/comments), calendar, vault | **Gmail, Figma** |
+| Broad synthesis | [querier.py:509](../../../../src/rebalance/ingest/querier.py#L509) `ask()` | project registry, GitHub activity, GitHub semantic, vault, vault activity, calendar, temporal | **Sleuth, Gmail, Figma** |
+| Ranked "what next" | [next_actions.py](../../../../src/rebalance/ingest/next_actions.py) `rank_next_actions()` | Sleuth, GitHub (items/commits/comments), calendar, vault | **Gmail, Figma** |
 
 Verified from the outside: an `ask()` call returns keys `vault_context`, `github_context`,
 `github_semantic_context`, `project_context`, `vault_activity`, `calendar_context`,
 `temporal_context` — and no sleuth/email/figma key exists.
-[ARCHITECTURE.md](../../ARCHITECTURE.md) concedes this: `_gather_sleuth_context()` is listed as
+[ARCHITECTURE.md](../../../../ARCHITECTURE.md) concedes this: `_gather_sleuth_context()` is listed as
 *future*, and `sleuth_reminders` is "mirrored but not yet gathered."
 
 **2. `/whats-next` is powered by the `next_actions` engine, not by `ask()`.**
 
-[web.py:1436](../../src/rebalance/web.py#L1436) `whatsnext_page()` reads a **precomputed, persisted**
+[web.py:1436](../../../../src/rebalance/web.py#L1436) `whatsnext_page()` reads a **precomputed, persisted**
 ranking via `load_ranked_next_actions()` — it never ranks inline (only `?refresh=1` recomputes).
 The ranking comes from `assemble_day_bundle()` → an `OperatorBundle` with exactly six fields
 (`calendar_blocks`, `gh_commits`, `gh_items`, `gh_comments`, `vault_edits`, `sleuth_activity`),
@@ -206,7 +206,7 @@ surface reads them.** Nothing combines an email or a Figma comment with a GitHub
 recommendation.
 
 **4. The code already lies about this.** The module docstring at
-[next_actions.py:5](../../src/rebalance/ingest/next_actions.py#L5) claims the bundle is assembled from
+[next_actions.py:5](../../../../src/rebalance/ingest/next_actions.py#L5) claims the bundle is assembled from
 "calendar + GitHub + vault + sleuth + **email**". There is no email in `OperatorBundle`, none in
 `_operator_candidates()`, and none in the upstream `DayActivity` it reuses. A case-insensitive grep for
 `email` and `figma` across `next_actions.py` returns **zero** matches. Phase 1 makes the docstring true
@@ -261,18 +261,18 @@ rather than deleting the claim.
 
 **Changes:**
 
-1. [pulse.py](../../src/rebalance/ingest/pulse.py) — `DayActivity`: add two fields.
+1. [pulse.py](../../../../src/rebalance/ingest/pulse.py) — `DayActivity`: add two fields.
    ```python
    email_activity: list[dict[str, Any]] = field(default_factory=list)
    figma_activity: list[dict[str, Any]] = field(default_factory=list)
    ```
-2. [pulse.py](../../src/rebalance/ingest/pulse.py) — `_query_day_activity()`: two `SELECT`s mirroring the
+2. [pulse.py](../../../../src/rebalance/ingest/pulse.py) — `_query_day_activity()`: two `SELECT`s mirroring the
    sleuth block, windowed to `[start, end)` like every other arm.
    - `email_messages` → `message_id, from_name, from_address, subject, snippet, received_at`
    - `figma_comments` → `comment_key, file_key, message, user_handle, created_at`, `WHERE resolved_at IS NULL`
-3. [next_actions.py](../../src/rebalance/ingest/next_actions.py) — `OperatorBundle`: same two fields;
+3. [next_actions.py](../../../../src/rebalance/ingest/next_actions.py) — `OperatorBundle`: same two fields;
    `assemble_day_bundle()` passes them through from the `DayActivity` it already builds.
-4. [next_actions.py](../../src/rebalance/ingest/next_actions.py) — `_operator_candidates()`: two loops.
+4. [next_actions.py](../../../../src/rebalance/ingest/next_actions.py) — `_operator_candidates()`: two loops.
    New deterministic-fallback priority:
 
    | Class | Source | Why |
@@ -286,7 +286,7 @@ rather than deleting the claim.
    | 6 | **figma (new, dormant)** | unresolved design comment |
    | 7 | vault | recently edited note |
 
-5. Fix the [next_actions.py:5](../../src/rebalance/ingest/next_actions.py#L5) docstring — it already
+5. Fix the [next_actions.py:5](../../../../src/rebalance/ingest/next_actions.py#L5) docstring — it already
    claims email; make it true and add figma.
 
 **QA gate — Phase 1:**
@@ -326,7 +326,7 @@ not a HiQS defect. The figma arm is correct-and-idle as designed (0 rows, no all
 
 **Changes:**
 
-1. [querier.py](../../src/rebalance/ingest/querier.py) — one new gatherer, ~6 lines. It returns the
+1. [querier.py](../../../../src/rebalance/ingest/querier.py) — one new gatherer, ~6 lines. It returns the
    **attested** shape (rank + title + source + evidence + why), never bare titles ([D2](#d2--the-ranking-must-arrive-attested-decided-2026-07-14)):
    ```python
    def _gather_hiqs_context(database_path: Path) -> list[dict[str, Any]]:
@@ -334,7 +334,7 @@ not a HiQS defect. The figma arm is correct-and-idle as designed (0 rows, no all
        from rebalance.ingest.next_actions import load_ranked_next_actions
        return [asdict(a) for a in load_ranked_next_actions(database_path).actions]
    ```
-2. [querier.py](../../src/rebalance/ingest/querier.py) — `_build_prompt()`: one labelled section
+2. [querier.py](../../../../src/rebalance/ingest/querier.py) — `_build_prompt()`: one labelled section
    (`## HiQS — ranked next actions`) carrying each action's receipts, so the synthesis sees the same
    attested ranked signal the dashboard shows.
 3. **`QueryResult` gains a first-class `hiqs` field.** The existing docstring pins the operator-flow
@@ -365,8 +365,8 @@ agent to pass a removed kwarg).
 
 **Precise invariant — tightened after agy's QA round; the first draft overclaimed.** The drift-proofing
 claim is **not** "there is a single writer." agy correctly found **two** writers — the `/whats-next`
-route ([web.py:1470](../../src/rebalance/web.py#L1470)) and the scheduled `refresh_index()`
-([index_ops.py:1420](../../src/rebalance/ingest/index_ops.py#L1420)) — so any "single writer" phrasing
+route ([web.py:1470](../../../../src/rebalance/web.py#L1470)) and the scheduled `refresh_index()`
+([index_ops.py:1420](../../../../src/rebalance/ingest/index_ops.py#L1420)) — so any "single writer" phrasing
 is simply false. Two writers into one cache is harmless. The invariant that actually buys the
 drift-proofing is:
 
@@ -401,7 +401,7 @@ gated/stalled scope inherited from the superseded issues instead of letting it r
 
 0. **Collapse `_operator_candidates()` into a registry provider — the Principle 3 fix ([D3](#d3--the-dispatch-chain-gets-collapsed-not-grown)).**
    Add a `candidates=` provider to the existing `Collector` descriptor in
-   [index_ops.py](../../src/rebalance/ingest/index_ops.py), mirroring the `semantic_docs=` provider that
+   [index_ops.py](../../../../src/rebalance/ingest/index_ops.py), mirroring the `semantic_docs=` provider that
    already lives there (`Collector.semantic_docs` → `_semantic_doc_providers()` → the semantic stage).
    Each source then **owns** its own candidate shape, registered at `register_collector(...)` time:
 
@@ -489,7 +489,7 @@ packages, modules, DB tables, MCP tools, or the `rebalance ...` CLI — that chu
    the tagline *"Turn workplace noise into high-quality signal."* Each row renders its **receipts**
    (source + evidence + why), not a bare rank — the **Attested** pillar is a UI requirement, not just a
    data one ([D2](#d2--the-ranking-must-arrive-attested-decided-2026-07-14)).
-2b. **Fix the casing drift.** [GUIDING-PRINCIPLES.md](../../GUIDING-PRINCIPLES.md) line 3 currently reads
+2b. **Fix the casing drift.** [GUIDING-PRINCIPLES.md](../../../../GUIDING-PRINCIPLES.md) line 3 currently reads
    **"HiQs"** (lowercase `s`) while everything else says **"HiQS"**. Trivial, but it is the north-star
    doc and the brand is now the system name — normalize to `HiQS` repo-wide as part of this pass.
 3. **README:** one short section — HiQS is the signal engine; rebalance-OS is the HiQS **Rebalance

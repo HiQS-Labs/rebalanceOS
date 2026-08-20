@@ -71,18 +71,18 @@ string with no conversion and no label at all.
 - **Zero test coverage** on any of these three — a real, pre-existing gap this work will close as a byproduct.
 
 **The 5 ad-hoc display implementations (duplicated parse-guard-convert-format logic):**
-1. [`pulse.py:709`](../../src/rebalance/ingest/pulse.py#L709) `_fmt_local(dt_value, tz, *, time_only=False)` — `"%b %-d %-I:%M %p"` or `"%-I:%M %p"`.
-2. [`pulse.py:819,824`](../../src/rebalance/ingest/pulse.py#L819) — inline in `_render_section_calendar`, bypasses its own file's `_fmt_local`, same `"%-I:%M %p"` pattern.
-3. [`next_actions.py:1619`](../../src/rebalance/ingest/next_actions.py#L1619) `_fmt_local_stamp(iso_utc, tz)` — `"%Y-%m-%d %H:%M %Z"`, falls back to `iso_utc or "unknown"` on parse failure.
-4. [`daily_report.py:301`](../../src/rebalance/ingest/daily_report.py#L301) `_event_local_time(event, config)` — takes an **already-parsed** `datetime` (via `parse_calendar_dt`, not ISO text), formats `"%I:%M %p"` then manually `.lstrip("0")`; falls back to `"—"`.
-5. [`note_builder.py:496`](../../src/rebalance/ingest/note_builder.py#L496) `_format_generated_at(value)` — `"%Y-%m-%d %H:%M:%S %Z"`, falls back to the raw `value` on parse failure.
+1. [`pulse.py:709`](../../../../src/rebalance/ingest/pulse.py#L709) `_fmt_local(dt_value, tz, *, time_only=False)` — `"%b %-d %-I:%M %p"` or `"%-I:%M %p"`.
+2. [`pulse.py:819,824`](../../../../src/rebalance/ingest/pulse.py#L819) — inline in `_render_section_calendar`, bypasses its own file's `_fmt_local`, same `"%-I:%M %p"` pattern.
+3. [`next_actions.py:1619`](../../../../src/rebalance/ingest/next_actions.py#L1619) `_fmt_local_stamp(iso_utc, tz)` — `"%Y-%m-%d %H:%M %Z"`, falls back to `iso_utc or "unknown"` on parse failure.
+4. [`daily_report.py:301`](../../../../src/rebalance/ingest/daily_report.py#L301) `_event_local_time(event, config)` — takes an **already-parsed** `datetime` (via `parse_calendar_dt`, not ISO text), formats `"%I:%M %p"` then manually `.lstrip("0")`; falls back to `"—"`.
+5. [`note_builder.py:496`](../../../../src/rebalance/ingest/note_builder.py#L496) `_format_generated_at(value)` — `"%Y-%m-%d %H:%M:%S %Z"`, falls back to the raw `value` on parse failure.
 
 **A 6th, related-but-distinct pattern** (relative, not absolute, time — folded in since it's the same
 "don't hand-roll a UTC display formatter" problem):
-6. [`web.py:473`](../../src/rebalance/web.py#L473) `_rel_time(iso)` — `"{d/h/m}{unit} ago"` compact relative age. Byte-for-byte portable to a shared helper (no tz needed for a delta) — the only **zero-behavior-change** migration in this set.
+6. [`web.py:473`](../../../../src/rebalance/web.py#L473) `_rel_time(iso)` — `"{d/h/m}{unit} ago"` compact relative age. Byte-for-byte portable to a shared helper (no tz needed for a delta) — the only **zero-behavior-change** migration in this set.
 
 **The one confirmed raw-UTC display bug** (the actual "replace" target from the issue):
-- [`cli/semantic.py:166,171-172`](../../src/rebalance/cli/semantic.py#L166) — `rebalance semantic-query` prints `updated: 2026-07-16 08:04:21` (UTC, `T`→space swapped, **no conversion, no timezone label at all** — ambiguous to a human reading it).
+- [`cli/semantic.py:166,171-172`](../../../../src/rebalance/cli/semantic.py#L166) — `rebalance semantic-query` prints `updated: 2026-07-16 08:04:21` (UTC, `T`→space swapped, **no conversion, no timezone label at all** — ambiguous to a human reading it).
 
 ## Phase 1 — Add display formatters to tz_utils.py
 
