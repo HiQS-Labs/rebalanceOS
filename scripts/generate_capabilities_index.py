@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Any
 
@@ -74,8 +75,13 @@ def _display_path(path: Path) -> str:
         return path.as_posix()
 
 
-def render_index(entries: list[dict[str, Any]], manifest_path: Path) -> str:
+def render_index(entries: list[dict[str, Any]], manifest_path: Path, output_path: Path | None = None) -> str:
     manifest_display = _display_path(manifest_path)
+    # The label stays repo-relative because it reads better, but the href has to resolve from
+    # wherever INDEX.md is written -- a repo-relative href in a file inside capabilities/ points
+    # at capabilities/capabilities/manifest.yaml and dangles (GH-88).
+    output_dir = output_path.parent if output_path is not None else manifest_path.parent
+    manifest_href = os.path.relpath(manifest_path, output_dir)
     lines = [
         "# Capabilities Index",
         "",
@@ -102,7 +108,7 @@ def render_index(entries: list[dict[str, Any]], manifest_path: Path) -> str:
     lines.extend(
         [
             "",
-            "Manifest source: [{}]({}).".format(manifest_display, manifest_display),
+            "Manifest source: [{}]({}).".format(manifest_display, manifest_href),
             "",
         ]
     )
@@ -111,7 +117,7 @@ def render_index(entries: list[dict[str, Any]], manifest_path: Path) -> str:
 
 def generate(manifest_path: Path, output_path: Path) -> str:
     entries = load_manifest(manifest_path)
-    rendered = render_index(entries, manifest_path)
+    rendered = render_index(entries, manifest_path, output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(rendered)
     return rendered

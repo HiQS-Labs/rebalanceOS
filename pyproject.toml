@@ -73,6 +73,10 @@ extend-exclude = [
   # .claude skills are prose documentation whose embedded code snippets are
   # illustrative, not product code the formatter should gate (GH-34).
   ".claude",
+  # Restored predecessor documents (GH-88). Same reasoning as .claude above, plus one more:
+  # these are an archival record of another repo. Reformatting their embedded snippets would
+  # edit history to satisfy a formatter.
+  "PROJECT/4-MISC/ARCHIVED-PREDECESSOR",
   "macOS",
   "vscode-extensions",
   "temp",
