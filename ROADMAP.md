@@ -150,7 +150,7 @@ _None yet._
 
 ### Deferred · vision
 
-_None yet._
+- **Fused retrieval measurement — PAUSED by operator decision 2026-08-20, do not restart unasked** ([#94](https://github.com/HiQS-Suite/rebalanceOS/issues/94)) — GH-81 measured the embedding lanes in isolation, but production fuses vector + FTS5 via RRF, so the end-to-end number was never produced. A protocol was written and independently reviewed (Codex + agy); review showed the primary test is **unrunnable on the existing query set** — only 5 of 39 queries can move the fused result, and n=5 cannot reach significance under any outcome. Closing that gap needs ~25 new hand-built lexical-hard queries. **The operator declined that cost: retrieval quality is judged by everyday use instead.** BGE-small, the query prefix, and hybrid RRF (k=60) are settled and not under review. Reopen only on a concrete retrieval failure traced to ranking — not to ingest, coverage, or a stale index. → [GH-94-FUSED-RETRIEVAL-PROTOCOL.md](PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md)
 
 ### Superseded
 
