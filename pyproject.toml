@@ -28,7 +28,12 @@ calendar = [
   "google-auth-httplib2>=0.2.0",
 ]
 embeddings = [
-  "mlx-embeddings>=0.1.0",
+  # GH-81 moved the embedder off mlx-embeddings to sentence-transformers
+  # (BAAI/bge-small-en-v1.5). The extra was left declaring the old package,
+  # so CI installed it and then died importing the new one — three tests in
+  # tests/test_embedder*.py on ModuleNotFoundError. Declare what the code
+  # actually imports.
+  "sentence-transformers>=3.0.0",
 ]
 server = [
   "fastapi>=0.110.0",
