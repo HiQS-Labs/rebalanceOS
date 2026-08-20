@@ -1,5 +1,6 @@
 """Shared pytest fixtures for the rebalance-OS test suite."""
 
+import importlib.machinery
 import os
 import sys
 import types
@@ -31,12 +32,25 @@ from rebalance.lib.metal_probe import metal_available
 #
 # Guarded by ImportError so a machine WITH MLX (this project's target platform) keeps testing
 # against the real package; the stub is a fallback, never an override.
+# Each stub carries a real `__spec__`. `types.ModuleType` leaves it None, and a
+# sys.modules entry with `__spec__ is None` makes `importlib.util.find_spec()`
+# raise `ValueError: mlx.__spec__ is None` rather than return None. Nothing
+# called find_spec on "mlx" until GH-81 put sentence-transformers in the CI
+# install: it pulls `transformers`, whose utils/generic.py runs
+# `is_mlx_available()` at import time, which is that exact call. The three
+# tests/test_embedder*.py tests died on it. With a spec present, transformers
+# proceeds to `importlib.metadata.version("mlx")`, gets PackageNotFoundError,
+# and correctly concludes MLX is absent — which is the truth on CI.
 try:  # pragma: no cover - depends on the host platform
     import mlx  # noqa: F401
     import mlx.core  # noqa: F401
 except ImportError:  # pragma: no cover - the CI / no-extras path
     _mlx_stub = types.ModuleType("mlx")
     _mlx_core_stub = types.ModuleType("mlx.core")
+    # submodule_search_locations marks "mlx" as a package, so "mlx.core" is a
+    # coherent submodule name rather than an attribute of a plain module.
+    _mlx_stub.__spec__ = importlib.machinery.ModuleSpec("mlx", loader=None, is_package=True)
+    _mlx_core_stub.__spec__ = importlib.machinery.ModuleSpec("mlx.core", loader=None)
     _mlx_stub.core = _mlx_core_stub
     sys.modules.setdefault("mlx", _mlx_stub)
     sys.modules.setdefault("mlx.core", _mlx_core_stub)

@@ -4,12 +4,31 @@ SentenceTransformers runs reliably on both CPU and Apple Silicon Metal without
 aborts or SIGABRT exceptions.
 """
 
+import importlib.util
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from rebalance.ingest import embedder
 from rebalance.ingest.embedder import _load_model
+
+
+def test_mlx_is_introspectable_by_find_spec():
+    """Whatever is registered as `mlx` must survive `importlib.util.find_spec`.
+
+    conftest substitutes a stub module for mlx wherever the real package is
+    absent (CI, or a venv without the `embeddings` extra). A `types.ModuleType`
+    has `__spec__ = None`, and find_spec raises ValueError on such an entry
+    rather than returning None. `transformers` — pulled in by
+    sentence-transformers since GH-81 — calls exactly this at import time via
+    `is_mlx_available()`, so a spec-less stub takes down every test that
+    imports the embedder. Assert the property directly, on real mlx and stub
+    alike, so the next import-time prober does not rediscover it in CI.
+    """
+    assert "mlx" in sys.modules, "conftest should register mlx (real or stub)"
+    assert importlib.util.find_spec("mlx") is not None
+    assert importlib.util.find_spec("mlx.core") is not None
 
 
 @pytest.fixture(autouse=True)
