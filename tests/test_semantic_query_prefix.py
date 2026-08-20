@@ -2,7 +2,7 @@
 
 The prefix lifted MRR@10 from 0.5716 to 0.7507 (Recall@1 0.410 -> 0.667) in the
 GH-81 bake-off: 14 queries improved, 0 regressed, p=0.0137 Holm-corrected. See
-PROJECT/2-WORKING/GH-81-BAKEOFF/RESULTS.md.
+TESTS-RESULTS/2026-08-20+GH-81/SUMMARY.md.
 
 Two things can silently undo that and neither would fail an existing test:
   * dropping the prefix from the query path (back to the measured-worse config);

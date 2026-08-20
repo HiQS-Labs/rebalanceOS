@@ -100,7 +100,7 @@ def _query_embed_text(query_text: str, model_name: str) -> str:
     same corpus (0.5716 vs 0.6816) — the prefix is not a tuning nicety, it is
     the difference between the vector index earning its keep and not.
 
-    See PROJECT/2-WORKING/GH-81-BAKEOFF/RESULTS.md for the full run.
+    See TESTS-RESULTS/2026-08-20+GH-81/SUMMARY.md for the full run.
 
     Gated on the model name because the instruction is BGE-specific: other
     models have their own (Qwen3 uses an "Instruct:/Query:" form) or none, and
