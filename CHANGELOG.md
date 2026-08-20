@@ -3123,3 +3123,34 @@ Running the collector once post-install (manually or by waiting for the next hou
 - Added initial MCP server scaffold with `list_projects(status="active")` tool.
 - Added template file: `templates/project-registry.template.md`.
 - Updated `README.md` with initial scaffold status and developer bootstrap commands.
+
+---
+
+## Predecessor repository — history before 2026-08-16
+
+Entries above this line predate **this** repository. `HiQS-Suite/rebalanceOS` was
+started fresh when the project moved to the HiQS-Suite org, so its git history
+begins **2026-08-16** even though the changelog reaches back to March 2026.
+
+Everything earlier — commits, blame, tags, releases, closed issues and PRs, and
+the `PROJECT/` planning documents that many entries above still link to — lives
+in the archived predecessor:
+
+**https://github.com/Hypercart-Dev-Tools/rebalance-OS** (2026-03-28 → 2026-08-17,
+default branch `development`, now archived and read-only)
+
+Two practical consequences:
+
+1. **`git log` / `git blame` in this repo cannot answer questions about earlier
+   work.** A file "absent from history" here has very likely simply not been
+   carried across. Check the predecessor before concluding a thing never existed —
+   that mistake was made and published once already
+   ([#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88)).
+2. **The `PROJECT/` docs this file and `ROADMAP.md` referenced but which were
+   never migrated have been recovered.** They live in
+   `PROJECT/4-MISC/ARCHIVED-PREDECESSOR/`, restored from the predecessor under
+   [#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88), which took broken
+   relative links in tracked files from 136 to 0. Read them as history: a stated
+   status describes the predecessor repo at archive time, not this repo today.
+   A few second-order references inside those documents deliberately point back
+   at the predecessor on GitHub rather than at local files.
