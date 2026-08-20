@@ -57,9 +57,38 @@ def _log_job(event: str, elapsed: float | None = None, exit_code: int | None = N
 
 
 # --- Configuration -----------------------------------------------------------
-# Operator-specific. Set OBSIDIAN_VAULT to your own vault; the former hardcoded
-# default named one operator's home directory and could not work anywhere else.
-VAULT = Path(os.environ.get("OBSIDIAN_VAULT", str(Path.home() / "Documents" / "Obsidian Vault")))
+# Operator-specific. Resolves vault path in priority order:
+# 1. OBSIDIAN_VAULT environment variable (explicit override)
+# 2. rebalance.ingest.config.get_vault_path() / temp/rbos.config
+# 3. Default fallback: ~/Documents/Obsidian Vault
+def _resolve_vault_path() -> Path:
+    env_val = os.environ.get("OBSIDIAN_VAULT")
+    if env_val and env_val.strip():
+        return Path(env_val.strip()).expanduser().resolve()
+
+    try:
+        from rebalance.ingest.config import get_vault_path
+
+        cfg_vault = get_vault_path()
+        if cfg_vault and cfg_vault.strip():
+            return Path(cfg_vault.strip()).expanduser().resolve()
+    except ImportError:
+        pass
+
+    cfg_file = Path(__file__).resolve().parent.parent / "temp" / "rbos.config"
+    if cfg_file.exists():
+        try:
+            data = json.loads(cfg_file.read_text(encoding="utf-8"))
+            cfg_vault = data.get("vault_path")
+            if cfg_vault and cfg_vault.strip():
+                return Path(cfg_vault.strip()).expanduser().resolve()
+        except (OSError, ValueError):
+            pass
+
+    return Path.home() / "Documents" / "Obsidian Vault"
+
+
+VAULT = _resolve_vault_path()
 TODAY_FILE = VAULT / "0. Today's Notes.md"
 YESTERDAY_FILE = VAULT / "0. Yesterday.md"
 
