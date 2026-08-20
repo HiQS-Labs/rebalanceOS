@@ -79,7 +79,7 @@ One-time setup:
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → create or pick a project.
 2. **APIs & Services → Library** → enable **Google Calendar API** (and **Gmail API** if
-   you want [GMAIL.md](./GMAIL.md) too).
+   you want [GMAIL.md](GMAIL.md) too).
 3. **APIs & Services → OAuth consent screen** → choose the audience:
    **Internal** if every user is in your own Google Workspace domain, **External**
    otherwise. Add the scopes for the APIs you enabled.
@@ -94,7 +94,7 @@ One-time setup:
    export GOOGLE_OAUTH_CLIENT_FILE=/path/to/client_secret.json
    ```
 
-[`google_oauth_client.example.json`](./google_oauth_client.example.json) shows the
+[`google_oauth_client.example.json`](google_oauth_client.example.json) shows the
 expected shape. If the file is missing, setup fails with an error naming every path it
 tried — it does not fall back to anything.
 
@@ -123,7 +123,7 @@ After clicking Allow, the script prints a list of your Google Calendars and thei
 > `migrate-to-keyring` step is needed (launchd's stripped environment reads the
 > JSON fallback). Verify with `rebalance doctor`. Upgrading a device that still has
 > a legacy pickle token? Run `rebalance config migrate-secrets` once to convert and
-> retire it. See [UPGRADE.md](./UPGRADE.md) for the full credential model.
+> retire it. See [UPGRADE.md](UPGRADE.md) for the full credential model.
 
 > **Calendar has no host-connector (`mcp`) ingest mode.** Unlike Gmail (which
 > offers an `oauth`/`mcp` choice), Google Calendar is ingested only via local
@@ -577,7 +577,7 @@ publishing status, which expires refresh tokens after 7 days.
 After flipping to Internal, re-mint once so the token is issued under the new
 status: `python scripts/setup_calendar_oauth.py --write-access --test` (writes
 the keyring + JSON fallback in one pass). The same client backs Gmail — see
-[GMAIL.md](./GMAIL.md).
+[GMAIL.md](GMAIL.md).
 
 **Common questions**
 

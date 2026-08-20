@@ -80,7 +80,7 @@ A live benchmark was conducted using Hugging Face sentence-transformers on Apple
 - [x] Rename script and templates:
   - `scripts/vault_sync.sh` → `scripts/obsidian_vault_embeddings.sh`
   - `scripts/com.rebalance-os.vault-sync.plist.template` → `scripts/com.rebalance-os.obsidian-vault-embeddings.plist.template`
-- [x] Update [SCHEDULER.md](SCHEDULER.md), [ARCHITECTURE.md](ARCHITECTURE.md), and `scripts/stack.sh`:
+- [x] Update [SCHEDULER.md](../../SCHEDULER.md), [ARCHITECTURE.md](../../ARCHITECTURE.md), and `scripts/stack.sh`:
   - Change job label from `vault-sync` to `obsidian-vault-embeddings`.
   - Update installer `scripts/install_obsidian_vault_embeddings_scheduler.sh`.
   - Unload old `com.rebalance-os.vault-sync` and load `com.rebalance-os.obsidian-vault-embeddings`.

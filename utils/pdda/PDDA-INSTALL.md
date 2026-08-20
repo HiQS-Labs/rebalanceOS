@@ -287,7 +287,7 @@ Once PDDA lives in several repos, keep them current from one canonical source (t
 the auto-regenerated manifest (`utils/pdda/pdda-sync-manifest.conf`, shared with `install.sh`), so a new
 runtime file under `utils/pdda/` propagates with no list edit. Per-repo adapted startup docs
 (`ROUTER.md`, `AGENTS.md`) are never touched. Full design + rationale:
-[`PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`](../../PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md).
+`PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`.
 
 > **`push` cannot repair a target's `ROUTER.md`.** The startup docs are outside the sync manifest by
 > design, so a target installed before GH-23 keeps its stale router indefinitely — `push` will never

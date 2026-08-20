@@ -13,7 +13,7 @@ whoever picks up the next task, human or model, and it is binding on both.
 
 If you state that something was measured — in a GitHub issue, a PR body, a commit
 message, `ROADMAP.md`, a code comment, or a reply to the operator — the measurement
-must be retained in [`TESTS-RESULTS/`](TESTS-RESULTS/) where a reader can check it
+must be retained in [`TESTS-RESULTS/`](TESTS-RESULTS) where a reader can check it
 without access to your machine.
 
 This exists because it has already failed here. A retrieval change was tested on 5
@@ -22,7 +22,7 @@ reverted, and the conclusion was reported as settled. It was noise. Re-run prope
 (39 queries, hand-established targets, paired significance test) the same change won
 decisively — 14 improved, 0 regressed, p=0.0137 — and the earlier call had been
 suppressing a real fix for weeks. See
-[`TESTS-RESULTS/2026-08-20+GH-81/`](TESTS-RESULTS/2026-08-20+GH-81/).
+[`TESTS-RESULTS/2026-08-20+GH-81/`](TESTS-RESULTS/2026-08-20+GH-81).
 
 The lesson is not "test more." It is: **a small unverifiable test is worse than no
 test**, because it manufactures false confidence and then gets cited.
@@ -73,7 +73,7 @@ change the experiment.
 On GH-81 it changed the experiment twice, and one of those changes is why the
 headline finding was detectable at all — the original significance rule would have
 returned "no measurable difference, keep the incumbent" almost regardless of the
-data. Transcripts: [`qa/`](TESTS-RESULTS/2026-08-20+GH-81/qa/).
+data. Transcripts: [`qa/`](TESTS-RESULTS/2026-08-20+GH-81/qa).
 
 ### 3.4 Include a dumb baseline
 

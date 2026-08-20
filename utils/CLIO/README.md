@@ -12,7 +12,7 @@ An optional second script converts that JSONL into human-readable Markdown —
 newest entry first — at any location you choose, such as a note in an Obsidian
 vault. It can run on demand or on a 5-minute `launchd` schedule (macOS).
 
-See [SKILL.md](SKILL.md) for the full install, verify, export, auto-sync, and
+See [INSTALL.md](INSTALL.md) for the full install, verify, export, auto-sync, and
 uninstall instructions.
 
 ## Why

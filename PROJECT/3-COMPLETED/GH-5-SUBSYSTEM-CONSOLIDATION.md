@@ -179,7 +179,7 @@ Three words name the same top tier, all user-visible: `danger` (`web_components.
 (`doctor.py:28`), `error` (`doctor.py:32`); plus `warn` vs `warning`, two enum values that look
 like a typo of each other and both reach the dashboard. Deletion-forward — visible dashboard
 changes accepted by operator decision. Full plan:
-[GH-5-PR2-STATUS-VOCABULARY.md](../1-INBOX/GH-5-PR2-STATUS-VOCABULARY.md). **Net lines: down.**
+[GH-5-PR2-STATUS-VOCABULARY.md](GH-5-PR2-STATUS-VOCABULARY.md). **Net lines: down.**
 
 ### Phase 4 — One health verdict, consumed by every surface (the real G6 lever)
 

@@ -67,7 +67,7 @@ the reviewed party grading their own homework.
 
 | Campaign | Subject | Outcome |
 |---|---|---|
-| [`2026-08-20+GH-81`](2026-08-20+GH-81/) | Embedding model bake-off: BGE-small vs Qwen3-0.6B vs Gemini vs FTS5 baseline, 39 queries × 6 lanes | Shipped BGE's query prefix (MRR@10 0.572 → 0.751, p=0.0137); retracted an earlier conclusion; declined Gemini; kept BGE over Qwen |
+| [`2026-08-20+GH-81`](2026-08-20+GH-81) | Embedding model bake-off: BGE-small vs Qwen3-0.6B vs Gemini vs FTS5 baseline, 39 queries × 6 lanes | Shipped BGE's query prefix (MRR@10 0.572 → 0.751, p=0.0137); retracted an earlier conclusion; declined Gemini; kept BGE over Qwen |
 
 ## Inspecting a run
 

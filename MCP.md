@@ -2,8 +2,8 @@
 
 > Canonical reference for the rebalance MCP server: layer roles, live and planned tool surface, server configuration, and host adapter setup.
 
-- For project execution decisions and onboarding sequence, see [PROJECT.md](./PROJECT.md).
-- For marketing overview, see [README.md](./README.md).
+- For project execution decisions and onboarding sequence, see PROJECT.md.
+- For marketing overview, see [README.md](README.md).
 
 ---
 
@@ -69,7 +69,7 @@ Returns projects from the `project_registry` table.
 
 Shows GitHub commit/PR/issue activity per project over a rolling window.
 
-**Prerequisite:** run `rebalance github-scan` via CLI first to populate the `github_activity` table. See [PROJECT.md — Step 6](./PROJECT.md) for setup.
+**Prerequisite:** run `rebalance github-scan` via CLI first to populate the `github_activity` table. See PROJECT.md — Step 6 for setup.
 
 | Param | Type | Default | Description |
 |---|---|---|---|
@@ -210,7 +210,7 @@ Structured operator log:
 - `temp/logs/calendar-event-create.jsonl` records created IDs, duplicate blocks, and skip outcomes for reconciliation
 - the log is local-only under `temp/`, gitignored, and can be rotated manually when it grows
 
-For the full operator workflow, dry-run behavior, and a copy-paste worked example, see [GOOGLE_CALENDAR.md — Creating Events Programmatically](./GOOGLE_CALENDAR.md#creating-events-programmatically).
+For the full operator workflow, dry-run behavior, and a copy-paste worked example, see [GOOGLE_CALENDAR.md — Creating Events Programmatically](GOOGLE_CALENDAR.md#creating-events-programmatically).
 
 **Trade-off:** the MCP tool remains the canonical transport for registered MCP hosts, but the CLI is the cleaner path for local terminal sessions and external AI tools that do not have the rebalance server registered. The CLI calls the same underlying `create_calendar_event(...)` implementation and keeps the same write-scope guardrails while avoiding raw JSON-RPC boilerplate.
 
@@ -273,7 +273,7 @@ Pulls Slack reminders from the Sleuth Web API and mirrors them into SQLite.
 
 ## Live Tool Surface — Onboarding
 
-These tools move onboarding out of the CLI and into any MCP-capable host, so an agent can drive the setup flow conversationally. See [PROJECT.md — Onboarding User Story](./PROJECT.md) for the sequence and UX rationale.
+These tools move onboarding out of the CLI and into any MCP-capable host, so an agent can drive the setup flow conversationally. See PROJECT.md — Onboarding User Story for the sequence and UX rationale.
 
 | Tool | Description | Params | Returns | Depends on |
 |---|---|---|---|---|
@@ -435,4 +435,4 @@ Planned: `weekly_rebalance`, `project_attention`, `review_unattributed_attention
 
 Copyright 2025 Hypercart DBA Neochrome, Inc.
 
-Licensed under the **Apache License, Version 2.0**. See [APACHE-LICENSE-2.0.txt](./APACHE-LICENSE-2.0.txt) or https://www.apache.org/licenses/LICENSE-2.0.
+Licensed under the **Apache License, Version 2.0**. See [APACHE-LICENSE-2.0.txt](APACHE-LICENSE-2.0.txt) or https://www.apache.org/licenses/LICENSE-2.0.

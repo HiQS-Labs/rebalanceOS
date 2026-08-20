@@ -143,5 +143,5 @@ Everything lands under `temp/triage/` (gitignored via `/temp`):
 ## Related
 
 - [`src/rebalance/ingest/github_reconciliation.py`](../../src/rebalance/ingest/github_reconciliation.py) — local SQLite issue↔PR matcher (used elsewhere; not invoked by triage)
-- [`experimental/close-candidates-action/`](../close-candidates-action/) — per-PR GitHub Action variant
+- [`experimental/close-candidates-action/`](../close-candidates-action) — per-PR GitHub Action variant
 - [`experimental/freshness/spike.py`](../freshness/spike.py) — sibling read-only dashboard pattern

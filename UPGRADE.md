@@ -6,7 +6,7 @@
 > (`~/.config/rebalance-os/secrets/`, `0600`) — no plaintext secrets in `temp/rbos.config`,
 > no pickle OAuth files. This guide reflects that model. Full audit, rationale, and the
 > deferred (multi-operator) work:
-> [PROJECT/2-WORKING/AUTH-AND-API-KEY-STORAGE-HARDENING.md](PROJECT/2-WORKING/AUTH-AND-API-KEY-STORAGE-HARDENING.md).
+> [PROJECT/2-WORKING/AUTH-AND-API-KEY-STORAGE-HARDENING.md](https://github.com/Hypercart-Dev-Tools/rebalance-OS/blob/development/PROJECT/4-MISC/AUTH-AND-API-KEY-STORAGE-HARDENING.md).
 
 rebalance-OS now stores its external credentials in the **OS keyring**
 (macOS Keychain) as the primary, with a **launchd-reachable fallback** for each

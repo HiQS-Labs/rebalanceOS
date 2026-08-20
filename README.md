@@ -189,7 +189,7 @@ The MCP server speaks standard JSON-RPC — no LLM-specific logic inside it. Any
 
 The scheduled side of the diagram (the launchd fleet: daily/hourly syncs, pulse publishing, health checks) is governed by the policy table in [SCHEDULER.md](SCHEDULER.md) — job cadences, scopes, prerequisites, and the runbook live there.
 
-For layer roles, tool surface, server configuration, and host adapter setup (Claude Desktop, Cursor, VS Code, Continue), see **[MCP.md](./MCP.md)**.
+For layer roles, tool surface, server configuration, and host adapter setup (Claude Desktop, Cursor, VS Code, Continue), see **[MCP.md](MCP.md)**.
 
 ---
 
@@ -256,15 +256,15 @@ The result is an AI assistant that actually knows your work — because it's rea
 
 | Guide | What's in it |
 |-------|--------------|
-| [GMAIL.md](./GMAIL.md) | Gmail inbox ingest — `oauth` (keyring) vs `mcp` methods, durable Internal tokens, query filters, troubleshooting |
-| [GOOGLE_CALENDAR.md](./GOOGLE_CALENDAR.md) | Google Calendar timesheets — setup, team config, event creation, project aggregation |
-| [MCP.md](./MCP.md) | MCP layer — tool surface, server config, host adapters (Claude Desktop, Cursor, VS Code, Continue) |
-| [UPGRADE.md](./UPGRADE.md) | Keyring credential model + multi-device upgrade steps |
-| [DASHBOARD.md](./DASHBOARD.md) | Local web/activity dashboard |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture and data flow |
-| [PROJECT/PDDA.md](./PROJECT/PDDA.md) · [ROADMAP.md](./ROADMAP.md) | Plan-doc contract and the pointer ledger indexing every active effort |
-| [AGENTS.md](./AGENTS.md) | Conventions for AI agents working in this repo |
-| [macOS/Apps/Focus5Float/README.md](./macOS/Apps/Focus5Float/README.md) | Focus 5 Float macOS app — build, install, binary path setup (`pipx`), self-checks |
+| [GMAIL.md](GMAIL.md) | Gmail inbox ingest — `oauth` (keyring) vs `mcp` methods, durable Internal tokens, query filters, troubleshooting |
+| [GOOGLE_CALENDAR.md](GOOGLE_CALENDAR.md) | Google Calendar timesheets — setup, team config, event creation, project aggregation |
+| [MCP.md](MCP.md) | MCP layer — tool surface, server config, host adapters (Claude Desktop, Cursor, VS Code, Continue) |
+| [UPGRADE.md](UPGRADE.md) | Keyring credential model + multi-device upgrade steps |
+| [DASHBOARD.md](DASHBOARD.md) | Local web/activity dashboard |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and data flow |
+| [PROJECT/PDDA.md](PROJECT/PDDA.md) · [ROADMAP.md](ROADMAP.md) | Plan-doc contract and the pointer ledger indexing every active effort |
+| [AGENTS.md](AGENTS.md) | Conventions for AI agents working in this repo |
+| [macOS/Apps/Focus5Float/README.md](macOS/Apps/Focus5Float/README.md) | Focus 5 Float macOS app — build, install, binary path setup (`pipx`), self-checks |
 
 ---
 
@@ -397,7 +397,7 @@ above and check that `python3 --version` really was 3.12+.
 > because macOS records only the process name `Python`.
 >
 > Full reference, tuning variables, and the non-editable-install caveat:
-> [UPGRADE.md § Embedding job guard](./UPGRADE.md#embedding-job-guard-gh-172--verify-on-every-device).
+> [UPGRADE.md § Embedding job guard](UPGRADE.md#embedding-job-guard-gh-172--verify-on-every-device).
 > On a machine with substantially less than 64 GB RAM, set
 > `REBALANCE_JOB_GUARD_MAX_RSS_GB` explicitly rather than relying on the fraction.
 
@@ -408,7 +408,7 @@ above and check that `python3 --version` really was 3.12+.
 > what `pulse-sync` writes, so a shared minute risks reading half-written state.
 > Install via the per-job `scripts/install_*_scheduler.sh` scripts; there is no
 > single install-everything script. Details:
-> [UPGRADE.md § Re-render your launchd plists](./UPGRADE.md#re-render-your-launchd-plists-gh-175--required-on-existing-devices).
+> [UPGRADE.md § Re-render your launchd plists](UPGRADE.md#re-render-your-launchd-plists-gh-175--required-on-existing-devices).
 
 ### Step 3 — Connect GitHub
 
@@ -448,8 +448,8 @@ owns the consent screen, scopes, quota and revocation. It is a five-minute, one-
 setup in the Google Cloud Console: enable the Calendar API, create a **Desktop app**
 OAuth client, and save the downloaded JSON as `~/secrets/google_oauth_client.json` (or
 point `GOOGLE_OAUTH_CLIENT_FILE` at it). Full walkthrough in
-[GOOGLE_CALENDAR.md](./GOOGLE_CALENDAR.md); expected file shape in
-[`google_oauth_client.example.json`](./google_oauth_client.example.json).
+[GOOGLE_CALENDAR.md](GOOGLE_CALENDAR.md); expected file shape in
+[`google_oauth_client.example.json`](google_oauth_client.example.json).
 
 **4a. Install with calendar support**
 
@@ -502,7 +502,7 @@ Edit `temp/calendar_config.json` with your preferences:
 .venv/bin/rebalance calendar-weekly-report --vault /path/to/vault --write-week-note
 ```
 
-For the full guide — including team setup, Claude Code prompts, and project definitions — see [GOOGLE_CALENDAR.md](./GOOGLE_CALENDAR.md).
+For the full guide — including team setup, Claude Code prompts, and project definitions — see [GOOGLE_CALENDAR.md](GOOGLE_CALENDAR.md).
 
 ### Step 5 — Connect Gmail (optional)
 
@@ -569,7 +569,7 @@ appears in `index_status()`, email hits show up in `semantic_query()`, and
 `rebalance doctor` reports `gmail — OK`.
 
 For the full guide — both ingest methods, durable (Internal) tokens, query
-filters, troubleshooting, and Claude Code prompts — see [GMAIL.md](./GMAIL.md).
+filters, troubleshooting, and Claude Code prompts — see [GMAIL.md](GMAIL.md).
 
 ### Step 6 — Start using with Claude Code
 
@@ -617,11 +617,11 @@ Claude Code calls the `ask` tool behind the scenes — it gathers your project r
 3. Quit and reopen Claude Desktop. The rebalance tools appear in the tool picker (hammer icon).
 4. Ask *"What should I work on today?"* to verify.
 
-For detailed setup, troubleshooting, and other MCP hosts, see [MCP.md — Claude Desktop](./MCP.md#claude-desktop).
+For detailed setup, troubleshooting, and other MCP hosts, see [MCP.md — Claude Desktop](MCP.md#claude-desktop).
 
 #### Extension (`.mcpb`) — coming soon
 
-rebalance OS will also ship as a Claude Desktop Extension. The extension packaging step (`mcpb pack`) requires bundling all Python dependencies into the archive. This is not yet automated — use the manual config above for daily use. See [manifest.json](./manifest.json) for the extension spec.
+rebalance OS will also ship as a Claude Desktop Extension. The extension packaging step (`mcpb pack`) requires bundling all Python dependencies into the archive. This is not yet automated — use the manual config above for daily use. See [manifest.json](manifest.json) for the extension spec.
 
 ### Other MCP hosts
 
@@ -630,7 +630,7 @@ The server works with any MCP-compatible client. Config files are provided for:
 - **Claude Code** — `.mcp.json` (auto-loaded on `cd rebalanceOS && claude`)
 - **VS Code (Copilot/Continue)** — `.vscode/mcp.json` (auto-loaded on workspace open)
 - **Claude Desktop** — manual config (see above) or extension (`.mcpb`, coming soon)
-- **Cursor** — see [MCP.md](./MCP.md) for config snippet
+- **Cursor** — see [MCP.md](MCP.md) for config snippet
 
 ### Focus 5 Float (optional macOS menu-bar app)
 
@@ -655,7 +655,7 @@ pipx install -e /path/to/rebalanceOS   # → ~/.local/bin/rebalance
 
 The app checks `~/.local/bin/rebalance` directly — no shell needed. Without
 this step the app shows _"Couldn't find the `rebalance` binary"_ when trying
-to start the server. See [macOS/Apps/Focus5Float/README.md](./macOS/Apps/Focus5Float/README.md)
+to start the server. See [macOS/Apps/Focus5Float/README.md](macOS/Apps/Focus5Float/README.md)
 for the full resolution order and troubleshooting.
 
 ---
@@ -731,7 +731,7 @@ Copyright 2025-2026 Hypercart DBA Neochrome, Inc.
 
 rebalance is dual-licensed, matching the rest of the HiQS suite.
 
-**AGPL-3.0-only** is the default and covers nearly every use — see [`LICENSE`](./LICENSE).
+**AGPL-3.0-only** is the default and covers nearly every use — see [`LICENSE`](LICENSE).
 Run it for your team, modify it, self-host it, fork it, all at no cost. The one obligation to
 know about is **§13**: if you modify rebalance and let others interact with your modified version
 over a network, you must offer those users the complete corresponding source of your version.
@@ -740,7 +740,7 @@ network-facing users but you, §13 rarely comes up in practice.
 
 A **commercial license** is available if you need to offer a modified rebalance as a hosted
 service, or embed it in a proprietary product, without publishing your changes — see
-[`LICENSE-COMMERCIAL.md`](./LICENSE-COMMERCIAL.md). Terms are negotiated, not click-through.
+[`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md). Terms are negotiated, not click-through.
 
 ---
 

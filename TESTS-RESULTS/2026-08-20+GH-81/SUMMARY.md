@@ -15,8 +15,8 @@
   - [`pairwise_tests.jsonl`](pairwise_tests.jsonl) — 15 records, Wilcoxon signed-rank + Holm
   - [`scoring-run-console.txt`](scoring-run-console.txt) — raw stdout of the run that produced every number here
   - [`queries.json`](queries.json) — the frozen 39-query set with hand-established targets
-  - [`scripts/`](scripts/) — `embed_local.py`, `embed_gemini.py`, `score.py`, as run
-  - [`qa/`](qa/) — the two third-party review transcripts, verbatim
+  - [`scripts/`](scripts) — `embed_local.py`, `embed_gemini.py`, `score.py`, as run
+  - [`qa/`](qa) — the two third-party review transcripts, verbatim
 
 ---
 

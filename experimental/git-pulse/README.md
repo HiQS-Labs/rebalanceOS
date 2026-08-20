@@ -2,7 +2,7 @@
 
 Passive, always-on collector that appends locally-authored git commits from a fixed set of repos to per-device files in a private GitHub repo checkout. No agent invocation required. Any human or AI can read the synced files and reconstruct what you touched across devices and repos.
 
-See [`git-pulse-plan.md`](./git-pulse-plan.md) for the background and design notes.
+See [`git-pulse-plan.md`](git-pulse-plan.md) for the background and design notes.
 
 ## TOC
 
