@@ -26,7 +26,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -1568,22 +1568,35 @@ _SEVERITY_FILTERS = (
 )
 
 
-def _source_filters() -> tuple[tuple[str, str], ...]:
-    """Source buttons, DERIVED from ``_SOURCE_BADGE`` — never restated.
+def _source_filters(entries: Iterable[dict[str, Any]] = ()) -> tuple[tuple[str, str], ...]:
+    """Source buttons, derived from the badge map UNIONED WITH THE ACTUAL DATA.
 
-    A hardcoded copy is what let ``registry`` belong to no filter. Deriving means
-    a new source is filterable the moment it has a badge, which is the only way
-    the two can't drift.
+    Deriving from ``_SOURCE_BADGE`` alone fixes ``registry`` but leaves the same
+    defect one step away. ``auth_log.log_event`` is documented as the generic
+    entry point "so new collectors can log without a typed helper" — it takes a
+    caller-supplied source string, and eight call sites pass a variable. So a
+    collector can write a source nobody remembered to badge, and that row would
+    render (the badge falls back to neutral) while matching no filter but "All":
+    invisible everywhere else, exactly as ``registry`` was.
+
+    Unioning with the sources present in the rendered rows makes the invariant
+    hold by construction rather than by anyone maintaining a list. Known sources
+    keep the badge map's order; unbadged ones follow, alphabetically, labelled by
+    their raw name. ``test_a_source_nobody_badged_is_still_reachable`` pins it.
     """
-    return (("all", "All"),) + tuple((name, label) for name, (_variant, label) in _SOURCE_BADGE.items())
+    seen = {str(e.get("source") or "") for e in entries}
+    seen.discard("")
+    extra = sorted(seen - set(_SOURCE_BADGE))
+    known = [(name, label) for name, (_variant, label) in _SOURCE_BADGE.items()]
+    return (("all", "All"),) + tuple(known) + tuple((name, name) for name in extra)
 
 
-def _syslog_controls() -> str:
+def _syslog_controls(entries: Iterable[dict[str, Any]] = ()) -> str:
     def buttons(axis: str, options: tuple[tuple[str, str], ...]) -> str:
         return "".join(
             f"<button class='syslog-toggle{' active' if key == 'all' else ''}' "
             f"data-axis='{axis}' data-filter='{html.escape(key, quote=True)}' "
-            f"onclick='syslogToggle(this)'>{label}</button>"
+            f"onclick='syslogToggle(this)'>{html.escape(label)}</button>"
             for key, label in options
         )
 
@@ -1591,7 +1604,7 @@ def _syslog_controls() -> str:
         _SYSLOG_TOGGLE_CSS
         + "<div class='syslog-bar'>"
         + "<div class='syslog-axis'><span class='syslog-axis-label'>Source</span>"
-        + f"<div class='syslog-toggles'>{buttons('source', _source_filters())}</div></div>"
+        + f"<div class='syslog-toggles'>{buttons('source', _source_filters(entries))}</div></div>"
         + "<div class='syslog-axis'><span class='syslog-axis-label'>Severity</span>"
         + f"<div class='syslog-toggles'>{buttons('severity', _SEVERITY_FILTERS)}</div></div>"
         + "</div>"
@@ -1712,7 +1725,7 @@ def auth_log_page() -> HTMLResponse:
         if total > len(entries)
         else ""
     )
-    controls = _syslog_controls().replace(
+    controls = _syslog_controls(entries).replace(
         "<span class='syslog-count' id='syslogCount'></span>",
         f"<span class='syslog-count' id='syslogCount' data-total='{total}'></span>",
     )

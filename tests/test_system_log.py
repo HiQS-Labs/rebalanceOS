@@ -55,6 +55,39 @@ class SourceTaxonomyTests(unittest.TestCase):
         self.assertIn("health", web._SOURCE_BADGE)
         self.assertIn("health", {key for key, _label in web._source_filters()})
 
+    def test_a_source_nobody_badged_is_still_reachable(self) -> None:
+        """THE STRONGER PIN — deriving from the badge map alone leaves the same
+        defect one step away.
+
+        `auth_log.log_event` is the documented generic entry point "so new
+        collectors can log without a typed helper", and eight call sites pass a
+        variable source. A collector can therefore write a source nobody added a
+        badge for. Such a row renders (the badge falls back to neutral) and, with
+        a badge-map-only filter list, would match nothing but "All" — invisible
+        under every other filter, exactly as `registry` was.
+        """
+        entries = [{"source": "figma"}, {"source": "github"}]
+        keys = {key for key, _label in web._source_filters(entries)}
+        self.assertIn("figma", keys)
+
+    def test_every_rendered_row_is_reachable_by_some_source_filter(self) -> None:
+        """The invariant stated over the real page, not over the map."""
+        import re
+        from unittest import mock
+
+        entries = [
+            {"ts": "2026-08-20T00:00:00Z", "device": "d", "source": "figma", "event": "sync_succeeded"},
+            {"ts": "2026-08-20T00:01:00Z", "device": "d", "source": "registry", "event": "watched_repos_reduced"},
+            {"ts": "2026-08-20T00:02:00Z", "device": "d", "source": "health", "event": "check_failed"},
+        ]
+        with mock.patch.object(web, "read_log_with_total", return_value=(entries, len(entries))):
+            page = web.auth_log_page().body.decode()
+
+        rendered = set(re.findall(r"<tr data-severity='[^']*' data-source='([^']*)'>", page))
+        buttons = set(re.findall(r"data-axis='source' data-filter='([^']*)'", page))
+        self.assertTrue(rendered, "fixture rendered no rows")
+        self.assertEqual(rendered - buttons, set(), "these sources render but match no filter")
+
 
 class FilterAxesTests(unittest.TestCase):
     def test_source_and_severity_are_separate_axes(self) -> None:
