@@ -6,9 +6,11 @@ import unittest
 
 from rebalance.web_components import (
     RB_BUTTON_CSS,
+    _NAV_LINKS,
     badge_html,
     button_link,
     render_shell,
+    render_sidebar,
 )
 
 
@@ -90,6 +92,33 @@ class RenderShellTests(unittest.TestCase):
 
     def test_narrow_is_the_default(self) -> None:
         self.assertIn('<main class="main narrow">', render_shell("t", "b", active="today"))
+
+
+class SystemLogLabelTests(unittest.TestCase):
+    """One page, one name (GH-101).
+
+    `/auth-log` was renamed to "System Log" everywhere EXCEPT the dashboard's own
+    System-section link, which kept saying "Authorization Log". Two names for one
+    page is not cosmetic: the operator cannot tell whether they are two surfaces,
+    and the stale name still advertises the narrower scope the page is supposed to
+    be outgrowing.
+    """
+
+    # The System section (Focus 5 / What's Next / System Log) lives only in the
+    # RICH sidebar — the one the dashboard renders by passing nav_data. That is
+    # the Home-page link, and it is where the stale name survived.
+    def _home_sidebar(self) -> str:
+        return render_sidebar("today", nav_data={})
+
+    def test_nav_and_sidebar_link_agree_on_the_name(self) -> None:
+        nav_label = next(label for key, _href, label in _NAV_LINKS if key == "authlog")
+        self.assertEqual(nav_label, "System Log")
+        self.assertIn("<span>System Log</span>", self._home_sidebar())
+
+    def test_the_old_name_is_gone_from_the_home_sidebar(self) -> None:
+        """THE PIN: the label AND its tooltip. The tooltip is the copy that
+        outlived the last rename, because nothing reads a title= attribute."""
+        self.assertNotIn("Authorization Log", self._home_sidebar())
 
 
 if __name__ == "__main__":

@@ -674,8 +674,8 @@ def render_sidebar(active: str, nav_data: dict | None = None) -> str:
           </li>
           <li class="auth-log-link">
             <a href="/auth-log" target="_blank" rel="noopener noreferrer"
-               title="Open the Authorization Log (auth events across all collectors)">
-              <span class="auth-log-icon">🔐</span><span>Authorization Log</span>
+               title="Open the System Log (auth and scheduled-job events across all collectors)">
+              <span class="auth-log-icon">🔐</span><span>System Log</span>
             </a>
           </li>
         </ul>
