@@ -1,6 +1,6 @@
 ---
 title: Pluggable embeddings — remove the hardcoding, stage the provider layer
-status: Plan — drafted, pending review (GH-97)
+status: Plan v2 — reviewed (Aider/qwen3.8-max), changes accepted; see §8 (GH-97)
 gh_issue: 97
 created: 2026-08-20
 branch: feat/gh97-pluggable-embeddings
@@ -184,3 +184,107 @@ No new test framework, no fixtures beyond a stub embedder.
 - Dimension mismatch refuses with an actionable message and a named migration command.
 - The four tests in §5 pass, and test 2 fails against today's code.
 - No provider protocol, no registry, no hosted implementation.
+
+
+## 8. Review outcome — Aider / qwen3.8-max, verdict: changes requested
+
+Reviewed before any implementation, per `SOP.md`. Relay transcript:
+`relay-system/2026-08-20/gh97-plan-review.md`. Five findings, all accepted; one of my
+"verified" claims was itself wrong, and the review surfaced a **live defect in shipped
+code** which is fixed on this branch.
+
+### 8.1 A shipped bug, found by the review and fixed here
+
+The reviewer claimed the dim guard's `INSERT OR REPLACE` failed because the meta table did
+not exist. **The stated mechanism was wrong** — the `SELECT` raises first, so nothing in
+the block runs. But the conclusion was right, and the real mechanism is worse:
+
+On a database with a **stale-width vec table and no meta table**, the guard's `SELECT`
+raised `no such table`, the bare `except` swallowed it, and the entire guard — *including
+the DROP* — was skipped. Control then reached `CREATE ... IF NOT EXISTS float[384]`
+(a no-op against the existing table) and the trailing `INSERT OR IGNORE`, which stamped
+`'384'` onto a table still 1024 wide.
+
+That is the **identical dishonest-metadata state GH-81 fixed**, reached through a shape the
+GH-81 guard could not observe. Reproduced, then fixed by creating the meta table *before*
+the guard reads it, in all three schemas. Verified against three shapes — fresh database,
+meta-absent + stale table, and the pre-GH-81 shape — all converge in one pass.
+`tests/test_schema_dim_migration.py` gains a regression test that **fails against the
+unfixed code**.
+
+### 8.2 My §6 risk-1 claim was half wrong; the fallback is promoted to primary
+
+I wrote that `query()` loads the model before `ensure_semantic_schema`. That part is
+correct (`semantic_index.py:796` embeds, `:800` ensures). **The conclusion drawn from it was
+not.** Every other ensure site runs model-less — `index_ops.get_index_status`,
+`backfill_semantic_documents`, `github_knowledge.sync_github_repo`,
+`note_ingester.ingest_vault`, `db.migrate.ensure_baseline_schema` — and `get_index_status`
+is a *read* path. Deriving the dimension at schema time would drag a multi-hundred-MB model
+load onto reads, and on a fresh database there is no meta row to read instead.
+
+**Accepted: the §6 fallback becomes the primary design.** Keep an explicit configured
+dimension (config key, default 384) as the source of truth for all DDL and all three
+guards; validate the loaded model's `get_sentence_embedding_dimension()` against it at
+embed time and refuse to write on mismatch. Deriving from the model becomes a cross-check,
+not the DDL's source of truth. This still removes the silent-disagreement class without
+ever needing a model at schema time.
+
+### 8.3 Unknown-model prompt policy splits by path
+
+§3.2's blanket raise is wrong for scheduled work. Accepted split:
+
+- **Query path** (`query()` → `_query_embed_text`): raise. Interactive, and a silently
+  wrong prompt is the more expensive error.
+- **Embed path** (`embed_chunks`, `embed_pending`, `embed_github_documents` — all under
+  launchd): **degrade to no prompt, log loudly, and surface a doctor check.** A raise in a
+  scheduled job stops embedding until a human notices, which is precisely the failure that
+  cost this repo 84% of its vault index for days. Guessing an unknown model's instruction
+  is worse than using none.
+
+The plan must also state *which paths the mapping governs* — today `_query_embed_text` is
+called only from `query()`, so as written the raise would never fire on the embed path at all.
+
+### 8.4 The migration must key on model identity, not dimension
+
+§4's refusal keys on dimension change. But **vectors from different models are incomparable
+even at equal dimension**, which §4 itself asserts. A same-dimension model swap would pass
+the guard and quietly mix two models' vectors in one index.
+
+Existing machinery already does better: `embed_pending` keys staleness on
+`f"{model_name}|{EMBEDDING_DIM}"` and `embed_chunks` forces re-embed when
+`embedding_meta.model_name` changes. The plan must say whether that stays the
+operator-visible path or is replaced — not leave two mechanisms disagreeing.
+
+### 8.5 Specification gaps to close before implementation
+
+- **Name the migration command** and what it does: drops all three vec0 tables, clears
+  `embedded_hash` / `embedded_model_version` / `embedded_at` across `chunks`,
+  `semantic_documents`, `github_documents`, and is resumable via `embedded_hash IS NULL`.
+- **Doctor must parse `sqlite_master` DDL**, not the meta rows — reading meta is exactly
+  the dishonesty GH-81 consisted of. `_vec_dim` in the existing test shows the technique.
+- **Pin the refusal contract** (exception type / message). The DoD item "test 2 fails
+  against today's code" is unverifiable while no refusal API is specified.
+- **Say what happens to `EMBEDDING_DIM`'s three import sites** (`embedder`,
+  `semantic_index`, `github_knowledge`) — dies outright, or survives as a derived value.
+- **Acknowledge the migrations-README tension:** §3.1 mutates `ensure_*_schema`, which
+  `db/migrations/README.md` declares frozen at baseline. Defensible under its
+  "idempotent self-healing virtual indexes" exception, but say so or the implementation PR
+  will be blocked on it.
+
+### 8.6 Additional coupling sites for §1
+
+- `embedder._embed_batch` — model-less zero-vector fallback `[[0.0] * EMBEDDING_DIM ...]`.
+- `semantic_index.embed_pending` — builds `f"{model_name}|{EMBEDDING_DIM}"`, a second
+  constructor for the string `doctor.py` also builds. One owner needed.
+- `github_knowledge.embed_github_documents` — a third writer of the dimension meta row.
+- `tests/test_semantic_query_prefix.py` — hardcodes `[[0.0] * 384 ...]`.
+
+Confirmed by the reviewer: there are exactly **three** vector tables, no fourth.
+
+### 8.7 Scope discipline upheld
+
+The reviewer independently agreed the provider registry should be cut: the `embed_texts=`
+seam already exists and already drove six models through one code path, nothing in Phase 1
+paints a corner, and `QUERY_PROMPTS` is the right shape to grow. §4's refuse-to-run was
+called "appropriately blunt". **Nothing was added to scope by this review** — only
+corrected.

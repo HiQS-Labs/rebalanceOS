@@ -70,6 +70,12 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_title)")
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS embedding_meta (
+            key     TEXT PRIMARY KEY,
+            value   TEXT NOT NULL
+        )
+    """)
     try:
         row = conn.execute("SELECT value FROM embedding_meta WHERE key = 'embedding_dim'").fetchone()
         if not row or str(row[0]) != "384":
@@ -88,12 +94,6 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     except sqlite3.DatabaseError:
         pass
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS embedding_meta (
-            key     TEXT PRIMARY KEY,
-            value   TEXT NOT NULL
-        )
-    """)
     conn.execute("INSERT OR IGNORE INTO embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
     conn.commit()
@@ -146,10 +146,22 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
     #
     # Reproduced end-to-end in tests/test_schema_dim_migration.py.
     #
-    # On a genuinely fresh database the SELECT raises (no such table), so this
-    # block is skipped entirely by the except; `not row` only reaches the drop
-    # on a database that has the meta table but no dim recorded — i.e. the
-    # pre-GH-81 shape.
+    # The meta table is created FIRST, before the guard reads it (GH-97). It used
+    # to be created after: on a database that had a stale vec table but no meta
+    # table, the SELECT below raised `no such table`, the except swallowed it, and
+    # the whole guard — including the DROP — was skipped. Control then fell to the
+    # `CREATE ... IF NOT EXISTS float[384]` (a no-op against the existing table) and
+    # the `INSERT OR IGNORE` at the bottom, which stamped '384' over a table that
+    # was still 1024 wide. That is the identical dishonest-metadata failure this
+    # guard exists to prevent, reachable through a shape the guard could not see.
+    # Creating the meta table first turns that case into an empty read, so `not row`
+    # fires the migration correctly.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_embedding_meta (
+            key     TEXT PRIMARY KEY,
+            value   TEXT NOT NULL
+        )
+    """)
     try:
         row = conn.execute("SELECT value FROM semantic_embedding_meta WHERE key = 'embedding_dim'").fetchone()
         if not row or str(row[0]) != "384":
@@ -170,12 +182,6 @@ def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
     except sqlite3.DatabaseError:
         pass
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_embedding_meta (
-            key     TEXT PRIMARY KEY,
-            value   TEXT NOT NULL
-        )
-    """)
     conn.execute("INSERT OR IGNORE INTO semantic_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
     # Phase 1 hybrid retrieval: an FTS5 lexical index over title+body, beside the
@@ -581,6 +587,12 @@ def _ensure_github_knowledge_schema(conn: sqlite3.Connection) -> None:
         "ON github_documents(repo_full_name, source_type, source_number)"
     )
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS github_embedding_meta (
+            key     TEXT PRIMARY KEY,
+            value   TEXT NOT NULL
+        )
+    """)
     try:
         row = conn.execute("SELECT value FROM github_embedding_meta WHERE key = 'embedding_dim'").fetchone()
         if not row or str(row[0]) != "384":
@@ -600,12 +612,6 @@ def _ensure_github_knowledge_schema(conn: sqlite3.Connection) -> None:
     except sqlite3.DatabaseError:
         pass
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS github_embedding_meta (
-            key     TEXT PRIMARY KEY,
-            value   TEXT NOT NULL
-        )
-    """)
     conn.execute("INSERT OR IGNORE INTO github_embedding_meta (key, value) VALUES ('embedding_dim', '384')")
 
 
