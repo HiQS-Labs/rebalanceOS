@@ -1,9 +1,9 @@
 """
-Embedding pipeline — batch-embed vault chunks via mlx-embeddings (Qwen3),
+Embedding pipeline — batch-embed vault chunks via sentence-transformers (BAAI/bge-small-en-v1.5),
 store in sqlite-vec, and query via ANN search.
 
 Model loading is deferred until first use to keep MCP server startup fast.
-mlx-embeddings is imported lazily so the rest of the package works without it.
+sentence-transformers is imported lazily so the rest of the package works without it.
 """
 
 from __future__ import annotations

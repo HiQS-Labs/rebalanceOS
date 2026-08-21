@@ -23,6 +23,7 @@ from rebalance.ingest.db import db_connection, ensure_calendar_schema
 from rebalance.lib.time_ops import format_local, local_tz
 from rebalance.ingest.project_priority import apply_project_priorities
 from rebalance.ingest.project_classifier import annotate_events_with_projects, load_project_matchers
+from rebalance.ingest.querier import DEFAULT_GEMINI_MODEL
 from rebalance.ingest.registry import get_projects
 
 
@@ -508,7 +509,7 @@ def build_dashboard_note_content(
     changelog_path: Path = DEFAULT_CHANGELOG_PATH,
     goals_path: Path = DEFAULT_4X4_PATH,
     gemini_synthesis: bool = False,
-    gemini_model: str = "gemini-3.5-flash",
+    gemini_model: str = DEFAULT_GEMINI_MODEL,
     cleanup: bool = False,
 ) -> str:
     """Build the final dashboard markdown, optionally with Gemini summary."""

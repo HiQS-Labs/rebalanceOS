@@ -204,7 +204,7 @@ def config_add_focus5_scan_root(
     _focus5_rerank_after_change()
     if added:
         typer.echo(f"✓ Added Focus 5 scan root: {expanded}")
-        typer.echo("  Run `rebalance refresh-index --scope focus5` to discover repos under it.")
+        typer.echo("  Run `rebalance refresh --scope focus5` to discover repos under it.")
     else:
         typer.echo(f"✓ Already a Focus 5 scan root: {expanded}")
 
@@ -397,7 +397,7 @@ def config_doctor() -> None:
         db = resolve_database_path()
         row("Database", True, str(db))
     except DatabaseNotFoundError:
-        row("Database", False, "not found — run: rebalance refresh-index")
+        row("Database", False, "not found — run: rebalance refresh")
 
     typer.echo("\n── LLM API keys (env vars) ──────────────────")
     row("GEMINI_API_KEY / GOOGLE_API_KEY", bool(get_gemini_api_key()), "used by RepairFSM and dashboard synthesis")

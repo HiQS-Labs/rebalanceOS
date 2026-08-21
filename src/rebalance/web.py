@@ -124,7 +124,9 @@ def _verify_zapier_auth(request: Request, secret: str) -> bool:
             return True
 
     fallback = request.query_params.get("zapier_secret")
-    return bool(fallback) and secrets.compare_digest(fallback, secret)
+    if not fallback:
+        return False
+    return secrets.compare_digest(fallback, secret)
 
 
 def _zapier_rate_limit_allows(client_ip: str, *, now: float | None = None) -> bool:
@@ -732,7 +734,7 @@ def focus5_page(refresh: bool = False, view: str = "focus5"):
     except DatabaseNotFoundError:
         body = (
             f"<h2>🎯 {page_title}</h2><div class='empty'>No rebalance database found. "
-            "Run <code>rebalance refresh-index</code> first.</div>"
+            "Run <code>rebalance refresh</code> first.</div>"
         )
         return _page(page_title, body, active="focus5", wide=True)
 
@@ -1512,7 +1514,7 @@ def whatsnext_page(refresh: bool = False):
     except DatabaseNotFoundError:
         body = (
             "<h2>🧭 What's Next</h2><div class='empty'>No rebalance database found. "
-            "Run <code>rebalance refresh-index</code> first.</div>"
+            "Run <code>rebalance refresh</code> first.</div>"
         )
         return _page("What's Next", body, active="whatsnext", wide=True)
 
@@ -1867,7 +1869,7 @@ def sleuth_graph_page() -> HTMLResponse:
         groups = []
         error_msg = html.escape(str(exc))
 
-    elements_json = _json.dumps(elements, ensure_ascii=False)
+    elements_json = _json.dumps(elements, ensure_ascii=False).replace("</", "<\\/")
 
     _legend_entries = [("client", "Client"), ("github", "GitHub issue/PR"), ("channel", "Channel"), ("other", "Other")]
     legend_items = "".join(

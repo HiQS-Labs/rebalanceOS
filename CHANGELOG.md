@@ -10,6 +10,26 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.3] - 2026-08-21
+
+### Fixed
+
+- An inline script breakout vulnerability on the reminder graph page was resolved; reminder
+  text containing closing script tags is now safely escaped so it cannot terminate the script block
+  or render as raw HTML markup.
+- Standardized Gemini and local chat model references across the codebase to import shared
+  constants rather than repeating string literals, with automated tests ensuring no module writes
+  them down again.
+- Empty states on several dashboard pages now suggest the correct refresh command instead of a
+  retired command name.
+- Docstrings and command help text that still named the retired embedding library were updated
+  to reflect the current backend.
+
+### Added
+
+- A declared `local-llm` optional installation extra providing `mlx-lm`, making the documented
+  local synthesis fallback directly installable, with actionable guidance when the package is missing.
+
 ## [0.75.2] - 2026-08-21
 
 ### Fixed
