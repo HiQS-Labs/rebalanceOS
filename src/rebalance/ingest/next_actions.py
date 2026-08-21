@@ -62,6 +62,7 @@ from rebalance.ingest.config import get_pulse_config, get_vault_path
 from rebalance.lib.time_ops import parse_date, parse_iso
 from rebalance.ingest.db import db_connection, run_migrations
 from rebalance.ingest.pulse import _query_day_activity, collect_pulse_snapshot
+from rebalance.ingest.slack_users import load_user_map
 from rebalance.lib.time_ops import format_local, local_tz
 
 logger = logging.getLogger(__name__)
@@ -281,6 +282,13 @@ class RankedAction:
     project: str | None = None
     evidence: list[str] = field(default_factory=list)
     why: str = ""
+    # ``author``: WHO the signal came from — the fourth ATTESTED receipt beside
+    # source, time and link (GUIDING-PRINCIPLES 01). Distinct from ``person``,
+    # which is a local display label for the teammate arm and is never exported.
+    # A source that genuinely does not record an author (your own vault edit, your
+    # own calendar hold) carries ``""``. It is never a guess and never a value
+    # invented to fill the column.
+    author: str = ""
     # ``automation``: this action looks like a concrete code/repo task that could
     # be filed as a GitHub issue and handed to a coding agent (Codex / Claude
     # Code). For now it only drives an "automation" tag in the UI — no issue is
@@ -499,21 +507,32 @@ Ranked next actions:"""
 # by editing this dispatch. ``rank_key`` sorts higher-signal first:
 #   sleuth 0 · email 1 · gh_items 2 · calendar 3 · gh_commits 4 · gh_comments 5
 #   · figma 6 · vault 7.
-# ATTESTED (D2): every candidate carries source, non-empty evidence, and why.
+# ATTESTED (D2): every candidate carries source, non-empty evidence, and why —
+# and ``author``, the WHO receipt, whenever the source records one. A source that
+# genuinely has no author to name emits ``""`` rather than a plausible stand-in.
 # ---------------------------------------------------------------------------
 
 
 def sleuth_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
-    return [
-        {
-            "rank_key": (0, s.get("last_seen_at") or ""),
-            "title": s.get("message_preview") or "Sleuth reminder",
-            "source": "sleuth",
-            "evidence": [f"sleuth/{s.get('state', '')}"],
-            "why": "open reminder assigned to/by you",
-        }
-        for s in bundle.sleuth_activity
-    ]
+    # The author of a reminder is whoever RAISED it, not whoever it landed on —
+    # "what you are owed" is only answerable if the asker is named. The id is
+    # resolved through the Slack user map for display; an id the map does not
+    # know stays as the raw id (still a traceable receipt), never "someone".
+    users = load_user_map()
+    out: list[dict[str, Any]] = []
+    for s in bundle.sleuth_activity:
+        sender_id = s.get("original_sender_id") or ""
+        out.append(
+            {
+                "rank_key": (0, s.get("last_seen_at") or ""),
+                "title": s.get("message_preview") or "Sleuth reminder",
+                "source": "sleuth",
+                "author": users.get(sender_id, sender_id),
+                "evidence": [f"sleuth/{s.get('state', '')}"],
+                "why": "open reminder assigned to/by you",
+            }
+        )
+    return out
 
 
 def email_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
@@ -537,6 +556,11 @@ def email_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (1, m.get("received_at") or ""),
                 "title": subject or "(no subject)",
                 "source": "email",
+                # The guard above already refused a row with neither subject nor
+                # sender, so a surviving row with no sender has a real subject —
+                # author is "" there, not "unknown sender" (that string is display
+                # prose for the evidence trail, never the queryable receipt).
+                "author": sender,
                 "evidence": [f"from {sender or 'unknown sender'}", m.get("received_at") or ""],
                 "why": "email received in the day window",
             }
@@ -563,6 +587,7 @@ def github_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (2, it.get("updated_at") or it.get("created_at") or ""),
                 "title": f"{it.get('item_type', 'item')} #{it.get('number')}: {it.get('title', '')}",
                 "source": "github",
+                "author": it.get("author_login") or "",
                 "project": it.get("repo"),
                 "evidence": [it.get("html_url") or it.get("repo") or ""],
                 "why": "open GitHub item you authored/own",
@@ -578,6 +603,7 @@ def github_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (4, c.get("committed_at") or ""),
                 "title": c.get("subject") or "commit",
                 "source": "github",
+                "author": c.get("author_login") or "",
                 "project": c.get("repo"),
                 "evidence": evidence,
                 "why": (
@@ -593,6 +619,7 @@ def github_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (5, cm.get("created_at") or ""),
                 "title": cm.get("preview") or "comment",
                 "source": "github",
+                "author": cm.get("author_login") or "",
                 "project": cm.get("repo"),
                 "evidence": [cm.get("html_url") or ""],
                 "why": "thread you engaged on",
@@ -602,11 +629,16 @@ def github_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
 
 
 def calendar_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
+    # This arm is OPERATOR_CALENDAR_ID-scoped, so ``person`` is usually absent —
+    # your own hold has no one else to attribute it to, and "" is the honest
+    # value. The teammate arm (_teammate_candidate) is where a named person
+    # actually appears.
     return [
         {
             "rank_key": (3, b.get("time") or ""),
             "title": b.get("summary") or "Calendar block",
             "source": "calendar",
+            "author": b.get("person") or "",
             "evidence": [f"{b.get('time', '')} ({b.get('duration_minutes', 0)}m)"],
             "why": "scheduled block on your calendar",
         }
@@ -626,6 +658,9 @@ def figma_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (6, fc.get("created_at") or ""),
                 "title": fc.get("message") or "Figma comment",
                 "source": "figma",
+                # "someone" above is display prose for the evidence line; the
+                # receipt field carries the real handle or nothing at all.
+                "author": fc.get("user_handle") or "",
                 "project": fc.get("file_key"),
                 "evidence": [f"{handle} on figma/{fc.get('file_key', '')}"],
                 "why": "unresolved Figma comment on a watched file",
@@ -647,6 +682,11 @@ def vault_candidates(bundle: OperatorBundle) -> list[dict[str, Any]]:
                 "rank_key": (7, v.get("last_modified") or ""),
                 "title": v.get("title") or v.get("rel_path") or "vault note",
                 "source": "vault",
+                # ``vault_files`` records no author: this is the operator's own
+                # local vault, and there is no second party to attest to. Filling
+                # this with the operator's name would be inference dressed as a
+                # receipt (D2), so it stays empty by design, not by omission.
+                "author": "",
                 "evidence": [v.get("rel_path") or ""],
                 "why": "recently edited note",
             }
@@ -707,6 +747,10 @@ def _teammate_candidate(blk: dict[str, Any]) -> dict[str, Any]:
         "title": blk.get("summary") or "Teammate block",
         "person": who,
         "source": "calendar",
+        # ``person`` is the local display label; ``author`` is the exported
+        # receipt. They coincide here, and only here. "teammate" is the display
+        # fallback, so the receipt takes the raw value or nothing.
+        "author": blk.get("person") or "",
         "project": blk.get("project"),
         "evidence": [f"{who} {blk.get('time', '')} ({dur}m)"],
         "why": "cross-person signal you are not already tracking",
@@ -754,7 +798,27 @@ def _candidate_to_action(c: dict[str, Any], rank: int) -> RankedAction:
         evidence=[e for e in (c.get("evidence") or []) if e],
         why=str(c.get("why") or ""),
         automation=bool(automation),
+        author=str(c.get("author") or ""),
     )
+
+
+def _reattach_authors(actions: list[RankedAction], candidates: list[RankedAction]) -> None:
+    """Carry the ``author`` receipt back onto model-ranked actions, IN PLACE.
+
+    The synthesis pass replaces the deterministic list wholesale, so without this
+    the WHO receipt would survive only on the fallback floor — present exactly
+    when the model failed, absent on the normal path. The model is deliberately
+    NOT asked for ``author``: an attested field may not be model-invented (D2 —
+    attestation, never inference), and a plausible-looking hallucinated name is
+    worse than no name at all.
+
+    A title the model rewrote finds no match and keeps ``author == ""``: unknown,
+    never guessed. That is the intended failure mode, not a gap to paper over.
+    """
+    by_title = {_norm_title(c.title): c.author for c in candidates if c.author}
+    for a in actions:
+        if not a.author:
+            a.author = by_title.get(_norm_title(a.title), "")
 
 
 # ---------------------------------------------------------------------------
@@ -1341,6 +1405,10 @@ def rank_next_actions(
             logger.warning("rank_next_actions: synthesis failed: %s", exc)
             note = (note + "; " if note else "") + f"synthesis failed: {exc}"
 
+    # Whichever list won, the WHO receipt comes from the deterministic candidates,
+    # never from the model. No-op when `ranked is fallback` (already attributed).
+    _reattach_authors(ranked, fallback)
+
     if not ranked:
         if operator_candidates_raw or teammate_delta:
             # Candidates existed but the ranked list is empty — the interesting case.
@@ -1554,6 +1622,9 @@ def load_ranked_next_actions(database_path: Path) -> RankedNextActions | None:
             project=a.get("project"),
             evidence=list(a.get("evidence") or []),
             why=a.get("why", ""),
+            # Absent on rows persisted before the author receipt existed; those
+            # read back as "" rather than failing the load.
+            author=a.get("author", ""),
         )
         for a in payload.get("ranked", [])
     ]

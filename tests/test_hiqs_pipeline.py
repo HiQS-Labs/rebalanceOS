@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rebalance.ingest.db import db_connection, run_migrations
-from rebalance.ingest.next_actions import rank_next_actions
+from rebalance.ingest.next_actions import RankedAction, _reattach_authors, rank_next_actions
 
 # A fixed instant; local tz is Etc/UTC in the sandbox, so this is inside the
 # local day [2026-07-14T00:00Z, 2026-07-15T00:00Z).
@@ -253,6 +253,91 @@ class Phase3RegistryWalkTests(unittest.TestCase):
         COLLECTORS.pop("faketest2", None)  # immediately unregister
         result = rank_next_actions(self._db, blend_team=False, synthesize=False, now=NOW)
         self.assertEqual([a for a in result.ranked if a.source == "faketest2"], [])
+
+
+class AuthorReceiptTests(unittest.TestCase):
+    """ATTESTED tenet 01 — the WHO receipt is a FIELD, not prose in ``evidence``.
+
+    Tenet 01 names four receipts: source, author, time, link. ``author`` was the
+    missing one. These pin both halves of the contract: a source that HAS an
+    author exposes it as a queryable field, and a source that does NOT records
+    ``""`` rather than a plausible stand-in (D2 — attestation, never inference).
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._db = _fresh_db(self._tmp.name)
+
+    def _rank(self):
+        return rank_next_actions(self._db, blend_team=False, synthesize=False, now=NOW)
+
+    def test_email_candidate_carries_sender_as_author_field(self) -> None:
+        _seed_email(self._db, subject="Deploy checklist")
+        email = [a for a in self._rank().ranked if a.source == "email"]
+        self.assertEqual(len(email), 1)
+        # The field — not "from The Boss" buried in the evidence prose.
+        self.assertEqual(email[0].author, "The Boss")
+        self.assertIn("author", email[0].as_dict(), msg="receipt must survive export")
+
+    def test_figma_candidate_carries_handle_as_author_field(self) -> None:
+        _seed_figma(self._db, resolved=False)
+        figma = [a for a in self._rank().ranked if a.source == "figma"]
+        self.assertEqual(len(figma), 1)
+        self.assertEqual(figma[0].author, "designer")
+
+    def test_source_with_no_author_records_empty_not_a_guess(self) -> None:
+        """A vault edit is the operator's own — there is no second party to name.
+
+        The failure this forbids is filling the column with the operator's name,
+        which would read as an attestation while being an inference.
+        """
+        with db_connection(self._db) as conn:
+            conn.execute(
+                "INSERT INTO vault_files "
+                "(rel_path, title, content_hash, ingested_at, last_modified) VALUES (?,?,?,?,?)",
+                ("Notes/plan.md", "Plan", "h1", IN_WINDOW, IN_WINDOW),
+            )
+            conn.commit()
+        vault = [a for a in self._rank().ranked if a.source == "vault"]
+        self.assertEqual(len(vault), 1, msg=f"ranked={[a.as_dict() for a in self._rank().ranked]}")
+        self.assertEqual(vault[0].author, "")
+
+
+class ReattachAuthorsTests(unittest.TestCase):
+    """The model ranks; it never authors the ``author`` field.
+
+    ``rank_next_actions`` REPLACES the deterministic list with the model's parse
+    when synthesis succeeds. Without re-attachment the WHO receipt would be
+    present exactly when the model failed and absent on the normal path — the
+    silent-degradation shape the guiding principles call out as anti-pattern A.
+    """
+
+    def _action(self, title: str, author: str = "") -> "RankedAction":
+        return RankedAction(rank=1, title=title, person=None, source="github", author=author)
+
+    def test_author_is_restored_onto_a_model_ranked_action(self) -> None:
+        candidates = [self._action("Fix the deploy script", author="octocat")]
+        parsed = [self._action("Fix the deploy script")]
+        _reattach_authors(parsed, candidates)
+        self.assertEqual(parsed[0].author, "octocat")
+
+    def test_a_title_the_model_rewrote_stays_empty_rather_than_guessing(self) -> None:
+        """THE PIN: no match → "", never the nearest candidate's author.
+
+        Attaching a neighbour's name to a retitled action would forge a receipt.
+        Empty is the correct answer to "who?" when the link back was lost.
+        """
+        candidates = [self._action("Fix the deploy script", author="octocat")]
+        parsed = [self._action("Address deployment issues")]
+        _reattach_authors(parsed, candidates)
+        self.assertEqual(parsed[0].author, "")
+
+    def test_an_existing_author_is_never_overwritten(self) -> None:
+        candidates = [self._action("Fix the deploy script", author="octocat")]
+        parsed = [self._action("Fix the deploy script", author="hubber")]
+        _reattach_authors(parsed, candidates)
+        self.assertEqual(parsed[0].author, "hubber")
 
 
 if __name__ == "__main__":

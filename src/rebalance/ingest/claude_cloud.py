@@ -348,6 +348,11 @@ def claude_cloud_candidates(bundle: Any) -> list[dict[str, Any]]:
             {
                 "rank_key": (_RANK_CLASS, ts),
                 "source": "claude_cloud",
+                # No author receipt: the sessions table records no actor, and
+                # "claude" would be inferred from the source name rather than
+                # attested by the data (GUIDING-PRINCIPLES D2). Empty until the
+                # collector actually captures who launched the run.
+                "author": "",
                 "project": r["repo"],
                 "evidence": ev or [r["id"] or "claude-cloud session"],
                 **cand,
