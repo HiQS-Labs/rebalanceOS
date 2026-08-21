@@ -10,6 +10,22 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.4] - 2026-08-21
+
+### Fixed
+
+- The dashboard health panel no longer wastes the left half of its own width. The short status
+  line used to sit in a fixed column beside the list of problems, holding empty space for the
+  full height of the panel while the problems were squeezed into what was left. The status line
+  is now a header across the top and the problems get the whole width beneath it.
+- Problem rows no longer look like the text is spilling out of them. They were drawn with a
+  fully rounded pill edge, which curves inward through the copy once a row wraps past one line.
+
+### Added
+
+- The health panel can be collapsed to just its status line with a caret, and remembers that
+  choice on the next visit. The caret only appears when there is something to hide.
+
 ## [0.75.3] - 2026-08-21
 
 ### Fixed
