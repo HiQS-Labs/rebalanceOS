@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.2] - 2026-08-21
+
+### Fixed
+
+- The system log's "Errors & warnings" filter button no longer displays the ampersand as raw
+  markup. The label was escaped twice on its way to the page, so readers saw the escape code
+  instead of the character.
+
 ## [0.75.1] - 2026-08-21
 
 ### Fixed

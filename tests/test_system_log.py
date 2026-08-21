@@ -144,5 +144,27 @@ class ReadLogWithTotalTests(unittest.TestCase):
         self.assertEqual(entries[0]["ts"], "2026-08-20T00:04:00Z")
 
 
+class FilterLabelEscapingTests(unittest.TestCase):
+    """Caught on the deployed page, not by a test — the shipped chip read
+    ``Errors &amp; warnings`` literally, because the label was stored
+    pre-escaped and ``buttons()`` escapes again on the way out.
+
+    Asserting on the ONE label that was wrong would leave every future label a
+    coin flip, so this scans the whole rendered control bar for the signature a
+    double escape always leaves: an entity whose own ampersand got escaped.
+    """
+
+    def test_no_label_is_escaped_twice(self) -> None:
+        markup = web._syslog_controls([{"source": "github"}, {"source": "health"}])
+        self.assertNotIn("&amp;amp;", markup)
+        self.assertNotIn("&amp;lt;", markup)
+        self.assertNotIn("&amp;#x27;", markup)
+
+    def test_the_ampersand_still_reaches_the_page_escaped_once(self) -> None:
+        """The fix must not swing the other way into raw, unescaped output."""
+        markup = web._syslog_controls([])
+        self.assertIn("Errors &amp; warnings", markup)
+
+
 if __name__ == "__main__":
     unittest.main()
