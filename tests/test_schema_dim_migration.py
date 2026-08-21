@@ -204,3 +204,54 @@ def test_fresh_database_is_untouched_by_the_migration_path(tmp_path):
 
     assert _vec_dim(conn, "semantic_embeddings") == 384
     assert conn.execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 1
+
+
+# --- GH-97 -------------------------------------------------------------------
+# Found during a relay review of the GH-97 plan. The dim guard used to read
+# `*_embedding_meta` BEFORE that table was created. On a database carrying a
+# stale-width vec table but no meta table, the SELECT raised `no such table`, the
+# bare `except` swallowed it, and the whole guard -- including the DROP -- was
+# skipped. Control then reached `CREATE ... IF NOT EXISTS float[384]` (a no-op
+# against the existing table) and the trailing `INSERT OR IGNORE`, which stamped
+# '384' onto a table still 1024 wide: the same dishonest-metadata state GH-81
+# fixed, reached through a shape the GH-81 guard could not observe.
+
+
+def _vec_width(conn, table):
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE name = ?", (table,)).fetchone()
+    return None if row is None else row[0].split("float")[1].split("]")[0].lstrip("[")
+
+
+def _semantic_documents_ddl():
+    return (
+        "CREATE TABLE semantic_documents (id INTEGER PRIMARY KEY, source_type TEXT, "
+        "source_table TEXT, source_pk TEXT, doc_kind TEXT, title TEXT, body TEXT, "
+        "content_hash TEXT, embedded_hash TEXT, embedded_model_version TEXT, "
+        "embedded_at TEXT, created_at TEXT, updated_at TEXT)"
+    )
+
+
+def test_stale_vec_table_with_no_meta_table_is_migrated(tmp_path):
+    """The guard must fire even when the meta table does not exist yet."""
+    conn = _connect(tmp_path / "t.db")
+    conn.execute(_semantic_documents_ddl())
+    conn.execute("CREATE VIRTUAL TABLE semantic_embeddings USING vec0(embedding float[1024])")
+    conn.commit()
+    assert conn.execute("SELECT name FROM sqlite_master WHERE name = 'semantic_embedding_meta'").fetchone() is None, (
+        "precondition: meta table must be absent or this test proves nothing"
+    )
+
+    ensure_semantic_schema(conn)
+
+    assert _vec_width(conn, "semantic_embeddings") == "384"
+    stored = conn.execute("SELECT value FROM semantic_embedding_meta WHERE key = 'embedding_dim'").fetchone()
+    assert stored is not None, "meta row must exist after the guard runs"
+    assert stored[0] == "384"
+
+
+def test_declared_width_and_stored_meta_agree_after_one_pass(tmp_path):
+    """One pass must converge, and the two sources of truth must not disagree."""
+    conn = _connect(tmp_path / "t.db")
+    ensure_semantic_schema(conn)
+    stored = conn.execute("SELECT value FROM semantic_embedding_meta WHERE key = 'embedding_dim'").fetchone()[0]
+    assert _vec_width(conn, "semantic_embeddings") == stored
