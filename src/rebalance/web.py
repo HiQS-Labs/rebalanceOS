@@ -1562,7 +1562,9 @@ _SYSLOG_TOGGLE_CSS = (
 # the severity. Two axes, composed (GH-101).
 _SEVERITY_FILTERS = (
     ("all", "All"),
-    ("problem", "Errors &amp; warnings"),
+    # Raw text, NOT pre-escaped: `buttons()` escapes every label on the way out,
+    # so an entity here ships as `&amp;amp;` and renders the entity literally.
+    ("problem", "Errors & warnings"),
     ("error", "Errors"),
     ("warning", "Warnings"),
 )
