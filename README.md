@@ -74,7 +74,8 @@ Honesty about state is a feature, not a disclaimer. What is real today:
 | Vault, GitHub, git-history, calendar and email ingest | **Beta** | Daily-driven; this is the core |
 | MCP server and the `ask` / semantic surfaces | **Beta** | Semantic search needs Apple Silicon; everything else is cross-platform |
 | Local dashboards and reports | **Beta** | |
-| Signal-agnostic prioritization | **In progress** | Aggregates per-project counts; not yet the ranked view described above |
+| Signal-agnostic prioritization | **Beta** | The ranked view ships: seven sources (vault, GitHub, calendar, Slack via Sleuth, email, Figma, Claude Cloud) reach one ordered list, served by the dashboard, the MCP `index` surface and `ask`. A source joins by registering a collector, never by editing the ranker. Two honest limits: the LLM ranking pass degrades to a deterministic order when it fails or returns unusable output, and the `automation` tag is a display label only — no issue is filed and no agent is triggered |
+| Attested signals (source · author · time · link) | **In progress** | `source`, `author` and the link trail are exported fields on every ranked action. Time is carried but still lives inside the sort key rather than a named field; Figma and Claude Cloud remain dormant until configured |
 | `utils/3-eyes/` job supervisor | **Alpha — not fully working** | Diagnostic tool, outside the supported core. Known defect: `pause` does not stop a launchd-managed job. Use `launchctl bootout` and verify. |
 | `experimental/` | **Experimental** | Exactly what it says |
 
