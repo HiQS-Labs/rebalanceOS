@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 
 from rebalance.cli._core import app
+from rebalance.ingest.embedder import DEFAULT_MODEL
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
 
 
@@ -18,7 +19,7 @@ def query_cmd(
     text: str = typer.Argument(..., help="Natural language query"),
     database: Path | None = DBOption(),
     top_k: int = typer.Option(10, help="Number of results to return"),
-    model: str = typer.Option("Qwen/Qwen3-Embedding-0.6B", help="Embedding model for query"),
+    model: str = typer.Option(DEFAULT_MODEL, help="Embedding model for query"),
 ) -> None:
     """Semantic search over vault notes."""
     from rebalance.ingest.semantic_index import query as semantic_query

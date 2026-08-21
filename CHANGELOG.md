@@ -10,6 +10,17 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.1] - 2026-08-21
+
+### Fixed
+
+- Semantic search from the command line works again. Every search command was still asking for
+  its results using the old, larger embedding model that the index stopped using in an earlier
+  release, so each one failed with a dimension mismatch instead of returning anything. Searching
+  through the assistant tools was never affected, which is why this went unnoticed. The model name
+  is now read from the single place that defines it, rather than being written out again in each
+  command, and a test now fails if any command writes it out again.
+
 ## [0.75.0] - 2026-08-20
 
 ### Added
