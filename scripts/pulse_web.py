@@ -2785,15 +2785,21 @@ PULSE_JS = r"""
       try {
         const ok = await copyTextToClipboard(copyBtn.dataset.copyText || '');
         if (!ok) throw new Error('clipboard copy returned false');
-        setCopyButtonStatus('Copied collector warning text', true);
+        // "collector" was renamed out of this surface in GH-5 Phase 4b — it made
+        // the general-ingestion timestamp read as a per-device pulse scan. These
+        // three labels kept it, and no test could see them: they are set by JS at
+        // runtime, so the guard in test_pulse_web_timestamp_disambiguation (which
+        // asserts against rendered HTML) never touched them. One click and the
+        // button announced the old wording again.
+        setCopyButtonStatus('Copied health summary', true);
         window.setTimeout(() => {
-          setCopyButtonStatus('Copy collector warning text');
+          setCopyButtonStatus('Copy health summary');
         }, 1500);
       } catch (err) {
         console.warn('copy banner text failed:', err);
         setCopyButtonStatus('Copy failed', false);
         window.setTimeout(() => {
-          setCopyButtonStatus('Copy collector warning text');
+          setCopyButtonStatus('Copy health summary');
         }, 1800);
       }
     });

@@ -154,6 +154,29 @@ class HealthyStateDisambiguationTests(unittest.TestCase):
         self.assertIn("2026-08-16", html)
 
 
+class RuntimeLabelsAreDisambiguatedTooTests(unittest.TestCase):
+    """The guard above reads RENDERED HTML, so it cannot see labels set by JS.
+
+    Three copy-button labels kept the "collector" wording this module exists to
+    remove — `setCopyButtonStatus('Copied collector warning text', …)` and two
+    siblings. The static `aria-label` was correct, so every HTML assertion
+    passed; one click replaced it with the old wording at runtime. Assert against
+    the emitted script text instead, which is where those strings actually live.
+    """
+
+    def _page_script(self) -> str:
+        import inspect
+
+        return inspect.getsource(pulse_web)
+
+    def test_copy_button_runtime_labels_do_not_say_collector(self) -> None:
+        for call in ("setCopyButtonStatus('Copied", "setCopyButtonStatus('Copy"):
+            for fragment in self._page_script().split(call)[1:]:
+                label = fragment.split("'")[0]
+                with self.subTest(label=label):
+                    self.assertNotIn("collector", label.lower())
+
+
 class HelperNameMatchesWhatItMeasuresTests(unittest.TestCase):
     def test_helper_renamed_off_the_ambiguous_word(self) -> None:
         self.assertTrue(hasattr(pulse_web, "_latest_ingest_activity"))
