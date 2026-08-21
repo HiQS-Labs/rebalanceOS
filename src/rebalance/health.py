@@ -170,27 +170,23 @@ class HealthStatus:
     def count(self) -> int:
         return len(self.problems)
 
-    @property
-    def status_text(self) -> str:
-        # Keep the compact legacy label when there are no notices. Once the
-        # collapsed notice tier is present, expose the complete bucket summary.
-        if self.notices:
-            return self.bucket_text
-        if self.errors:
-            return _bucket_label(len(self.errors), "error")
-        if self.warnings:
-            return _bucket_label(len(self.warnings), "warning")
-        return "healthy"
+    # `status_text` was here: a hybrid that returned the compact label when there
+    # were no notices and the full bucket summary when there were. GH-100 split
+    # that in two, because one property cannot serve both callers — a headline
+    # must exclude notices and a paste-ready summary must include them. With
+    # `problem_text` and `bucket_text` covering both, it had no production caller
+    # left, and three near-identical summary properties is a coin-flip at every
+    # call site. Its tests moved to whichever of the two now owns the behaviour.
 
     @property
     def problem_text(self) -> str:
         """Actionable summary — errors and warnings ONLY (GH-100).
 
-        ``status_text`` folds notices into the count, which is right for a
-        complete panel summary and wrong for a headline: notices are checks the
-        operator has already marked intentional, so counting them next to a real
-        error tells them 21 things need attention when one does. Header surfaces
-        render THIS; the notices tier carries its own count where it lives.
+        A headline must not count notices: they are checks the operator has
+        already marked intentional, so counting them beside a real error says 21
+        things need attention when one does. Header surfaces render THIS; the
+        notices tier carries its own count where it lives, and ``bucket_text``
+        keeps the complete picture for anything paste-ready.
 
         Returns ``"healthy"`` when nothing is actionable, so a caller can render
         one element in every state instead of branching into a second widget.

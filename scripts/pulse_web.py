@@ -1760,7 +1760,8 @@ PAGE_CSS = """
   0%, 100% { box-shadow: 0 0 0   0   transparent; }
   50%       { box-shadow: 0 0 5px 3px color-mix(in srgb, var(--warn) 40%, transparent); }
 }
-.ok-dot                        { animation: glow-ok   2.8s ease-in-out infinite; }
+/* `.ok-dot` was here. Its only emitter was the sync chip, deleted in GH-100;
+   `@keyframes glow-ok` stays because `.health-dot` below still uses it. */
 .health-dot                    { animation: glow-ok   2.8s ease-in-out infinite; }
 .health-pill.has-issues .health-dot { animation: glow-warn 2.8s ease-in-out infinite; }
 .system-now { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px dashed var(--border); border-radius: 999px; background: var(--card); font-size: 12px; color: var(--fg-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: help; }

@@ -31,13 +31,18 @@ class VerdictTests(unittest.TestCase):
         checks = [Check("sleuth", WARN, "no env file")]
         h = compute_health_status(checks, {"sources": {}}, NOW)
         self.assertEqual(h.verdict, WARN)
-        self.assertEqual(h.status_text, "1 warning")
+        # GH-100: status_text is gone; the headline is problem_text.
+        self.assertEqual(h.problem_text, "1 warning")
 
     def test_fail_dominates(self) -> None:
         checks = [Check("sleuth", WARN, "x"), Check("database", FAIL, "missing")]
         h = compute_health_status(checks, {"sources": {}}, NOW)
         self.assertEqual(h.verdict, FAIL)
-        self.assertEqual(h.status_text, "1 error")
+        # FAIL dominates the VERDICT, but not the headline. `status_text` used to
+        # return "1 error" here and drop the warning entirely; `problem_text`
+        # names every non-empty problem bucket, so the warning is not hidden by
+        # the error sitting above it.
+        self.assertEqual(h.problem_text, "1 error · 1 warning")
 
     def test_ordering_fail_first_launchd_last(self) -> None:
         checks = [
