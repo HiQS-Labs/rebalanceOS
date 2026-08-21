@@ -373,6 +373,15 @@ def _clipboard_icon_svg() -> str:
     )
 
 
+def _caret_icon_svg() -> str:
+    return (
+        '<svg class="health-banner-caret-icon" viewBox="0 0 20 20" fill="none" '
+        'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+        '<path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+        "</svg>"
+    )
+
+
 def _latest_ingest_activity(status: dict[str, Any]) -> str | None:
     """Newest timestamp across the general ingestion sources.
 
@@ -473,13 +482,27 @@ def render_status_bar(
         status_text=health.bucket_text or "healthy",
         activity_text=activity_text,
     )
-    items_html = f'<div class="health-banner-items">{"".join(items)}</div>' if items else ""
+    items_html = f'<div class="health-banner-items" id="health-banner-items">{"".join(items)}</div>' if items else ""
+    # The caret only earns its place when there is something to hide.
+    toggle_html = (
+        f"""<button
+          type="button"
+          class="health-banner-toggle"
+          aria-expanded="true"
+          aria-controls="health-banner-items"
+          aria-label="Collapse health details"
+          title="Collapse health details"
+        >{_caret_icon_svg()}<span class="visually-hidden">Collapse health details</span></button>"""
+        if items
+        else ""
+    )
 
     return f"""
     <section class="health-banner health-banner-{tone}" aria-live="polite">
       <div class="health-banner-lead">
         <span class="health-banner-badge">{_esc(health.problem_text)}</span>
         <span class="health-banner-activity">Last data ingest {activity_html}</span>
+        <span class="health-banner-controls">
         <button
           type="button"
           class="health-banner-copy-btn"
@@ -487,6 +510,8 @@ def render_status_bar(
           aria-label="Copy health summary"
           title="Copy health summary"
         >{_clipboard_icon_svg()}<span class="visually-hidden">Copy health summary</span></button>
+        {toggle_html}
+        </span>
       </div>
       {items_html}
     </section>
@@ -1794,13 +1819,15 @@ PAGE_CSS = """
   font-variant-numeric: tabular-nums;
   color: var(--timestamp);
 }
+/* The lead used to sit in its own `auto` grid column beside the problems. The
+   lead is one short line and the problems are many tall ones, so that column was
+   dead space for the whole height of the banner while the problems were squeezed
+   into the remaining half-width. The lead is now a full-width header row and the
+   problems get the full width beneath it. */
 .health-banner {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  /* start, not center: items wrap to several rows now, and a centred lead would
-     drift away from the first problem it labels. */
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -1836,11 +1863,44 @@ PAGE_CSS = """
   color: var(--fg-dim); font-size: 11px; margin-top: 2px;
 }
 .health-banner-lead {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   white-space: nowrap;
+  min-width: 0;
 }
+.health-banner-activity { flex: 1 1 auto; min-width: 0; }
+.health-banner-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.health-banner-toggle {
+  font: inherit;
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  color: var(--fg);
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.health-banner-toggle:hover { background: var(--card); }
+.health-banner-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.health-banner-caret-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform .15s ease;
+}
+.health-banner.is-collapsed .health-banner-caret-icon { transform: rotate(-90deg); }
+.health-banner.is-collapsed .health-banner-items { display: none; }
 .health-banner-badge {
   display: inline-flex;
   align-items: center;
@@ -1909,24 +1969,26 @@ PAGE_CSS = """
    that says what to do and it is no longer trimmed to fit. */
 .health-banner-items {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   min-width: 0;
 }
+/* A pill radius (999px) on a box whose text wraps to three lines bows the edges
+   in around the copy — hence "the text is overfilling the pills". These are
+   multi-line rows, so they get a row radius. */
 .health-banner-item {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 8px;
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--card) 78%, transparent);
   border: 1px solid color-mix(in srgb, var(--ink) 5%, transparent);
   white-space: normal;
   overflow-wrap: anywhere;
   min-width: 0;
-  flex: 0 1 auto;
 }
 .health-banner-name {
   font-size: 11px;
@@ -2375,8 +2437,8 @@ PAGE_CSS = """
   .figma-config-row { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; align-items: stretch; gap: 12px; }
   .topbar > div:last-child { flex-wrap: wrap; }
-  .health-banner { grid-template-columns: 1fr; }
   .health-banner-lead { flex-wrap: wrap; white-space: normal; }
+  .health-banner-controls { margin-left: 0; }
 }
 
 /* Open PRs card */
@@ -2485,6 +2547,26 @@ PULSE_JS = r"""
   const btn = document.getElementById('pulse-refresh');
   const undoTray = document.getElementById('goal-undo-tray');
   const copyBtn = document.querySelector('.health-banner-copy-btn[data-copy-text]');
+  const healthBanner = document.querySelector('.health-banner');
+  const healthToggle = healthBanner && healthBanner.querySelector('.health-banner-toggle');
+  if (healthToggle) {
+    const KEY = 'pulse.healthBanner.collapsed';
+    const apply = (collapsed) => {
+      healthBanner.classList.toggle('is-collapsed', collapsed);
+      healthToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      const label = collapsed ? 'Expand health details' : 'Collapse health details';
+      healthToggle.setAttribute('aria-label', label);
+      healthToggle.title = label;
+    };
+    let stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (_) {}
+    apply(stored === '1');
+    healthToggle.addEventListener('click', () => {
+      const collapsed = !healthBanner.classList.contains('is-collapsed');
+      apply(collapsed);
+      try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (_) {}
+    });
+  }
 
   const escapeHtml = (value) => {
     return String(value ?? '')
