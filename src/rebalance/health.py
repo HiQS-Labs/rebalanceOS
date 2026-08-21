@@ -183,6 +183,23 @@ class HealthStatus:
         return "healthy"
 
     @property
+    def problem_text(self) -> str:
+        """Actionable summary — errors and warnings ONLY (GH-100).
+
+        ``status_text`` folds notices into the count, which is right for a
+        complete panel summary and wrong for a headline: notices are checks the
+        operator has already marked intentional, so counting them next to a real
+        error tells them 21 things need attention when one does. Header surfaces
+        render THIS; the notices tier carries its own count where it lives.
+
+        Returns ``"healthy"`` when nothing is actionable, so a caller can render
+        one element in every state instead of branching into a second widget.
+        """
+        buckets = ((len(self.errors), "error"), (len(self.warnings), "warning"))
+        parts = [_bucket_label(count, name) for count, name in buckets if count]
+        return " · ".join(parts) if parts else "healthy"
+
+    @property
     def bucket_text(self) -> str:
         """Complete panel summary, omitting empty buckets."""
         buckets = (

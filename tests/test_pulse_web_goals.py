@@ -78,7 +78,7 @@ class PulseWebGoalTests(unittest.TestCase):
         self.assertIn("<b>9</b> in progress", html)
         self.assertEqual(html.count('class="goal goal-compact"'), 6)
 
-    def test_render_health_banner_prioritizes_failures(self) -> None:
+    def test_render_status_bar_prioritizes_failures(self) -> None:
         checks = [
             Check("launchd:github-sync", WARN, "last run exited with status 1"),
             Check("gmail", WARN, "ADC token is missing the Gmail readonly scope"),
@@ -89,38 +89,111 @@ class PulseWebGoalTests(unittest.TestCase):
 
         now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
         health = compute_health_status(checks, {"sources": {}}, now)
-        html = pulse_web.render_health_banner(
+        html = pulse_web.render_status_bar(
             health,
             now,
             "2026-05-28T17:55:00+00:00",
         )
 
         self.assertIn("2 errors", html)
-        # GH-5 Phase 4b (#2): was "Collector attention needed". These problems are
-        # doctor Checks of every kind (gmail, sleuth, launchd, …), so the old
-        # summary was overbroad as well as ambiguous against the per-device
-        # collector items rendered directly below it.
-        self.assertIn("Attention needed", html)
         self.assertIn("github token", html)
         self.assertIn("vault", html)
-        self.assertIn("+1 more", html)
         self.assertIn("health-banner-copy-btn", html)
         self.assertIn("data-copy-text=", html)
         self.assertNotIn('launchd:github-sync</span><span class="health-banner-detail"', html)
 
-    def test_render_sync_chip_uses_warning_state(self) -> None:
+    def test_overflow_says_what_was_hidden(self) -> None:
+        """GH-100: "+1 more" did not say more WHAT. A silent cap reads as
+        "that's everything"; the count must name what it is counting."""
+        checks = [Check(f"check-{i}", FAIL, "broken") for i in range(6)]
         now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
-        health = compute_health_status([Check("gmail", WARN, "scope missing")], {"sources": {}}, now)
-        chip = pulse_web.render_sync_chip(
-            health,
-            "2026-05-28T17:55:00+00:00",
-            now,
-        )
+        health = compute_health_status(checks, {"sources": {}}, now)
+        html = pulse_web.render_status_bar(health, now, "2026-05-28T17:55:00+00:00")
 
-        self.assertIn("synced-warn", chip)
-        # GH-5 Phase 4b (#2): was "Collector warnings" — the chip renders the
-        # general-ingestion timestamp, not a per-device collector's scan age.
-        self.assertIn("Sync warnings", chip)
+        self.assertIn("2 more problems not shown", html)
+
+    def test_the_hint_is_never_truncated(self) -> None:
+        """THE PIN (GH-100): the remedy survives intact.
+
+        The old bar trimmed the hint to 120 chars, which on a live screen
+        rendered "→ inspect tem…" — the complaint kept, the fix cut. Detail may
+        still be shortened: a shortened symptom is still a usable symptom.
+        """
+        long_hint = (
+            "inspect temp/logs/health-check.err for the failing step, then re-run "
+            "`rebalance doctor --verbose` and confirm the launchd job is bootstrapped "
+            "with `launchctl print gui/$UID/com.rebalance.health-check`"
+        )
+        self.assertGreater(len(long_hint), 120, "the fixture must exceed the old cap to prove anything")
+        checks = [Check("launchd:health-check", FAIL, "last run exited with status 1", hint=long_hint)]
+        now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
+        health = compute_health_status(checks, {"sources": {}}, now)
+        html = pulse_web.render_status_bar(health, now, "2026-05-28T17:55:00+00:00")
+
+        self.assertIn(long_hint, html)
+        self.assertNotIn("…", html.split('class="health-banner-fix"')[1][: len(long_hint) + 40])
+
+    def test_the_bar_renders_when_healthy(self) -> None:
+        """One element in every state — that is what retires the sync chip.
+
+        The chip existed only to have somewhere to say "last ingest" when
+        nothing was wrong. If the bar disappeared on a healthy system, the chip
+        would have to come back.
+        """
+        now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
+        health = compute_health_status([], {"sources": {}}, now)
+        html = pulse_web.render_status_bar(health, now, "2026-05-28T17:55:00+00:00")
+
+        self.assertIn("health-banner-ok", html)
+        self.assertIn("healthy", html)
+        self.assertIn("Last data ingest", html)
+
+    def test_notices_do_not_inflate_the_headline(self) -> None:
+        """GH-100: the badge counts what is actionable.
+
+        Notices are checks the operator already marked intentional. Counting 18
+        of them beside one real error told the operator 19 things needed
+        attention when one did.
+        """
+        from rebalance.doctor import NOTICE
+
+        checks = [
+            Check("github token", FAIL, "no GitHub token configured"),
+            *[Check(f"launchd:job-{i}", WARN, "not loaded", severity=NOTICE) for i in range(18)],
+        ]
+        now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
+        health = compute_health_status(checks, {"sources": {}}, now)
+        self.assertEqual(len(health.notices), 18)
+
+        html = pulse_web.render_status_bar(health, now, "2026-05-28T17:55:00+00:00")
+        badge = html.split('class="health-banner-badge">')[1].split("</span>")[0]
+        self.assertEqual(badge, "1 error")
+        self.assertNotIn("notice", badge)
+
+    def test_the_copy_button_still_carries_the_complete_picture(self) -> None:
+        """The bar is a summary; the clipboard is the whole story.
+
+        Excluding notices from the HEADLINE must not delete them from the thing
+        the operator pastes into an issue.
+        """
+        from rebalance.doctor import NOTICE
+
+        checks = [
+            Check("github token", FAIL, "no GitHub token configured"),
+            Check("launchd:job", WARN, "not loaded", severity=NOTICE),
+        ]
+        now = datetime(2026, 5, 28, 18, 0, tzinfo=timezone.utc)
+        health = compute_health_status(checks, {"sources": {}}, now)
+        html = pulse_web.render_status_bar(health, now, "2026-05-28T17:55:00+00:00")
+
+        copy_text = html.split('data-copy-text="')[1].split('"')[0]
+        self.assertIn("1 error", copy_text)
+        self.assertIn("1 notice", copy_text)
+
+    def test_the_sync_chip_is_gone(self) -> None:
+        """GH-100: two widgets rendering one HealthStatus is the defect itself."""
+        self.assertFalse(hasattr(pulse_web, "render_sync_chip"))
+        self.assertFalse(hasattr(pulse_web, "render_health_banner"))
 
     def test_build_stream_rows_includes_email_and_figma(self) -> None:
         rows = pulse_web.build_stream_rows(
