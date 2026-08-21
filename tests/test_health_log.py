@@ -90,21 +90,123 @@ class HealthTransitionTests(unittest.TestCase):
         """Losing sight of a broken thing is not the same as it being fixed.
 
         Dropping it from state quietly would let a failing check disappear with
-        no record — the silent-success shape this project keeps hitting.
+        no record — the silent-success shape this project keeps hitting. It takes
+        TWO absences, because one is not proof (see the flapping tests below).
         """
-        health_log.log_health_transitions([_check("gmail", FAIL)])
-        health_log.log_health_transitions([])
+        health_log.log_health_transitions([_check("gmail", FAIL), _check("vault", OK)])
+        health_log.log_health_transitions([_check("vault", OK)])
+        health_log.log_health_transitions([_check("vault", OK)])
         events = self._events()
         self.assertEqual([e["event"] for e in events], ["check_failed", "check_vanished"])
         self.assertEqual(events[1]["detail"]["to"], "unseen")
+        self.assertEqual(events[1]["detail"]["absent_runs"], 2)
 
     def test_a_healthy_check_that_stops_being_reported_is_silence(self) -> None:
         """The mirror case: nothing was wrong, so nothing is lost."""
         health_log.log_health_transitions([_check("gmail", FAIL)])
         health_log.log_health_transitions([_check("gmail", OK)])
         before = len(self._events())
+        health_log.log_health_transitions([_check("vault", OK)])
+        health_log.log_health_transitions([_check("vault", OK)])
+        self.assertEqual(len(self._events()), before)
+
+
+class SubsetAndFlapTests(unittest.TestCase):
+    """`run_doctor` returns a SUBSET in normal operation.
+
+    Its schema and project checks are gated on the database existing
+    (``doctor.py``, ``if db_path:``), so losing the database drops several checks
+    at once. A one-absence vanish rule would log each as vanished and then, on
+    the next healthy run, log each again as a fresh failure — flapping instead of
+    reporting.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = Path(self._tmp.name)
+        patcher = mock.patch.object(auth_log, "_log_dir", return_value=self.dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _events(self) -> list[dict]:
+        path = self.dir / "auth_activity.jsonl"
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def test_a_check_missing_for_one_run_then_back_produces_no_events(self) -> None:
+        """THE PIN for flapping. A blip must cost nothing."""
+        health_log.log_health_transitions([_check("schema", FAIL), _check("vault", OK)])
+        before = len(self._events())
+        health_log.log_health_transitions([_check("vault", OK)])  # database gone
+        health_log.log_health_transitions([_check("schema", FAIL), _check("vault", OK)])  # back
+        self.assertEqual(len(self._events()), before, "a one-run blip must not log anything")
+
+    def test_an_empty_run_is_a_failed_run_not_a_healed_world(self) -> None:
+        """Zero usable checks means doctor broke, not that everything recovered.
+
+        Sweeping would mark every check vanished; persisting the empty result
+        would erase state so the next healthy run re-reported every failure.
+        """
+        health_log.log_health_transitions([_check("gmail", FAIL)])
+        before = len(self._events())
+        health_log.log_health_transitions([])
         health_log.log_health_transitions([])
         self.assertEqual(len(self._events()), before)
+
+        # State survived: the check coming back unchanged is still a no-op.
+        health_log.log_health_transitions([_check("gmail", FAIL)])
+        self.assertEqual(len(self._events()), before)
+
+
+class StatePersistenceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = Path(self._tmp.name)
+        patcher = mock.patch.object(auth_log, "_log_dir", return_value=self.dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _events(self) -> list[dict]:
+        path = self.dir / "auth_activity.jsonl"
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def test_a_failed_state_write_is_loud(self) -> None:
+        """The flooding case: state never advances, so every run re-reports.
+
+        It cannot be prevented without somewhere to write — but it must not be
+        silent, or the log fills up with no explanation anywhere.
+        """
+        with mock.patch.object(health_log.Path, "write_text", side_effect=OSError("read-only")):
+            with self.assertLogs("rebalance.ingest.health_log", level="WARNING") as captured:
+                ok = health_log._save_state({"vault": FAIL}, {})
+        self.assertFalse(ok)
+        self.assertTrue(any("re-report" in line for line in captured.output))
+
+    def test_the_state_file_is_replaced_atomically(self) -> None:
+        """A half-written sidecar reads as corrupt, which sends the next run down
+        the re-report-everything path. Concurrent runs must cost a duplicate
+        event at worst, never a broken file."""
+        health_log._save_state({"vault": FAIL}, {"gmail": 1})
+        leftovers = list(self.dir.glob("health_state.json.*.tmp"))
+        self.assertEqual(leftovers, [], "temp file left behind")
+        data = json.loads((self.dir / "health_state.json").read_text())
+        self.assertEqual(data["checks"], {"vault": FAIL})
+        self.assertEqual(data["absent"], {"gmail": 1})
+
+    def test_the_pre_absence_counter_state_format_still_loads(self) -> None:
+        """Discarding it on upgrade would re-report every failing check once."""
+        (self.dir / "health_state.json").write_text(json.dumps({"vault": FAIL}), encoding="utf-8")
+        checks, absent = health_log._load_state()
+        self.assertEqual(checks, {"vault": FAIL})
+        self.assertEqual(absent, {})
+
+        health_log.log_health_transitions([_check("vault", FAIL)])
+        self.assertEqual(self._events(), [], "an unchanged check must stay silent across the format upgrade")
 
     def test_accepts_doctor_check_objects_as_well_as_dicts(self) -> None:
         health_log.log_health_transitions([Check("database", FAIL, "missing")])
