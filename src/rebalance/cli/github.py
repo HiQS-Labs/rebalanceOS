@@ -17,6 +17,7 @@ from rebalance.ingest.config import (
     get_github_token,
     normalize_github_repo_name,
 )
+from rebalance.ingest.embedder import DEFAULT_MODEL
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
 
 
@@ -135,7 +136,7 @@ def github_sync_artifacts(
 @app.command("github-embed")
 def github_embed(
     database: Path | None = DBOption(),
-    model: str = typer.Option("Qwen/Qwen3-Embedding-0.6B", help="HuggingFace model name"),
+    model: str = typer.Option(DEFAULT_MODEL, help="HuggingFace model name"),
     batch_size: int = typer.Option(32, help="Batch size for embedding"),
     min_chars: int = typer.Option(40, help="Minimum document length to embed"),
     force: bool = typer.Option(False, help="Force re-embed all GitHub documents"),
@@ -170,7 +171,7 @@ def github_query_cmd(
     database: Path | None = DBOption(),
     repo: str = typer.Option("", help="Optional owner/name repo filter"),
     top_k: int = typer.Option(8, help="Number of results to return"),
-    model: str = typer.Option("Qwen/Qwen3-Embedding-0.6B", help="Embedding model for query"),
+    model: str = typer.Option(DEFAULT_MODEL, help="Embedding model for query"),
 ) -> None:
     """Semantic search over the local GitHub issue/PR/comment corpus."""
     from rebalance.ingest.semantic_index import query as semantic_query

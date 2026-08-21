@@ -12,6 +12,7 @@ import typer
 
 from rebalance.cli._core import ingest_app
 from rebalance.ingest.config import get_github_token
+from rebalance.ingest.embedder import DEFAULT_MODEL
 from rebalance.ingest.preflight import run_preflight
 from rebalance.ingest.registry import sync_registry
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
@@ -165,7 +166,7 @@ def ingest_notes(
 @ingest_app.command("embed")
 def ingest_embed(
     database: Path | None = DBOption(),
-    model: str = typer.Option("Qwen/Qwen3-Embedding-0.6B", help="HuggingFace model name"),
+    model: str = typer.Option(DEFAULT_MODEL, help="HuggingFace model name"),
     batch_size: int = typer.Option(32, help="Batch size for embedding (lower = less memory)"),
     force: bool = typer.Option(False, help="Force re-embed all chunks (use after model change)"),
 ) -> None:
