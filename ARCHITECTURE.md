@@ -554,6 +554,7 @@ src/rebalance/
                               Google OAuth services. Configure user defaults via
                               `rebalance config set-default-database` and `set-secrets-dir`.
   web.py                   — FastAPI local dashboard/web surfaces (`/`, `/focus-5`, `/auth-log`, etc.)
+  ingest/health_log.py     — doctor check TRANSITIONS into the unified system log (GH-101)
   doctor.py                — installation health checks; backs `rebalance doctor`
   ingest/
     config.py              — secrets storage (temp/rbos.config)

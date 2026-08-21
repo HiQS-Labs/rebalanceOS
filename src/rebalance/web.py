@@ -38,7 +38,7 @@ from fastapi.responses import (
 from pydantic import BaseModel
 
 from rebalance.lib import time_ops
-from rebalance.ingest.auth_log import read_log, _log_path
+from rebalance.ingest.auth_log import read_log_with_total, _log_path
 from rebalance.ingest import zapier_calendar, zapier_email
 from rebalance.lib.time_ops import format_relative, parse_utc_iso
 from rebalance import three_eyes_bridge
@@ -238,8 +238,20 @@ _EVENT_BADGE = {
     "watched_repos_reduced": ("warning", "⚠ watched repos reduced"),
     # GH-124: commit-threshold auto-promotion
     "project_auto_promoted": ("ok", "✓ project auto-added"),
+    # GH-101: doctor health-check state changes. Written by
+    # rebalance.ingest.health_log on transition only, never on every sample.
+    "check_failed": ("error", "✗ check failing"),
+    "check_degraded": ("warning", "⚠ check degraded"),
+    "check_recovered": ("ok", "✓ check recovered"),
+    "check_vanished": ("warning", "⚠ check no longer reported"),
 }
 
+# Every source the log can carry. THE FILTER IS DERIVED FROM THIS (GH-101) — the
+# page used to restate the list in a hardcoded JavaScript Set, and the two had
+# already drifted: "registry" existed here and in neither JS branch, so a
+# registry row showed under All and vanished under both Auth and Jobs, belonging
+# to no filter at all. `_SOURCE_FILTERS` below and `test_system_log_filters` keep
+# that from happening again.
 _SOURCE_BADGE = {
     "calendar": ("info", "calendar"),
     "github": ("neutral", "github"),
@@ -247,6 +259,7 @@ _SOURCE_BADGE = {
     "sleuth": ("neutral", "sleuth"),
     "launchd": ("neutral", "launchd"),
     "registry": ("neutral", "registry"),
+    "health": ("neutral", "health"),
 }
 
 # Page-local CSS for the FastAPI surfaces (Focus 5 / Auth Log / Home). The base
@@ -1528,37 +1541,84 @@ def whatsnext_page(refresh: bool = False):
 
 _SYSLOG_TOGGLE_CSS = (
     "<style>"
-    ".syslog-bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.75rem 0}"
+    ".syslog-bar{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin:.75rem 0}"
+    ".syslog-axis{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}"
+    ".syslog-axis-label{color:var(--muted);font-size:.78rem;text-transform:uppercase;"
+    "letter-spacing:.05em;font-weight:600}"
     ".syslog-toggles{display:flex;gap:.3rem;flex-wrap:wrap}"
     ".syslog-toggle{padding:.3rem .75rem;border:1px solid var(--border);border-radius:2rem;"
     "background:var(--card);cursor:pointer;font:inherit;font-size:.85rem;color:var(--ink)}"
     ".syslog-toggle.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}"
     ".syslog-input{flex:1;min-width:14rem;padding:.4rem .6rem;font:inherit;"
     "border:1px solid var(--border);border-radius:6px}"
-    ".syslog-count{color:var(--muted);font-size:.85rem;white-space:nowrap}"
+    ".syslog-count{color:var(--muted);font-size:.85rem}"
+    ".syslog-truncated{color:var(--muted);font-size:.85rem;font-style:italic}"
     "</style>"
 )
 
-_AUTH_LOG_SEARCH = (
-    _SYSLOG_TOGGLE_CSS
-    + "<div class='syslog-bar'>"
-    + "<div class='syslog-toggles'>"
-    + "<button class='syslog-toggle active' data-filter='all'    onclick='syslogToggle(this)'>All</button>"
-    + "<button class='syslog-toggle'         data-filter='auth'  onclick='syslogToggle(this)'>Auth</button>"
-    + "<button class='syslog-toggle'         data-filter='jobs'  onclick='syslogToggle(this)'>Jobs</button>"
-    + "<button class='syslog-toggle'         data-filter='errors' onclick='syslogToggle(this)'>Errors &amp; Warnings</button>"
-    + "</div>"
-    + "<input id='syslogSearch' class='syslog-input' type='search' autocomplete='off' "
-    + "oninput='syslogFilter()' placeholder='Search…'>"
-    + "<span class='syslog-count' id='syslogCount'></span>"
-    + "</div>"
+# Severity is a PROPERTY of every row, not a category of log. It used to sit in
+# the same mutually-exclusive group as the source filters, which made "errors in
+# jobs" unaskable: choosing Errors discarded the source, choosing Jobs discarded
+# the severity. Two axes, composed (GH-101).
+_SEVERITY_FILTERS = (
+    ("all", "All"),
+    ("problem", "Errors &amp; warnings"),
+    ("error", "Errors"),
+    ("warning", "Warnings"),
 )
+
+
+def _source_filters() -> tuple[tuple[str, str], ...]:
+    """Source buttons, DERIVED from ``_SOURCE_BADGE`` — never restated.
+
+    A hardcoded copy is what let ``registry`` belong to no filter. Deriving means
+    a new source is filterable the moment it has a badge, which is the only way
+    the two can't drift.
+    """
+    return (("all", "All"),) + tuple((name, label) for name, (_variant, label) in _SOURCE_BADGE.items())
+
+
+def _syslog_controls() -> str:
+    def buttons(axis: str, options: tuple[tuple[str, str], ...]) -> str:
+        return "".join(
+            f"<button class='syslog-toggle{' active' if key == 'all' else ''}' "
+            f"data-axis='{axis}' data-filter='{html.escape(key, quote=True)}' "
+            f"onclick='syslogToggle(this)'>{label}</button>"
+            for key, label in options
+        )
+
+    return (
+        _SYSLOG_TOGGLE_CSS
+        + "<div class='syslog-bar'>"
+        + "<div class='syslog-axis'><span class='syslog-axis-label'>Source</span>"
+        + f"<div class='syslog-toggles'>{buttons('source', _source_filters())}</div></div>"
+        + "<div class='syslog-axis'><span class='syslog-axis-label'>Severity</span>"
+        + f"<div class='syslog-toggles'>{buttons('severity', _SEVERITY_FILTERS)}</div></div>"
+        + "</div>"
+        + "<div class='syslog-bar'>"
+        + "<input id='syslogSearch' class='syslog-input' type='search' autocomplete='off' "
+        + "oninput='syslogFilter()' placeholder='Search…'>"
+        + "<span class='syslog-count' id='syslogCount'></span>"
+        + "</div>"
+    )
+
 
 _AUTH_LOG_FILTER_JS = """
 <script>
 (function () {
-  var AUTH_SOURCES = new Set(["github","calendar","gmail","sleuth"]);
-  var _activeFilter = "all";
+  // No source taxonomy here, deliberately. The client used to carry its own
+  // hardcoded Set of auth sources beside the server's badge map, and the two had
+  // already drifted: one source was in the server's map and in neither client
+  // branch, so its rows belonged to no filter at all. The server now emits
+  // data-source per row and derives the buttons from that same map; the client
+  // only compares strings (GH-101). Keep it that way — a list here is the bug.
+  var _active = { source: "all", severity: "all" };
+
+  function severityMatches(want, sev) {
+    if (want === "all") return true;
+    if (want === "problem") return sev === "error" || sev === "warning";
+    return sev === want;
+  }
 
   function applyFilter() {
     var q = (document.getElementById("syslogSearch").value || "").trim().toLowerCase();
@@ -1567,28 +1627,34 @@ _AUTH_LOG_FILTER_JS = """
     rows.forEach(function (tr) {
       var sev = tr.getAttribute("data-severity") || "";
       var src = tr.getAttribute("data-source") || "";
-      var filterMatch;
-      switch (_activeFilter) {
-        case "auth":   filterMatch = AUTH_SOURCES.has(src); break;
-        case "jobs":   filterMatch = (src === "launchd"); break;
-        case "errors": filterMatch = (sev === "error" || sev === "warning"); break;
-        default:       filterMatch = true;
-      }
+      // The two axes COMPOSE, so "errors in jobs" is one click on each. They
+      // used to be one mutually-exclusive group, which made that unaskable.
+      var sourceMatch = _active.source === "all" || src === _active.source;
+      var sevMatch = severityMatches(_active.severity, sev);
       var textMatch = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;
-      var visible = filterMatch && textMatch;
+      var visible = sourceMatch && sevMatch && textMatch;
       tr.style.display = visible ? "" : "none";
       if (visible) shown++;
     });
     var el = document.getElementById("syslogCount");
-    if (el) el.textContent = shown + " / " + rows.length + " shown";
+    if (el) {
+      // Three numbers, because they are three different things and conflating
+      // them is how "12 / 500 shown" made 500 look like the total.
+      var loaded = rows.length;
+      var total = parseInt(el.getAttribute("data-total") || "0", 10) || loaded;
+      var text = shown + " shown · " + loaded + " loaded";
+      if (total > loaded) text += " · " + total + " in the log";
+      el.textContent = text;
+    }
   }
 
   window.syslogToggle = function (btn) {
-    document.querySelectorAll(".syslog-toggle").forEach(function (b) {
+    var axis = btn.getAttribute("data-axis") || "source";
+    document.querySelectorAll('.syslog-toggle[data-axis="' + axis + '"]').forEach(function (b) {
       b.classList.remove("active");
     });
     btn.classList.add("active");
-    _activeFilter = btn.getAttribute("data-filter");
+    _active[axis] = btn.getAttribute("data-filter");
     applyFilter();
   };
 
@@ -1599,9 +1665,12 @@ _AUTH_LOG_FILTER_JS = """
 """
 
 
+_SYSLOG_ROW_LIMIT = 500
+
+
 @app.get("/auth-log", response_class=HTMLResponse)
 def auth_log_page() -> HTMLResponse:
-    entries = read_log(limit=500)
+    entries, total = read_log_with_total(limit=_SYSLOG_ROW_LIMIT)
 
     raw_link = '<a class="raw-link" href="/auth-log/raw">⬇ raw JSONL</a>'
 
@@ -1620,7 +1689,8 @@ def auth_log_page() -> HTMLResponse:
         detail = detail if isinstance(detail, dict) else {}
         detail_str = _auth_detail_html(detail)
         rows.append(
-            f"<tr data-severity='{variant}' data-source='{source}'>"
+            f"<tr data-severity='{html.escape(variant, quote=True)}' "
+            f"data-source='{html.escape(str(source), quote=True)}'>"
             f"<td>{html.escape(str(e.get('ts', '')[:19].replace('T', ' ')))}</td>"
             f"<td>{html.escape(str(e.get('device', '')))}</td>"
             f"<td>{source_badge}</td>"
@@ -1634,7 +1704,19 @@ def auth_log_page() -> HTMLResponse:
         f"<th>Timestamp (UTC)</th><th>Device</th><th>Source</th><th>Event</th><th>Detail</th>"
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table>"
     )
-    body = f"<h2>System Log {raw_link}</h2>{_AUTH_LOG_SEARCH}{table}{_AUTH_LOG_FILTER_JS}"
+    # Truncation is stated, never implied. The counter reads the total from here;
+    # a page that silently drops history reads as "this is everything".
+    truncated = (
+        f"<div class='syslog-truncated'>Showing the {len(entries)} most recent of {total} entries. "
+        f"The full history is in the {raw_link.replace('⬇ raw JSONL', 'raw JSONL')}.</div>"
+        if total > len(entries)
+        else ""
+    )
+    controls = _syslog_controls().replace(
+        "<span class='syslog-count' id='syslogCount'></span>",
+        f"<span class='syslog-count' id='syslogCount' data-total='{total}'></span>",
+    )
+    body = f"<h2>System Log {raw_link}</h2>{controls}{truncated}{table}{_AUTH_LOG_FILTER_JS}"
     return _page("System Log", body, active="authlog")
 
 

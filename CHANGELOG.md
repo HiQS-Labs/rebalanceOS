@@ -10,6 +10,44 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.0] - 2026-08-20
+
+### Added
+
+- The dashboard header now shows a single status element in every state, including when
+  everything is healthy, replacing the separate sync chip and health banner that rendered the
+  same verdict in different words.
+- Health-check state changes are now recorded in the system log, so the errors shown on the
+  dashboard and the errors listed on the System Log page finally come from the same place.
+  Only changes are written, never repeated samples, so the log grows with how often things
+  break rather than with how long the machine has been running.
+- The System Log's source and severity filters are now independent, so questions like
+  "errors from scheduled jobs" can be asked in one click each. They were previously a single
+  mutually exclusive group in which choosing one discarded the other.
+- Ranked next-actions now carry the author of each signal as its own field, completing the
+  source / author / time / link receipt set.
+
+### Changed
+
+- The System Log's row counter now distinguishes what is shown, what is loaded, and how many
+  entries exist, and the page states plainly when it is showing only the most recent slice.
+- The dashboard's problem count now reflects only what is actionable. Acknowledged notices keep
+  their own separate count instead of being added to the headline figure.
+- Remediation hints in the status bar are no longer shortened, and wrap onto multiple lines
+  rather than scrolling off the right edge.
+- The dashboard link to the System Log now matches the page's own name; it still said
+  "Authorization Log".
+
+### Fixed
+
+- Fixed the scheduled page-health watcher, which read a header element that no longer exists and
+  would have reported every check as "unknown" while exiting successfully.
+- Fixed the System Log's source filters, which were defined separately in the page and in the
+  browser and had drifted: one source matched no filter at all and its entries were unreachable.
+- Fixed the copy-to-clipboard button announcing the wrong subsystem name to screen readers.
+- Fixed a vector-table migration that could leave a database recording a dimension it was not
+  actually using.
+
 ## [0.74.0] - 2026-08-19
 
 ### Added
