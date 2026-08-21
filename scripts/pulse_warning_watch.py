@@ -93,42 +93,61 @@ class PulseSnapshot:
 
 
 class _PulseHTMLParser(HTMLParser):
-    """Extract the sync chip and banner copy text from pulse HTML."""
+    """Extract the status bar's tone, badge and copy text from pulse HTML.
+
+    Reads ``<section class="health-banner health-banner-{tone}">`` (GH-100). It
+    used to read a separate ``<span class="synced synced-{tone}">`` sync chip,
+    which GH-100 deleted because it rendered the same ``HealthStatus`` as the
+    banner. Nothing detected that deletion: the watcher's tests feed hand-written
+    fixture HTML, so they kept passing against markup the page had stopped
+    emitting — and the watcher would have logged ``page_state="unknown"`` forever
+    while reporting itself healthy. ``test_pulse_warning_watch`` now parses the
+    REAL render for exactly this reason.
+
+    ``sync_tone``/``sync_text`` keep their names: they are the persisted JSONL
+    field names, and renaming them would silently split every historical record
+    from the ones after it.
+    """
 
     def __init__(self) -> None:
         super().__init__()
         self.sync_tone = ""
         self.sync_text = ""
         self.banner_text = ""
-        self._sync_depth = 0
-        self._sync_parts: list[str] = []
+        self._badge_depth = 0
+        self._badge_parts: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attrs_map = {k: v or "" for k, v in attrs}
         classes = set(attrs_map.get("class", "").split())
-        if tag == "span" and "synced" in classes:
+
+        if tag == "section" and "health-banner" in classes:
             for tone in ("ok", "warn", "danger"):
-                if f"synced-{tone}" in classes:
+                if f"health-banner-{tone}" in classes:
                     self.sync_tone = tone
-                    self._sync_depth += 1
                     break
-        elif self._sync_depth > 0:
-            self._sync_depth += 1
+
+        # The badge is the bar's own one-line verdict ("1 error · 2 warnings" /
+        # "healthy") — the text the chip used to carry.
+        if "health-banner-badge" in classes:
+            self._badge_depth += 1
+        elif self._badge_depth > 0:
+            self._badge_depth += 1
 
         copy_text = attrs_map.get("data-copy-text", "")
         if copy_text and not self.banner_text:
             self.banner_text = html.unescape(copy_text).strip()
 
     def handle_endtag(self, tag: str) -> None:
-        if self._sync_depth > 0:
-            self._sync_depth -= 1
-            if self._sync_depth == 0:
-                self.sync_text = _compact("".join(self._sync_parts))
-                self._sync_parts = []
+        if self._badge_depth > 0:
+            self._badge_depth -= 1
+            if self._badge_depth == 0:
+                self.sync_text = _compact("".join(self._badge_parts))
+                self._badge_parts = []
 
     def handle_data(self, data: str) -> None:
-        if self._sync_depth > 0 and data.strip():
-            self._sync_parts.append(data)
+        if self._badge_depth > 0 and data.strip():
+            self._badge_parts.append(data)
 
 
 def _utc_now() -> datetime:
@@ -170,8 +189,11 @@ def extract_banner_text(page_html: str) -> tuple[str, str, str, str]:
 
     banner_match = _BANNER_RE.search(page_html)
     if not banner_match and not parser.banner_text:
-        page_state = "healthy" if sync_tone == "ok" else "unknown"
-        return page_state, sync_text, "", sync_tone
+        # No bar at all. Since GH-100 the bar renders in EVERY state, so this now
+        # means the page did not render — not that the system is fine. Reporting
+        # "healthy" here would be the watcher inventing an all-clear from missing
+        # evidence, which is the failure it exists to catch.
+        return "unknown", sync_text, "", sync_tone
 
     banner_html = banner_match.group("body") if banner_match else ""
     if parser.banner_text:
@@ -180,7 +202,15 @@ def extract_banner_text(page_html: str) -> tuple[str, str, str, str]:
         banner_text = html.unescape(copy_match.group("text")).strip()
     else:
         banner_text = _strip_tags(banner_html)
-    page_state = "warning" if sync_tone in {"warn", "danger"} else "unknown"
+
+    # The bar's own tone IS the verdict now — one surface, one classification,
+    # rather than the watcher re-deriving state from a second widget.
+    if sync_tone in {"warn", "danger"}:
+        page_state = "warning"
+    elif sync_tone == "ok":
+        page_state = "healthy"
+    else:
+        page_state = "unknown"
     return page_state, sync_text, banner_text, sync_tone
 
 
