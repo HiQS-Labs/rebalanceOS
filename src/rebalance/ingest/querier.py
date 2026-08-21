@@ -3,8 +3,8 @@ General-purpose natural language query engine.
 
 Gathers context from all data sources (vault embeddings, GitHub activity,
 project registry), assembles a prompt, and optionally synthesizes via a
-local LLM (Qwen3 via mlx-lm). Returns both raw context and synthesis so
-the host agent can review, adapt, and present.
+local LLM (Qwen3 via mlx-lm; requires optional extra `pip install 'rebalance-os[local-llm]'`).
+Returns both raw context and synthesis so the host agent can review, adapt, and present.
 
 The local LLM is a first-pass summarizer — not the final answer. The host
 agent (Claude, Copilot, etc.) is expected to refine the output.
@@ -490,7 +490,10 @@ def _synthesize(prompt: str, model_name: str = DEFAULT_CHAT_MODEL, max_tokens: i
     """Generate a response using a local Qwen chat model via mlx-lm."""
     global _cached_chat_model, _cached_chat_tokenizer, _cached_chat_model_name
 
-    from mlx_lm import load, generate
+    try:
+        from mlx_lm import load, generate
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("mlx-lm is not installed. Install with: pip install 'rebalance-os[local-llm]'") from exc
 
     if _cached_chat_model is None or _cached_chat_model_name != model_name:
         _cached_chat_model, _cached_chat_tokenizer = load(model_name)

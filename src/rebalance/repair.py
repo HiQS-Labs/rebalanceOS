@@ -38,6 +38,7 @@ from enum import Enum
 from typing import Any, Callable
 
 from rebalance.ingest.config import get_gemini_api_key
+from rebalance.ingest.querier import DEFAULT_GEMINI_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +103,7 @@ def is_unrecoverable(error: str) -> bool:
 # FSM
 # ---------------------------------------------------------------------------
 
-_LLM_MODEL = "gemini-3.5-flash"
+_LLM_MODEL = DEFAULT_GEMINI_MODEL
 _LLM_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 

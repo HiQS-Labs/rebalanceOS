@@ -159,6 +159,7 @@ class FilterLabelEscapingTests(unittest.TestCase):
         self.assertNotIn("&amp;amp;", markup)
         self.assertNotIn("&amp;lt;", markup)
         self.assertNotIn("&amp;#x27;", markup)
+        self.assertNotIn("&amp;quot;", markup)
 
     def test_the_ampersand_still_reaches_the_page_escaped_once(self) -> None:
         """The fix must not swing the other way into raw, unescaped output."""

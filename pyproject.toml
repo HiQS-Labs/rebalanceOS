@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rebalance-os"
-version = "0.75.2"
+version = "0.75.3"
 description = "Local-first workday operating system with MCP tools and Obsidian ingest"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -34,6 +34,10 @@ embeddings = [
   # tests/test_embedder*.py on ModuleNotFoundError. Declare what the code
   # actually imports.
   "sentence-transformers>=3.0.0",
+]
+local-llm = [
+  # GH-108: mlx-lm powers local Qwen LLM synthesis (Mac Apple Silicon).
+  "mlx-lm>=0.19.0",
 ]
 server = [
   "fastapi>=0.110.0",

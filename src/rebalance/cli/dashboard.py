@@ -13,6 +13,7 @@ import typer
 
 from rebalance.cli._core import app
 from rebalance.ingest.config import get_vault_path
+from rebalance.ingest.querier import DEFAULT_GEMINI_MODEL
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
 
 
@@ -32,7 +33,9 @@ def dashboard_render_cmd(
     output: Path = typer.Option(None, "--output", "-o", help="Write dashboard markdown to an explicit path"),
     gemini_synthesis: bool = typer.Option(False, "--gemini-synthesis", help="Add a Gemini-written operator summary"),
     cleanup: bool = typer.Option(False, "--cleanup", help="Tighten the Gemini-written summary to reduce redundancy"),
-    gemini_model: str = typer.Option("gemini-3.5-flash", "--gemini-model", help="Gemini model for optional synthesis"),
+    gemini_model: str = typer.Option(
+        DEFAULT_GEMINI_MODEL, "--gemini-model", help="Gemini model for optional synthesis"
+    ),
     reingest_note: bool = typer.Option(
         False,
         "--reingest-note/--no-reingest-note",

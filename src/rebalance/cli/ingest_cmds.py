@@ -170,7 +170,7 @@ def ingest_embed(
     batch_size: int = typer.Option(32, help="Batch size for embedding (lower = less memory)"),
     force: bool = typer.Option(False, help="Force re-embed all chunks (use after model change)"),
 ) -> None:
-    """Generate embeddings for ingested chunks via mlx-embeddings."""
+    """Generate embeddings for ingested chunks via sentence-transformers."""
     from rebalance.ingest.embedder import embed_vault_chunks
 
     try:

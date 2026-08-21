@@ -11,6 +11,7 @@ import typer
 
 from rebalance.cli._core import app
 from rebalance.ingest.embedder import DEFAULT_MODEL
+from rebalance.ingest.querier import DEFAULT_CHAT_MODEL
 from rebalance.paths import DatabaseNotFoundError, DBOption, resolve_database_path
 
 
@@ -81,7 +82,7 @@ def ask_cmd(
     database: Path | None = DBOption(),
     days: int = typer.Option(7, help="Activity window in days"),
     no_llm: bool = typer.Option(False, help="Skip local LLM synthesis, return raw context only"),
-    chat_model: str = typer.Option("Qwen/Qwen3-0.6B", help="Chat model for synthesis"),
+    chat_model: str = typer.Option(DEFAULT_CHAT_MODEL, help="Chat model for synthesis"),
 ) -> None:
     """Ask a natural language question across all data sources."""
     from rebalance.ingest.querier import ask as querier_ask
