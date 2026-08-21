@@ -126,7 +126,8 @@ is what keeps the deferred 3-Eyes plists safe (GH-59).
 | Install / reinstall ONE job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
 | Run a job now | `bash scripts/<job>.sh` |
 | Tail a job log | `cat temp/logs/<job_name>_$(date +%Y-%m-%d).log` |
-| Job lifecycle history | `temp/logs/auth_activity.jsonl` (also `rebalance serve` → /auth-log) |
+| Job lifecycle history | `temp/logs/auth_activity.jsonl` (also `rebalance serve` → /auth-log, the System Log page) |
+| Health-check state changes | same log, `source=health` — written on TRANSITION only by `rebalance.ingest.health_log`, never once per run |
 | Verify templates match installed plists | render with the installer substitutions and `diff` against `~/Library/LaunchAgents/` |
 
 Plists pin absolute paths, so a job belongs to **one checkout**. `stack.sh up`

@@ -878,6 +878,20 @@ def main() -> int:
     print(f"  {len(checks)} check(s) collected")
     for c in checks:
         run_log.add_check(c)
+
+    # GH-101: record state CHANGES into the unified system log, BEFORE the GitHub
+    # sync below. Order matters — the sync can abort on a rate limit, and the
+    # local record of what changed must not depend on GitHub being reachable.
+    try:
+        from rebalance.ingest.health_log import log_health_transitions  # noqa: PLC0415
+
+        transitions = log_health_transitions(checks)
+        if transitions:
+            print(f"  {len(transitions)} state change(s) logged to the system log")
+            for name, was, now_state in transitions:
+                print(f"    {was} → {now_state}  {name}")
+    except Exception as exc:  # noqa: BLE001 — logging must never break the reporter
+        print(f"  warning: could not log health transitions: {exc}")
     print()
 
     # --- GitHub state ---

@@ -47,7 +47,9 @@ def test_notices_do_not_escalate_the_verdict() -> None:
     assert h.warnings == []
 
 
-def test_status_text_summarizes_every_nonempty_bucket() -> None:
+def test_bucket_text_summarizes_every_nonempty_bucket() -> None:
+    """The COMPLETE summary — notices included. This is what the copy button
+    pastes into an issue, where leaving a bucket out would be misleading."""
     h = _h(
         [
             Check("database", FAIL, "missing"),
@@ -55,12 +57,32 @@ def test_status_text_summarizes_every_nonempty_bucket() -> None:
             Check("launchd:pulse-server", OK, "running", severity=NOTICE),
         ]
     )
-    assert h.status_text == "1 error · 1 warning · 1 notice"
+    assert h.bucket_text == "1 error · 1 warning · 1 notice"
 
 
-def test_status_text_stays_compact_without_notices() -> None:
+def test_the_headline_counts_only_what_is_actionable() -> None:
+    """The counterpart (GH-100). `status_text` used to serve both roles by
+    switching on whether notices existed; one property cannot, so it was split
+    into `problem_text` (headline) and `bucket_text` (complete) and removed."""
     h = _h([Check("a", WARN, "x"), Check("b", WARN, "y")])
-    assert h.status_text == "2 warnings"
+    assert h.problem_text == "2 warnings"
+
+
+def test_the_headline_excludes_notices_but_the_summary_keeps_them() -> None:
+    h = _h(
+        [
+            Check("database", FAIL, "missing"),
+            Check("launchd:pulse-server", OK, "running", severity=NOTICE),
+        ]
+    )
+    assert h.problem_text == "1 error"
+    assert h.bucket_text == "1 error · 1 notice"
+
+
+def test_problem_text_is_healthy_when_nothing_is_actionable() -> None:
+    """Notices alone must not make the headline look like a problem."""
+    h = _h([Check("launchd:pulse-server", OK, "running", severity=NOTICE)])
+    assert h.problem_text == "healthy"
 
 
 def test_bucket_label_pluralizes() -> None:

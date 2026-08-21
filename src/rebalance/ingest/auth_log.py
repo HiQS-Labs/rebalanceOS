@@ -430,6 +430,23 @@ def read_log(limit: int = 200) -> list[dict[str, Any]]:
     return list(reversed(entries[-limit:]))
 
 
+def read_log_with_total(limit: int = 200) -> tuple[list[dict[str, Any]], int]:
+    """``read_log`` plus how many entries exist in total (GH-101).
+
+    The System Log page capped at 500 rows and rendered "12 / 500 shown", which
+    made 500 read as the total rather than the ceiling — older entries were gone
+    with nothing saying they had existed. A surface that truncates has to be able
+    to say so, and it cannot say so without this number.
+
+    Shares one read with ``read_log`` rather than re-parsing the file; on a log
+    with no rotation that second pass is not free.
+    """
+    entries = _read_file(_log_path())
+    entries += _read_file(_legacy_calendar_path(), default_source="calendar")
+    entries.sort(key=lambda e: e.get("ts", ""))
+    return list(reversed(entries[-limit:])), len(entries)
+
+
 def latest_failure_by_source(sources: list[str] | None = None) -> dict[str, dict[str, Any]]:
     """Return the most recent *failure* event per source.
 

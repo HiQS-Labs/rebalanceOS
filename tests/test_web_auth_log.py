@@ -21,7 +21,9 @@ class WebAuthLogTests(unittest.TestCase):
                 },
             }
         ]
-        with patch("rebalance.web.read_log", return_value=entries):
+        # GH-101: the page now also needs the TOTAL, so it can say when it truncated
+        # instead of letting the row cap read as the whole log.
+        with patch("rebalance.web.read_log_with_total", return_value=(entries, len(entries))):
             response = auth_log_page()
 
         html = response.body.decode("utf-8")
@@ -42,7 +44,9 @@ class WebAuthLogTests(unittest.TestCase):
                 },
             }
         ]
-        with patch("rebalance.web.read_log", return_value=entries):
+        # GH-101: the page now also needs the TOTAL, so it can say when it truncated
+        # instead of letting the row cap read as the whole log.
+        with patch("rebalance.web.read_log_with_total", return_value=(entries, len(entries))):
             response = auth_log_page()
 
         html = response.body.decode("utf-8")
@@ -64,7 +68,9 @@ class WebAuthLogTests(unittest.TestCase):
                 },
             }
         ]
-        with patch("rebalance.web.read_log", return_value=entries):
+        # GH-101: the page now also needs the TOTAL, so it can say when it truncated
+        # instead of letting the row cap read as the whole log.
+        with patch("rebalance.web.read_log_with_total", return_value=(entries, len(entries))):
             response = auth_log_page()
 
         html = response.body.decode("utf-8")

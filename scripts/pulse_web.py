@@ -60,7 +60,12 @@ from dashboard import (  # type: ignore  # noqa: E402
     _parse_iso,
     _truncate,
 )
-from rebalance.doctor import FAIL, WARN, Check, run_doctor  # noqa: E402
+
+# FAIL/WARN dropped with render_sync_chip (GH-100): the chip branched on
+# health.verdict, and the bar reads health.failures/.warnings instead. Verified
+# pulse_server does not re-export them from here — unlike the goals_file names
+# below, which it does.
+from rebalance.doctor import Check, run_doctor  # noqa: E402
 from rebalance.health import HealthStatus, compute_health_status  # noqa: E402
 from rebalance.ingest.config import get_figma_file_keys  # noqa: E402
 from rebalance.ingest.goals_file import (  # noqa: E402
@@ -339,8 +344,14 @@ def _health_banner_copy_text(
     status_text: str,
     activity_text: str,
 ) -> str:
+    """Paste-ready summary. Unlike the rendered bar, this is COMPLETE.
+
+    The bar shows the first few problems and truncates each detail to fit one
+    line; this is what the operator pastes into an issue, so it carries every
+    problem and every hint at full length. Callers pass ``bucket_text`` (notices
+    included) rather than ``problem_text`` for the same reason.
+    """
     lines = [
-        "Attention needed",
         f"Status: {status_text}",
         f"Last data ingest: {activity_text}",
     ]
@@ -396,43 +407,78 @@ def _latest_ingest_activity(status: dict[str, Any]) -> str | None:
     return latest_raw
 
 
-def render_health_banner(
+# How many problems the bar shows before collapsing the rest into a counted
+# overflow line. Four fits one row at the common window width.
+_STATUS_BAR_VISIBLE = 4
+
+# Details are trimmed so one problem stays on one line. Hints are NOT — see
+# render_status_bar.
+_STATUS_BAR_DETAIL_CHARS = 120
+
+
+def render_status_bar(
     health: HealthStatus,
     now: datetime,
     last_ingest: str | None,
 ) -> str:
-    problems = health.problems
-    if not problems:
-        return ""
+    """THE header status surface — one element, every state (GH-100).
 
-    tone = "danger" if health.failures else "warn"
-    status_text = health.status_text
+    This replaces the sync chip and the health banner, which rendered from the
+    SAME ``HealthStatus`` a few lines apart and said the same thing in different
+    words ("Sync degraded" beside "1 ERROR · 2 WARNINGS · 18 NOTICES" beside
+    "Attention needed"), each repeating the ingest timestamp. The operator had to
+    reconcile three labels to learn one fact.
+
+    It always renders, including when healthy. That is what lets one element do
+    the chip's job: a second widget existed only to have somewhere to say "last
+    ingest" when there was nothing wrong.
+
+    Three deliberate choices:
+
+    * The badge counts PROBLEMS, not notices (``problem_text``). Notices are
+      checks already marked intentional; the sidebar tier carries its own count.
+    * The hint is never truncated. It is the only text here that says what to DO
+      — truncating it to 120 chars produced "→ inspect tem…" on a live screen,
+      clipping the remedy while keeping the complaint. The detail is trimmed
+      instead, because a shortened symptom is still a usable symptom.
+    * Overflow is counted and named, never silently dropped.
+    """
+    problems = health.problems
+    tone = "danger" if health.failures else ("warn" if health.warnings else "ok")
     activity_text = format_timestamp(last_ingest, relative=True, tz=TZ) or "never"
     activity_html = _timestamp_html(last_ingest, tz=TZ, relative=True, fallback="never")
-    copy_text = _health_banner_copy_text(
-        problems,
-        status_text=status_text,
-        activity_text=activity_text,
-    )
 
     items = []
-    for check in problems[:4]:
-        fix = f'<span class="health-banner-fix">→ {_esc(_short_text(check.hint, 120))}</span>' if check.hint else ""
+    for check in problems[:_STATUS_BAR_VISIBLE]:
+        # No _short_text on the hint: the fix survives intact or not at all.
+        fix = f'<span class="health-banner-fix">→ {_esc(_compact_whitespace(check.hint))}</span>' if check.hint else ""
         items.append(
             f'<span class="health-banner-item">'
             f'<span class="health-banner-name">{_esc(check.name)}</span>'
-            f'<span class="health-banner-detail">{_esc(_short_text(check.detail, 120))}</span>'
+            f'<span class="health-banner-detail">{_esc(_short_text(check.detail, _STATUS_BAR_DETAIL_CHARS))}</span>'
             f"{fix}"
             f"</span>"
         )
-    if len(problems) > 4:
-        items.append(f'<span class="health-banner-item more">+{len(problems) - 4} more</span>')
+    hidden = len(problems) - _STATUS_BAR_VISIBLE
+    if hidden > 0:
+        items.append(
+            f'<span class="health-banner-item more">{hidden} more problem{"" if hidden == 1 else "s"} not shown</span>'
+        )
+
+    # The copy button is the most useful control in the header — it is the only
+    # place the operator gets the WHOLE story. So it carries the complete bucket
+    # summary (notices included) and every problem at full length.
+    copy_text = _health_banner_copy_text(
+        problems,
+        status_text=health.bucket_text or "healthy",
+        activity_text=activity_text,
+    )
+    items_html = f'<div class="health-banner-items">{"".join(items)}</div>' if items else ""
 
     return f"""
     <section class="health-banner health-banner-{tone}" aria-live="polite">
       <div class="health-banner-lead">
-        <span class="health-banner-badge">{_esc(status_text)}</span>
-        <span class="health-banner-summary">Attention needed</span>
+        <span class="health-banner-badge">{_esc(health.problem_text)}</span>
         <span class="health-banner-activity">Last data ingest {activity_html}</span>
         <button
           type="button"
@@ -442,27 +488,9 @@ def render_health_banner(
           title="Copy health summary"
         >{_clipboard_icon_svg()}<span class="visually-hidden">Copy health summary</span></button>
       </div>
-      <div class="health-banner-items">{"".join(items)}</div>
+      {items_html}
     </section>
     """
-
-
-def render_sync_chip(
-    health: HealthStatus,
-    last_ingest: str | None,
-    now: datetime,
-) -> str:
-    activity_text = format_timestamp(last_ingest, relative=True, tz=TZ) or "—"
-    if health.verdict == FAIL:
-        tone = "danger"
-        label = f"Sync degraded · {activity_text}"
-    elif health.verdict == WARN:
-        tone = "warn"
-        label = f"Sync warnings · {activity_text}"
-    else:
-        tone = "ok"
-        label = f"Last ingest {activity_text}"
-    return f'<span class="synced synced-{tone}"><span class="ok-dot"></span>{_esc(label)}</span>'
 
 
 def build_obsidian_url(vault_path: Path | None, file_path: Path) -> str | None:
@@ -1719,12 +1747,9 @@ PAGE_CSS = """
 .topbar .crumb { color: var(--fg-muted); font-weight: 500; padding-top: 4px; }
 .topbar-right { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .topbar-row { display: flex; gap: 10px; align-items: center; }
-.synced { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 12px; color: var(--fg-muted); }
-.synced .ok-dot { width: 8px; height: 8px; background: var(--ok); border-radius: 50%; }
-.synced.synced-warn { border-color: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
-.synced.synced-warn .ok-dot { background: var(--warn); }
-.synced.synced-danger { border-color: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
-.synced.synced-danger .ok-dot { background: var(--danger); }
+/* GH-100: the .synced sync-chip rules lived here. The chip rendered from the
+   same HealthStatus as the banner below and duplicated its verdict; the bar now
+   covers every state including healthy, so the chip and its CSS are gone. */
 
 /* Status dot glow pulse */
 @keyframes glow-ok {
@@ -1735,7 +1760,8 @@ PAGE_CSS = """
   0%, 100% { box-shadow: 0 0 0   0   transparent; }
   50%       { box-shadow: 0 0 5px 3px color-mix(in srgb, var(--warn) 40%, transparent); }
 }
-.ok-dot                        { animation: glow-ok   2.8s ease-in-out infinite; }
+/* `.ok-dot` was here. Its only emitter was the sync chip, deleted in GH-100;
+   `@keyframes glow-ok` stays because `.health-dot` below still uses it. */
 .health-dot                    { animation: glow-ok   2.8s ease-in-out infinite; }
 .health-pill.has-issues .health-dot { animation: glow-warn 2.8s ease-in-out infinite; }
 .system-now { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px dashed var(--border); border-radius: 999px; background: var(--card); font-size: 12px; color: var(--fg-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: help; }
@@ -1772,12 +1798,20 @@ PAGE_CSS = """
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
-  align-items: center;
+  /* start, not center: items wrap to several rows now, and a centred lead would
+     drift away from the first problem it labels. */
+  align-items: start;
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   overflow: hidden;
+}
+/* The healthy state. The bar renders in EVERY state now (GH-100), so this tone
+   is what a working system looks like: one quiet line, no colour shouting. */
+.health-banner-ok {
+  border-color: color-mix(in srgb, var(--ok) 18%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ok) 7%, transparent), color-mix(in srgb, var(--page) 96%, transparent));
 }
 .health-banner-warn {
   border-color: color-mix(in srgb, var(--warn) 22%, transparent);
@@ -1820,10 +1854,9 @@ PAGE_CSS = """
   text-transform: uppercase;
   letter-spacing: .06em;
 }
-.health-banner-summary {
-  font-weight: 700;
-  color: var(--fg);
-}
+/* GH-100: .health-banner-summary held the words "Attention needed" — a mood,
+   not an instruction, and the third label for a fact the badge already stated.
+   The badge and the per-problem hints carry it now. */
 .health-banner-activity {
   color: var(--fg-muted);
   font-size: 12px;
@@ -1869,24 +1902,31 @@ PAGE_CSS = """
   white-space: nowrap;
   border: 0;
 }
+/* GH-100: these used to be one non-wrapping row inside `overflow-x: auto`, so a
+   problem past the right edge was reachable only by sideways scrolling — which
+   is how "→ inspect tem…" ended up clipped mid-word on a live screen. Items now
+   WRAP, and their text wraps with them, because the hint is the one string here
+   that says what to do and it is no longer trimmed to fit. */
 .health-banner-items {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
   min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 2px;
 }
 .health-banner-item {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   padding: 6px 10px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--card) 78%, transparent);
   border: 1px solid color-mix(in srgb, var(--ink) 5%, transparent);
-  white-space: nowrap;
-  flex: 0 0 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .health-banner-name {
   font-size: 11px;
@@ -1898,6 +1938,14 @@ PAGE_CSS = """
 .health-banner-detail {
   color: var(--fg-muted);
   font-size: 12px;
+}
+/* The remedy. It had no rule at all before GH-100 — the one string that says
+   what to DO rendered as plain body text, indistinguishable from the symptom
+   beside it, and was the first thing the old layout clipped. */
+.health-banner-fix {
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
 }
 .health-banner-item.more {
   color: var(--fg-muted);
@@ -2738,15 +2786,21 @@ PULSE_JS = r"""
       try {
         const ok = await copyTextToClipboard(copyBtn.dataset.copyText || '');
         if (!ok) throw new Error('clipboard copy returned false');
-        setCopyButtonStatus('Copied collector warning text', true);
+        // "collector" was renamed out of this surface in GH-5 Phase 4b — it made
+        // the general-ingestion timestamp read as a per-device pulse scan. These
+        // three labels kept it, and no test could see them: they are set by JS at
+        // runtime, so the guard in test_pulse_web_timestamp_disambiguation (which
+        // asserts against rendered HTML) never touched them. One click and the
+        // button announced the old wording again.
+        setCopyButtonStatus('Copied health summary', true);
         window.setTimeout(() => {
-          setCopyButtonStatus('Copy collector warning text');
+          setCopyButtonStatus('Copy health summary');
         }, 1500);
       } catch (err) {
         console.warn('copy banner text failed:', err);
         setCopyButtonStatus('Copy failed', false);
         window.setTimeout(() => {
-          setCopyButtonStatus('Copy collector warning text');
+          setCopyButtonStatus('Copy health summary');
         }, 1800);
       }
     });
@@ -3130,7 +3184,6 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
     } <span class="tz-key">{_esc(system_now_tz)} · {_esc(TZ.key)}</span></span>
             </div>
             <div class="topbar-row">
-              {render_sync_chip(health_status, last_ingest, now)}
               <a href="{_esc(HEALTH_ISSUES_URL)}" target="_blank" rel="noopener noreferrer"
                  class="health-pill metric{" has-issues" if health_filed_30d else ""}"
                  title="GitHub issues the health reporter auto-filed in the last day — click to view on GitHub">
@@ -3141,7 +3194,7 @@ def build_page(*, goals_path: Path, vault_path: Path | None, refresh_seconds: in
             </div>
           </div>
         </div>
-        {render_health_banner(health_status, now, last_ingest)}
+        {render_status_bar(health_status, now, last_ingest)}
         {
         render_hero(
             goals,

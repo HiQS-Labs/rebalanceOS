@@ -49,8 +49,10 @@ def _strip_copy_payload(html: str) -> str:
 
 
 def _banner(checks: list[Check]) -> str:
+    # GH-100 merged the chip and the banner into one bar; the naming invariant
+    # this module protects is unchanged and now has one surface to hold it.
     health = compute_health_status(checks, {"sources": {}}, NOW)
-    return pulse_web.render_health_banner(health, NOW, INGEST_TS)
+    return pulse_web.render_status_bar(health, NOW, INGEST_TS)
 
 
 class BannerLeadDisambiguationTests(unittest.TestCase):
@@ -122,26 +124,57 @@ class CopyPayloadMirrorsVisibleTextTests(unittest.TestCase):
         self.assertIn("fleet:Mac Studio", text)
 
 
-class SyncChipDisambiguationTests(unittest.TestCase):
-    """The chip renders the same general-ingestion timestamp and had the same
-    mislabel."""
+class HealthyStateDisambiguationTests(unittest.TestCase):
+    """The chip carried this invariant for the no-problems case; the bar does now.
 
-    def _chip(self, checks: list[Check]) -> str:
-        health = compute_health_status(checks, {"sources": {}}, NOW)
-        return pulse_web.render_sync_chip(health, INGEST_TS, NOW)
+    GH-100 retired ``render_sync_chip``, but the mislabel it was fixed for is a
+    property of the ingest timestamp, not of the widget that renders it. The bar
+    shows that timestamp in EVERY state, so the guard follows it there — a
+    healthy dashboard is exactly where the chip used to be the only surface.
+    """
 
-    def test_chip_does_not_call_the_ingest_timestamp_a_collector(self) -> None:
+    def test_the_bar_does_not_call_the_ingest_timestamp_a_collector(self) -> None:
         for checks in (
             [Check("gmail", WARN, "scope missing")],
             [],
         ):
             with self.subTest(checks=len(checks)):
-                self.assertNotIn("collector", self._chip(checks).lower())
+                self.assertNotIn("collector", _strip_copy_payload(_banner(checks)).lower())
 
-    def test_chip_still_reports_the_warning_state(self) -> None:
-        chip = self._chip([Check("gmail", WARN, "scope missing")])
-        self.assertIn("synced-warn", chip)
-        self.assertIn("Sync warnings", chip)
+    def test_the_bar_still_reports_the_warning_state(self) -> None:
+        html = _banner([Check("gmail", WARN, "scope missing")])
+        self.assertIn("health-banner-warn", html)
+        self.assertIn("1 warning", html)
+
+    def test_the_healthy_state_still_shows_the_ingest_timestamp(self) -> None:
+        """What the chip existed for. If this regresses, the bar has stopped
+        covering every state and a second widget will be needed again."""
+        html = _banner([])
+        self.assertIn("Last data ingest", html)
+        self.assertIn("2026-08-16", html)
+
+
+class RuntimeLabelsAreDisambiguatedTooTests(unittest.TestCase):
+    """The guard above reads RENDERED HTML, so it cannot see labels set by JS.
+
+    Three copy-button labels kept the "collector" wording this module exists to
+    remove — `setCopyButtonStatus('Copied collector warning text', …)` and two
+    siblings. The static `aria-label` was correct, so every HTML assertion
+    passed; one click replaced it with the old wording at runtime. Assert against
+    the emitted script text instead, which is where those strings actually live.
+    """
+
+    def _page_script(self) -> str:
+        import inspect
+
+        return inspect.getsource(pulse_web)
+
+    def test_copy_button_runtime_labels_do_not_say_collector(self) -> None:
+        for call in ("setCopyButtonStatus('Copied", "setCopyButtonStatus('Copy"):
+            for fragment in self._page_script().split(call)[1:]:
+                label = fragment.split("'")[0]
+                with self.subTest(label=label):
+                    self.assertNotIn("collector", label.lower())
 
 
 class HelperNameMatchesWhatItMeasuresTests(unittest.TestCase):
