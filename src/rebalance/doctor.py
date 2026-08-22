@@ -1112,6 +1112,38 @@ def _check_sleuth(db_path: Path | None = None) -> Check:
     return Check("sleuth", OK, f"configured (via {where})")
 
 
+def _check_slack_users(db_path: Path | None) -> Check:
+    """Warn only when indexed Sleuth reminders lack their name-lookup cache."""
+    from rebalance.ingest.db import db_connection
+    from rebalance.ingest.slack_users import get_slack_users_path
+
+    name = "slack users"
+    if db_path is None:
+        return Check(name, OK, "no database")
+
+    try:
+        with db_connection(db_path) as conn:
+            has_table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sleuth_reminders'"
+            ).fetchone()
+            has_sleuth_rows = bool(has_table and conn.execute("SELECT 1 FROM sleuth_reminders LIMIT 1").fetchone())
+    except Exception as exc:  # noqa: BLE001 — doctor must never crash
+        return Check(name, FAIL, f"could not read Sleuth reminders: {exc}")
+
+    if not has_sleuth_rows:
+        return Check(name, OK, "no Sleuth reminders indexed")
+
+    path = get_slack_users_path()
+    if path.exists():
+        return Check(name, OK, f"lookup cache present ({path})")
+    return Check(
+        name,
+        WARN,
+        f"Sleuth reminders are indexed but Slack user lookup cache is missing ({path})",
+        "refresh Sleuth data or configure a Slack bot token so names can be resolved",
+    )
+
+
 def _check_apple_reminders(db_path: Path | None = None) -> Check:
     """Apple Reminders — opt-in local macOS source. Surfaces schema drift from the
     last sync (cheap, DB-only; no live-store read, so it's safe on any host)."""
@@ -1397,6 +1429,13 @@ def _check_commit_coverage(db_path: Path | None = None) -> Check:
         return Check("commit coverage", WARN, f"coverage check failed: {exc}")
 
     status = {"ok": OK, "warn": WARN, "degraded": WARN}.get(verdict["status"], WARN)
+    if report.local_scanning_off_repos:
+        return Check(
+            "commit coverage",
+            status,
+            verdict["reason"],
+            "Configure checkout roots with `rebalance config set-local-repo-roots <path>` to enable coverage checks.",
+        )
     return Check("commit coverage", status, verdict["reason"])
 
 
@@ -2151,6 +2190,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
 
     # Integration credentials — Sleuth/Slack, Gmail, Google Calendar, Figma.
     report.checks.append(_check_sleuth(db_path))
+    report.checks.append(_check_slack_users(db_path))
     report.checks.append(_check_apple_reminders(db_path))
     report.checks.append(_check_gmail(db_path))
     report.checks.append(_check_calendar())

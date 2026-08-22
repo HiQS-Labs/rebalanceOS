@@ -1,0 +1,27 @@
+name: build-0770-resolvers-and-onboarding
+phases:
+  - id: ro1
+    name: Live Slack user resolver and write-through cache origin (#114)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.77.0-RESOLVERS-AND-ONBOARDING/phases-briefs/p1-slack-resolver.md
+    artifact: src/rebalance/ingest/slack_users.py,src/rebalance/ingest/config.py,tests/test_slack_users.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+
+  - id: ro2
+    name: Missing slack_users diagnostic and lifecycle onboarding stage (#115)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.77.0-RESOLVERS-AND-ONBOARDING/phases-briefs/p2-slack-users-diagnostics.md
+    artifact: src/rebalance/doctor.py,src/rebalance/ingest/lifecycle.py,tests/test_doctor.py,tests/test_lifecycle_contract.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: ro1
+
+  - id: ro3
+    name: Empty local_repo_roots summary and onboarding discovery (#116)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.77.0-RESOLVERS-AND-ONBOARDING/phases-briefs/p3-repo-roots-onboarding.md
+    artifact: src/rebalance/ingest/github_coverage.py,src/rebalance/doctor.py,src/rebalance/ingest/lifecycle.py,tests/test_github_coverage.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: ro2

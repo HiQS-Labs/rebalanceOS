@@ -208,6 +208,27 @@ def _check_github_token(ctx: SetupContext) -> tuple[bool, str]:
     return token is not None, "token configured" if token else "no token found"
 
 
+_LOCAL_REPO_ROOT_SUGGESTIONS = (
+    "Documents/GH Repos",
+    "Documents/GitHub",
+    "Projects",
+)
+
+
+def _check_local_repo_roots_configured(ctx: SetupContext) -> tuple[bool, str]:
+    """Report configured roots, or cheap filesystem suggestions for onboarding."""
+    from rebalance.ingest.config import get_local_repo_roots
+
+    roots = get_local_repo_roots()
+    if roots:
+        return True, ", ".join(roots)
+
+    suggestions = [f"~/{relative}" for relative in _LOCAL_REPO_ROOT_SUGGESTIONS if (Path.home() / relative).is_dir()]
+    if suggestions:
+        return False, f"not configured; detected likely checkout root(s): {', '.join(suggestions)}"
+    return False, "not configured; try ~/Documents/GH Repos if that is where your checkouts live"
+
+
 def _oauth_token_file_exists(service: str) -> bool:
     """File-fallback probe (review finding): the runtime collectors read a
     token FILE via resolve_oauth_token_path, not just the keyring — a
@@ -243,6 +264,14 @@ def _check_gmail_auth(ctx: SetupContext) -> tuple[bool, str]:
     if _oauth_token_file_exists("gmail"):
         return True, "OAuth token present (file)"
     return False, "no Gmail OAuth token"
+
+
+def _check_slack_users_configured(ctx: SetupContext) -> tuple[bool, str]:
+    """Report whether the optional Sleuth-to-Slack name cache is available."""
+    from rebalance.ingest.slack_users import get_slack_users_path
+
+    path = get_slack_users_path()
+    return path.exists(), str(path)
 
 
 def _registry_path(ctx: SetupContext) -> Path | None:
@@ -329,6 +358,18 @@ SETUP_STAGES: tuple[SetupStage, ...] = (
         executor="mcp:setup_github_token",
     ),
     SetupStage(
+        id="local_repo_roots_configured",
+        title="Local checkout roots",
+        check=_check_local_repo_roots_configured,
+        remediation=(
+            "Set the folders that contain your local checkouts: "
+            "`rebalance config set-local-repo-roots <path>` (for example, `~/Documents/GH Repos`)."
+        ),
+        executor="cli:rebalance config set-local-repo-roots <path>",
+        optional=True,
+        requires=("config_exists",),
+    ),
+    SetupStage(
         id="calendar_auth",
         # Titles never encode optionality — the `optional` flag is the
         # machine-readable source; renderers decorate (spike finding).
@@ -345,6 +386,18 @@ SETUP_STAGES: tuple[SetupStage, ...] = (
         check=_check_gmail_auth,
         remediation="Run `python scripts/setup_gmail_oauth.py` and complete the browser consent.",
         executor="script:scripts/setup_gmail_oauth.py",
+        optional=True,
+        requires=("config_exists",),
+    ),
+    SetupStage(
+        id="slack_users_configured",
+        title="Slack user names",
+        check=_check_slack_users_configured,
+        remediation=(
+            "Refresh Sleuth data; export-provided names populate the cache automatically. "
+            "For unresolved IDs, configure a Slack bot token and render the Sleuth view."
+        ),
+        executor="mcp:refresh_index",
         optional=True,
         requires=("config_exists",),
     ),

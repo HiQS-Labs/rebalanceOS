@@ -42,6 +42,7 @@ _LS_REMOTE_TIMEOUT_S = 30
 # in flight during a refresh is normal, so the WARN floor is above zero.
 GAP_WARN_THRESHOLD = 5
 STALE_FETCH_WARN_HOURS = 48
+LOCAL_SCANNING_OFF_REASON = "local repo scanning is off (set local_repo_roots)"
 
 
 @dataclass
@@ -78,9 +79,14 @@ class RepoCoverage:
 class CoverageReport:
     repos: list[RepoCoverage] = field(default_factory=list)
     checked_at: str = ""
+    local_scanning_off_repos: int = 0
 
     def as_dict(self) -> dict:
-        return {"checked_at": self.checked_at, "repos": [r.as_dict() for r in self.repos]}
+        return {
+            "checked_at": self.checked_at,
+            "repos": [r.as_dict() for r in self.repos],
+            "local_scanning_off_repos": self.local_scanning_off_repos,
+        }
 
     @property
     def worst_state(self) -> str:
@@ -259,6 +265,18 @@ def check_coverage(
     check_remote: bool = False,
 ) -> CoverageReport:
     """Measure coverage across *repos*; one repo's failure never hides another."""
+    if roots is None:
+        # Coverage differs from the backfill's convenience fallback: a doctor
+        # verdict must make an intentional opt-in visible, not silently scan a
+        # parent directory that may not be the operator's checkout root.
+        from rebalance.ingest.config import get_local_repo_roots
+
+        roots = get_local_repo_roots()
+    if not roots:
+        return CoverageReport(
+            checked_at=_now(),
+            local_scanning_off_repos=len(repos),
+        )
     return CoverageReport(
         repos=[check_repo_coverage(database_path, repo, roots=roots, check_remote=check_remote) for repo in repos],
         checked_at=_now(),
@@ -272,6 +290,12 @@ def coverage_health(report: CoverageReport) -> dict:
     uncoverable repo. An uncoverable repo is a WARN rather than silence — that
     silence is the failure shape this whole issue is about.
     """
+    if report.local_scanning_off_repos:
+        return {
+            "status": "warn",
+            "reason": f"{LOCAL_SCANNING_OFF_REASON} — {report.local_scanning_off_repos} repos not checked",
+        }
+
     problems = report.problems()
     if not problems:
         return {"status": "ok", "reason": "commit corpus matches every watched remote"}
