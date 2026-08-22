@@ -548,7 +548,8 @@ def sync_sleuth_reminders(
                        reminder_message_text, ignore_snooze, assignee_id,
                        original_sender_id, target_channel_id, original_channel_id,
                        original_channel_name, original_message_id,
-                       original_thread_ts, github_urls_json
+                       original_thread_ts, github_urls_json,
+                       last_seen_at, last_synced_at
                 FROM sleuth_reminders WHERE reminder_id = ?
                 """,
                 (r.reminder_id,),
@@ -611,8 +612,8 @@ def sync_sleuth_reminders(
                         original_message_id = ?,
                         original_thread_ts = ?,
                         github_urls_json = ?,
-                        last_seen_at = ?,
-                        last_synced_at = ?
+                        last_seen_at = CASE WHEN last_seen_at > ? THEN last_seen_at ELSE ? END,
+                        last_synced_at = CASE WHEN last_synced_at > ? THEN last_synced_at ELSE ? END
                     WHERE reminder_id = ?
                     """,
                     (
@@ -633,14 +634,19 @@ def sync_sleuth_reminders(
                         desired["github_urls_json"],
                         now_iso,
                         now_iso,
+                        now_iso,
+                        now_iso,
                         r.reminder_id,
                     ),
                 )
                 updated += 1
             else:
                 conn.execute(
-                    "UPDATE sleuth_reminders SET last_seen_at = ?, last_synced_at = ? WHERE reminder_id = ?",
-                    (now_iso, now_iso, r.reminder_id),
+                    "UPDATE sleuth_reminders "
+                    "SET last_seen_at = CASE WHEN last_seen_at > ? THEN last_seen_at ELSE ? END, "
+                    "last_synced_at = CASE WHEN last_synced_at > ? THEN last_synced_at ELSE ? END "
+                    "WHERE reminder_id = ?",
+                    (now_iso, now_iso, now_iso, now_iso, r.reminder_id),
                 )
                 unchanged += 1
 
@@ -654,16 +660,18 @@ def sync_sleuth_reminders(
                 placeholders = ",".join("?" * len(seen_ids))
                 cur = conn.execute(
                     f"UPDATE sleuth_reminders "
-                    f"SET is_active = 0, state = 'stale', last_synced_at = ? "
+                    f"SET is_active = 0, state = 'stale', "
+                    f"last_synced_at = CASE WHEN last_synced_at > ? THEN last_synced_at ELSE ? END "
                     f"WHERE is_active = 1 AND reminder_id NOT IN ({placeholders})",
-                    (now_iso, *seen_ids),
+                    (now_iso, now_iso, *seen_ids),
                 )
             else:
                 cur = conn.execute(
                     "UPDATE sleuth_reminders "
-                    "SET is_active = 0, state = 'stale', last_synced_at = ? "
+                    "SET is_active = 0, state = 'stale', "
+                    "last_synced_at = CASE WHEN last_synced_at > ? THEN last_synced_at ELSE ? END "
                     "WHERE is_active = 1",
-                    (now_iso,),
+                    (now_iso, now_iso),
                 )
             retired = cur.rowcount or 0
 

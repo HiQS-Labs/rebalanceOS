@@ -727,6 +727,38 @@ class TestParseRankedSynthesis(unittest.TestCase):
         self.assertFalse(na._is_generated_next_actions_file("Projects/Binoid.md", "Binoid"))
 
 
+class TestSleuthCandidates(unittest.TestCase):
+    def test_sleuth_candidates_unmapped_sender_id(self) -> None:
+        """Unmapped Slack sender receipts survive provider and rank ordering."""
+        bundle = na.OperatorBundle(
+            local_day="2026-08-21",
+            sleuth_activity=[
+                {
+                    "original_sender_id": "@U12345678",
+                    "message_preview": "Older reminder",
+                    "last_seen_at": "2026-08-21T09:00:00+00:00",
+                    "state": "open",
+                },
+                {
+                    "original_sender_id": "@U87654321",
+                    "message_preview": "Newer reminder",
+                    "last_seen_at": "2026-08-21T10:00:00+00:00",
+                    "state": "open",
+                },
+            ],
+        )
+        original_load_user_map = na.load_user_map
+        na.load_user_map = lambda: {}
+        try:
+            candidates = na.sleuth_candidates(bundle)
+            ranked = na._operator_candidates(bundle)
+        finally:
+            na.load_user_map = original_load_user_map
+
+        self.assertEqual([candidate["author"] for candidate in candidates], ["@U12345678", "@U87654321"])
+        self.assertEqual([candidate["author"] for candidate in ranked], ["@U87654321", "@U12345678"])
+
+
 class TestVaultRender(unittest.TestCase):
     """The fixed-vault-file render sink (render_next_actions_markdown +
     write_next_actions_to_vault)."""

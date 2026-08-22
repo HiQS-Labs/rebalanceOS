@@ -176,9 +176,14 @@ class SleuthRemindersTests(unittest.TestCase):
 
     # --- Retire-on-disappearance reconciliation --------------------------
 
-    def test_full_pull_retires_disappeared_rows(self) -> None:
-        """active_only=False with a reminder missing from the response retires it."""
+    def test_staling_sweep_reconciles_missing_reminders(self) -> None:
+        """An empty full pull retires active rows without deleting their audit history."""
         self._run_sync(_success_payload())  # seeds R-001 is_active=1
+        with sqlite3.connect(self.db_path) as conn:
+            before = conn.execute(
+                "SELECT first_seen_at, last_seen_at, reminder_message_text "
+                "FROM sleuth_reminders WHERE reminder_id = 'R-001'"
+            ).fetchone()
 
         empty_payload = _success_payload(reminders=[])
         result = self._run_sync(empty_payload, active_only=False)
@@ -187,9 +192,13 @@ class SleuthRemindersTests(unittest.TestCase):
         self.assertEqual(result.updated_count, 0)
 
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute("SELECT is_active, state FROM sleuth_reminders WHERE reminder_id = 'R-001'").fetchone()
+            row = conn.execute(
+                "SELECT is_active, state, first_seen_at, last_seen_at, reminder_message_text "
+                "FROM sleuth_reminders WHERE reminder_id = 'R-001'"
+            ).fetchone()
         self.assertEqual(row[0], 0)
         self.assertEqual(row[1], "stale")
+        self.assertEqual(row[2:], before)
 
     def test_active_only_pull_does_not_retire_disappeared_rows(self) -> None:
         """active_only=True preserves history; missing rows stay is_active=1."""
@@ -212,7 +221,7 @@ class SleuthRemindersTests(unittest.TestCase):
         second = self._run_sync(_success_payload(reminders=[]), active_only=False)
         self.assertEqual(second.retired_count, 0)
 
-    def test_retire_only_targets_disappeared_rows(self) -> None:
+    def test_staling_sweep_retires_only_partially_disappeared_rows(self) -> None:
         """A row still in the response is left alone; only missing ones retire."""
         # Seed two reminders, then drop R-002 from the response.
         self._run_sync(
@@ -232,6 +241,24 @@ class SleuthRemindersTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(kept, (1, "overdue"))
         self.assertEqual(retired, (0, "stale"))
+
+    def test_staling_sweep_does_not_regress_timestamps_when_clock_drifts(self) -> None:
+        """A local clock behind the prior sync must still retire without rewinding timestamps."""
+        future = "2026-04-22T12:00:00+00:00"
+        past = "2026-04-22T11:00:00+00:00"
+        with patch("rebalance.ingest.sleuth_reminders.time_ops.now_iso", return_value=future):
+            self._run_sync(_success_payload())
+
+        with patch("rebalance.ingest.sleuth_reminders.time_ops.now_iso", return_value=past):
+            result = self._run_sync(_success_payload(reminders=[]), active_only=False)
+
+        self.assertEqual(result.retired_count, 1)
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT state, is_active, first_seen_at, last_seen_at, last_synced_at "
+                "FROM sleuth_reminders WHERE reminder_id = 'R-001'"
+            ).fetchone()
+        self.assertEqual(row, ("stale", 0, future, future, future))
 
     # --- Error paths ------------------------------------------------------
 

@@ -1,0 +1,18 @@
+name: build-0760-signal-alignment
+phases:
+  - id: sa1
+    name: Sleuth reminder disappearance and staling sweep validation (#113)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.76.0-SIGNAL-ALIGNMENT/phases-briefs/p1-staling-sweep.md
+    artifact: src/rebalance/ingest/sleuth_reminders.py,tests/test_sleuth_reminders.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+
+  - id: sa2
+    name: What's next candidate ranking and attribution fallback (#113)
+    reviewer: agy
+    brief: PROJECT/2-WORKING/BUILD-0.76.0-SIGNAL-ALIGNMENT/phases-briefs/p2-whats-next-synthesis.md
+    artifact: src/rebalance/ingest/next_actions.py,tests/test_next_actions.py
+    turn_timeout_s: 900
+    max_review_rounds: 3
+    depends_on: sa1
