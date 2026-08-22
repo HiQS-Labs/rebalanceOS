@@ -223,9 +223,7 @@ def _check_local_repo_roots_configured(ctx: SetupContext) -> tuple[bool, str]:
     if roots:
         return True, ", ".join(roots)
 
-    suggestions = [
-        f"~/{relative}" for relative in _LOCAL_REPO_ROOT_SUGGESTIONS if (Path.home() / relative).is_dir()
-    ]
+    suggestions = [f"~/{relative}" for relative in _LOCAL_REPO_ROOT_SUGGESTIONS if (Path.home() / relative).is_dir()]
     if suggestions:
         return False, f"not configured; detected likely checkout root(s): {', '.join(suggestions)}"
     return False, "not configured; try ~/Documents/GH Repos if that is where your checkouts live"

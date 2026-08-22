@@ -1126,9 +1126,7 @@ def _check_slack_users(db_path: Path | None) -> Check:
             has_table = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sleuth_reminders'"
             ).fetchone()
-            has_sleuth_rows = bool(
-                has_table and conn.execute("SELECT 1 FROM sleuth_reminders LIMIT 1").fetchone()
-            )
+            has_sleuth_rows = bool(has_table and conn.execute("SELECT 1 FROM sleuth_reminders LIMIT 1").fetchone())
     except Exception as exc:  # noqa: BLE001 — doctor must never crash
         return Check(name, FAIL, f"could not read Sleuth reminders: {exc}")
 

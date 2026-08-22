@@ -17,8 +17,9 @@ def _reset_cache() -> None:
 def test_cache_hit_avoids_payload_and_api(tmp_path: Path) -> None:
     cache = tmp_path / "slack_users.json"
     cache.write_text(json.dumps({"users": {"U1": "Cached Name"}}), encoding="utf-8")
-    with patch.object(slack_users, "SLACK_USERS_PATH", cache), patch.object(
-        slack_users, "_fetch_slack_user", side_effect=AssertionError("API called")
+    with (
+        patch.object(slack_users, "SLACK_USERS_PATH", cache),
+        patch.object(slack_users, "_fetch_slack_user", side_effect=AssertionError("API called")),
     ):
         _reset_cache()
         assert slack_users.resolve_slack_user("U1", payload={"display_name": "New Name"}) == "Cached Name"
@@ -58,8 +59,10 @@ def test_configured_token_resolves_via_slack_api_and_caches(tmp_path: Path, monk
         return Response()
 
     monkeypatch.setenv(config.KEYRING_DISABLE_ENV_VAR, "1")
-    with patch.object(config, "CONFIG_PATH", config_path), patch.object(slack_users, "SLACK_USERS_PATH", cache), patch.object(
-        slack_users, "urlopen", side_effect=fake_urlopen
+    with (
+        patch.object(config, "CONFIG_PATH", config_path),
+        patch.object(slack_users, "SLACK_USERS_PATH", cache),
+        patch.object(slack_users, "urlopen", side_effect=fake_urlopen),
     ):
         _reset_cache()
         assert slack_users.resolve_slack_user("U3") == "Grace"
@@ -72,7 +75,10 @@ def test_configured_token_resolves_via_slack_api_and_caches(tmp_path: Path, monk
 
 def test_unresolved_user_falls_back_to_raw_id_without_writing_cache(tmp_path: Path) -> None:
     cache = tmp_path / "slack_users.json"
-    with patch.object(slack_users, "SLACK_USERS_PATH", cache), patch.object(config, "get_slack_bot_token", return_value=None):
+    with (
+        patch.object(slack_users, "SLACK_USERS_PATH", cache),
+        patch.object(config, "get_slack_bot_token", return_value=None),
+    ):
         _reset_cache()
         assert slack_users.format_slack_mentions("Ping <@U4>") == "Ping @U4"
         assert not cache.exists()
@@ -83,9 +89,12 @@ def test_resolved_multiword_names_compact_sleuth_reminders(tmp_path: Path) -> No
     cache.write_text(json.dumps({"users": {"U5": "Ada Lovelace"}}), encoding="utf-8")
     with patch.object(slack_users, "SLACK_USERS_PATH", cache):
         _reset_cache()
-        assert slack_users.compact_sleuth_reminder(
-            "<@U5> - please follow up on <https://example.com|this>\n> Ship the resolver"
-        ) == "Ship the resolver"
+        assert (
+            slack_users.compact_sleuth_reminder(
+                "<@U5> - please follow up on <https://example.com|this>\n> Ship the resolver"
+            )
+            == "Ship the resolver"
+        )
 
 
 def test_concurrent_cache_misses_preserve_both_resolved_users(tmp_path: Path) -> None:
