@@ -5,6 +5,7 @@ asserted on; these tests cover the database-backed checks (driven by a temp
 DB) and the report aggregation logic.
 """
 
+import sqlite3
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,7 @@ from rebalance.doctor import (
     _check_gmail,
     _check_pulse,
     _check_pulse_collectors,
+    _check_slack_users,
     _check_sleuth,
     _diagnostics_index,
     run_doctor,
@@ -217,6 +219,28 @@ class IntegrationCheckTests(unittest.TestCase):
             check = _check_sleuth()
         self.assertEqual(check.status, OK)
         self.assertIn("keyring", check.detail)
+
+    def test_slack_users_warns_only_for_indexed_sleuth_activity_without_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "rebalance.db"
+            cache = Path(tmp) / "slack_users.json"
+            with db_connection(db) as conn:
+                conn.execute("CREATE TABLE sleuth_reminders (reminder_id TEXT PRIMARY KEY)")
+                conn.commit()
+
+            with patch("rebalance.ingest.slack_users.get_slack_users_path", return_value=cache):
+                self.assertEqual(_check_slack_users(db).status, OK)
+
+                conn = sqlite3.connect(db)
+                try:
+                    conn.execute("INSERT INTO sleuth_reminders VALUES ('reminder-1')")
+                    conn.commit()
+                finally:
+                    conn.close()
+                self.assertEqual(_check_slack_users(db).status, WARN)
+
+                cache.write_text('{"users": {}}', encoding="utf-8")
+                self.assertEqual(_check_slack_users(db).status, OK)
 
     def test_calendar_token_presence(self) -> None:
         # _check_calendar resolves keyring → secret-store JSON → legacy pickle.

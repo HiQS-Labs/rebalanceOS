@@ -452,6 +452,17 @@ def set_onboarding_stage_skipped(stage_id: str, skipped: bool = True) -> list[st
 # allow-list — and live in plain rbos.config.
 
 
+def get_slack_bot_token() -> str | None:
+    """Return the optional Slack bot token (keyring → secret store → config).
+
+    ``users.info`` is a best-effort enrichment path, so callers must also
+    work without this token.  A legacy ``slack_bot_token`` in ``rbos.config``
+    remains readable during migration, just like the other API tokens.
+    """
+    token, _source = _get_secret_dual_store("slack_bot_token")
+    return (token.strip() or None) if isinstance(token, str) else None
+
+
 def get_figma_token() -> str | None:
     """Return the configured Figma personal access token (keyring → rbos.config).
 

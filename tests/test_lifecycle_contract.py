@@ -75,11 +75,18 @@ class SetupStageMapTests(unittest.TestCase):
         for stage in SETUP_STAGES:
             self.assertTrue(stage.remediation.strip(), stage.id)
 
-    def test_optional_stages_are_auth_and_graduation(self):
+    def test_optional_stages_are_auth_cache_and_graduation(self):
         optional = {s.id for s in SETUP_STAGES if s.optional}
         self.assertEqual(
             optional,
-            {"calendar_auth", "gmail_auth", "schedulers_installed", "first_pulse"},
+            {
+                "calendar_auth",
+                "gmail_auth",
+                "slack_users_configured",
+                "local_repo_roots_configured",
+                "schedulers_installed",
+                "first_pulse",
+            },
         )
 
 
@@ -109,9 +116,11 @@ class _EvaluateHarness(unittest.TestCase):
             patch("rebalance.ingest.lifecycle._launch_agents_dir") as agents_dir,
             patch("rebalance.ingest.lifecycle._pulse_html_path") as pulse_html,
             patch("rebalance.paths.resolve_oauth_token_path") as oauth_path,
+            patch("rebalance.ingest.slack_users.get_slack_users_path") as slack_users_path,
         ):
             sandbox = Path(vault or tempfile.gettempdir())
             oauth_path.side_effect = lambda svc: sandbox / f"oauth-{svc}.json"
+            slack_users_path.return_value = sandbox / "slack_users.json"
             agents_dir.return_value = sandbox / "LaunchAgents"
             pulse_html.return_value = sandbox / "web" / "pulse.html"
             fake_cfg = Path(vault or tempfile.gettempdir()) / "rbos.config"
@@ -154,8 +163,15 @@ class EvaluateSetupTests(_EvaluateHarness):
             report = self._evaluate(vault_dir=tmp)
             self.assertEqual(self._status(report, "calendar_auth"), "next")
             self.assertEqual(self._status(report, "gmail_auth"), "next")
+            self.assertEqual(self._status(report, "slack_users_configured"), "next")
             # The required pipeline continues past the optional stages.
             self.assertEqual(report["now"], "registry_exists")
+
+    def test_slack_user_cache_marks_optional_stage_done(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "slack_users.json").write_text('{"users": {}}')
+            report = self._evaluate(vault_dir=tmp)
+        self.assertEqual(self._status(report, "slack_users_configured"), "done")
 
     def test_all_required_done_reports_setup_complete(self):
         with tempfile.TemporaryDirectory() as tmp:

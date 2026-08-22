@@ -11,11 +11,13 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.ingest.github_commit_backfill import backfill_commits
 from rebalance.ingest.github_coverage import (
     check_repo_coverage,
+    check_coverage,
     coverage_health,
     CoverageReport,
     RepoCoverage,
@@ -170,6 +172,35 @@ class CoverageCheckTests(unittest.TestCase):
         c = check_repo_coverage(self.db, "Some-Org/nope", roots=[], check_remote=False)
         self.assertEqual(c.state, "uncoverable")
         self.assertFalse(c.is_clean)
+
+    def test_empty_local_repo_roots_returns_one_scanning_off_summary(self):
+        repos = ["Some-Org/one", "Some-Org/two", "Some-Org/three"]
+        with patch("rebalance.ingest.config.get_local_repo_roots", return_value=[]):
+            report = check_coverage(self.db, repos)
+
+        self.assertEqual(report.repos, [])
+        self.assertEqual(report.local_scanning_off_repos, len(repos))
+        self.assertEqual(
+            coverage_health(report),
+            {
+                "status": "warn",
+                "reason": "local repo scanning is off (set local_repo_roots) — 3 repos not checked",
+            },
+        )
+
+    def test_explicit_empty_roots_returns_the_same_scanning_off_summary(self):
+        repos = ["Some-Org/one", "Some-Org/two"]
+
+        report = check_coverage(self.db, repos, roots=[])
+
+        self.assertEqual(report.repos, [])
+        self.assertEqual(
+            coverage_health(report),
+            {
+                "status": "warn",
+                "reason": "local repo scanning is off (set local_repo_roots) — 2 repos not checked",
+            },
+        )
 
     # -- health verdict --
 
