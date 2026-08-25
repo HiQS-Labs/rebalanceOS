@@ -2,7 +2,7 @@
 """Auto-file GitHub issues for failing rebalance health checks.
 
 Runs ``rebalance doctor``, then creates/closes GitHub issues on
-``HiQS-Suite/rebalanceOS`` so
+``HiQS-Labs/rebalanceOS`` so
 failures are tracked in the project backlog without manual triage.
 
 Logging
@@ -55,7 +55,7 @@ Options
     --llm-max-per-run N     Max LLM calls in this single invocation (default: 5)
     --dedup-days N          Look back N days for closed issues (default: 30)
     --dry-run               Print plan; make no GitHub or LLM API calls
-    --repo OWNER/REPO       Override target repo (default: HiQS-Suite/rebalanceOS)
+    --repo OWNER/REPO       Override target repo (default: HiQS-Labs/rebalanceOS)
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ from rebalance.lib.json_ops import parse_llm_json  # noqa: E402 — needs _boots
 
 DEVICE_NAME: str = socket.gethostname()
 
-REPO = "HiQS-Suite/rebalanceOS"  # GH-36: the canonical repo; the retiring clone's tracker is archived
+REPO = "HiQS-Labs/rebalanceOS"  # GH-36: the canonical repo; the retiring clone's tracker is archived. Org renamed HiQS-Suite -> HiQS-Labs 2026-08 (redirects break here: GitHub's 307 redirect isn't followed by urllib's POST handling, so the stale name was a hard crash, not a soft degrade).
 LABEL = "rebalance-health"
 ISSUE_TITLE_PREFIX = "health:"
 

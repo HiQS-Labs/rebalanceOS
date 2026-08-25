@@ -73,8 +73,8 @@ elif man.get("version") != m.group(1):
     print(f"version {man.get('version')} != pyproject {m.group(1)}")
 
 url = (man.get("repository") or {}).get("url", "")
-if "HiQS-Suite/rebalanceOS" not in url:
-    print(f"repository url is not HiQS-Suite/rebalanceOS: {url}")
+if "HiQS-Labs/rebalanceOS" not in url:
+    print(f"repository url is not HiQS-Labs/rebalanceOS: {url}")
 
 
 def is_mcp_tool(dec):
