@@ -929,7 +929,13 @@ struct RosterLayout<Content: View>: View {
                 spacing: Theme.Space.s
             ) { content }
         } else {
-            VStack(spacing: Theme.Space.s) { content }
+            // LAZY, not a plain `VStack`. This container also carries the Prompt
+            // Log feed, which is thousands of entries; a plain VStack realizes
+            // every one of them — each with NSView-backed buttons — and beach-
+            // balls the app on tab switch. It was a `LazyVStack` before this
+            // type existed and it must stay one. `LazyVGrid` above is already
+            // lazy, so only this branch was ever at risk.
+            LazyVStack(spacing: Theme.Space.s) { content }
         }
     }
 }

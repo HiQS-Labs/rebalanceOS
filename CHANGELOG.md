@@ -24,6 +24,17 @@
   exactly as before, so it only changes what you see once the panel is dragged wider. A toolbar
   button pins the cards to one column for anyone who prefers that, and the choice is remembered.
 
+## [0.75.7] - 2026-08-24
+
+### Fixed
+
+- Switching to the Prompt Log tab no longer hangs the app with a spinning beach ball. The shared
+  card container introduced in 0.75.6 drew its one-column layout without the "only build what's on
+  screen" behaviour the feed previously had, so every entry in the log — well over a thousand,
+  each with its own buttons — was built at once on every switch. Only the one-column layout was
+  affected; the tiled layout was always built lazily. Guarded by a test that lays out 1,500 entries
+  and fails if the cost grows with the number of rows.
+
 ## [0.75.6] - 2026-08-24
 
 ### Fixed
