@@ -2745,7 +2745,10 @@ def parse_roadmap_ledger(path):
                     break
             cre = re.search(r"cx/risk/eff (\d+)/(\d+)/(\d+)", raw)
             doc = re.search(r"\]\((PROJECT/[^)]+\.md)", raw)
-            issue = re.search(r"https://github\.com/HiQS-Suite/XYZ-forge/(?:issues|pull)/\d+", raw)
+            # Org-agnostic on purpose (not pinned to a specific owner): this parses
+            # XYZ-forge's own ROADMAP.md format, whose issue/PR links predate and will
+            # outlive any one org name (rots on org rename otherwise — see GH-123).
+            issue = re.search(r"https://github\.com/[^/\s]+/XYZ-forge/(?:issues|pull)/\d+", raw)
             pos[sec] = pos.get(sec, 0) + 1
             entry = {
                 "gh_number": int(gh.group(1)) if gh else None,

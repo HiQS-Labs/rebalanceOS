@@ -241,4 +241,27 @@ elif [ "$pyver" != "$pkgver" ]; then
   report 0 "pyproject version ($pyver) != package __version__ ($pkgver)"
 fi
 
+# --- 8. retired org/owner names in live files ---------------------------------
+# GH-123-class bug: a hardcoded old org name in a REST API call doesn't get GitHub's
+# free redirect (that only covers git fetch/push and browser links) — it silently
+# rots until something actually calls the API and hard-crashes. Caught HiQS-Suite
+# surviving in health_issue_reporter.py for days, invisibly, because the thing that
+# would have reported the crash WAS the crashing script.
+#
+# RETIRED_OWNERS is a list so the NEXT rename is one line here, not a fresh grep
+# invented from scratch. Scoped to files a live process actually reads/executes —
+# the same historical-ledger exclusions as check 1 (CHANGELOG.md/ROADMAP.md/PROJECT/**
+# and relay/marathon transcripts legitimately cite old org names in old, dated
+# entries; rewriting them would falsify history, not fix a bug).
+RETIRED_OWNERS=(HiQS-Suite)
+for owner in "${RETIRED_OWNERS[@]}"; do
+  while IFS= read -r hit; do
+    [ -n "$hit" ] && report 8 "retired org '$owner' still referenced: $hit"
+  done < <(git grep -nF "$owner" -- '*.py' '*.sh' '*.js' '*.json' '*.yml' '*.yaml' \
+             ':(exclude)CHANGELOG.md' ':(exclude)ROADMAP.md' ':(exclude)PROJECT/**' \
+             ':(exclude)relay-system/**' ':(exclude)marathon-system/**' \
+             ':(exclude)test/**' ':(exclude)tests/**' \
+             ':(exclude)utils/frontdoor-check.sh' 2>/dev/null)
+done
+
 exit "$fired"
