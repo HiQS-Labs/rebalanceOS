@@ -24,6 +24,26 @@
   exactly as before, so it only changes what you see once the panel is dragged wider. A toolbar
   button pins the cards to one column for anyone who prefers that, and the choice is remembered.
 
+## [0.75.6] - 2026-08-24
+
+### Fixed
+
+- Prompt Log entries written since 2026-08-21 show their age again. CLIO changed the timestamp it
+  writes from `2026-08-21T15:48:18Z` to `2026-08-24 19:57:39 PDT`, and the app only understood the
+  first shape, so every newer entry rendered an empty grey capsule where "2h ago" belongs — 1,460
+  of 1,951 entries in a live log. Both shapes are read now, and a timestamp that genuinely cannot
+  be read hides the capsule instead of drawing an empty one.
+
+### Added
+
+- The Prompt Log tiles its entries left to right and re-flows them to fewer columns as the panel
+  narrows, matching the repo board.
+- Each repo's newest prompt is now held up automatically in a "Latest per repo" band, taken from
+  the last 30 prompts. Typing a new prompt in Claude Code replaces that repo's entry on the next
+  refresh. These are worked out fresh each time rather than stored, so nothing goes stale, and they
+  are kept separate from pins made by hand — a manual pin always wins, and the automatic ones never
+  use up the five manual pin slots.
+
 ## [0.75.4] - 2026-08-21
 
 ### Fixed

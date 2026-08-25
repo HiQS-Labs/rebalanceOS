@@ -435,9 +435,11 @@ struct ContentView: View {
                 if !filteredPinnedEntries.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Space.s) {
                         pinnedSectionHeader
-                        ForEach(filteredPinnedEntries) { entry in
-                            PromptLogRowView(entry: entry, isPinned: true, openInfo: model.vscodeOpenInfo(forRepoName: entry.repo)) {
-                                model.togglePin(entry)
+                        RosterLayout(tiled: model.tileCards) {
+                            ForEach(filteredPinnedEntries) { entry in
+                                PromptLogRowView(entry: entry, isPinned: true, openInfo: model.vscodeOpenInfo(forRepoName: entry.repo)) {
+                                    model.togglePin(entry)
+                                }
                             }
                         }
                     }
@@ -446,13 +448,33 @@ struct ContentView: View {
                     Divider().overlay(Theme.separator)
                 }
 
-                if filteredPinnedEntries.isEmpty && filteredUnpinnedEntries.isEmpty {
+                // Automatic "newest prompt per repo" band. Sits below the manual
+                // pins because those are a deliberate choice and these are not.
+                if !filteredAutoPinnedEntries.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Space.s) {
+                        autoPinnedSectionHeader
+                        RosterLayout(tiled: model.tileCards) {
+                            ForEach(filteredAutoPinnedEntries) { entry in
+                                PromptLogRowView(entry: entry, isPinned: false, isAutoPinned: true,
+                                                 openInfo: model.vscodeOpenInfo(forRepoName: entry.repo)) {
+                                    model.togglePin(entry)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Space.m)
+                    .padding(.bottom, Theme.Space.m)
+                    Divider().overlay(Theme.separator)
+                }
+
+                if filteredPinnedEntries.isEmpty && filteredAutoPinnedEntries.isEmpty
+                    && filteredUnpinnedEntries.isEmpty {
                     emptyState(icon: "magnifyingglass",
                                title: "No matches",
                                detail: "No prompts from a repo matching \"\(promptLogFilter)\".")
                 } else {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: Theme.Space.s) {
+                        RosterLayout(tiled: model.tileCards) {
                             ForEach(Array(filteredUnpinnedEntries.enumerated()), id: \.element.id) { index, entry in
                                 PromptLogRowView(entry: entry, isPinned: false, darker: !index.isMultiple(of: 2), openInfo: model.vscodeOpenInfo(forRepoName: entry.repo)) {
                                     model.togglePin(entry)
@@ -499,6 +521,9 @@ struct ContentView: View {
     private var filteredPinnedEntries: [PromptLogEntry] {
         filterByRepo(model.pinnedPromptLogEntries)
     }
+    private var filteredAutoPinnedEntries: [PromptLogEntry] {
+        filterByRepo(model.autoPinnedPromptLogEntries)
+    }
     private var filteredUnpinnedEntries: [PromptLogEntry] {
         filterByRepo(model.unpinnedPromptLogEntries)
     }
@@ -533,6 +558,19 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes all \(model.pinnedPromptLogEntries.count) pinned entries. This can't be undone.")
+        }
+    }
+
+    // Caption for the automatic band. No reset control: there is nothing to
+    // reset — these are derived from the log on every read, so the only way to
+    // change one is to write a newer prompt in that repo.
+    private var autoPinnedSectionHeader: some View {
+        HStack(spacing: 6) {
+            Text("LATEST PER REPO (\(model.autoPinnedPromptLogEntries.count))")
+                .font(Theme.caption).foregroundStyle(Theme.text3).tracking(0.5)
+            Spacer(minLength: 0)
+            Text("last \(Focus5Model.autoPinScanDepth) prompts")
+                .font(Theme.caption).foregroundStyle(Theme.text3)
         }
     }
 
@@ -954,6 +992,10 @@ struct TelemetryRowView: View {
 struct PromptLogRowView: View {
     let entry: PromptLogEntry
     let isPinned: Bool
+    /// Held up by the automatic "newest per repo" scan rather than by the
+    /// operator. Styled apart from a manual pin because it is temporary — the
+    /// next prompt from this repo silently replaces it.
+    var isAutoPinned: Bool = false
     var darker: Bool = false
     // Resolved via Focus5Model.vscodeOpenInfo(forRepoName:) — nil when the
     // repo isn't in the current roster/off-roster payload, in which case the
@@ -966,7 +1008,22 @@ struct PromptLogRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Theme.Space.s) {
-                KeyCap(text: RelTime.ago(entry.timestamp), font: Theme.monoSmall, height: 24)
+                // Only when the stamp parsed. An unreadable timestamp used to
+                // render an EMPTY capsule, which reads as a bug rather than as
+                // missing data (and was one, for every entry CLIO wrote after it
+                // changed timestamp format — see RelTime.parse).
+                let age = RelTime.ago(entry.timestamp)
+                if !age.isEmpty {
+                    KeyCap(text: age, font: Theme.monoSmall, height: 24)
+                }
+                if isAutoPinned {
+                    Text("LATEST")
+                        .font(Theme.caption).tracking(0.5)
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Theme.accentSoft, in: Capsule())
+                        .help("Automatically held up as this repo's newest prompt")
+                }
                 Spacer(minLength: Theme.Space.s)
                 if let openInfo {
                     OpenRepoButton(repoName: entry.repo, localPath: openInfo.localPath, vscodeURL: openInfo.vscodeURL)
@@ -1005,7 +1062,7 @@ struct PromptLogRowView: View {
     }
 
     private var rowBackground: Color {
-        if isPinned { return Theme.accentSoft }
+        if isPinned || isAutoPinned { return Theme.accentSoft }
         if hovered { return Theme.hover }
         return darker ? Theme.hover : .clear
     }

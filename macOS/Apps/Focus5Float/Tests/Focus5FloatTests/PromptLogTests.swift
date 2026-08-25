@@ -325,15 +325,26 @@ final class PromptLogTests: XCTestCase {
         XCTAssertTrue(model.pinnedPromptLogIDs.isEmpty)
     }
 
-    func testPinnedAndUnpinnedEntriesPartitionWithoutOverlap() {
+    func testPinnedAutoPinnedAndUnpinnedEntriesPartitionWithoutOverlap() {
+        // The feed is now a THREE-way split — manual pins, the automatic
+        // "newest per repo" band, and everything else — and an entry must appear
+        // in exactly one of them or it renders twice on screen.
         let model = Focus5Model()
         model.promptLogFileURL = makeTempFile(named: "log.md", contents: twoEntryFixture)
         let toPin = model.promptLogEntries[0]
         model.togglePin(toPin)
 
-        XCTAssertEqual(model.pinnedPromptLogEntries.map(\.id), [toPin.id])
-        XCTAssertFalse(model.unpinnedPromptLogEntries.map(\.id).contains(toPin.id))
-        XCTAssertEqual(model.unpinnedPromptLogEntries.count, model.promptLogEntries.count - 1)
+        let pinned = model.pinnedPromptLogEntries.map(\.id)
+        let auto = model.autoPinnedPromptLogEntries.map(\.id)
+        let rest = model.unpinnedPromptLogEntries.map(\.id)
+
+        XCTAssertEqual(pinned, [toPin.id])
+        XCTAssertFalse(auto.contains(toPin.id), "A manually pinned entry also auto-pinned.")
+        XCTAssertFalse(rest.contains(toPin.id))
+        XCTAssertTrue(Set(auto).isDisjoint(with: Set(rest)))
+        XCTAssertEqual(Set(pinned + auto + rest), Set(model.promptLogEntries.map(\.id)),
+                       "An entry fell out of every band, or landed in two.")
+        XCTAssertEqual(pinned.count + auto.count + rest.count, model.promptLogEntries.count)
     }
 
     // MARK: - Persistence

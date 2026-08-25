@@ -90,9 +90,53 @@ final class Focus5Model {
         let byID = Dictionary(uniqueKeysWithValues: promptLogEntries.map { ($0.id, $0) })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
     }
+
+    /// How far back the automatic "newest per repo" scan looks.
+    static let autoPinScanDepth = 30
+
+    /// The newest entry from each repo within the last `autoPinScanDepth`
+    /// messages, held up automatically so every active repo shows its current
+    /// prompt without the operator pinning anything.
+    ///
+    /// These are TEMPORARY and derived — recomputed from `promptLogEntries` on
+    /// every refresh, never stored. That is the whole mechanism behind "pinned
+    /// until there's a newer message from that repo": when CLIO appends a newer
+    /// prompt for a repo, the next read simply computes a different winner. No
+    /// eviction logic, nothing to keep in sync, and nothing that can strand a
+    /// stale pin if a log is edited or rebuilt.
+    ///
+    /// A MANUAL pin always wins: a repo whose newest entry the operator already
+    /// pinned by hand is skipped, so the same prompt never appears twice, and
+    /// auto-pins never consume the 5-slot manual queue — five busy repos would
+    /// otherwise fill it permanently and the pin button would stop working.
+    var autoPinnedPromptLogEntries: [PromptLogEntry] {
+        let manual = Set(pinnedPromptLogIDs)
+        var seenRepos = Set<String>()
+        var newest: [PromptLogEntry] = []
+        // promptLogEntries is newest-first (CLIO writes newest directly below
+        // its marker and the reader preserves file order), so the first entry
+        // seen for a repo IS that repo's newest.
+        for entry in promptLogEntries.prefix(Self.autoPinScanDepth) {
+            guard !manual.contains(entry.id) else {
+                // Counts as that repo's slot being spoken for — otherwise the
+                // manual pin and an auto-pin of an OLDER prompt would both show.
+                seenRepos.insert(entry.repo)
+                continue
+            }
+            guard seenRepos.insert(entry.repo).inserted else { continue }
+            newest.append(entry)
+        }
+        return newest
+    }
+
+    func isAutoPinned(_ entry: PromptLogEntry) -> Bool {
+        autoPinnedPromptLogEntries.contains { $0.id == entry.id }
+    }
+
     var unpinnedPromptLogEntries: [PromptLogEntry] {
-        let pinned = Set(pinnedPromptLogIDs)
-        return promptLogEntries.filter { !pinned.contains($0.id) }
+        var held = Set(pinnedPromptLogIDs)
+        held.formUnion(autoPinnedPromptLogEntries.map(\.id))
+        return promptLogEntries.filter { !held.contains($0.id) }
     }
 
     /// Pure extension-string discriminator: `.md` (any case) → markdown/text
