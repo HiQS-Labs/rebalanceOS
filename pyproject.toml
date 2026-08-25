@@ -87,6 +87,12 @@ extend-exclude = [
   "ask_self",
   "experimental",
   ".swe-diagram",
+  # Vendored verbatim from XYZ-forge (the release-ledger app). Linting it here
+  # would fork it from upstream over B007/B023 style nits, and the next
+  # `xyz-sync` would silently revert the fix. Named individually, not as
+  # `utils/py/`, so first-party code added beside them is still linted.
+  "utils/py/releases_app.py",
+  "utils/py/releases_cycle.py",
 ]
 
 [tool.ruff.lint]

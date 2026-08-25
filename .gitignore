@@ -106,6 +106,19 @@ REPO_MAP.md
 *.sqlite-wal
 *.sqlite-shm
 
+# ...except the release ledger. `releases.sql` is the git-mergeable dump and is
+# authoritative at merge boundaries, but it CANNOT stand alone: `releases check
+# --rebuild` refuses with `rule=not-initialized` when no releases.db is present,
+# so a dump-only commit leaves a fresh clone with no ledger and no way to
+# rebuild one. Both artifacts are tracked, which is what the upstream repo does.
+# This is a single named file, not a relaxation of the rule above.
+!releases.db
+
+# Regenerable side-by-side output of the release ledger (`releases gen`), and its
+# drift report. Both are derived from releases.db; upstream ignores them too.
+RELEASES.generated.md
+RELEASES.generated.md.drift
+
 # AI agent scratch workspaces — never repo content (GH-266)
 .gemini/
 
