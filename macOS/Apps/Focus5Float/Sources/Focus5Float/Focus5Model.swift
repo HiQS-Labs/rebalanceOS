@@ -72,6 +72,20 @@ final class Focus5Model {
     }
     static let maxPinnedPromptLogEntries = 5
 
+    // Roster layout (GH-120). True = the cards TILE left to right and re-flow to
+    // fewer columns as the panel narrows, which is what the web board does and is
+    // the default here for the same reason. False pins them to one column.
+    //
+    // How many columns is never decided here — RosterLayout asks the real width
+    // at render time. At the default 340pt panel a tiled roster is a single
+    // column anyway, so the default costs nothing until the operator drags the
+    // panel wider (the panel is `.resizable`).
+    var tileCards: Bool = true {
+        didSet {
+            UserDefaults.standard.set(tileCards, forKey: "tileCards")
+        }
+    }
+
     var pinnedPromptLogEntries: [PromptLogEntry] {
         let byID = Dictionary(uniqueKeysWithValues: promptLogEntries.map { ($0.id, $0) })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
@@ -123,6 +137,11 @@ final class Focus5Model {
         if let path = UserDefaults.standard.string(forKey: "promptLogFilePath") {
             promptLogFileURL = URL(fileURLWithPath: path)
         }
+        // Tiling defaults ON, so an absent key must NOT collapse to bool(forKey:)'s
+        // false. object(forKey:) distinguishes "never set" from "set to false",
+        // which is what keeps a first run tiled and still honours an operator who
+        // deliberately turned it off.
+        tileCards = (UserDefaults.standard.object(forKey: "tileCards") as? Bool) ?? true
     }
 
     var isDirtyView: Bool { rankingMode == "dirty_first" }

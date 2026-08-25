@@ -82,6 +82,18 @@ struct ContentView: View {
 
                 ToolbarIconButton(systemName: "arrow.up.left.and.arrow.down.right", action: togglePanelWidth)
                     .help("Toggle panel width")
+
+                // GH-120. Icon mirrors the state it switches TO, matching the
+                // panel-width button beside it.
+                ToolbarIconButton(
+                    systemName: model.tileCards
+                        ? "rectangle.grid.1x2"
+                        : "rectangle.split.3x1",
+                    action: toggleRosterLayout
+                )
+                .help(model.tileCards
+                      ? "Stack the repos in one column"
+                      : "Tile the repos left to right")
             }
 
             HStack(spacing: Theme.Space.s) {
@@ -243,6 +255,12 @@ struct ContentView: View {
 
     /// Toggle between the reference width (340) and a bounded wider mode for
     /// longer repo names / telemetry descriptions.
+    private func toggleRosterLayout() {
+        withAnimation(Theme.spring) {
+            model.tileCards.toggle()
+        }
+    }
+
     private func togglePanelWidth() {
         guard let panel = NSApp.windows.first(where: { $0 is FloatingPanel }) else { return }
         var frame = panel.frame
@@ -301,8 +319,10 @@ struct ContentView: View {
                         if let banner = model.dirtyBanner {
                             DirtyBannerView(warning: banner)
                         }
-                        ForEach(Array(model.roster.enumerated()), id: \.element.id) { index, card in
-                            RepoCardView(card: card, darker: !index.isMultiple(of: 2))
+                        RosterLayout(tiled: model.tileCards) {
+                            ForEach(Array(model.roster.enumerated()), id: \.element.id) { index, card in
+                                RepoCardView(card: card, darker: !index.isMultiple(of: 2))
+                            }
                         }
                         if !model.offRoster.isEmpty {
                             OffRosterFooter(warnings: model.offRoster)
@@ -716,9 +736,15 @@ struct RepoCardView: View {
     }
 
     // Expanded sub-sections — mirrors the web card.
+    //
+    // GH-120: the same four sections, laid out either stacked (default, and what
+    // this app has always done) or left to right.
     @ViewBuilder private var detail: some View {
         Divider().overlay(Theme.separator).padding(.bottom, 2)
+        detailSections
+    }
 
+    @ViewBuilder private var detailSections: some View {
         CardSection(label: "Why ranked") {
             Text(card.rankReason)
                 .font(Theme.body)
@@ -827,6 +853,49 @@ private struct OpenRepoButton: View {
 }
 
 /// Labeled section block inside the expanded card.
+// Roster layout (GH-120) — the Focus 5 board's own responsive grid.
+//
+// This is the web board's behaviour ported over: the cards TILE left to right
+// and re-flow to fewer columns as the panel narrows, ending at a single stacked
+// column. One card is one tile; a card's own sections stay stacked inside it,
+// exactly as on the web.
+//
+// `.adaptive(minimum:)` rather than hardcoded breakpoints. `web.py` needs media
+// queries because CSS has no other way to ask "how many fit?", and it spells
+// that as 5/3/2/1 columns at 1400/1000/680px. An adaptive grid asks the question
+// directly against the real proposed width, and at those same widths it lands on
+// the same counts — so the two surfaces agree without a second copy of the
+// breakpoint table that could drift.
+//
+// NOTE: what this must never become is a layout gated on IDEAL width
+// (`ViewThatFits` over unbounded `Text`). That was the first cut of this feature
+// and it was a dead control: measured, four text columns ideal out at ~993pt
+// against the ~300pt on offer, so the row candidate never won at any width.
+struct RosterLayout<Content: View>: View {
+    let tiled: Bool
+    @ViewBuilder let content: Content
+
+    /// Narrowest card that still reads, tuned so the adaptive grid lands on the
+    /// SAME column counts as the web board's media queries at the same widths:
+    /// 5 above 1400, 3 at 1000, 2 at 680, 1 at 340. (With `Theme.Space.s` gutters
+    /// the grid fits `floor((W + 8) / 280)` columns, which reproduces that table.)
+    static var minimumCardWidth: CGFloat { 272 }
+
+    var body: some View {
+        if tiled {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: Self.minimumCardWidth),
+                                   spacing: Theme.Space.s,
+                                   alignment: .topLeading)],
+                alignment: .leading,
+                spacing: Theme.Space.s
+            ) { content }
+        } else {
+            VStack(spacing: Theme.Space.s) { content }
+        }
+    }
+}
+
 struct CardSection<Content: View>: View {
     let label: String
     @ViewBuilder let content: Content

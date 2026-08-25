@@ -18,6 +18,11 @@
   beside the board toggles it, the stacked view stays the default, and the choice is remembered
   for next time. On a narrow window the side-by-side view folds back to stacked rather than
   squeezing the columns into unreadable slivers.
+- The Focus 5 Float app for Mac now tiles the repo cards left to right and re-flows them to fewer
+  columns as the panel is narrowed, ending at a single column — the same behaviour the web board
+  has always had, at the same window widths. At the panel's default width this is a single column,
+  exactly as before, so it only changes what you see once the panel is dragged wider. A toolbar
+  button pins the cards to one column for anyone who prefers that, and the choice is remembered.
 
 ## [0.75.4] - 2026-08-21
 
