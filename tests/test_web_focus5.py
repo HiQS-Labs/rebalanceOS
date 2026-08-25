@@ -626,5 +626,69 @@ class Focus5GoalsRouteTests(unittest.TestCase):
         self.assertFalse(resp.json()["ok"])
 
 
+class HorizontalLayoutModeTests(unittest.TestCase):
+    """The layout switch (GH-120).
+
+    Horizontal mode turns each repo's own data left-to-right; it does not
+    reorder the roster. The switch is client-side, so these assert the two
+    things the server is actually responsible for: shipping the hooks the
+    script needs, and never rendering a layout the viewer did not choose.
+    """
+
+    def _body(self, **kw) -> str:
+        return _focus5_body(_data([_card()]), **kw)
+
+    def test_the_switch_is_rendered(self) -> None:
+        body = self._body()
+        self.assertIn("f5LayoutToggle", body)
+        self.assertIn("f5-layout", body)
+
+    def test_the_sections_are_wrapped_so_they_can_become_a_row(self) -> None:
+        """Horizontal mode flexes `.f5-body`. Before GH-120 the three sections
+        were bare siblings of the identity block, so turning the card into a row
+        would have swept the name and reason into the same row as the data."""
+        body = self._body()
+        self.assertIn("class='f5-body'", body)
+        self.assertIn("class='f5-head'", body)
+
+    def test_the_script_can_find_the_grid_it_toggles(self) -> None:
+        """The class goes on the grid, so the script needs it by id. A renamed
+        or dropped id leaves a button that silently does nothing."""
+        body = self._body()
+        self.assertIn("id='f5Grid'", body)
+        self.assertIn("focus5.layout.horizontal", body)
+
+    def test_the_server_never_renders_the_horizontal_class(self) -> None:
+        """THE PIN. The server has no way to know the viewer's stored choice —
+        the client re-applies it after load. If `is-horizontal` were ever
+        rendered server-side, a first-time viewer would get a layout they never
+        picked, and it would flash on every load for someone who chose vertical.
+        The class may appear only inside the stylesheet and the script."""
+        markup = self._body().split("<script>")[0]
+        markup = markup.split("<style>")[0]
+        self.assertNotIn("is-horizontal", markup)
+
+    def test_the_button_starts_unpressed(self) -> None:
+        self.assertIn("aria-pressed='false'", self._body())
+
+    def test_both_boards_get_the_switch(self) -> None:
+        """Focus 5 and Dirty Five share one renderer; a switch on only one of
+        them would be a coin flip on which board the operator is looking at."""
+        for view in ("focus5", "dirty"):
+            with self.subTest(view=view):
+                self.assertIn("f5LayoutToggle", self._body(view=view))
+
+    def test_the_card_actions_survive_the_rewrap(self) -> None:
+        """`Open` and the hide control sit outside `.f5-body`; the rewrap must
+        not have moved or dropped them."""
+        body = self._body()
+        self.assertIn("data-f5-open", body)
+        self.assertIn("data-f5-hide", body)
+
+    def test_an_empty_roster_renders_no_switch(self) -> None:
+        """Nothing to lay out, so the control would toggle an absent grid."""
+        self.assertNotIn("f5LayoutToggle", _focus5_body(_data([])))
+
+
 if __name__ == "__main__":
     unittest.main()

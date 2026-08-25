@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.5] - 2026-08-24
+
+### Added
+
+- The Focus 5 board can now show each repo's details side by side instead of stacked. A switch
+  beside the board toggles it, the stacked view stays the default, and the choice is remembered
+  for next time. On a narrow window the side-by-side view folds back to stacked rather than
+  squeezing the columns into unreadable slivers.
+
 ## [0.75.4] - 2026-08-21
 
 ### Fixed
