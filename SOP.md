@@ -1,6 +1,6 @@
 # SOP — Standard Operating Procedure
 
-Do not store any credentials or secrets in this file.
+Do not store any credentials or secrets in this file, other repo files, or any PII in public facing GH issues.
 
 This document codifies how work in this repo gets **evidenced**. It is written for
 whoever picks up the next task, human or model, and it is binding on both.
