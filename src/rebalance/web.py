@@ -338,6 +338,30 @@ tr:hover td { background: var(--zebra); }
 /* GH-81 Phase 2: a fallback-basis badge on a rostered card (reflog disabled). */
 .f5-basis { color: var(--muted); font-weight: 400; font-size: 12px; }
 /* Focus 5 / Dirty Five view toggle — a small segmented control. */
+/* Horizontal layout mode (GH-120). Default stays vertical: the sections stack
+   inside a card and five cards sit side by side. In horizontal mode each repo
+   takes a full-width row and its OWN data reads left to right.
+   `.f5-grid.is-horizontal` is two classes, so it outranks the single-class
+   `grid-template-columns` breakpoints below regardless of source order. */
+.f5-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.f5-head { min-width: 0; }
+.f5-grid.is-horizontal { grid-template-columns: 1fr; }
+.f5-grid.is-horizontal .f5-card { flex-direction: row; align-items: flex-start; gap: 16px; }
+.f5-grid.is-horizontal .f5-head { flex: 0 0 220px; }
+.f5-grid.is-horizontal .f5-body { flex-direction: row; gap: 16px; flex: 1 1 auto; }
+.f5-grid.is-horizontal .f5-body > * { flex: 1 1 0; min-width: 0; }
+/* Below this the three columns are narrower than their own content, so the mode
+   folds back to a stack rather than shipping unreadable slivers. */
+@media (max-width: 900px) {
+  .f5-grid.is-horizontal .f5-card,
+  .f5-grid.is-horizontal .f5-body { flex-direction: column; }
+  .f5-grid.is-horizontal .f5-head { flex: 1 1 auto; }
+}
+.f5-layout { font: inherit; font-size: 13px; font-weight: 600; color: var(--muted);
+             background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+             padding: 7px 12px; margin-left: 8px; cursor: pointer; }
+.f5-layout:hover { color: var(--ink); }
+.f5-layout:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .f5-views { display: inline-flex; gap: 4px; padding: 3px; margin-bottom: 16px;
             background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
 .f5-view { font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none;
@@ -575,15 +599,54 @@ def _f5_card(card: dict[str, Any]) -> str:
         f"title='Hide from Focus 5' aria-label='Hide {name} from Focus 5'>✕</button>"
     )
     actions = f"<div class='f5-actions'>{open_btn}{hide_btn}</div>"
+    # The head (position/name/reason) and the three data sections are wrapped
+    # separately so horizontal mode can turn ONLY the sections into a row and
+    # leave the identity block as the card's left-hand label (GH-120).
     return (
         f"<div class='f5-card'>"
         f"{actions}"
-        f"<div><div class='f5-pos'>#{card['position']}</div>"
+        f"<div class='f5-head'><div class='f5-pos'>#{card['position']}</div>"
         f"<a class='f5-name' href='{vsurl}' title='Open in VS Code' data-f5-open=\"{identity}\">{name}</a>"
         f"<div class='f5-reason'>{reason}{reason_badge}</div></div>"
-        f"{_f5_health(card)}{_f5_pr(card)}{_f5_activity(card)}"
+        f"<div class='f5-body'>{_f5_health(card)}{_f5_pr(card)}{_f5_activity(card)}</div>"
         f"</div>"
     )
+
+
+# Layout switch behaviour (GH-120). Kept beside the Focus 5 body like the hide
+# and open controls, so it never touches shared page chrome.
+#
+# The server always renders vertical; this re-applies the stored choice on load.
+# That ordering is deliberate — a viewer with no stored preference must see the
+# default, and a cookie is not worth carrying for a per-device display setting.
+_FOCUS5_LAYOUT_ASSETS = """
+<script>
+(function () {
+  var KEY = 'focus5.layout.horizontal';
+  var grid = document.getElementById('f5Grid');
+  var btn = document.getElementById('f5LayoutToggle');
+  if (!grid || !btn) { return; }
+  function apply(horizontal) {
+    grid.classList.toggle('is-horizontal', horizontal);
+    btn.setAttribute('aria-pressed', horizontal ? 'true' : 'false');
+    btn.textContent = horizontal ? '\u2195 Vertical' : '\u2194 Horizontal';
+    btn.title = horizontal
+      ? 'Switch back to the stacked layout'
+      : 'Switch between stacked and side-by-side layout';
+  }
+  var stored = null;
+  // Private windows and blocked site data throw on ACCESS, not just on write,
+  // so the read is guarded too and an unreadable store means "use the default".
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+  apply(stored === '1');
+  btn.addEventListener('click', function () {
+    var horizontal = !grid.classList.contains('is-horizontal');
+    apply(horizontal);
+    try { localStorage.setItem(KEY, horizontal ? '1' : '0'); } catch (e) {}
+  });
+})();
+</script>
+"""
 
 
 def _focus5_body(data: dict[str, Any], *, view: str = "focus5") -> str:
@@ -607,6 +670,15 @@ def _focus5_body(data: dict[str, Any], *, view: str = "focus5") -> str:
         )
         + "</div>"
     )
+    # Layout switch (GH-120). Server always renders the vertical default; the
+    # client re-applies a stored preference on load. Rendering the stored mode
+    # server-side would need a cookie, and getting it wrong would show a
+    # first-time viewer a layout they never chose.
+    layout_btn = (
+        "<button type='button' class='f5-layout' id='f5LayoutToggle' "
+        "aria-pressed='false' title='Switch between stacked and side-by-side layout'>"
+        "\u2194 Horizontal</button>"
+    )
     head = f"<h2>{title} {refresh_btn}</h2>{toggle}"
     roster = data.get("roster") or []
     if not roster:
@@ -628,10 +700,16 @@ def _focus5_body(data: dict[str, Any], *, view: str = "focus5") -> str:
         f"<b>{mode}</b> · {data['summary']['discovered']} repos discovered · "
         f"<span class='f5-live'>● tree health checked live</span></div>"
     )
+    # Only now — the empty state returns above, and a switch with no grid behind
+    # it is a dead control. Caught by its own test rather than on screen.
+    head += layout_btn
     strip = _f5_warning_strip(data)
     banner = _f5_dirty_banner(data)
     cards = "".join(_f5_card(c) for c in roster)
-    return f"{head}{meta}{strip}{banner}<div class='f5-grid'>{cards}</div>{_FOCUS5_HIDE_ASSETS}{_FOCUS5_OPEN_ASSETS}"
+    return (
+        f"{head}{meta}{strip}{banner}<div class='f5-grid' id='f5Grid'>{cards}</div>"
+        f"{_FOCUS5_HIDE_ASSETS}{_FOCUS5_OPEN_ASSETS}{_FOCUS5_LAYOUT_ASSETS}"
+    )
 
 
 # Scoped CSS + JS for the per-card hide (✕) control. Kept in the Focus 5 body so

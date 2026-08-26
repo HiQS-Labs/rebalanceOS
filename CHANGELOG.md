@@ -10,6 +10,51 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.75.5] - 2026-08-24
+
+### Added
+
+- The Focus 5 board can now show each repo's details side by side instead of stacked. A switch
+  beside the board toggles it, the stacked view stays the default, and the choice is remembered
+  for next time. On a narrow window the side-by-side view folds back to stacked rather than
+  squeezing the columns into unreadable slivers.
+- The Focus 5 Float app for Mac now tiles the repo cards left to right and re-flows them to fewer
+  columns as the panel is narrowed, ending at a single column — the same behaviour the web board
+  has always had, at the same window widths. At the panel's default width this is a single column,
+  exactly as before, so it only changes what you see once the panel is dragged wider. A toolbar
+  button pins the cards to one column for anyone who prefers that, and the choice is remembered.
+
+## [0.75.7] - 2026-08-24
+
+### Fixed
+
+- Switching to the Prompt Log tab no longer hangs the app with a spinning beach ball. The shared
+  card container introduced in 0.75.6 drew its one-column layout without the "only build what's on
+  screen" behaviour the feed previously had, so every entry in the log — well over a thousand,
+  each with its own buttons — was built at once on every switch. Only the one-column layout was
+  affected; the tiled layout was always built lazily. Guarded by a test that lays out 1,500 entries
+  and fails if the cost grows with the number of rows.
+
+## [0.75.6] - 2026-08-24
+
+### Fixed
+
+- Prompt Log entries written since 2026-08-21 show their age again. CLIO changed the timestamp it
+  writes from `2026-08-21T15:48:18Z` to `2026-08-24 19:57:39 PDT`, and the app only understood the
+  first shape, so every newer entry rendered an empty grey capsule where "2h ago" belongs — 1,460
+  of 1,951 entries in a live log. Both shapes are read now, and a timestamp that genuinely cannot
+  be read hides the capsule instead of drawing an empty one.
+
+### Added
+
+- The Prompt Log tiles its entries left to right and re-flows them to fewer columns as the panel
+  narrows, matching the repo board.
+- Each repo's newest prompt is now held up automatically in a "Latest per repo" band, taken from
+  the last 30 prompts. Typing a new prompt in Claude Code replaces that repo's entry on the next
+  refresh. These are worked out fresh each time rather than stored, so nothing goes stale, and they
+  are kept separate from pins made by hand — a manual pin always wins, and the automatic ones never
+  use up the five manual pin slots.
+
 ## [0.75.4] - 2026-08-21
 
 ### Fixed

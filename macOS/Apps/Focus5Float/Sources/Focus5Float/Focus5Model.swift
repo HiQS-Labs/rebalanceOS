@@ -72,13 +72,71 @@ final class Focus5Model {
     }
     static let maxPinnedPromptLogEntries = 5
 
+    // Roster layout (GH-120). True = the cards TILE left to right and re-flow to
+    // fewer columns as the panel narrows, which is what the web board does and is
+    // the default here for the same reason. False pins them to one column.
+    //
+    // How many columns is never decided here — RosterLayout asks the real width
+    // at render time. At the default 340pt panel a tiled roster is a single
+    // column anyway, so the default costs nothing until the operator drags the
+    // panel wider (the panel is `.resizable`).
+    var tileCards: Bool = true {
+        didSet {
+            UserDefaults.standard.set(tileCards, forKey: "tileCards")
+        }
+    }
+
     var pinnedPromptLogEntries: [PromptLogEntry] {
         let byID = Dictionary(uniqueKeysWithValues: promptLogEntries.map { ($0.id, $0) })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
     }
+
+    /// How far back the automatic "newest per repo" scan looks.
+    static let autoPinScanDepth = 30
+
+    /// The newest entry from each repo within the last `autoPinScanDepth`
+    /// messages, held up automatically so every active repo shows its current
+    /// prompt without the operator pinning anything.
+    ///
+    /// These are TEMPORARY and derived — recomputed from `promptLogEntries` on
+    /// every refresh, never stored. That is the whole mechanism behind "pinned
+    /// until there's a newer message from that repo": when CLIO appends a newer
+    /// prompt for a repo, the next read simply computes a different winner. No
+    /// eviction logic, nothing to keep in sync, and nothing that can strand a
+    /// stale pin if a log is edited or rebuilt.
+    ///
+    /// A MANUAL pin always wins: a repo whose newest entry the operator already
+    /// pinned by hand is skipped, so the same prompt never appears twice, and
+    /// auto-pins never consume the 5-slot manual queue — five busy repos would
+    /// otherwise fill it permanently and the pin button would stop working.
+    var autoPinnedPromptLogEntries: [PromptLogEntry] {
+        let manual = Set(pinnedPromptLogIDs)
+        var seenRepos = Set<String>()
+        var newest: [PromptLogEntry] = []
+        // promptLogEntries is newest-first (CLIO writes newest directly below
+        // its marker and the reader preserves file order), so the first entry
+        // seen for a repo IS that repo's newest.
+        for entry in promptLogEntries.prefix(Self.autoPinScanDepth) {
+            guard !manual.contains(entry.id) else {
+                // Counts as that repo's slot being spoken for — otherwise the
+                // manual pin and an auto-pin of an OLDER prompt would both show.
+                seenRepos.insert(entry.repo)
+                continue
+            }
+            guard seenRepos.insert(entry.repo).inserted else { continue }
+            newest.append(entry)
+        }
+        return newest
+    }
+
+    func isAutoPinned(_ entry: PromptLogEntry) -> Bool {
+        autoPinnedPromptLogEntries.contains { $0.id == entry.id }
+    }
+
     var unpinnedPromptLogEntries: [PromptLogEntry] {
-        let pinned = Set(pinnedPromptLogIDs)
-        return promptLogEntries.filter { !pinned.contains($0.id) }
+        var held = Set(pinnedPromptLogIDs)
+        held.formUnion(autoPinnedPromptLogEntries.map(\.id))
+        return promptLogEntries.filter { !held.contains($0.id) }
     }
 
     /// Pure extension-string discriminator: `.md` (any case) → markdown/text
@@ -123,6 +181,11 @@ final class Focus5Model {
         if let path = UserDefaults.standard.string(forKey: "promptLogFilePath") {
             promptLogFileURL = URL(fileURLWithPath: path)
         }
+        // Tiling defaults ON, so an absent key must NOT collapse to bool(forKey:)'s
+        // false. object(forKey:) distinguishes "never set" from "set to false",
+        // which is what keeps a first run tiled and still honours an operator who
+        // deliberately turned it off.
+        tileCards = (UserDefaults.standard.object(forKey: "tileCards") as? Bool) ?? true
     }
 
     var isDirtyView: Bool { rankingMode == "dirty_first" }
