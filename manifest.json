@@ -10,9 +10,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/HiQS-Suite/rebalanceOS"
+    "url": "https://github.com/HiQS-Labs/rebalanceOS"
   },
-  "documentation": "https://github.com/HiQS-Suite/rebalanceOS/blob/main/README.md",
+  "documentation": "https://github.com/HiQS-Labs/rebalanceOS/blob/main/README.md",
   "server": {
     "type": "python",
     "entry_point": "server/mcp_server.py",

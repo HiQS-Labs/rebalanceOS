@@ -18,7 +18,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-NEW_REPO="HiQS-Suite/rebalanceOS"
+NEW_REPO="HiQS-Labs/rebalanceOS"
 # The retiring repo. Work stranded in ITS pr queue is invisible to any in-tree
 # search — that is exactly how an entire lib/*_ops campaign got restarted.
 OLD_REPO="Hypercart-Dev-Tools/rebalance-OS"

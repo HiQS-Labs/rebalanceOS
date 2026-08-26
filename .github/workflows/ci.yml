@@ -48,6 +48,8 @@ jobs:
           python-version: "3.12"
       - name: Check documentation links
         run: python3 scripts/check_doc_links.py
+      - name: Front-door health board (FRONTDOOR.md)
+        run: bash utils/frontdoor-check.sh
 
   typecheck:
     runs-on: ubuntu-latest
@@ -125,7 +127,7 @@ jobs:
 
       # HiQS runs as its OWN pytest process, not appended to the line above.
       # It is a standalone package with its own pyproject, destined for
-      # extraction to HiQS-Suite/HiQS — running it in the incumbent's process is
+      # extraction to HiQS-Labs/HiQS — running it in the incumbent's process is
       # the very coupling its clean-room gate exists to prevent, and it is not
       # hypothetical: sharing a process makes
       # test_github_failure_continues_logs_error_and_keeps_watermark fail on

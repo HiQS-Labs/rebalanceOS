@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Auto-file GitHub issues for failing rebalance health checks.
 
-Runs ``rebalance doctor``, then creates/closes GitHub issues on
-``HiQS-Suite/rebalanceOS`` so
-failures are tracked in the project backlog without manual triage.
+Runs ``rebalance doctor``, then creates/closes GitHub issues on the repo
+resolved from the local git remote (see ``_default_repo()``) so failures are
+tracked in the project backlog without manual triage.
 
 Logging
 -------
@@ -55,7 +55,7 @@ Options
     --llm-max-per-run N     Max LLM calls in this single invocation (default: 5)
     --dedup-days N          Look back N days for closed issues (default: 30)
     --dry-run               Print plan; make no GitHub or LLM API calls
-    --repo OWNER/REPO       Override target repo (default: HiQS-Suite/rebalanceOS)
+    --repo OWNER/REPO       Override target repo (default: derived from `git remote get-url origin`)
 """
 
 from __future__ import annotations
@@ -65,6 +65,7 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -77,7 +78,44 @@ from rebalance.lib.json_ops import parse_llm_json  # noqa: E402 — needs _boots
 
 DEVICE_NAME: str = socket.gethostname()
 
-REPO = "HiQS-Suite/rebalanceOS"  # GH-36: the canonical repo; the retiring clone's tracker is archived
+# GH-36 hard-coded the owner/repo string here, and it silently rotted through the
+# 2026-08 GitHub org rename (see frontdoor-check.sh's RETIRED_OWNERS for the exact
+# retired name): GitHub's redirect covers git fetch/push transparently, but NOT a
+# raw REST API POST through urllib, which refuses to follow a
+# 307 and raises HTTPError instead — this script hard-crashed on every run for days
+# before anyone noticed, because the failure was invisible (the health-check job that
+# would have reported the crash IS this script). Two independent fixes, not one:
+#   1. Derive the repo from `git remote get-url origin` so a FUTURE rename can't
+#      repeat this — no hardcoded owner/repo string to go stale a second time.
+#   2. `_request()` below also follows a 307/308 manually as defense in depth, so even
+#      a stale --repo override (or a repo TRANSFER, not just an org rename) degrades
+#      to "still works" instead of "hard crash with no one watching."
+_FALLBACK_REPO = "HiQS-Labs/rebalanceOS"  # last-resort default if git detection fails
+# (e.g. this script run from a checkout with no .git, or git itself missing) — kept as
+# a literal specifically so the script still works stand-alone, NOT as the source of
+# truth; _default_repo() below is.
+
+
+def _default_repo() -> str:
+    """Derive OWNER/REPO from the local git remote — self-healing across renames.
+
+    Falls back to _FALLBACK_REPO only when git detection is impossible, never when it
+    just returns something surprising — a real answer beats a guess even if the repo
+    was renamed again since this file was last touched.
+    """
+    try:
+        url = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent.parent), "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return _FALLBACK_REPO
+    # Matches both https://github.com/OWNER/REPO(.git) and git@github.com:OWNER/REPO(.git)
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else _FALLBACK_REPO
+
+
+REPO = _default_repo()
 LABEL = "rebalance-health"
 ISSUE_TITLE_PREFIX = "health:"
 
@@ -233,7 +271,7 @@ def format_rate_limit_reset(reset_epoch: int | None) -> str:
     return f"{reset_dt.strftime('%Y-%m-%dT%H:%M:%SZ')} (~{seconds_left // 60}m from now)"
 
 
-def _request(method: str, path: str, token: str, payload: dict | None = None) -> dict | list:
+def _request(method: str, path: str, token: str, payload: dict | None = None, _redirected: bool = False) -> dict | list:
     url = f"{GITHUB_API}{path}"
     body = json.dumps(payload).encode() if payload else None
     req = urllib.request.Request(
@@ -251,6 +289,19 @@ def _request(method: str, path: str, token: str, payload: dict | None = None) ->
         with urllib.request.urlopen(req) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
+        # Defense in depth (see the REPO/_default_repo comment above): urllib's
+        # HTTPRedirectHandler deliberately does NOT auto-follow 307/308 for a
+        # non-GET/HEAD method — the HTTP spec requires the method+body be
+        # preserved on redirect, and stdlib punts that back to the caller rather
+        # than silently resending a POST body. A repo rename or transfer (not
+        # just THIS org rename) can trigger this on ANY endpoint, not just the
+        # one that bit us — follow it once, manually, instead of hard-crashing a
+        # health-check job that no one is otherwise watching.
+        if exc.code in (307, 308) and not _redirected:
+            location = exc.headers.get("Location") if exc.headers else None
+            if location:
+                new_path = location[len(GITHUB_API):] if location.startswith(GITHUB_API) else location
+                return _request(method, new_path, token, payload, _redirected=True)
         body_text = exc.read().decode(errors="replace")
         if _is_rate_limit_response(exc, body_text):
             raise GitHubRateLimitExceeded(
