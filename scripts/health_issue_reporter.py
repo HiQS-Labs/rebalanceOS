@@ -106,7 +106,10 @@ def _default_repo() -> str:
     try:
         url = subprocess.run(
             ["git", "-C", str(Path(__file__).resolve().parent.parent), "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=5, check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
         ).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return _FALLBACK_REPO
@@ -300,7 +303,7 @@ def _request(method: str, path: str, token: str, payload: dict | None = None, _r
         if exc.code in (307, 308) and not _redirected:
             location = exc.headers.get("Location") if exc.headers else None
             if location:
-                new_path = location[len(GITHUB_API):] if location.startswith(GITHUB_API) else location
+                new_path = location[len(GITHUB_API) :] if location.startswith(GITHUB_API) else location
                 return _request(method, new_path, token, payload, _redirected=True)
         body_text = exc.read().decode(errors="replace")
         if _is_rate_limit_response(exc, body_text):
