@@ -22,7 +22,7 @@ name: build-0750-signal-integrity
 phases:
   - id: si1
     name: Rate-limit budget and ETag conditional requests in GitHubClient (#54, #62)
-    reviewer: agy
+    reviewer: codex
     brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/si1-ratelimit-budget-etag.md
     artifact: src/rebalance/ingest/_http.py,tests/test_http_client.py
     turn_timeout_s: 900
@@ -30,7 +30,7 @@ phases:
 
   - id: si2
     name: Two-tier ingest cadence — hourly delta, daily deep scan (#62)
-    reviewer: agy
+    reviewer: codex
     brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/si2-two-tier-ingest-cadence.md
     artifact: src/rebalance/ingest/github_scan.py,tests/test_github_scan.py
     turn_timeout_s: 900
@@ -39,7 +39,7 @@ phases:
 
   - id: si3
     name: Route health_issue_reporter.py through GitHubClient (#75)
-    reviewer: agy
+    reviewer: codex
     brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/si3-health-reporter-through-client.md
     artifact: scripts/health_issue_reporter.py,tests/test_health_issue_reporter.py
     turn_timeout_s: 900
@@ -48,7 +48,7 @@ phases:
 
   - id: si4
     name: Wire resolve_slack_user into sleuth_candidates (#123)
-    reviewer: agy
+    reviewer: codex
     brief: PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/si4-wire-slack-resolver.md
     artifact: src/rebalance/ingest/next_actions.py,tests/test_next_actions.py
     turn_timeout_s: 900
