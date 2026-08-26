@@ -63,9 +63,12 @@ extra plus pytest. Measured on a fresh clone:
 | `.venv/bin/python -m pytest -q`, README install `.[embeddings,calendar]` | 2320, **13 collection errors** |
 | `.venv/bin/python -m pytest -q`, `.[embeddings,calendar,server]` + pytest | **2441, clean** |
 
-A zero-test gate reports success and approves every phase. That is the same failure shape the
-whole build exists to remove, so it is worth stating plainly rather than leaving to whoever
-launches next.
+Both wrong invocations FAIL LOUDLY rather than passing silently — pytest exits 5 on
+"no tests collected" and non-zero on collection errors, so marathon-drive halts at phase 1 either
+way. (An earlier draft of this runbook claimed a zero-test gate would report success and approve
+every phase. That was asserted, not measured, and it is wrong: exit 5 is non-zero. The cost of
+getting the gate wrong here is a halted run and a confusing error, not a silently rubber-stamped
+one.)
 
 The 13 errors are all `ModuleNotFoundError: No module named 'fastapi'`, which lives in the
 `server` extra. `README.md:28` documents `.[embeddings,calendar]` and does not mention `server`
