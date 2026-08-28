@@ -174,6 +174,40 @@ def test_env_shebang_with_dead_interpreter_still_warns_specifically(tmp_path, mo
     assert str(stale_shim) in check.detail
 
 
+def test_env_dash_s_shebang_resolves_the_name_after_the_flag(tmp_path, monkeypatch):
+    """`#!/usr/bin/env -S python3 -u` — `-S` splits the rest into env's own
+    argv, so the interpreter name is the token AFTER it, not `-S` itself.
+
+    Before the fix, `shebang_parts[1]` ("-S") was passed to `shutil.which()`
+    directly — this test's `fake_which` would raise on that call (`-S` is not
+    a name it recognizes), proving the wrong token was looked up."""
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    python = venv_bin / "python3.13"
+    python.write_text("")
+
+    live_interpreter = tmp_path / "other" / "python3"
+    live_interpreter.parent.mkdir(parents=True)
+    live_interpreter.write_text("")
+
+    stale_shim = tmp_path / "other" / "rebalance"
+    stale_shim.write_text("#!/usr/bin/env -S python3 -u\n")
+
+    def fake_which(name):
+        if name == "rebalance":
+            return str(stale_shim)
+        if name == "python3":
+            return str(live_interpreter)
+        raise AssertionError(f"unexpected shutil.which({name!r}) — wrong token resolved")
+
+    monkeypatch.setattr(doctor.sys, "executable", str(python))
+    monkeypatch.setattr(doctor.shutil, "which", fake_which)
+
+    check = doctor._check_rebalance_shim()
+    assert check.status == doctor.WARN
+    assert "no longer exists" not in check.detail
+
+
 def test_env_shebang_with_live_interpreter_is_generic_shadow_warn(tmp_path, monkeypatch):
     """A resolvable `env python3` shim is a real shadow, but not a *dead
     interpreter* — must not falsely claim the interpreter is missing."""

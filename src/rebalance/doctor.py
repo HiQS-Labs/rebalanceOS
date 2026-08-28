@@ -439,7 +439,11 @@ def _check_rebalance_shim() -> Check:
             if shebang_parts and Path(shebang_parts[0]).name == "env" and len(shebang_parts) > 1:
                 # `#!/usr/bin/env python3` — env itself always exists; resolve the NAME it
                 # would launch via PATH, or it's unresolvable (blank, not "env exists").
-                interpreter = shutil.which(shebang_parts[1]) or ""
+                # `#!/usr/bin/env -S python3 -u` — `-S` splits the rest of the line into
+                # env's own argv, so the interpreter name is the token AFTER it, not `-S`
+                # itself (which shutil.which() would silently fail to resolve).
+                name_index = 2 if shebang_parts[1] == "-S" and len(shebang_parts) > 2 else 1
+                interpreter = shutil.which(shebang_parts[name_index]) or ""
             elif shebang_parts:
                 interpreter = shebang_parts[0]
     except (OSError, UnicodeDecodeError):
