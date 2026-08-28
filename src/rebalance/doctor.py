@@ -386,22 +386,35 @@ def _check_rebalance_shim() -> Check:
     real cause. Doctor can only run from a *working* install, so this can
     never catch its own shim being broken; it catches a shadowing entry that
     would bite the operator the next time they type the bare command.
+
+    Anchored on ``sys.executable``, not ``sys.argv[0]``: this repo ships a
+    real ``src/rebalance/__main__.py``, so ``rebalance doctor`` can be reached
+    via `python -m rebalance` as well as the installed console script, and
+    argv[0] differs between them. The running interpreter's own venv is the
+    one invariant across every invocation shape — its `bin/` directory is
+    where its own `rebalance` console script lives, side by side with the
+    interpreter, in every normal install layout.
+
+    Deliberately NOT ``.resolve()``d: a venv's ``bin/python3`` is typically a
+    *symlink* to the base interpreter (e.g. Homebrew's), so resolving it
+    walks straight out of the venv and compares against the wrong directory
+    entirely — confirmed live against this repo's own ``.venv`` mid-fix,
+    where it produced a false positive on a perfectly correct invocation.
+    ``os.path.abspath`` normalizes ``.``/``..`` without following symlinks,
+    which is exactly "same script path", not "same real file".
     """
     try:
-        running = Path(sys.argv[0]).resolve()
+        running = Path(os.path.abspath(sys.executable)).parent / "rebalance"
     except Exception as exc:  # noqa: BLE001 — doctor must never crash
-        return Check("rebalance shim", OK, f"could not resolve the running script: {exc}")
+        return Check("rebalance shim", OK, f"could not resolve the running interpreter: {exc}")
 
     first_on_path = shutil.which("rebalance")
     if first_on_path is None:
         return Check("rebalance shim", OK, "no `rebalance` resolvable on PATH to compare")
 
-    try:
-        first_resolved = Path(first_on_path).resolve()
-    except OSError:
-        first_resolved = Path(first_on_path)
+    first_abs = Path(os.path.abspath(first_on_path))
 
-    if first_resolved == running:
+    if first_abs == running:
         return Check("rebalance shim", OK, f"PATH resolves `rebalance` to the running install ({running})")
 
     interpreter = ""
@@ -409,7 +422,13 @@ def _check_rebalance_shim() -> Check:
         with open(first_on_path, encoding="utf-8", errors="strict") as fh:
             first_line = fh.readline().strip()
         if first_line.startswith("#!"):
-            interpreter = first_line[2:].strip().split(" ", 1)[0]
+            shebang_parts = first_line[2:].strip().split()
+            if shebang_parts and Path(shebang_parts[0]).name == "env" and len(shebang_parts) > 1:
+                # `#!/usr/bin/env python3` — env itself always exists; resolve the NAME it
+                # would launch via PATH, or it's unresolvable (blank, not "env exists").
+                interpreter = shutil.which(shebang_parts[1]) or ""
+            elif shebang_parts:
+                interpreter = shebang_parts[0]
     except (OSError, UnicodeDecodeError):
         pass
 
@@ -427,7 +446,7 @@ def _check_rebalance_shim() -> Check:
     return Check(
         "rebalance shim",
         WARN,
-        f"`rebalance` on PATH resolves to {first_on_path}, not the running install ({running})",
+        f"`rebalance` on PATH resolves to {first_on_path}, not the running install's own ({running})",
         f"run `which -a rebalance`; if the shadowing entry is unwanted, remove it or put "
         f"{running.parent} ahead of it on PATH",
     )

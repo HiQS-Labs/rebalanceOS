@@ -25,7 +25,28 @@ roadmap_exempt: true
 
 | What was just completed | What's next |
 |---|---|
-| Added `_check_rebalance_shim()` to `rebalance doctor`, wired into `run_doctor()`; 4 regression tests. | None — closed as a Green Board quick win. |
+| Added `_check_rebalance_shim()` to `rebalance doctor`, wired into `run_doctor()`; revised after an agy QA pass (see below); 8 regression tests. | None — closed as a Green Board quick win. |
+
+## Revision (agy QA pass, 2026-08-27)
+
+An `/relay-xyz` review with agy on the initial version (anchored on `sys.argv[0]`) found it would
+false-positive under `python -m rebalance doctor` — this repo ships a real
+`src/rebalance/__main__.py`, so that invocation is genuine, and argv[0] there is `__main__.py`'s
+path, not the console script's. Also flagged: `#!/usr/bin/env python3` shebangs extracted `/usr/bin/env`
+itself as "the interpreter" rather than resolving `python3`.
+
+Fixed by anchoring on `sys.executable` (invariant across invocation shape) instead of `sys.argv[0]`,
+and resolving an `env`-form shebang's target name via `shutil.which()`. **While verifying that fix
+live**, a second, more severe false positive turned up that agy's review never touched: a normal
+`python3 -m venv` layout symlinks `.venv/bin/python3` to a base interpreter (Homebrew's, here) —
+`.resolve()`-ing `sys.executable` walks straight out of the venv, so the check false-positived on
+this repo's own correctly-invoked `.venv/bin/rebalance doctor`. Fixed by comparing normalized
+(`os.path.abspath`) paths instead of symlink-resolved ones — "same script path" is the right
+invariant, not "same real file". Confirmed OK against `.venv/bin/rebalance doctor --json` directly.
+
+Also applied agy's minor GH-67 finding in the same pass: `tests/test_uninstall_rebalance.py`'s
+`_run()` used `cwd=cwd or str(repo)`, which would silently misbehave if a caller ever passed
+`cwd=""`. Changed to `cwd=str(repo) if cwd is None else cwd`.
 
 ## Why
 
@@ -61,10 +82,12 @@ ask behind "closes it" in the original issue's suggested fix list (option 3, gen
 
 ## Verification
 
-- `.venv/bin/python -m pytest tests/test_doctor_rebalance_shim.py -q` → 4 passed
-- `.venv/bin/ruff check src/rebalance/doctor.py tests/test_doctor_rebalance_shim.py` → clean
+- `.venv/bin/python -m pytest tests/test_doctor_rebalance_shim.py -q` → 8 passed
+- `.venv/bin/ruff check src/rebalance/doctor.py tests/test_doctor_rebalance_shim.py tests/test_uninstall_rebalance.py` → clean
 - `.venv/bin/mypy src/rebalance/doctor.py` → clean
-- Full suite (`tests/`) → 2044 passed, 16 skipped, 10 xfailed, no regressions
+- Full suite (`tests/`) → 2048 passed, 16 skipped, 10 xfailed, no regressions
+- Live: `.venv/bin/rebalance doctor --json` → `rebalance shim` check reports `ok` against this
+  repo's real venv (previously false-positived `warning` before the abspath fix)
 
 ## Lessons Learned (For Future Agents)
 
