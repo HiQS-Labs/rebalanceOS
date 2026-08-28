@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -371,6 +373,63 @@ def _check_unpushed_work() -> Check:
         WARN,
         f"{len(stale)}/{len(repos)} checkout(s) carry unpushed work — {detail}",
         "push the branches (or set their upstreams); discovery offers these repos for promotion",
+    )
+
+
+def _check_rebalance_shim() -> Check:
+    """GH-261: a stale `rebalance` earlier on PATH shadows the working one.
+
+    Typically a leftover console-script in an abandoned venv (e.g. a
+    `.venv-py314-backup/`) whose shebang names an interpreter that no longer
+    exists. When that shim wins PATH resolution, a bare `rebalance ...` fails
+    with `command not found` naming a Python binary — nothing points at the
+    real cause. Doctor can only run from a *working* install, so this can
+    never catch its own shim being broken; it catches a shadowing entry that
+    would bite the operator the next time they type the bare command.
+    """
+    try:
+        running = Path(sys.argv[0]).resolve()
+    except Exception as exc:  # noqa: BLE001 — doctor must never crash
+        return Check("rebalance shim", OK, f"could not resolve the running script: {exc}")
+
+    first_on_path = shutil.which("rebalance")
+    if first_on_path is None:
+        return Check("rebalance shim", OK, "no `rebalance` resolvable on PATH to compare")
+
+    try:
+        first_resolved = Path(first_on_path).resolve()
+    except OSError:
+        first_resolved = Path(first_on_path)
+
+    if first_resolved == running:
+        return Check("rebalance shim", OK, f"PATH resolves `rebalance` to the running install ({running})")
+
+    interpreter = ""
+    try:
+        with open(first_on_path, encoding="utf-8", errors="strict") as fh:
+            first_line = fh.readline().strip()
+        if first_line.startswith("#!"):
+            interpreter = first_line[2:].strip().split(" ", 1)[0]
+    except (OSError, UnicodeDecodeError):
+        pass
+
+    if interpreter and not Path(interpreter).exists():
+        return Check(
+            "rebalance shim",
+            WARN,
+            f"`rebalance` on PATH resolves to {first_on_path} first, a stale shim whose "
+            f"interpreter ({interpreter}) no longer exists — a bare `rebalance` fails with "
+            f"`command not found` naming that interpreter, not this repo",
+            f"run `which -a rebalance`, then remove or fix the stale entry ahead of "
+            f"{running} on PATH",
+        )
+
+    return Check(
+        "rebalance shim",
+        WARN,
+        f"`rebalance` on PATH resolves to {first_on_path}, not the running install ({running})",
+        f"run `which -a rebalance`; if the shadowing entry is unwanted, remove it or put "
+        f"{running.parent} ahead of it on PATH",
     )
 
 
@@ -2175,6 +2234,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_repo_local_secrets())
     report.checks.append(_check_vault())
     report.checks.append(_check_unpushed_work())
+    report.checks.append(_check_rebalance_shim())
 
     if db_path is not None:
         report.checks.append(_check_schema(db_path))
