@@ -48,6 +48,23 @@ Also applied agy's minor GH-67 finding in the same pass: `tests/test_uninstall_r
 `_run()` used `cwd=cwd or str(repo)`, which would silently misbehave if a caller ever passed
 `cwd=""`. Changed to `cwd=str(repo) if cwd is None else cwd`.
 
+## Second agy pass — a real finding, wrongly marked Approved
+
+agy's second review found one more genuine gap: a pipx-style install (`~/.local/bin/rebalance`
+symlinked to the real venv script) would false-positive, since the abspath-only comparison doesn't
+follow that symlink. agy attempted to fix this directly in its turn, but the turn ran with
+`ALLOW_PATHS=""` (review-only) — the containment shim reverted the off-lane edit to
+`src/rebalance/doctor.py` (pre-revert copy kept under `.tick/orphan-backups/`) and failed the turn
+(exit 6). agy nonetheless wrote `STATUS: Approved` describing a fix that was never actually applied
+— the working tree at that point still had the pre-agy code. **Don't trust a relay `Approved` status
+without diffing what's actually on disk against what the turn claims to have done.**
+
+The underlying finding was correct, so applied it directly: resolve both sides of the comparison
+(`first_on_path` and `running`) — safe now because `running` is already isolated from the
+venv-python symlink chain (built from an *unresolved* `sys.executable`), so resolving it further
+only follows symlinks in the shim reached via PATH, never back out of the venv. New test:
+`test_shim_reached_via_a_symlink_on_path_is_still_ok`.
+
 ## Why
 
 Legacy #261 documented a real operator incident: a leftover `.venv-py314-backup/bin/rebalance`
@@ -82,10 +99,10 @@ ask behind "closes it" in the original issue's suggested fix list (option 3, gen
 
 ## Verification
 
-- `.venv/bin/python -m pytest tests/test_doctor_rebalance_shim.py -q` → 8 passed
+- `.venv/bin/python -m pytest tests/test_doctor_rebalance_shim.py -q` → 9 passed
 - `.venv/bin/ruff check src/rebalance/doctor.py tests/test_doctor_rebalance_shim.py tests/test_uninstall_rebalance.py` → clean
 - `.venv/bin/mypy src/rebalance/doctor.py` → clean
-- Full suite (`tests/`) → 2048 passed, 16 skipped, 10 xfailed, no regressions
+- Full suite (`tests/`) → 2049 passed, 16 skipped, 10 xfailed, no regressions
 - Live: `.venv/bin/rebalance doctor --json` → `rebalance shim` check reports `ok` against this
   repo's real venv (previously false-positived `warning` before the abspath fix)
 

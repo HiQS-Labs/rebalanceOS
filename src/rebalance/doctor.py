@@ -395,13 +395,17 @@ def _check_rebalance_shim() -> Check:
     where its own `rebalance` console script lives, side by side with the
     interpreter, in every normal install layout.
 
-    Deliberately NOT ``.resolve()``d: a venv's ``bin/python3`` is typically a
-    *symlink* to the base interpreter (e.g. Homebrew's), so resolving it
-    walks straight out of the venv and compares against the wrong directory
-    entirely — confirmed live against this repo's own ``.venv`` mid-fix,
-    where it produced a false positive on a perfectly correct invocation.
-    ``os.path.abspath`` normalizes ``.``/``..`` without following symlinks,
-    which is exactly "same script path", not "same real file".
+    ``sys.executable`` is deliberately NOT ``.resolve()``d before deriving
+    ``running``: a venv's ``bin/python3`` is typically a *symlink* to the base
+    interpreter (e.g. Homebrew's), so resolving it walks straight out of the
+    venv and compares against the wrong directory entirely — confirmed live
+    against this repo's own ``.venv`` mid-fix, where it produced a false
+    positive on a perfectly correct invocation. ``os.path.abspath`` there
+    normalizes ``.``/``..`` without following symlinks. Once ``running`` names
+    a real file (the venv's own console script, not a symlink chain), both
+    sides ARE resolved for the final comparison — a `rebalance` reached via
+    its own symlink (pipx, `ln -s` into `~/.local/bin`) is still the same
+    install, not a shadow.
     """
     try:
         running = Path(os.path.abspath(sys.executable)).parent / "rebalance"
@@ -412,9 +416,18 @@ def _check_rebalance_shim() -> Check:
     if first_on_path is None:
         return Check("rebalance shim", OK, "no `rebalance` resolvable on PATH to compare")
 
-    first_abs = Path(os.path.abspath(first_on_path))
+    # `running` is already isolated from the venv-python symlink chain above, so it's now
+    # safe to .resolve() further — it names a real file (the venv's own console script),
+    # not a symlink out of the venv. PATH's match can legitimately be reached through a
+    # symlink of its own (pipx, a manual `ln -s` into ~/.local/bin) that points AT this
+    # same running install; resolving both sides makes that read as a match, not a shadow.
+    try:
+        first_check = Path(first_on_path).resolve()
+        running_check = running.resolve()
+    except OSError:
+        first_check, running_check = Path(first_on_path), running
 
-    if first_abs == running:
+    if first_check == running_check:
         return Check("rebalance shim", OK, f"PATH resolves `rebalance` to the running install ({running})")
 
     interpreter = ""

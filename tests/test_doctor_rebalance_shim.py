@@ -77,6 +77,29 @@ def test_python_dash_m_invocation_is_not_a_false_positive(tmp_path, monkeypatch)
     assert check.status == doctor.OK
 
 
+def test_shim_reached_via_a_symlink_on_path_is_still_ok(tmp_path, monkeypatch):
+    """A pipx-style install: `~/.local/bin/rebalance` is a SYMLINK to the
+    real venv script. abspath alone won't follow it to a match — this is
+    the same install reached a different way, not a shadow."""
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    python = venv_bin / "python3.13"
+    python.write_text("")
+    real_rebalance = venv_bin / "rebalance"
+    real_rebalance.write_text("#!/bin/sh\n")
+
+    local_bin = tmp_path / "local" / "bin"
+    local_bin.mkdir(parents=True)
+    symlinked_rebalance = local_bin / "rebalance"
+    symlinked_rebalance.symlink_to(real_rebalance)
+
+    monkeypatch.setattr(doctor.sys, "executable", str(python))
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: str(symlinked_rebalance))
+
+    check = doctor._check_rebalance_shim()
+    assert check.status == doctor.OK, check.detail
+
+
 def test_nothing_on_path_is_ok(tmp_path, monkeypatch):
     python = tmp_path / "python3"
     python.write_text("")
