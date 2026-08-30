@@ -58,6 +58,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - Every captured GitHub issue doc in `PROJECT/1-INBOX/GH-*.md` is first-class intake and must also be parked in `ROADMAP.md` as a one-line queue entry immediately at capture, then promoted or removed later. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
 - Do not create a second competing plan when a canonical `PROJECT/**` doc already exists.
 - Do not build a redundant solution when extending an existing one is viable (enforced by PDDA Phase 0 review). If >50% of the new solution overlaps with an existing one, the plan MUST include deprecating/deleting the old one.
+- SQLite has exactly two gateways, and they are **separate stores by design** — `src/rebalance/ingest/db/` opens this project's own index (path resolved from `REBALANCE_DB`), while `HiQS/hiqs/db.py` opens the HiQS clean-room rebuild's app-data store, staged to spin out to its own repo. They address different database files and are not converged (settled in GH-136, 2026-08-30). New SQLite access goes through one of them: a direct `sqlite3.connect` anywhere else is pinned by `utils/pdda/check_banned_imports.py --check` against `utils/pdda/sqlite_connect_baseline.json` and fails CI — additions *and* stale baselines both block.
 - Do not override deterministic PDDA findings with prose.
 - Do not report a win you did not verify with `rebalance doctor`, `pytest tests/`, or the relevant PDDA check.
 

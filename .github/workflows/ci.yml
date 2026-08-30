@@ -32,6 +32,13 @@ jobs:
         run: ruff check .
       - name: Format check
         run: ruff format --check .
+      # GH-136: no direct sqlite3.connect outside the two gateway directories
+      # (src/rebalance/ingest/db/ and HiQS/hiqs/ — separate stores by design, not
+      # to be converged). The exact per-file baseline only shrinks: a new bypass
+      # fails, and so does a baseline left stale after a bypass is retired. The
+      # wider banned-import ratchet wiring stays with #126.
+      - name: SQLite gateway ratchet (GH-136)
+        run: python utils/pdda/check_banned_imports.py --check
 
   # GH-92. GH-88 found 136 broken relative links in tracked docs (ROADMAP.md alone
   # held 107) and 45% breakage overall, none of which any test could catch -- a doc
