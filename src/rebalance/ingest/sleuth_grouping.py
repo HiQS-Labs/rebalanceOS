@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from rebalance.ingest.db.connection import db_connection_readonly
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -356,9 +358,6 @@ def grouped_reminders_from_db(
     clients: list[dict[str, Any]] | None = None,
 ) -> list[ReminderGroup]:
     """Convenience wrapper: open DB, load active reminders, group them."""
-    conn = sqlite3.connect(db_path)
-    try:
+    with db_connection_readonly(db_path) as conn:
         reminders = load_active_reminders(conn)
-    finally:
-        conn.close()
     return group_reminders(reminders, clients=clients)
