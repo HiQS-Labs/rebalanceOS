@@ -1,12 +1,12 @@
 ---
 title: "SQLite gateway routing — retire the nine direct-connect bypasses"
-status: "In progress"
+status: "Shipped"
 created: 2026-08-30
 updated: 2026-08-30
 owner: noel
 gh_issue: 136
 goal: "Route every direct sqlite3.connect outside the two gateway directories through a gateway, behind a CI ratchet that pins the exact baseline and only lets it shrink."
-release: "0.76.0"
+release: "0.76.0 + 0.77.0"
 ---
 
 # GH-136 — SQLite gateway routing
@@ -46,10 +46,7 @@ be relitigated without new evidence:
 
 | What was just completed | What's next |
 |---|---|
-| Phase 0: gateway question settled (different files, by design — recorded in `ROUTER.md`); corrections posted on the issue; ratchet + exact baseline live in CI from 0.76.0 | Phase 1: route the five `mode=ro` sites through `db_connection_readonly` |
-| Two corrections posted: the read-only helper already exists; the gateways serve different stores | Phase 2: route the three untracked `src/` sites |
-| | Phase 3: decide `utils/py/` + `utils/gh250/` — route or written exemption |
-| | Phase 4: baseline to zero, close #136, archive this doc |
+| All four phases shipped 2026-08-30: gateway question settled + ratchet live (0.76.0); five read-only sites, three src sites routed; four reasoned exemptions; baseline `{}` — no unexempted direct connect remains | Nothing — issue closes with the routing PR; future bypasses are CI-blocked by the ratchet |
 
 ## Phase 0 — settle and pin (done)
 
@@ -61,47 +58,47 @@ be relitigated without new evidence:
 - [x] CI step in the `lint` job (issue acceptance criterion 3)
 - [x] Constraint tests in `tests/test_sqlite_gateway_ratchet.py` (7)
 
-## Phase 1 — route the five read-only sites
+## Phase 1 — route the five read-only sites (done)
 
 All five already open `mode=ro` URIs; each becomes
 `with db_connection_readonly(path) as conn:`. The helper never creates the parent
 directory or file, and callers that treat a missing DB as empty must keep checking
 existence first (the helper's docstring says the same).
 
-- [ ] `src/rebalance/ingest/apple_reminders.py:316`
-- [ ] `src/rebalance/ingest/apple_reminders.py:776`
-- [ ] `src/rebalance/ingest/apple_reminders.py:980`
-- [ ] `src/rebalance/ingest/ask_self_scan.py:148`
-- [ ] `src/rebalance/doctor.py:2149`
-- [ ] Tighten the baseline (`--update-baseline`), review the diff, keep CI green
+- [x] `src/rebalance/ingest/apple_reminders.py:316`
+- [x] `src/rebalance/ingest/apple_reminders.py:776`
+- [x] `src/rebalance/ingest/apple_reminders.py:980`
+- [x] `src/rebalance/ingest/ask_self_scan.py:148`
+- [x] `src/rebalance/doctor.py:2149`
+- [x] Tighten the baseline (`--update-baseline`), review the diff, keep CI green
 
-## Phase 2 — route the three untracked src sites
+## Phase 2 — route the three untracked src sites (done)
 
-- [ ] `src/rebalance/ingest/sleuth_grouping.py:359` (writable connect — use
+- [x] `src/rebalance/ingest/sleuth_grouping.py:359` (writable connect — use
       `db_connection`/`get_connection`; confirm schema-ensure expectations first)
-- [ ] `src/rebalance/web.py:1936` (aliased `_sqlite3.connect` — same rule)
-- [ ] `src/rebalance/mcp/server.py:38` (probe-and-close — decide whether the gateway
+- [x] `src/rebalance/web.py:1936` (aliased `_sqlite3.connect` — same rule)
+- [x] `src/rebalance/mcp/server.py:38` (probe-and-close — decide whether the gateway
       fits a connection-liveness probe or warrants an explicit written exemption)
-- [ ] Tighten the baseline
+- [x] Tighten the baseline
 
-## Phase 3 — decide utils/py and gh250
+## Phase 3 — decide utils/py and gh250 (done — exemptions)
 
 The issue allows either routing or a written exemption — silence is what produced
 these two.
 
-- [ ] `utils/gh250/reclaim.py:145` — route or exempt with reason
-- [ ] `utils/py/releases_app.py:402,3430` — route or exempt with reason (note the
+- [x] `utils/gh250/reclaim.py:145` — route or exempt with reason
+- [x] `utils/py/releases_app.py:402,3430` — route or exempt with reason (note the
       `isolation_level=None` autocommit expectations before routing)
-- [ ] `utils/py/releases_cycle.py:43` — route or exempt with reason
-- [ ] Record exemptions, if any, beside the baseline (not in an issue comment)
+- [x] `utils/py/releases_cycle.py:43` — route or exempt with reason
+- [x] Record exemptions, if any, beside the baseline (not in an issue comment)
 
-## Phase 4 — tighten to zero and close
+## Phase 4 — tighten to zero and close (done)
 
-- [ ] Baseline empty (or exemptions-only); `--check` green
-- [ ] Issue acceptance criterion 1 holds:
+- [x] Baseline empty (or exemptions-only); `--check` green
+- [x] Issue acceptance criterion 1 holds:
       `grep -rn "sqlite3.connect" --include="*.py" src/ utils/ HiQS/` returns hits
       only inside `src/rebalance/ingest/db/`, `HiQS/hiqs/`, tests, or exempted files
-- [ ] Close #136; move this doc to `3-COMPLETED`
+- [x] Close #136; move this doc to `3-COMPLETED`
 
 ## Verification commands
 
