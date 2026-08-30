@@ -28,13 +28,13 @@ Design notes
 from __future__ import annotations
 
 import os
-import sqlite3
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
 from rebalance.lib.time_ops import now_iso
 from rebalance.ingest.db import db_connection, run_migrations
+from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.ingest.sync_snapshot import get_device_id
 from rebalance.lib.git_ops import parse_github_remote_url, run_git, should_descend
 
@@ -145,19 +145,13 @@ def read_index_metadata(index_db_path: Path) -> dict[str, Any] | None:
     if not index_db_path.is_file():
         return None
     try:
-        conn = sqlite3.connect(f"file:{index_db_path}?mode=ro", uri=True)
-    except Exception:  # noqa: BLE001
-        return None
-    try:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM repo_metadata LIMIT 1").fetchone()
-        if row is None:
-            return None
-        return {k: row[k] for k in row.keys()}
+        with db_connection_readonly(index_db_path) as conn:
+            row = conn.execute("SELECT * FROM repo_metadata LIMIT 1").fetchone()
+            if row is None:
+                return None
+            return {k: row[k] for k in row.keys()}
     except Exception:  # noqa: BLE001 — older/newer ask_self schema without the table
         return None
-    finally:
-        conn.close()
 
 
 def _should_descend(name: str) -> bool:

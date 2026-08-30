@@ -46,11 +46,14 @@ import re
 import shutil
 import sqlite3
 import zlib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from rebalance.lib import time_ops
+from rebalance.ingest.db.connection import db_connection_readonly
 
 logger = logging.getLogger(__name__)
 
@@ -231,22 +234,17 @@ def compute_schema_fingerprint(db_path: Path) -> dict[str, Any]:
         "sqlite": sqlite3.sqlite_version,
     }
     try:
-        conn = _open_ro(db_path)
-    except sqlite3.Error:
-        return fp
-    try:
-        reminder_table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
-        list_table = _resolve_table(conn, _LIST_TABLE_CANDIDATES)
-        fp["reminder_table"] = reminder_table
-        fp["list_table"] = list_table
-        if reminder_table:
-            cols = sorted(_table_columns(conn, reminder_table))
-            fp["reminder_column_count"] = len(cols)
-            fp["columns_sha"] = hashlib.sha256(",".join(cols).encode("utf-8")).hexdigest()[:12]
+        with _open_ro(db_path) as conn:
+            reminder_table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
+            list_table = _resolve_table(conn, _LIST_TABLE_CANDIDATES)
+            fp["reminder_table"] = reminder_table
+            fp["list_table"] = list_table
+            if reminder_table:
+                cols = sorted(_table_columns(conn, reminder_table))
+                fp["reminder_column_count"] = len(cols)
+                fp["columns_sha"] = hashlib.sha256(",".join(cols).encode("utf-8")).hexdigest()[:12]
     except sqlite3.Error:
         pass
-    finally:
-        conn.close()
     return fp
 
 
@@ -310,28 +308,23 @@ def snapshot_stores(stores_dir: Path, dest: Path) -> list[Path]:
     return copied
 
 
-def _open_ro(path: Path) -> sqlite3.Connection:
+@contextmanager
+def _open_ro(path: Path) -> Iterator[sqlite3.Connection]:
     """Open a snapshot copy strictly read-only (belt-and-suspenders; we only
     ever read, but mode=ro makes an accidental write impossible)."""
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    with db_connection_readonly(path) as conn:
+        yield conn
 
 
 def _count_reminders(path: Path) -> int:
     try:
-        conn = _open_ro(path)
-    except sqlite3.OperationalError:
-        return 0
-    try:
-        table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
-        if table is None:
-            return 0
-        return int(conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
+        with _open_ro(path) as conn:
+            table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
+            if table is None:
+                return 0
+            return int(conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
     except sqlite3.Error:
         return 0
-    finally:
-        conn.close()
 
 
 def pick_active_store(snapshot_paths: list[Path]) -> Path:
@@ -378,8 +371,7 @@ def extract_reminders(
     Returns ``(reminders, skipped_count, mapping_fallbacks)``. Rows marked for
     deletion or missing a stable id/title are skipped (counted, not silently
     dropped). All column access is guarded by what the schema actually has."""
-    conn = _open_ro(db_path)
-    try:
+    with _open_ro(db_path) as conn:
         reminder_table = _resolve_table(conn, _REMINDER_TABLE_CANDIDATES)
         if reminder_table is None:
             raise AppleRemindersSchemaError(f"No reminder table found (looked for {_REMINDER_TABLE_CANDIDATES})")
@@ -410,8 +402,6 @@ def extract_reminders(
 
         select_cols = ["ZTITLE", "ZCKIDENTIFIER", *present_optional]
         rows = conn.execute(f"SELECT {', '.join(select_cols)} FROM {reminder_table}").fetchall()
-    finally:
-        conn.close()
 
     # First pass: map ZPARENTREMINDER (a local Z_PK) to the parent's stable id.
     pk_to_ckid: dict[int, str] = {}
@@ -773,14 +763,11 @@ def get_apple_reminders_meta(database_path: Path) -> dict[str, Any]:
     source has never synced. JSON values are decoded; scalars pass through."""
     if not Path(database_path).exists():
         return {}
-    conn = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
-    try:
+    with db_connection_readonly(Path(database_path)) as conn:
         try:
             rows = conn.execute("SELECT key, value FROM apple_reminders_sync_meta").fetchall()
         except sqlite3.OperationalError:
             return {}
-    finally:
-        conn.close()
     out: dict[str, Any] = {}
     for key, value in rows:
         try:
@@ -977,15 +964,11 @@ def list_apple_reminders(
         sql += " LIMIT ?"
         params.append(int(limit))
 
-    conn = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
+    with db_connection_readonly(Path(database_path)) as conn:
         try:
             rows = conn.execute(sql, params).fetchall()
         except sqlite3.OperationalError:
             return []  # table not created yet (source never synced)
-    finally:
-        conn.close()
 
     out: list[dict[str, Any]] = []
     for r in rows:

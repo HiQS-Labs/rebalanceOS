@@ -1,7 +1,4 @@
 {
-  "src/rebalance/doctor.py": 1,
-  "src/rebalance/ingest/apple_reminders.py": 3,
-  "src/rebalance/ingest/ask_self_scan.py": 1,
   "src/rebalance/ingest/sleuth_grouping.py": 1,
   "src/rebalance/mcp/server.py": 1,
   "src/rebalance/web.py": 1,
