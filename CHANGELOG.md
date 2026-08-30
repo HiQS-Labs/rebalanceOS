@@ -10,6 +10,23 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.76.0] - 2026-08-30
+
+### Added
+
+- CI now fails when a new direct SQLite connection is opened outside the two sanctioned database
+  gateways. The nine existing bypasses are pinned as an exact per-file baseline that only
+  shrinks: a new bypass fails the build, and so does a baseline left stale after a bypass is
+  retired. Two bypasses slipped past review after the previous cleanup was declared complete;
+  this gate exists so the third cannot.
+
+### Changed
+
+- Documented at the router level that the project's two database gateways serve different stores
+  by design — one is this project's own index, the other is the clean-room rebuild's separate
+  app-data store — so future audits stop re-deriving whether they should be merged. They should
+  not.
+
 ## [0.75.5] - 2026-08-24
 
 ### Added
