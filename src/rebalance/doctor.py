@@ -456,8 +456,7 @@ def _check_rebalance_shim() -> Check:
             f"`rebalance` on PATH resolves to {first_on_path} first, a stale shim whose "
             f"interpreter ({interpreter}) no longer exists — a bare `rebalance` fails with "
             f"`command not found` naming that interpreter, not this repo",
-            f"run `which -a rebalance`, then remove or fix the stale entry ahead of "
-            f"{running} on PATH",
+            f"run `which -a rebalance`, then remove or fix the stale entry ahead of {running} on PATH",
         )
 
     return Check(
