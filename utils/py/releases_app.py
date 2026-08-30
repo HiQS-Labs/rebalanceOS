@@ -399,7 +399,9 @@ def connect(db_path, must_exist=True):
         refuse("not-initialized", "no %s here; run `releases init` first" % DB_NAME)
     # isolation_level=None: transactions are BEGIN/COMMIT'd explicitly by perform_write, so the
     # intent journal -> COMMIT -> stage -> rename ordering is the ONLY ordering that exists.
-    conn = sqlite3.connect(db_path, isolation_level=None)
+    # Separate store (releases ledger) with its own fail-closed policy — autocommit plus an
+    # asserted foreign_keys check the rebalance gateway does not offer.
+    conn = sqlite3.connect(db_path, isolation_level=None)  # GATEWAY-OK: own store, own fail-closed policy (GH-136)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
@@ -3427,7 +3429,9 @@ def _rebuild(root, conn):
 
     tmp_db = "%s.rebuild-%s" % (paths["db"], new_txn_id()[:12])
     try:
-        tconn = sqlite3.connect(tmp_db, isolation_level=None)
+        # Staging copy of the separate releases ledger, rebuilt under the same app-local
+        # autocommit + foreign_keys policy as connect() above.
+        tconn = sqlite3.connect(tmp_db, isolation_level=None)  # GATEWAY-OK: staging copy, same policy (GH-136)
         try:
             tconn.row_factory = sqlite3.Row
             tconn.execute("PRAGMA foreign_keys = ON")

@@ -98,6 +98,22 @@ def test_gateway_dirs_and_tests_are_exempt(checker, tmp_path):
     assert checker.scan_sqlite_calls(root) == {}
 
 
+def test_reasoned_pragma_exempts_a_site(checker, tmp_path):
+    root = _make_tree(
+        tmp_path,
+        {
+            "src/ops.py": 'c = sqlite3.connect("x")  # GATEWAY-OK: one-shot prod surgery (GH-136)\n',
+            "src/plain.py": 'c = sqlite3.connect("y")\n',
+        },
+    )
+    assert checker.scan_sqlite_calls(root) == {"src/plain.py": 1}
+
+
+def test_empty_pragma_reason_still_counts(checker, tmp_path):
+    root = _make_tree(tmp_path, {"src/ops.py": 'c = sqlite3.connect("x")  # GATEWAY-OK:\n'})
+    assert checker.scan_sqlite_calls(root) == {"src/ops.py": 1}
+
+
 def test_unreadable_file_fails_closed(checker, tmp_path, monkeypatch):
     _make_tree(tmp_path, {"src/broken.py": "x = 1\n"})
     real_read_text = Path.read_text

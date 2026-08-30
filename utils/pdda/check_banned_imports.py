@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 SQLITE_CALL_RE = re.compile(r"sqlite3\.connect\s*\(")
+SQLITE_PRAGMA_RE = re.compile(r"#\s*GATEWAY-OK:\s*(.*)$")
 SQLITE_ROOTS = ("src", "utils", "HiQS")
 SQLITE_GATEWAY_DIRS = ("src/rebalance/ingest/db", "HiQS/hiqs")
 SQLITE_SELF_EXEMPT = ("utils/pdda/check_banned_imports.py",)
@@ -56,8 +57,10 @@ def scan_sqlite_calls(root: Path) -> dict[str, int]:
     """Count direct SQLite connection call sites per file under the scanned roots.
 
     Tests directories, hidden/build directories, the two gateway directories, and this
-    checker itself are exempt. Raises ``SystemExit`` on unreadable files rather than
-    returning a silently incomplete result (fail closed).
+    checker itself are exempt. A same-line ``# GATEWAY-OK: <reason>`` pragma exempts a
+    reviewed call site; a pragma with an empty reason still counts (fail closed, per
+    the pragma contract #126 specifies). Raises ``SystemExit`` on unreadable files
+    rather than returning a silently incomplete result.
     """
     counts: dict[str, int] = {}
     for top in SQLITE_ROOTS:
@@ -76,7 +79,14 @@ def scan_sqlite_calls(root: Path) -> dict[str, int]:
                     content = file_path.read_text(encoding="utf-8")
                 except OSError as exc:
                     raise SystemExit(f"sqlite gateway ratchet: cannot read {rel}: {exc}") from exc
-                found = len(SQLITE_CALL_RE.findall(content))
+                found = 0
+                for line in content.splitlines():
+                    if not SQLITE_CALL_RE.search(line):
+                        continue
+                    pragma = SQLITE_PRAGMA_RE.search(line)
+                    if pragma and pragma.group(1).strip():
+                        continue
+                    found += 1
                 if found:
                     counts[rel] = found
     return counts

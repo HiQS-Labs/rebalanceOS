@@ -142,7 +142,9 @@ def main() -> None:
         print(f"ERROR: Database not found at {db_path}", file=sys.stderr)
         sys.exit(1)
 
-    conn = sqlite3.connect(str(db_path))
+    # One-shot production-DB maintenance tool (GH-250): explicit transaction control against
+    # a multi-GB live database is the point — self-contained ops policy by design.
+    conn = sqlite3.connect(str(db_path))  # GATEWAY-OK: one-shot prod-DB surgery, explicit txn control (GH-136)
     conn.isolation_level = None  # explicit transactions below
     load_vec_extension(conn)
 

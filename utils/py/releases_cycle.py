@@ -40,7 +40,9 @@ def connect_ro(db_path):
     path = Path(db_path).resolve()
     if not path.is_file():
         raise FileNotFoundError(str(path))
-    return sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+    # The releases ledger is a separate store with its own connection helpers; staying stdlib-only
+    # keeps the releases app portable and free of rebalance imports.
+    return sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)  # GATEWAY-OK: separate store, stdlib-only app (GH-136)
 
 
 def _days_until(iso_day, today):
