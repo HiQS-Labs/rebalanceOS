@@ -204,7 +204,17 @@ def _run(sandbox, *args, env=None, cwd=None):
         **(env or {}),
         "LAUNCHCTL_BIN": str(stub),
     }
-    result = subprocess.run(["bash", str(SCRIPT), *args], capture_output=True, text=True, env=environment, cwd=cwd)
+    # GH-67: a caller that omits cwd= must not silently inherit pytest's own invocation
+    # directory — the script resolves relative operands with realpath against ITS cwd, so an
+    # unpinned cwd makes the result depend on where `pytest` itself was run from. Default to
+    # the sandbox repo so every test states the directory it intends.
+    result = subprocess.run(
+        ["bash", str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        env=environment,
+        cwd=str(repo) if cwd is None else cwd,
+    )
 
     # Checked on EVERY invocation rather than in one dedicated test, because the failure mode
     # is a fixture author reaching for a realistic label in a brand-new test — which a test

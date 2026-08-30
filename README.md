@@ -368,8 +368,12 @@ above and check that `python3 --version` really was 3.12+.
 > On Linux / Windows / Intel Mac, drop the `embeddings` extra:
 > `pip install -e ".[calendar]"` (semantic search will be unavailable; everything else works).
 
-> **To run the test suite**, add the `dev` extra — it is not included above:
-> `.venv/bin/pip install -e ".[dev]"`, then `.venv/bin/pytest tests/` from the repo root.
+> **To run the test suite**, add the `dev` and `server` extras — neither is included above:
+> `.venv/bin/pip install -e ".[dev,server]"`, then `.venv/bin/pytest tests/` from the repo root.
+> `--collect-only` should report 0 errors (the count itself drifts as tests are added —
+> don't pin it); a `ModuleNotFoundError: fastapi`
+> means the `server` extra was skipped (GH-127 — it is easy to miss since nothing above it
+> installs `fastapi`).
 > Run it from the repo root; `pytest` invoked from inside `src/rebalance/` puts that
 > directory on `sys.path`, where the local `mcp/` package shadows the installed MCP SDK.
 

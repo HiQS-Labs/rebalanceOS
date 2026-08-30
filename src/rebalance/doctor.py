@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -371,6 +373,98 @@ def _check_unpushed_work() -> Check:
         WARN,
         f"{len(stale)}/{len(repos)} checkout(s) carry unpushed work — {detail}",
         "push the branches (or set their upstreams); discovery offers these repos for promotion",
+    )
+
+
+def _check_rebalance_shim() -> Check:
+    """GH-261: a stale `rebalance` earlier on PATH shadows the working one.
+
+    Typically a leftover console-script in an abandoned venv (e.g. a
+    `.venv-py314-backup/`) whose shebang names an interpreter that no longer
+    exists. When that shim wins PATH resolution, a bare `rebalance ...` fails
+    with `command not found` naming a Python binary — nothing points at the
+    real cause. Doctor can only run from a *working* install, so this can
+    never catch its own shim being broken; it catches a shadowing entry that
+    would bite the operator the next time they type the bare command.
+
+    Anchored on ``sys.executable``, not ``sys.argv[0]``: this repo ships a
+    real ``src/rebalance/__main__.py``, so ``rebalance doctor`` can be reached
+    via `python -m rebalance` as well as the installed console script, and
+    argv[0] differs between them. The running interpreter's own venv is the
+    one invariant across every invocation shape — its `bin/` directory is
+    where its own `rebalance` console script lives, side by side with the
+    interpreter, in every normal install layout.
+
+    ``sys.executable`` is deliberately NOT ``.resolve()``d before deriving
+    ``running``: a venv's ``bin/python3`` is typically a *symlink* to the base
+    interpreter (e.g. Homebrew's), so resolving it walks straight out of the
+    venv and compares against the wrong directory entirely — confirmed live
+    against this repo's own ``.venv`` mid-fix, where it produced a false
+    positive on a perfectly correct invocation. ``os.path.abspath`` there
+    normalizes ``.``/``..`` without following symlinks. Once ``running`` names
+    a real file (the venv's own console script, not a symlink chain), both
+    sides ARE resolved for the final comparison — a `rebalance` reached via
+    its own symlink (pipx, `ln -s` into `~/.local/bin`) is still the same
+    install, not a shadow.
+    """
+    try:
+        running = Path(os.path.abspath(sys.executable)).parent / "rebalance"
+    except Exception as exc:  # noqa: BLE001 — doctor must never crash
+        return Check("rebalance shim", OK, f"could not resolve the running interpreter: {exc}")
+
+    first_on_path = shutil.which("rebalance")
+    if first_on_path is None:
+        return Check("rebalance shim", OK, "no `rebalance` resolvable on PATH to compare")
+
+    # `running` is already isolated from the venv-python symlink chain above, so it's now
+    # safe to .resolve() further — it names a real file (the venv's own console script),
+    # not a symlink out of the venv. PATH's match can legitimately be reached through a
+    # symlink of its own (pipx, a manual `ln -s` into ~/.local/bin) that points AT this
+    # same running install; resolving both sides makes that read as a match, not a shadow.
+    try:
+        first_check = Path(first_on_path).resolve()
+        running_check = running.resolve()
+    except OSError:
+        first_check, running_check = Path(first_on_path), running
+
+    if first_check == running_check:
+        return Check("rebalance shim", OK, f"PATH resolves `rebalance` to the running install ({running})")
+
+    interpreter = ""
+    try:
+        with open(first_on_path, encoding="utf-8", errors="strict") as fh:
+            first_line = fh.readline().strip()
+        if first_line.startswith("#!"):
+            shebang_parts = first_line[2:].strip().split()
+            if shebang_parts and Path(shebang_parts[0]).name == "env" and len(shebang_parts) > 1:
+                # `#!/usr/bin/env python3` — env itself always exists; resolve the NAME it
+                # would launch via PATH, or it's unresolvable (blank, not "env exists").
+                # `#!/usr/bin/env -S python3 -u` — `-S` splits the rest of the line into
+                # env's own argv, so the interpreter name is the token AFTER it, not `-S`
+                # itself (which shutil.which() would silently fail to resolve).
+                name_index = 2 if shebang_parts[1] == "-S" and len(shebang_parts) > 2 else 1
+                interpreter = shutil.which(shebang_parts[name_index]) or ""
+            elif shebang_parts:
+                interpreter = shebang_parts[0]
+    except (OSError, UnicodeDecodeError):
+        pass
+
+    if interpreter and not Path(interpreter).exists():
+        return Check(
+            "rebalance shim",
+            WARN,
+            f"`rebalance` on PATH resolves to {first_on_path} first, a stale shim whose "
+            f"interpreter ({interpreter}) no longer exists — a bare `rebalance` fails with "
+            f"`command not found` naming that interpreter, not this repo",
+            f"run `which -a rebalance`, then remove or fix the stale entry ahead of {running} on PATH",
+        )
+
+    return Check(
+        "rebalance shim",
+        WARN,
+        f"`rebalance` on PATH resolves to {first_on_path}, not the running install's own ({running})",
+        f"run `which -a rebalance`; if the shadowing entry is unwanted, remove it or put "
+        f"{running.parent} ahead of it on PATH",
     )
 
 
@@ -2175,6 +2269,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_repo_local_secrets())
     report.checks.append(_check_vault())
     report.checks.append(_check_unpushed_work())
+    report.checks.append(_check_rebalance_shim())
 
     if db_path is not None:
         report.checks.append(_check_schema(db_path))
