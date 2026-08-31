@@ -6,6 +6,7 @@ updated: 2026-08-31
 owner: noel
 gh_issue: 139
 branch: feat/gh139-clio-multi-agent
+reviewed: "agy relay r1 2026-08-31: changes requested (1 Blocker / 2 Shoulds / 1 Nit) — all applied; r2 confirmation pending"
 context_tags: [clio, capture, hooks, launchd, observability]
 effort: 2
 complexity: 3
@@ -30,7 +31,7 @@ non_goals: "No change to clio:id derivation; no rewrite of the exporter's delive
 
 | What was just completed | What's next |
 |---|---|
-| Issue [#139](https://github.com/HiQS-Labs/rebalanceOS/issues/139) opened; capture surfaces scouted on one machine (findings below); plan drafted | Phase 0 spike: verify ZCode hook stdin shape, Codex prompt record source, Agy conversation DB schema |
+| Issue [#139](https://github.com/HiQS-Labs/rebalanceOS/issues/139) opened; surfaces scouted; plan drafted; **agy relay r1 reviewed — changes requested (1 Blocker / 2 Shoulds / 1 Nit), all applied** (Agy store corrected to JSONL transcripts; tailer JSONL-dedup requirement added; viewer-regression + tailer-restart gates added; timestamp-normalization spike item added) | Phase 0 spike: verify ZCode hook stdin shape, Codex prompt record source, Agy transcript `source`/`created_at` semantics; then agy r2 confirmation |
 
 ## Background
 
@@ -77,13 +78,22 @@ Key files today:
   `{"prompt","session_id"}` JSON Claude Code posts?), the exact config location and `enabled: true`
   gate, and that `${CLAUDE_PROJECT_DIR}`/session-id template vars populate for hook scripts.
   Findings:
+- [ ] **Timestamp normalization (all sources).** `clio:id` embeds the timestamp string verbatim, so
+  every source must be normalized **at capture time** to UTC, second-precision ISO-8601
+  (`YYYY-MM-DDTHH:MM:SSZ`, exactly what the Claude hook's `date -u` emits) — a source emitting local
+  time, sub-second precision, or a raw epoch would destabilize IDs and break dedup. Verify each
+  source's native timestamp format and pin the normalizer per agent. Findings:
 - [ ] **Codex:** identify the canonical prompt record — a `history.jsonl` (absent on the scout
   machine; check the persistence setting that creates it) vs parsing session rollout JSONLs
-  (`{"payload","timestamp","type"}` with `session_meta`/`event_msg` entries). Decide one source of
-  record and confirm it covers VS Code extension sessions, not just CLI sessions. Findings:
-- [ ] **Agy:** inspect a conversation database under the Agy app-data tree **read-only** (copy
-  first if WAL makes live reads risky); confirm where the user's prompt text lives per turn and
-  whether a stable per-session id + timestamp can be derived. Findings:
+  (`{"payload","timestamp","type"}` with `session_meta`/`event_msg` entries — verified present and
+  current on the scout machine) vs the `state_*.sqlite` stores. Decide one source of record and
+  confirm it covers VS Code extension sessions, not just CLI sessions. Findings:
+- [ ] **Agy:** per-turn data lives in **JSONL transcripts** —
+  `brain/<conversation-id>/.system_generated/logs/transcript.jsonl` with
+  `content`/`created_at`/`source`/`type` keys (verified 2026-08-31; the `conversations/*.db`
+  SQLite files are NOT the prompt record). Confirm the `source`/`type` values that identify a
+  user-submitted prompt, whether `created_at` is UTC and stable, and the per-conversation file
+  lifecycle (rotation, rename-on-complete). Findings:
 - [ ] Confirm one shared capture writer can serve hook callers (stdin JSON) and tailer callers
   (file/DB polling) without per-agent forks of the cleaning/filter logic. Findings:
 
@@ -125,6 +135,8 @@ worked around silently.
   still applying per agent, Claude Code path byte-identical output for the same input.
 - [ ] `test/clio-exporter.sh` covers: `agent` rendering, legacy default, unchanged `clio:id`
   derivation, note re-run produces zero duplicates for pre-upgrade JSONL.
+- [ ] **Viewer regression check:** load a note rendered with the third metadata token in the
+  sidebar extension (`vscode-extensions/clio`) and confirm it renders (rendered + source modes).
 - [ ] Real-session verify: one ZCode prompt + one Claude Code prompt land in the JSONL with
   correct `agent` values and render once each in the note.
 - [ ] `pytest tests/` full suite green.
@@ -135,7 +147,8 @@ worked around silently.
   Codex prompts as JSONL lines with `agent: "codex"`, `repo`/`branch` resolved from the session's
   project directory when derivable (empty otherwise), riding the existing capture filters.
 - [ ] Cursor + delivery semantics mirror the exporter's discipline: cursor is an optimization,
-  IDs are the dedup guarantee; a skipped or re-run tailer never duplicates an entry (IDs + note scan).
+  IDs are the dedup guarantee — the tailer **scans the existing JSONL ID set before every append**
+  (see invariant 3), so a crash between append and cursor-advance can never double-write.
 - [ ] Ship the launchd job (macOS) + install/uninstall lines in `utils/CLIO/INSTALL.md`; the job
   label follows the existing family naming, operator-facing copy uses the functional name.
 - [ ] Backfill boundary decided explicitly: on first run the tailer starts **now** (no history
@@ -145,21 +158,24 @@ worked around silently.
 
 - [ ] Tailer tests (mock rollout/history fixtures under `test/fixtures/`): happy path, malformed
   line, mid-session resume, restart-no-duplicates, capture-filter interaction.
+- [ ] **Restart-no-duplicates runs the tailer twice with NO exporter run in between** — the JSONL
+  must contain zero duplicate IDs (guards the within-batch rendering gap).
 - [ ] Real-session verify: a VS Code Codex prompt lands with `agent: "codex"` and renders once.
 - [ ] `pytest tests/` + both CLIO test scripts green.
 
 ## Phase 3 — Agy (standalone app) capture
 
-- [ ] Same tailer pattern over Agy's conversation storage (per Phase 0 schema findings), strictly
-  read-only: open databases copy-first or in read-only mode so a live Agy session is never
-  blocked or corrupted (WAL-safe).
-- [ ] Emit `agent: "agy"` lines with the same invariants; dedup rides the ID machinery.
+- [ ] Same tailer pattern over Agy's **JSONL transcripts**
+  (`brain/<conversation-id>/.system_generated/logs/transcript.jsonl`, per Phase 0's `source`/`type`
+  findings), strictly read-only; treat any companion SQLite stores as indexes, never as the prompt
+  record. Dedup rides the ID machinery **plus the JSONL-scan-before-append rule** (invariant 3).
+- [ ] Emit `agent: "agy"` lines with the same invariants.
 - [ ] Install/uninstall documented in `utils/CLIO/INSTALL.md`; launchd job follows Phase 2's shape.
 
 **QA gate (Phase 3):**
 
-- [ ] Tailer tests with fixture DB copies: new-turn detection, restart-no-duplicates, live-write
-  safety (writer not blocked), capture filters.
+- [ ] Tailer tests with fixture transcript copies: new-turn detection, restart-no-duplicates
+  (twice, no exporter in between), live-write safety (writer not blocked), capture filters.
 - [ ] Real-session verify: an Agy prompt lands with `agent: "agy"` and renders once.
 - [ ] Full suite green; exporter `--status` reports all four agents' IDs as delivered.
 
@@ -170,22 +186,51 @@ worked around silently.
 2. **IDs are immutable.** `clio:id = session_id:timestamp` for every agent; the additive `agent`
    field never enters the ID. Collision across agents is theoretically possible and practically
    negligible (uuid session ids + second-precision UTC); covered by a test note, not a format change.
-3. **Capture stays best-effort and fast.** The hook never blocks prompt submission (exit 0, errors
+3. **Tailers dedup against the JSONL, not just the note.** The exporter renders each JSONL line
+   independently and has **no within-batch ID dedup** (`prompt-log-to-md.sh` render step, ~lines
+   496–503), so two same-ID lines that land in the JSONL between exporter runs both render. A tailer
+   that crashes after appending but before advancing its cursor would re-append on restart — so every
+   tailer must scan the existing JSONL ID set (its own agent's ids suffice) before appending, in
+   addition to its cursor. The cursor is an optimization; the ID set is the guarantee.
+4. **Capture stays best-effort and fast.** The hook never blocks prompt submission (exit 0, errors
    to the error log); tailers degrade to catch-up on next tick.
-4. **The viewer extension must survive.** `vscode-extensions/clio` already tolerates `clio:id`
+5. **The viewer extension must survive.** `vscode-extensions/clio` already tolerates `clio:id`
    comments and atomic saves; the only format delta it sees is the extra `· agent` token and
    (new notes only) the header wording.
-5. **PII discipline.** Device names, usernames, and vault paths stay in per-device config/launchd
+6. **PII discipline.** Device names, usernames, and vault paths stay in per-device config/launchd
    plists — never in repo docs, issues, or fixtures (fixtures use synthetic values).
 
 ## Risks
 
 - **ZCode hook payload drift** — if ZCode's stdin JSON differs from Claude Code's, the shared
-  writer needs a small per-agent normalizer; Phase 0 pins this before any code.
+  writer needs a small per-agent normalizer; Phase 0 pins this before any code. Most likely to
+  bite first (internal tools evolve fast), and the spike-first mitigation covers it.
 - **Codex VS Code sessions may not write the same files as CLI sessions** — Phase 0 must verify
-  the IDE path specifically; if the IDE writes nothing observable, fall back to the rollout
+  the IDE path specifically among the three candidates (history file, rollout JSONLs — verified
+  present, `state_*.sqlite`); if the IDE writes nothing observable, fall back to the rollout
   session files and record that in the spike findings.
-- **Agy DB schema is undocumented and can move between app updates** — the tailer must fail soft
-  (log + skip) on schema drift rather than crash-loop; consider a schema-version probe at startup.
+- **Agy storage layout is undocumented and can move between app updates** — the prompt record is
+  the JSONL transcripts (initial scouting mistook the `conversations/*.db` SQLite files for it;
+  corrected during the agy r1 review), and the tailer must fail soft (log + skip) on schema drift
+  rather than crash-loop; consider a schema probe at startup.
 - **Exporter legacy matching** — the `·`-token metadata line is load-bearing for
-  `legacy-unlabelled` backfill matching; the agent token must append, never reorder.
+  `legacy-unlabelled` backfill matching; the agent token must append, never reorder. The agy r1
+  review re-verified `split(" · ")[0]` machine isolation in `reconcile_status` and `backfill_plan`
+  and found it safe for the added token.
+- **Within-batch duplicate rendering** — duplicate same-ID JSONL lines land between exporter runs
+  render twice (no within-batch dedup in the exporter); mitigated by invariant 3
+  (tailers scan the JSONL ID set before append) and the restart-no-duplicates gates.
+
+## Review
+
+- **agy relay r1 — 2026-08-31 — Changes requested.** 1 Blocker, 2 Shoulds, 1 Nit; all applied:
+  - [Blocker] Capture-strategy facts corrected (Agy = JSONL transcripts, not SQLite; Codex store
+    candidates widened) and tailer dedup redesignated to the JSONL ID set with a restart gate.
+  - [Should] Timestamp normalization (UTC, second-precision) added as an explicit Phase 0 spike
+    item, since `clio:id` embeds the timestamp verbatim.
+  - [Should] Viewer-regression step added to the Phase 1 gate; Phase 2 restart gate now runs the
+    tailer twice with no exporter in between.
+  - [Nit] Agy schema-drift risk rewritten to name the actual storage; ZCode drift called as
+    first-to-bite.
+  - Schema v2 / ID stability and scope/ordering passed unamended (`[Pass]` on Q2 and Q4).
+- **agy r2 confirmation:** pending.
