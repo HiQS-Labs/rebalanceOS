@@ -6,7 +6,7 @@ updated: 2026-08-31
 owner: noel
 gh_issue: 139
 branch: feat/gh139-clio-multi-agent
-reviewed: "agy relay r1 2026-08-31: changes requested (1 Blocker / 2 Shoulds / 1 Nit) — all applied; r2 confirmation pending"
+reviewed: "agy relay r1 2026-08-31: changes requested (1 Blocker / 2 Shoulds / 1 Nit) — all applied; agy r2 2026-08-31: Approved (5/5 confirmed)"
 context_tags: [clio, capture, hooks, launchd, observability]
 effort: 2
 complexity: 3
@@ -233,4 +233,6 @@ worked around silently.
   - [Nit] Agy schema-drift risk rewritten to name the actual storage; ZCode drift called as
     first-to-bite.
   - Schema v2 / ID stability and scope/ordering passed unamended (`[Pass]` on Q2 and Q4).
-- **agy r2 confirmation:** pending.
+- **agy r2 confirmation — 2026-08-31 — Approved.** All five confirmations returned
+  `[Confirmed]` (Blocker application, timestamp spike item, viewer gate, risk wording, and the
+  no-regression check on what passed r1). The plan is cleared for Phase 0.
