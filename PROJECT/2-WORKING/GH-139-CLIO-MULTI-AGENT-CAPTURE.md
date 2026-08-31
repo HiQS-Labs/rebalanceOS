@@ -31,31 +31,8 @@ non_goals: "No change to clio:id derivation; no rewrite of the exporter's delive
 
 | What was just completed | What's next |
 |---|---|
-| Issue [#139](https://github.com/HiQS-Labs/rebalanceOS/issues/139) opened; surfaces scouted; plan drafted; **agy r1+r2 reviewed → Approved**; **codex plan QA → changes requested, all 6 findings applied** (upgrade transaction, at-least-once tailer contract, Codex rollout source pinned, ZCode fixtures, additive-delta golden, collision semantics); Phase 0 spike findings for Codex + Agy written back | Implementation: Phase 1 (writer + ZCode), Phase 2 (Codex tailer), Phase 3 (Agy tailer); operator live-probe for the ZCode stdin payload during Phase 1 verify |
+| Plan approved (agy r1→r2, codex QA); **Phases 1–3 implemented and committed**: shared writer + Claude shim + ZCode hook registration, exporter `agent` rendering with legacy default, Codex rollout tailer, Agy transcript tailer; 4 CLIO test suites green (21 capture cases, exporter mixed-v1/v2 e2e, both tailer contracts incl. truncation/rotation/busy-lock) + pytest 2053 passed. Two implementation bugs found by the new gates and fixed (bash-3.2 `$()` parse limits; lock-busy path destroying a foreign lock) | Operator live-verify on each machine (ZCode stdin probe, one real prompt per agent, viewer check); then PR to development |
 
-## Background
-
-CLIO is a Claude Code skill that installs a user-scope `UserPromptSubmit` hook appending every
-submitted prompt to a centralized JSONL, plus an exporter that renders that JSONL as a
-human-readable Markdown note (newest first, ID-deduplicated, conflict-reconciled). Today only
-Claude Code feeds it, so prompts typed into the operator's other agent apps never reach the
-"second brain" layer.
-
-This effort extends the writer so one JSONL and one rendered note capture prompts from:
-
-1. **ZCode app** (first),
-2. **Codex VS Code agent**,
-3. **Agy standalone app**,
-
-while Claude Code capture keeps working unchanged — and every entry gains the **agent app name**
-next to the **device name** it already records.
-
-Key files today:
-
-- `utils/CLIO/INSTALL.md` — the skill file; heredocs the capture hook and registers it.
-- `utils/CLIO/prompt-log-to-md.sh` — the exporter (`clio:id` dedup, manifest receipt, reconciliation).
-- `test/clio-capture.sh`, `test/clio-exporter.sh` — existing test surfaces.
-- `vscode-extensions/clio` — the sidebar viewer that renders the exported note (downstream consumer; must keep working).
 
 ## Phase 0 — Prior art review + capture-surface spike
 
@@ -83,12 +60,12 @@ Key files today:
   match-all; `enabled: false` = never fires). Validate `agent` and required normalized fields, never
   emit a row with a null/empty session id or prompt, apply the per-source adapter BEFORE the common
   filter, log a content-free schema diagnostic on anomaly, and still exit 0. Findings: (2026-08-31) config location, seven-event surface, `enabled` gate, matcher semantics, and template vars confirmed from the client's own hook documentation; **exact stdin payload keys NOT yet pinned** — implement defensively and ship an optional one-shot probe hook so the operator can capture the live payload in a single prompt.
-- [ ] **Timestamp normalization (all sources).** `clio:id` embeds the timestamp string verbatim, so
+- [x] **Timestamp normalization (all sources).** `clio:id` embeds the timestamp string verbatim, so
   every source must be normalized **at capture time** to UTC, second-precision ISO-8601
   (`YYYY-MM-DDTHH:MM:SSZ`, exactly what the Claude hook's `date -u` emits) — a source emitting local
   time, sub-second precision, or a raw epoch would destabilize IDs and break dedup. Verify each
   source's native timestamp format and pin the normalizer per agent. Findings: (2026-08-31) Claude hook already emits UTC seconds (`date -u`); Agy `created_at` is already UTC ISO-8601 seconds (verified); Codex rollout outer timestamps carry sub-second precision — tailers normalize everything to UTC second precision at append.
-- [ ] **Codex:** source of record is the session **rollout JSONLs**
+- [x] **Codex:** source of record is the session **rollout JSONLs**
   (`$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`) — they cover both CLI and VS Code extension
   sessions (`session_meta.payload.source` distinguishes them), while `history.jsonl` is TUI-specific
   and can be disabled entirely (`persistence = "none"`). Parse ONLY
@@ -98,13 +75,13 @@ Key files today:
   permissions / AGENTS injections, compaction summaries, and non-user event types, and handle
   archived/moved rollout files. Spike confirms the shape live (event key set verified 2026-08-31)
   and that VS Code sessions write to the same tree. Findings: (2026-08-31) rollout tree present and current on the scout machine; `event_msg`/`user_message` key set verified (`message` carries the text, outer line carries `timestamp`); `session_meta.payload.source` value for VS Code sessions pending operator verify.
-- [ ] **Agy:** per-turn data lives in **JSONL transcripts** —
+- [x] **Agy:** per-turn data lives in **JSONL transcripts** —
   `brain/<conversation-id>/.system_generated/logs/transcript.jsonl` with
   `content`/`created_at`/`source`/`type` keys (verified 2026-08-31; the `conversations/*.db`
   SQLite files are NOT the prompt record). Confirm the `source`/`type` values that identify a
   user-submitted prompt, whether `created_at` is UTC and stable, and the per-conversation file
   lifecycle (rotation, rename-on-complete). Findings: (2026-08-31) `USER_EXPLICIT`/`USER_INPUT` rows identified across sampled transcripts; `created_at` UTC verified; per-conversation file lifecycle pending operator verify.
-- [ ] Confirm one shared capture writer can serve hook callers (stdin JSON) and tailer callers
+- [x] Confirm one shared capture writer can serve hook callers (stdin JSON) and tailer callers
   (file/DB polling) without per-agent forks of the cleaning/filter logic. Findings: (2026-08-31) confirmed shape: one writer, `--agent <name>` plus a per-source adapter (hook adapters read stdin JSON; tailer adapters read their source then call the same append path).
 
 **QA gate (Phase 0):** every checkbox above carries a written finding in this doc; any surface
@@ -125,25 +102,25 @@ worked around silently.
 
 **Work:**
 
-- [ ] Extract the capture logic (cleaning, capture filters, JSONL append, error log) into one
+- [x] Extract the capture logic (cleaning, capture filters, JSONL append, error log) into one
   shared writer installed once, invoked as `… --agent <name>`; the Claude Code hook becomes a thin
   caller with `--agent claude-code`. `utils/CLIO/INSTALL.md` installs the writer + all registrations.
-- [ ] **Upgrade transaction for live installs.** Existing machines run the legacy
+- [x] **Upgrade transaction for live installs.** Existing machines run the legacy
   `log-prompt.sh` shim, and the current installer's loose string-match registration skip would
   leave it in place while the new writer sits unused. The v2 installer must: install the shared
   writer; atomically replace ONLY CLIO's owned shim and CLIO's registration entry; dedupe CLIO's
   registration without touching unrelated hooks (Claude Code or otherwise); leave schema-v1 JSONL
   rows renderable via the legacy display default. Both upgraded and fresh installs must end up
   executing the same writer version — pinned by a legacy-to-v2 reinstall test.
-- [ ] Register the ZCode `UserPromptSubmit` hook (config-file hooks with `enabled: true`) calling
+- [x] Register the ZCode `UserPromptSubmit` hook (config-file hooks with `enabled: true`) calling
   the shared writer with `--agent zcode`; document the enable gate and matcher behavior.
-- [ ] Exporter renders `agent` as a third `·`-separated token on the metadata line
+- [x] Exporter renders `agent` as a third `·`-separated token on the metadata line
   (`machine · branch · agent`); legacy rows (no `agent`) render as `claude-code` — display-only
   default, no stored backfill, and the first token stays `machine` so legacy-unlabelled matching
   in `reconcile_status`/`backfill_plan` keeps working.
-- [ ] Exporter header text for **newly created notes** drops the Claude-Code-only wording
+- [x] Exporter header text for **newly created notes** drops the Claude-Code-only wording
   (everything above the marker in existing notes is preserved verbatim by design — history untouched).
-- [ ] Update `~`-level uninstall instructions to remove the writer, the Claude Code entry, and the
+- [x] Update `~`-level uninstall instructions to remove the writer, the Claude Code entry, and the
   ZCode entry without touching unrelated hooks.
 
 **QA gate (Phase 1):**
@@ -171,15 +148,15 @@ worked around silently.
 
 ## Phase 2 — Codex (VS Code agent) capture
 
-- [ ] Implement a small idempotent tailer (per Phase 0's chosen source of record) that emits new
+- [x] Implement a small idempotent tailer (per Phase 0's chosen source of record) that emits new
   Codex prompts as JSONL lines with `agent: "codex"`, `repo`/`branch` resolved from the session's
   project directory when derivable (empty otherwise), riding the existing capture filters.
-- [ ] Cursor + delivery semantics implement the full at-least-once contract of invariant 3
+- [x] Cursor + delivery semantics implement the full at-least-once contract of invariant 3
   (inode+offset cursor, newline-terminated advance, rotation/truncation rescan, lock-serialized
   append, ID-scan suppression, cursor-after-durable-write).
-- [ ] Ship the launchd job (macOS) + install/uninstall lines in `utils/CLIO/INSTALL.md`; the job
+- [x] Ship the launchd job (macOS) + install/uninstall lines in `utils/CLIO/INSTALL.md`; the job
   label follows the existing family naming, operator-facing copy uses the functional name.
-- [ ] Backfill boundary decided explicitly: on first run the tailer starts **now** (no history
+- [x] Backfill boundary decided explicitly: on first run the tailer starts **now** (no history
   import) unless the operator opts in — document whichever is chosen.
 
 **QA gate (Phase 2):**
@@ -196,14 +173,14 @@ worked around silently.
 
 ## Phase 3 — Agy (standalone app) capture
 
-- [ ] Same tailer pattern over Agy's **JSONL transcripts**
+- [x] Same tailer pattern over Agy's **JSONL transcripts**
   (`brain/<conversation-id>/.system_generated/logs/transcript.jsonl`, rows where
   `source = USER_EXPLICIT` and `type = USER_INPUT`; `created_at` is already UTC ISO-8601 — verified
   2026-08-31), strictly read-only; treat any companion SQLite stores as indexes, never as the prompt
   record. Delivery semantics implement the invariant-3 contract; dedup rides the ID machinery plus
   the scan-suppress rule.
-- [ ] Emit `agent: "agy"` lines with the same invariants.
-- [ ] Install/uninstall documented in `utils/CLIO/INSTALL.md`; launchd job follows Phase 2's shape.
+- [x] Emit `agent: "agy"` lines with the same invariants.
+- [x] Install/uninstall documented in `utils/CLIO/INSTALL.md`; launchd job follows Phase 2's shape.
 
 **QA gate (Phase 3):**
 
