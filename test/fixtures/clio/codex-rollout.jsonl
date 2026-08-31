@@ -1,0 +1,7 @@
+{"payload":{"id":"01a04627-1c89-74b2-8549-abc57b8120a7","cwd":"/tmp/mock-repo","source":"cli"},"timestamp":"2026-08-27T19:16:03.101Z","type":"session_meta"}
+{"payload":{"type":"user_message","message":"This is the first substantive mock user prompt, deliberately longer than the one hundred character capture threshold."},"timestamp":"2026-08-27T19:16:03.500Z","type":"event_msg"}
+{"payload":{"type":"agent_message","message":"Understood, working on it."},"timestamp":"2026-08-27T19:16:20.000Z","type":"event_msg"}
+{"payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<user_instructions>\nInjected AGENTS-style context that must never be captured as a user prompt.\n</user_instructions>"}]},"timestamp":"2026-08-27T19:16:20.100Z","type":"response_item"}
+{"payload":{"type":"token_count","total":1234},"timestamp":"2026-08-27T19:16:21.000Z","type":"event_msg"}
+{"payload":{"type":"user_message","message":"This is the second mock user prompt, submitted after the first reply, also comfortably past the capture threshold."},"timestamp":"2026-08-27T19:17:45.250Z","type":"event_msg"}
+{"payload":{"type":"task_complete","last_agent_message":"done"},"timestamp":"2026-08-27T19:18:00.000Z","type":"event_msg"}
