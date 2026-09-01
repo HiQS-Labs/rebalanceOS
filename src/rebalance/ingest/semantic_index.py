@@ -508,7 +508,7 @@ def sync_code_documents(conn: Any, repo_root: Path) -> dict[str, int]:
 # small explicit map (rather than read off the collector) so the backfill has
 # no hard dependency on collector internals — adding a SourceModule means one
 # entry here next to its registration.
-_REGISTRY_SOURCE_TABLES: dict[str, str] = {"figma": "figma_comments"}
+_REGISTRY_SOURCE_TABLES: dict[str, str] = {"figma": "figma_comments", "clio": "clio_prompts"}
 
 # Sources already handled by the legacy if-ladder; the provider path skips them.
 _LADDER_SOURCES: frozenset[str] = frozenset({"vault", "github", "email", "code"})
