@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,12 +21,40 @@ def ensure_clio_schema(conn: Any) -> None:
             session_id TEXT NOT NULL,
             prompt TEXT NOT NULL,
             agent TEXT,
+            repo TEXT,
             synced_at TEXT NOT NULL
         )
         """
     )
+    
     conn.execute("CREATE INDEX IF NOT EXISTS clio_prompts_ts ON clio_prompts (timestamp)")
+    
+    # Migration: add repo if missing
+    columns = {col[1] for col in conn.execute("PRAGMA table_info(clio_prompts)").fetchall()}
+    if "repo" not in columns:
+        conn.execute("ALTER TABLE clio_prompts ADD COLUMN repo TEXT")
 
+
+
+
+def filter_prompt_metadata(prompt: str) -> str:
+    """Filter out relay metadata blocks and other noise before storing."""
+    if not prompt:
+        return prompt
+    # 1. Filter out RELAY AUTOMATION blocks
+    prompt = re.sub(
+        r'<!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->.*?<!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->', 
+        '', prompt, flags=re.DOTALL
+    )
+    # 2. Filter out <SYSTEM_MESSAGE>...</SYSTEM_MESSAGE>
+    prompt = re.sub(
+        r'<SYSTEM_MESSAGE>.*?</SYSTEM_MESSAGE>', 
+        '', prompt, flags=re.DOTALL
+    )
+    # 3. Clean up NEXT/STATUS headers if they are left behind
+    prompt = re.sub(r'^NEXT:.*\n', '', prompt, flags=re.MULTILINE)
+    prompt = re.sub(r'^STATUS:.*\n', '', prompt, flags=re.MULTILINE)
+    return prompt.strip()
 
 @dataclass(frozen=True)
 class ClioSyncResult:
@@ -70,6 +99,9 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
                 session_id = data.get("session_id", "").strip()
                 prompt = data.get("prompt", "").strip()
                 agent = data.get("agent", "")
+                repo = data.get("repo", "")
+                
+                prompt = filter_prompt_metadata(prompt)
                 
                 if not ts or not session_id or not prompt:
                     continue
@@ -90,10 +122,10 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
                 
                 conn.execute(
                     """
-                    INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, synced_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, repo, synced_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (record_id, ts, session_id, prompt, agent, synced_at)
+                    (record_id, ts, session_id, prompt, agent, repo, synced_at)
                 )
                 inserted += 1
                 
@@ -112,7 +144,7 @@ def clio_semantic_docs(conn: Any) -> "Iterator[SemanticDoc]":
     
     rows = conn.execute(
         """
-        SELECT id, timestamp, session_id, prompt, agent, synced_at
+        SELECT id, timestamp, session_id, prompt, agent, repo, synced_at
         FROM clio_prompts
         """
     ).fetchall()
@@ -122,15 +154,20 @@ def clio_semantic_docs(conn: Any) -> "Iterator[SemanticDoc]":
         if not prompt_text.strip():
             continue
             
+        # Cap for SemanticDoc embedding
+        if len(prompt_text) > 4000:
+            prompt_text = prompt_text[:3997] + "..."
+            
         yield SemanticDoc(
             source_pk=row["id"],
             doc_kind="clio_prompt",
             title=f"CLIO Prompt ({row['agent'] or 'claude'})",
             body=prompt_text,
-            metadata={
+                        metadata={
                 "session_id": row["session_id"],
                 "timestamp": row["timestamp"],
                 "agent": row["agent"] or "",
+                "repo": row["repo"] or "",
             },
             created_at=row["timestamp"],
             updated_at=row["synced_at"],

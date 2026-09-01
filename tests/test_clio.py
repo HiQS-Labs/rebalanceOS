@@ -19,8 +19,8 @@ def test_clio_semantic_docs(tmp_path: Path):
     ensure_clio_schema(conn)
     
     conn.execute(
-        "INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, synced_at) VALUES (?, ?, ?, ?, ?, ?)",
-        ("id1", "2026-08-31T21:26:07Z", "sess1", "hello world", "claude", "now")
+        "INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, repo, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("id1", "2026-08-31T21:26:07Z", "sess1", "hello world", "claude", "repo1", "now")
     )
     
     docs = list(clio_semantic_docs(conn))
