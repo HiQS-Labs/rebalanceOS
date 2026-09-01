@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-08-31.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 4
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -59,6 +59,21 @@ ROUND: 1 / 4
 ## Log
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+### Reviewer (aider) — r1
+swept file: yes
+Verdict: Approved
+
+Findings:
+- [Pass] `Used tool:` / `Ran command:` stripping is correct for line-start prefixes — `.relay-artifacts/clio-capture.sh:68`. The regex `^\"?(Ran command:|Viewed |Used tool:|The user has approved this document\\.)[^\\n]*\\n?` with `gm` anchors each line, matches the prefix case-insensitively, consumes to end of line, and removes the optional newline.
+- [Nit] The same line-start regex does not match indented prefixes because it lacks `^\\s*` — `.relay-artifacts/clio-capture.sh:68`. If indented synthetic lines can occur, consider `^\\s*\"?`. Non-blocking for the stated DoD.
+- [Pass] Tag stripping uses dot-all for multi-line tags — `.relay-artifacts/clio-capture.sh:66`. The `; ""; "gms")` flags include `s`, so `.*?` can span newlines to the matching `</\\1>` close tag. Note: `.relay-artifacts/clio-capture.sh:76` separately drops raw rows containing `<task-notification>` before cleaning; that is a capture filter, not a tag-regex defect.
+- [Pass] Newline squashing replacement uses actual newline escapes, not literal backslash-n — `.relay-artifacts/clio-capture.sh:69`. The replacement is `"\n\n"` in the jq string, so the cleaned prompt contains two newline characters; JSON output may encode them as `\n`, but the data does not contain literal `\n` text.
+- [Pass] Whole-file sweep found no additional Blocker/Should issues in the pre-existing script — `.relay-artifacts/clio-capture.sh:1-151`. Optional observations only: lock cleanup relies on stale-break if an unexpected failure occurs after lock acquisition (`.relay-artifacts/clio-capture.sh:104-128`), and full-log ID scanning may become costly as the log grows (`.relay-artifacts/clio-capture.sh:138-148`).
+
+Pre-existing defects: none found at Blocker/Should severity.
+
+Handoff: relay closed (Approved), no further turn needed.
+
 <!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
 ▶ TAKE YOUR TURN (aider)
 <!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->
