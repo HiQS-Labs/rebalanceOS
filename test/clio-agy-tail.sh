@@ -50,6 +50,22 @@ out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$(log_count "$home/.claude/prompt-log.jsonl")" = "0" ] \
   || fail "start-now: history import happened despite the default"
 
+# -- 1b. first sighting ends in a PARTIAL record: completion delivered once ---
+home=$(setup_home "$TMP/partial-first")
+agyroot="$TMP/partial-first/agy"
+transcript=$(new_transcript "$agyroot" "$CONV")
+cp "$FIXTURE" "$transcript"
+printf '%s' '{"content":"This is the fifth mock Agy user prompt, present but unterminated at first sighting, long enough to clear the threshold.","created_at":"2026-08-24T03:55:00Z","source":"USER_EXPLICIT","status":"DONE","step_index":8,"type":"USER_INPUT"}' >> "$transcript"
+HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER" >/dev/null
+[ "$(log_count "$home/.claude/prompt-log.jsonl")" = "0" ] \
+  || fail "partial first sighting: a partial record was captured pre-completion"
+printf '\n' >> "$transcript"
+out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
+[ "$out" = "clio-agy-tail: delivered=1 deferred_files=0" ] \
+  || fail "partial first sighting: completion was not delivered, got: $out"
+[ "$(log_count "$home/.claude/prompt-log.jsonl")" = "1" ] \
+  || fail "partial first sighting: expected exactly 1 row after completion"
+
 # -- 2. explicit backfill imports ONLY the user rows --------------------------
 home=$(setup_home "$TMP/backfill")
 agyroot="$TMP/backfill/agy"

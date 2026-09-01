@@ -38,6 +38,13 @@ date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
 
 file_id() { stat -f '%i' "$1" 2>/dev/null || stat -c '%i' "$1" 2>/dev/null || echo "?"; }
 file_size() { stat -f '%z' "$1" 2>/dev/null || stat -c '%s' "$1" 2>/dev/null || echo 0; }
+file_last_newline() { # byte offset just after the last terminating newline (0 if none)
+  python3 - "$1" <<'PYEOF'
+import sys
+with open(sys.argv[1], "rb") as fh:
+    print(fh.read().rfind(b"\n") + 1)
+PYEOF
+}
 
 state_lookup() { # $1 = path -> echoes "inode offset"; nonzero when unseen
   [ -f "$STATE" ] || return 1
@@ -58,8 +65,10 @@ state_update() {
 }
 
 # Read one transcript from $2 (byte offset), emit one JSON row per submitted
-# user prompt on stdout and "CONSUMED <bytes>" on stderr. Byte-exact: the
-# cursor only ever lands after a terminating newline.
+# user prompt on stdout and "CONSUMED <bytes>" on stderr. Rows are
+# self-contained (session id comes from the path, not file content), so the
+# read seeks straight to the offset — no full-file walk per tick. Byte-exact:
+# the cursor only ever lands after a terminating newline.
 extract_rows() {
   python3 - "$1" "$2" <<'PYEOF'
 import json, sys
@@ -126,7 +135,9 @@ while IFS= read -r file; do
   elif [ "$BACKFILL" = "1" ]; then
     offset=0
   else
-    offset=$size
+    # Start now: land the cursor after the last TERMINATING newline so a
+    # record completed after first sighting is still delivered.
+    offset=$(file_last_newline "$file")
     state_update "$file" "$inode" "$offset"
     continue
   fi

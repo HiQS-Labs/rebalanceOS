@@ -47,6 +47,21 @@ out=$(HOME="$home" CODEX_HOME="$TMP/start-now/codex" "$TAILER")
 [ "$(log_count "$home/.claude/prompt-log.jsonl")" = "0" ] \
   || fail "start-now: history import happened despite the default"
 
+# -- 1b. first sighting ends in a PARTIAL record: completion delivered once ---
+home=$(setup_home "$TMP/partial-first")
+rollout=$(new_session_file "$TMP/partial-first/codex")
+cp "$FIXTURE" "$rollout"
+printf '%s' '{"payload":{"type":"user_message","message":"This is the fifth mock user prompt, present but unterminated at first sighting, long enough to clear the threshold."},"timestamp":"2026-08-27T19:25:00.000Z","type":"event_msg"}' >> "$rollout"
+HOME="$home" CODEX_HOME="$TMP/partial-first/codex" "$TAILER" >/dev/null
+[ "$(log_count "$home/.claude/prompt-log.jsonl")" = "0" ] \
+  || fail "partial first sighting: a partial record was captured pre-completion"
+printf '\n' >> "$rollout"
+out=$(HOME="$home" CODEX_HOME="$TMP/partial-first/codex" "$TAILER")
+[ "$out" = "clio-codex-tail: delivered=1 deferred_files=0" ] \
+  || fail "partial first sighting: completion was not delivered, got: $out"
+[ "$(log_count "$home/.claude/prompt-log.jsonl")" = "1" ] \
+  || fail "partial first sighting: expected exactly 1 row after completion"
+
 # -- 2. explicit backfill imports the pre-existing rows -----------------------
 home=$(setup_home "$TMP/backfill")
 rollout=$(new_session_file "$TMP/backfill/codex")
