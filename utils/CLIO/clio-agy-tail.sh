@@ -17,7 +17,6 @@
 # change or size regression, no history import on first sighting unless
 # CLIO_TAIL_BACKFILL=1, and a busy append lock aborts without advancing.
 set -euo pipefail
-
 AGY_ROOT="${CLIO_AGY_ROOT:-$HOME/.gemini/antigravity-cli}"
 STATE="$HOME/.claude/prompt-log-agy-tail.state"
 TAIL_LOCK="$HOME/.claude/prompt-log-agy-tail.lock"
@@ -29,8 +28,13 @@ diag() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) clio-agy-tail: $*" >> "$ERRLOG"; }
 
 [ -x "$WRITER" ] || { echo "clio-agy-tail: shared writer not installed at $WRITER" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "clio-agy-tail: python3 is required" >&2; exit 1; }
-[ -d "$AGY_ROOT/brain" ] || exit 0
 command -v jq >/dev/null 2>&1 || { echo "clio-agy-tail: jq is required" >&2; exit 1; }
+
+if [ -n "${CLIO_AGY_ROOT:-}" ]; then
+  SEARCH_ROOTS=("$CLIO_AGY_ROOT/brain")
+else
+  SEARCH_ROOTS=("$HOME/.gemini/antigravity/brain" "$HOME/.gemini/antigravity-cli/brain")
+fi
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
 mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
@@ -194,7 +198,7 @@ while IFS= read -r file; do
   else
     skipped=$((skipped + 1))
   fi
-done < <(find "$AGY_ROOT/brain" -type f -path '*/.system_generated/logs/transcript_full.jsonl' 2>/dev/null | sort)
+done < <(find "${SEARCH_ROOTS[@]}" -type f -path '*/.system_generated/logs/transcript_full.jsonl' 2>/dev/null | sort)
 
 echo "clio-agy-tail: delivered=$delivered deferred_files=$skipped"
 exit 0
