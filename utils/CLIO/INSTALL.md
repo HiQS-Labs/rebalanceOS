@@ -110,7 +110,7 @@ row=$(printf '%s' "$input" | jq -rc --arg ts "$ts" --arg agent "$AGENT" --arg mi
   | (if $record == 1 then ((.session_id // "") | textval) else (((.session_id // "") | textval) as $s | (if ($s | length) > 0 then $s else $env_sid end)) end) as $sid
   | ($raw | clean_prompt) as $cleaned
   | ($min | tonumber) as $minn
-  | select($raw | test("<task-notification>|\\[SYSTEM NOTIFICATION - NOT USER INPUT\\]"; "i") | not)
+  | select($raw | test("<task-notification>|\\[SYSTEM NOTIFICATION - NOT USER INPUT\\]|RELAY AUTOMATION"; "i") | not)
   | select(($cleaned | length) >= $minn)
   | select(($sid | length) > 0)
   | select(($cleaned | length) > 0)
