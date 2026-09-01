@@ -111,3 +111,7 @@ Rules:
 - `src/rebalance/ingest/index_ops.py:208-278` and `ARCHITECTURE.md:116-141` — signal health / source→table fanout patterns to extend for `clio`.
 
 **Status of plan doc:** expanded from stub to a contract-compliant design; QA adjudication above flags all three questions as pass-after-fix (no open blockers). Implementer should treat the stub's underspecified "PR/Issue heuristic matching" as the only material change in scope, per Q2.
+
+## Lessons Learned (For Future Agents)
+- **Metadata Filtering:** Claude outputs relay automation blocks which need to be stripped to keep the dataset clean. The parser is the best place to do this before it hits SQLite.
+- **Single Source of Truth:** `index_ops.py` orchestration prevents multiple tools from trying to index the same files.
