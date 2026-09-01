@@ -236,6 +236,24 @@ collision_is_suppressed_with_a_trace() {
     || fail "suppressed collision left no content-free trace"
 }
 
+collision_suppression_holds_at_scale() {
+  # Regression: with `jq ... | grep -q` under pipefail, an early-exit match
+  # SIGPIPEd jq and a real collision thousands of lines before EOF read as
+  # "no collision". The ID set is now captured before matching.
+  home="$TMP/collision-scale"
+  mkdir -p "$home/.claude"
+  for i in $(seq 1 5000); do
+    printf '{"timestamp":"2026-08-27T19:16:06Z","repo":"r","branch":"","machine":"m","agent":"codex","session_id":"bulk%s","prompt":"filler row that pads the log volume past the pipe buffer boundary for the collision scan"}\n' "$i" >> "$home/.claude/prompt-log.jsonl"
+  done
+  printf '%s' "$(jq -nc '{timestamp:"2026-08-27T19:16:06Z", repo:"r", branch:"", machine:"m", session_id:"bulk2500", prompt:"a colliding row whose matching id sits thousands of lines before the end of the log, long enough to clear the capture threshold and reach the suppression scan"}')" \
+    | env HOME="$home" /bin/bash "$WRITER" --agent codex --record \
+    || fail "collision at scale: writer exited non-zero"
+  n=$(wc -l < "$home/.claude/prompt-log.jsonl" | tr -d ' ')
+  [ "$n" = "5000" ] || fail "collision at scale: expected suppression, log has $n rows"
+  grep -q "id-collision suppressed: bulk2500:" "$home/.claude/prompt-log-errors.log" \
+    || fail "collision at scale: no suppression trace"
+}
+
 lock_busy_returns_3_and_writes_nothing() {
   home="$TMP/lockbusy"
   mkdir -p "$home/.claude" "$home/.claude/prompt-log.lock"
@@ -300,6 +318,7 @@ missing_session_never_emits_a_row
 record_mode_normalizes_timestamp_and_stamps_agent
 record_mode_fills_machine_when_row_lacks_it
 collision_is_suppressed_with_a_trace
+collision_suppression_holds_at_scale
 lock_busy_returns_3_and_writes_nothing
 invalid_agent_is_a_usage_error
 run_second_cell_note "$@"

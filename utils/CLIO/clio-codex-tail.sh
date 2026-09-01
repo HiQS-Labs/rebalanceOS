@@ -87,6 +87,19 @@ state_update() { # $1 = path, $2 = inode, $3 = offset, $4 = session_id, $5 = cwd
 extract_rows() {
   python3 - "$1" "$2" "${3:-}" "${4:-}" <<'PYEOF'
 import json, sys
+from datetime import datetime, timezone
+
+def norm_ts(ts):
+    """Normalize any ISO-8601 instant to UTC second precision (clio:id contract)."""
+    if not ts:
+        return ""
+    if ts.endswith("Z") and len(ts) >= 20:
+        return ts[:19] + "Z"
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return ""
 
 path, offset = sys.argv[1], int(sys.argv[2])
 ctx_sid, ctx_cwd = sys.argv[3], sys.argv[4]
@@ -101,7 +114,7 @@ cut = data.rfind(b"\n")
 malformed = 0
 session_id, cwd = ctx_sid, ctx_cwd
 if cut != -1 and cut >= (offset - scan_start):
-    consumed = cut + 1
+    consumed = (cut + 1) - (offset - scan_start)
     if scan_start != offset:
         session_id, cwd = "", ""
     session_id, cwd = (ctx_sid, ctx_cwd) if scan_start == offset else ("", "")
@@ -129,7 +142,7 @@ if cut != -1 and cut >= (offset - scan_start):
             continue
         repo = cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else ""
         print(json.dumps({
-            "timestamp": str(obj.get("timestamp") or ""),
+            "timestamp": norm_ts(str(obj.get("timestamp") or "")),
             "repo": repo,
             "branch": "",
             "machine": "",
@@ -197,16 +210,20 @@ while IFS= read -r -d '' file; do
   [ "$new_malformed" -gt 0 ] && diag "$new_malformed malformed source line(s) skipped in $file"
 
   chunk_ok=1
-  last_cwd=""; last_repo=""; last_branch=""
+  repo_cache=""
   while IFS= read -r row; do
     [ -z "$row" ] && continue
-    # Resolve repo/branch from the session cwd (cached per distinct cwd).
+    # Resolve repo/branch from the session cwd, cached PER DISTINCT cwd.
     row_cwd=$(printf '%s' "$row" | jq -r '.cwd // ""')
     if [ -n "$row_cwd" ]; then
-      if [ "$row_cwd" != "$last_cwd" ]; then
-        last_cwd="$row_cwd"
+      hit=$(printf '%s' "$repo_cache" | awk -F'\t' -v c="$row_cwd" '$1 == c { print $2 "\t" $3; exit }')
+      if [ -n "$hit" ]; then
+        last_repo=${hit%%$'\t'*}
+        last_branch=${hit##*$'\t'}
+      else
         last_repo=$(basename "$(git -C "$row_cwd" rev-parse --show-toplevel 2>/dev/null || echo "$row_cwd")")
         last_branch=$(git -C "$row_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        repo_cache="${repo_cache}${row_cwd}"$'\t'"${last_repo}"$'\t'"${last_branch}"$'\n'
       fi
       row=$(printf '%s' "$row" | jq -c --arg repo "$last_repo" --arg branch "$last_branch" '.repo = $repo | .branch = $branch')
     fi

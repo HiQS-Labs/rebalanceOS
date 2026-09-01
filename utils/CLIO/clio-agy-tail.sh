@@ -3,9 +3,10 @@
 # conversation transcripts into CLIO JSONL rows (agent=agy). Strictly read-only
 # over the source; all writes go through the shared capture writer.
 #
-# Source of record: per-conversation transcript JSONLs at
-#   $CLIO_AGY_ROOT/brain/<conversation-id>/.system_generated/logs/transcript.jsonl
-# (default CLIO_AGY_ROOT=$HOME/.gemini/antigravity-cli). Only rows where
+# Source of record: per-conversation FULL transcripts at
+#   $CLIO_AGY_ROOT/brain/<conversation-id>/.system_generated/logs/transcript_full.jsonl
+# (default CLIO_AGY_ROOT=$HOME/.gemini/antigravity-cli). transcript.jsonl is
+# deliberately NOT used — it truncates large text fields. Only rows where
 # source == USER_EXPLICIT and type == USER_INPUT carry a submitted prompt;
 # the conversation id is the brain directory name. Companion SQLite stores
 # are indexes and are never read.
@@ -72,6 +73,19 @@ state_update() {
 extract_rows() {
   python3 - "$1" "$2" <<'PYEOF'
 import json, sys
+from datetime import datetime, timezone
+
+def norm_ts(ts):
+    """Normalize any ISO-8601 instant to UTC second precision (clio:id contract)."""
+    if not ts:
+        return ""
+    if ts.endswith("Z") and len(ts) >= 20:
+        return ts[:19] + "Z"
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return ""
 
 path, offset = sys.argv[1], int(sys.argv[2])
 with open(path, "rb") as fh:
@@ -102,7 +116,7 @@ for line in complete.split(b"\n"):
     if not isinstance(text, str) or not text.strip() or not session_id:
         continue
     print(json.dumps({
-        "timestamp": str(obj.get("created_at") or ""),
+        "timestamp": norm_ts(str(obj.get("created_at") or "")),
         "repo": "",
         "branch": "",
         "machine": "",
@@ -180,7 +194,7 @@ while IFS= read -r file; do
   else
     skipped=$((skipped + 1))
   fi
-done < <(find "$AGY_ROOT/brain" -type f -path '*/.system_generated/logs/transcript.jsonl' 2>/dev/null | sort)
+done < <(find "$AGY_ROOT/brain" -type f -path '*/.system_generated/logs/transcript_full.jsonl' 2>/dev/null | sort)
 
 echo "clio-agy-tail: delivered=$delivered deferred_files=$skipped"
 exit 0

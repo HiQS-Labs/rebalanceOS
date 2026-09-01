@@ -66,7 +66,7 @@ minchars="${CLIO_MIN_PROMPT_CHARS:-100}"
 AGENT=""; RECORD=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --agent) AGENT="${2:-}"; shift 2 ;;
+    --agent) [ "$#" -ge 2 ] || { echo "$ts clio-capture: --agent requires a value" >> "$errlog"; exit 2; }; AGENT="$2"; shift 2 ;;
     --record) RECORD=1; shift ;;
     --*) echo "clio-capture: unknown option $1" >&2; exit 2 ;;
     *) echo "clio-capture: unexpected argument $1" >&2; exit 2 ;;
@@ -147,7 +147,9 @@ acquire_lock() {
   while ! mkdir "$LOCK" 2>/dev/null; do
     if [ "$waited" -ge 50 ]; then return 3; fi
     now=$(date +%s)
-    born=$(cat "$LOCK/born" 2>/dev/null || echo "$now")
+    # A lock without a readable born file falls back to the dir mtime, so a
+    # SIGKILLed holder (or a failed born write) can never deadlock capture.
+    born=$(cat "$LOCK/born" 2>/dev/null || stat -f %m "$LOCK" 2>/dev/null || stat -c %Y "$LOCK" 2>/dev/null || echo "$now")
     if [ $((now - born)) -gt 60 ]; then
       rm -rf "$LOCK"
       diag "broke a stale append lock"
@@ -164,14 +166,21 @@ release_lock() { rm -rf "$LOCK"; }
 if ! acquire_lock; then
   # The lock belongs to another writer — leave it exactly as found.
   diag "append lock busy — row not logged"
-  exit 3
+  if [ "$RECORD" -eq 1 ]; then exit 3; fi
+  exit 0
 fi
 
 row_id=$(printf '%s' "$row" | jq -r '(.session_id) + ":" + (.timestamp)')
-if [ -s "$LOG" ] && jq -Rr 'fromjson? | ((.session_id // "") + ":" + (.timestamp // ""))' "$LOG" 2>/dev/null | grep -qxF "$row_id"; then
-  diag "id-collision suppressed: $row_id"
-  release_lock
-  exit 0
+if [ -s "$LOG" ]; then
+  # Capture the full ID set BEFORE matching: grep -q early-exit would SIGPIPE
+  # jq under pipefail and a real collision would read as "no collision".
+  log_ids=$(jq -Rr 'fromjson? | ((.session_id // "") + ":" + (.timestamp // ""))' "$LOG" 2>/dev/null || true)
+  case $'\n'"$log_ids"$'\n' in *$'\n'"$row_id"$'\n'*)
+    diag "id-collision suppressed: $row_id"
+    release_lock
+    exit 0
+    ;;
+  esac
 fi
 printf '%s\n' "$row" >> "$LOG"
 release_lock
@@ -208,18 +217,21 @@ if [ -d "$HOME/.zcode" ] || [ "${1:-}" = "--with-zcode" ]; then
   if grep -q "clio-capture.sh" "$ZCONFIG" 2>/dev/null; then
     echo "ZCode hook already registered in $ZCONFIG — skipping."
   else
-    jq '.hooks = ((.hooks // {}) + {enabled: true})
+    if jq '.hooks = ((.hooks // {}) + (if (.hooks.enabled? // null) == null then {enabled: true} else {} end))
          | .hooks.events = ((.hooks.events // {}) + {UserPromptSubmit: (((.hooks.events.UserPromptSubmit // [])
              + [{hooks: [{type: "command", command: "$HOME/.claude/hooks/clio-capture.sh --agent zcode"}]}]))})' \
-      "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"
-    echo "ZCode hook registered in $ZCONFIG."
+      "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"; then
+      echo "ZCode hook registered in $ZCONFIG."
+    else
+      echo "ZCode registration failed — config untouched." >&2
+    fi
   fi
 fi
 
 install -m 0755 utils/CLIO/prompt-log-to-md.sh ~/.claude/hooks/prompt-log-to-md.sh
 
 echo "✅ Installed. Smoke test (uses the Claude shim; expects agent=claude-code):"
-echo '{"prompt":"a substantive session-opening prompt well past the capture threshold","session_id":"install-check"}' | ~/.claude/hooks/log-prompt.sh
+echo '{"prompt":"a substantive session-opening prompt that runs well past the one hundred character capture threshold on its own","session_id":"install-check"}' | ~/.claude/hooks/log-prompt.sh
 tail -1 ~/.claude/prompt-log.jsonl
 ```
 
@@ -236,6 +248,7 @@ prompt, then remove it:
 ```bash
 cat > ~/.claude/hooks/clio-hook-probe.sh << 'EOF'
 #!/bin/bash
+umask 077
 input=$(cat); printf '%s' "$input" > "$HOME/clio-hook-payload.json"
 exit 0
 EOF
@@ -386,8 +399,9 @@ launchctl unload "$PLIST" 2>/dev/null; launchctl load "$PLIST"
 ## Optional: Agy capture (Antigravity CLI)
 
 Agy has no prompt-submit hook either; the same tailer pattern reads its per-conversation
-transcript JSONLs (`brain/<id>/.system_generated/logs/transcript.jsonl`), capturing only
-rows where `source` is `USER_EXPLICIT` and `type` is `USER_INPUT`:
+FULL transcript JSONLs (`brain/<id>/.system_generated/logs/transcript_full.jsonl` — the
+plain `transcript.jsonl` truncates large text), capturing only rows where `source` is
+`USER_EXPLICIT` and `type` is `USER_INPUT`:
 
 ```bash
 install -m 0755 utils/CLIO/clio-agy-tail.sh ~/.claude/hooks/clio-agy-tail.sh
@@ -404,21 +418,28 @@ either client's config are untouched.
 ```bash
 # Claude Code: remove the shim registration
 tmp=$(mktemp)
-jq '.hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // [])
-      | map(.hooks = ((.hooks // []) | map(select(((.command // "") == "$HOME/.claude/hooks/log-prompt.sh") | not))))
-      | map(select((.hooks // []) | length > 0)))
-    | if (.hooks.UserPromptSubmit // []) == [] then del(.hooks.UserPromptSubmit) else . end' \
+jq 'if (.hooks // null) == null then . else
+      (.hooks.UserPromptSubmit //= [])
+      | .hooks.UserPromptSubmit = (.hooks.UserPromptSubmit
+          | map(.hooks = ((.hooks // []) | map(select(((.command // "") == "$HOME/.claude/hooks/log-prompt.sh") | not))))
+          | map(select((.hooks // []) | length > 0)))
+      | if (.hooks.UserPromptSubmit // []) == [] then del(.hooks.UserPromptSubmit) else . end
+    end' \
   ~/.claude/settings.json > "$tmp" && mv "$tmp" ~/.claude/settings.json
 
 # ZCode: remove the writer registration and drop the enabled gate if CLIO set it
 if [ -f ~/.zcode/cli/config.json ]; then
   tmp=$(mktemp)
-  jq '(.hooks.events.UserPromptSubmit //= [])
-        | .hooks.events.UserPromptSubmit = (.hooks.events.UserPromptSubmit
-            | map(.hooks = ((.hooks // []) | map(select(((.command // "") | contains("clio-capture.sh")) | not))))
-            | map(select((.hooks // []) | length > 0)))
-        | if (.hooks.events.UserPromptSubmit // []) == [] then del(.hooks.events.UserPromptSubmit) else . end
-        | if ((.hooks.events // {}) == {}) then del(.hooks.events) else . end' \
+  jq 'if (.hooks // null) == null then . else
+        if (.hooks.events // null) == null then . else
+          (.hooks.events.UserPromptSubmit //= [])
+          | .hooks.events.UserPromptSubmit = (.hooks.events.UserPromptSubmit
+              | map(.hooks = ((.hooks // []) | map(select(((.command // "") | contains("clio-capture.sh")) | not))))
+              | map(select((.hooks // []) | length > 0)))
+          | if (.hooks.events.UserPromptSubmit // []) == [] then del(.hooks.events.UserPromptSubmit) else . end
+          | if ((.hooks.events // {}) == {}) then del(.hooks.events) else . end
+        end
+      end' \
     ~/.zcode/cli/config.json > "$tmp" && mv "$tmp" ~/.zcode/cli/config.json
 fi
 

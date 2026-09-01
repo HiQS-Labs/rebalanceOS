@@ -32,7 +32,7 @@ setup_home() { # $1 = case dir; echoes the home path
 new_transcript() { # $1 = AGY root, $2 = conversation id; echoes the path
   conv="$1/brain/$2/.system_generated/logs"
   mkdir -p "$conv"
-  printf '%s\n' "$conv/transcript.jsonl"
+  printf '%s\n' "$conv/transcript_full.jsonl"
 }
 
 log_count() { [ -f "$1" ] && wc -l < "$1" | tr -d ' ' || echo 0; }
@@ -79,6 +79,20 @@ log="$home/.claude/prompt-log.jsonl"
 grep -qF '"agent":"agy"' "$log" || fail "backfill: agent not stamped"
 grep -qF '"session_id":"'$CONV'"' "$log" || fail "backfill: conversation id not used as session"
 grep -qF '"timestamp":"2026-08-24T03:46:13Z"' "$log" || fail "backfill: created_at not carried as UTC"
+
+# A second CONCURRENT conversation must keep state and IDs isolated: it is
+# first-sighted empty during the backfill run, then receives its prompt live.
+CONV2="6ce72b44-6253-4005-891c-893d8b8aaebb"
+transcript2=$(new_transcript "$agyroot" "$CONV2")
+: > "$transcript2"
+HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER" >/dev/null
+printf '%s\n' '{"content":"This is a mock prompt from a second concurrent Agy conversation, long enough to clear the one hundred character capture threshold comfortably.","created_at":"2026-08-24T04:00:00Z","source":"USER_EXPLICIT","status":"DONE","step_index":0,"type":"USER_INPUT"}' > "$transcript2"
+out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
+[ "$out" = "clio-agy-tail: delivered=1 deferred_files=0" ] \
+  || fail "second conversation: expected its prompt delivered, got: $out"
+grep -qF '"session_id":"'$CONV2'"' "$log" \
+  || fail "second conversation: session id not isolated"
+[ "$(log_count "$log")" = "3" ] || fail "second conversation: expected 3 JSONL rows"
 grep -qF 'Planner response text' "$log" \
   && fail "backfill: a MODEL row leaked into the log" || true
 grep -qF 'Checkpoint metadata' "$log" \
@@ -89,32 +103,32 @@ out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$out" = "clio-agy-tail: delivered=0 deferred_files=0" ] \
   || fail "restart: expected an idle second run, got: $out"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
-[ "$(log_count "$log")" = "2" ] || fail "restart x2: duplicate rows appeared"
+[ "$(log_count "$log")" = "3" ] || fail "restart x2: duplicate rows appeared"
 ids=$(jq -r '(.session_id + ":" + .timestamp)' "$log" | sort -u | wc -l | tr -d ' ')
-[ "$ids" = "2" ] || fail "restart: JSONL contains duplicate IDs"
+[ "$ids" = "3" ] || fail "restart: JSONL contains duplicate IDs"
 
 # -- 4. live append: only the new prompt is delivered -------------------------
 printf '%s\n' '{"content":"This is the third mock Agy user prompt, appended live after the first tailer pass, long enough to clear the capture threshold.","created_at":"2026-08-24T03:50:00Z","source":"USER_EXPLICIT","status":"DONE","step_index":5,"type":"USER_INPUT"}' >> "$transcript"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$out" = "clio-agy-tail: delivered=1 deferred_files=0" ] \
   || fail "live append: expected 1 new row, got: $out"
-[ "$(log_count "$log")" = "3" ] || fail "live append: expected 3 JSONL rows"
+[ "$(log_count "$log")" = "4" ] || fail "live append: expected 4 JSONL rows"
 
 # -- 5. truncated final record: retried, never written half -------------------
 printf '%s' '{"content":"This is the fourth mock Agy user prompt, deliberately left unfinished on the wr' >> "$transcript"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
-[ "$(log_count "$log")" = "3" ] \
+[ "$(log_count "$log")" = "4" ] \
   || fail "truncated record: a partial record was written"
 printf '%s ites with no trailing newline.","created_at":"2026-08-24T03:51:00Z","source":"USER_EXPLICIT","status":"DONE","step_index":6,"type":"USER_INPUT"}\n' >> "$transcript"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$out" = "clio-agy-tail: delivered=1 deferred_files=0" ] \
   || fail "truncated record: completion was not delivered on the next run"
-[ "$(log_count "$log")" = "4" ] || fail "truncated record: expected 4 JSONL rows"
+[ "$(log_count "$log")" = "5" ] || fail "truncated record: expected 5 JSONL rows"
 
 # -- 6. rotation: replaced transcript rescans; IDs suppress duplicates --------
 cp "$FIXTURE" "$transcript.new" && mv "$transcript.new" "$transcript"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
-[ "$(log_count "$log")" = "4" ] \
+[ "$(log_count "$log")" = "5" ] \
   || fail "rotation: rescan duplicated rows (expected suppression by ID)"
 
 # -- 7. overlapping invocations: a busy tailer lock is a silent no-op ---------
@@ -133,11 +147,11 @@ printf '%s\n' '{"content":"This is the fifth mock Agy user prompt, written while
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$out" = "clio-agy-tail: delivered=0 deferred_files=1" ] \
   || fail "append lock busy: expected the file to be deferred, got: $out"
-[ "$(log_count "$log")" = "4" ] || fail "append lock busy: a row was written anyway"
+[ "$(log_count "$log")" = "5" ] || fail "append lock busy: a row was written anyway"
 rm -rf "$applock"
 out=$(HOME="$home" CLIO_AGY_ROOT="$agyroot" "$TAILER")
 [ "$out" = "clio-agy-tail: delivered=1 deferred_files=0" ] \
   || fail "append lock freed: the deferred chunk was not delivered"
-[ "$(log_count "$log")" = "5" ] || fail "append lock freed: expected 5 JSONL rows"
+[ "$(log_count "$log")" = "6" ] || fail "append lock freed: expected 6 JSONL rows"
 
 echo "PASS: agy tailer"

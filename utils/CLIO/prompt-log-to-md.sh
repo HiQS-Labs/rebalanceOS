@@ -505,6 +505,24 @@ else
   : > "$new_entries"
 fi
 
+# Belt-and-braces: render only the FIRST block per ID. The writer's collision
+# suppression normally prevents same-ID rows; this guards the note even if
+# duplicates ever land between exporter runs (GL-139 adversarial review).
+if [ -s "$new_entries" ]; then
+  awk '
+    /^<!-- clio:id:[^ ]+ -->$/ {
+      id = $0
+      sub(/^<!-- clio:id:/, "", id); sub(/ -->$/, "", id)
+      if (seen[id]) { skip = 1; dups++; next }
+      seen[id] = 1
+      skip = 0
+      print
+      next
+    }
+    skip == 0 { print }
+  ' "$new_entries" > "$new_entries.d" && mv "$new_entries.d" "$new_entries"
+fi
+
 emitted_ids=$(grep -o 'clio:id:[^ ]*' "$new_entries" 2>/dev/null || true)
 emitted_count=$(grep -c '^<!-- clio:id:' "$new_entries" 2>/dev/null || true)
 
