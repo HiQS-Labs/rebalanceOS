@@ -6,7 +6,7 @@ updated: 2026-08-30
 owner: noel
 gh_issue: 136
 goal: "Route every direct sqlite3.connect outside the two gateway directories through a gateway, behind a CI ratchet that pins the exact baseline and only lets it shrink."
-release: "0.76.0 + 0.77.0"
+release: "0.76.0 + 0.79.0"
 ---
 
 # GH-136 — SQLite gateway routing

@@ -59,7 +59,7 @@ fresh_note_and_idempotency() {
   } > "$home/.claude/prompt-log.jsonl"
 
   run_exporter "$shell" "$home" "$out" > "$case_dir/first.out"
-  assert_contains "$out" '# Claude Code Prompt Log'
+  assert_contains "$out" '# Agent Prompt Log'
   assert_contains "$out" '<!-- CLIO:ENTRIES -->'
   assert_before "$out" 'second prompt' 'first prompt'
   assert_count "$home/.claude/prompt-log-manifest.txt" 'clio:id:' 2
@@ -349,6 +349,59 @@ malformed_source_row_is_dropped() {
   assert_contains "$case_dir/second.out" 'Synced 0 new prompt(s)'
 }
 
+
+# ---------------- GH-139: agent token + legacy default + mixed generations --
+
+renders_agent_token() {
+  shell=$1
+  case_dir="$TMP/agent-token-$2"
+  home="$case_dir/home"
+  out="$case_dir/note.md"
+  mkdir -p "$home/.claude"
+  printf '{"timestamp":"2026-08-31T10:00:00Z","repo":"alpha","branch":"main","machine":"fixture","agent":"zcode","session_id":"az1","prompt":"a substantive zcode session-opening prompt well past the capture threshold"}\n' \
+    > "$home/.claude/prompt-log.jsonl"
+  run_exporter "$shell" "$home" "$out" >/dev/null
+  assert_contains "$out" 'fixture · main · zcode'
+  assert_contains "$out" 'clio:id:az1:2026-08-31T10:00:00Z'
+}
+
+legacy_rows_render_claude_code_default() {
+  shell=$1
+  case_dir="$TMP/legacy-default-$2"
+  home="$case_dir/home"
+  out="$case_dir/note.md"
+  mkdir -p "$home/.claude"
+  # Schema-v1 row: no agent key.
+  json_line '2026-07-19T10:00:00Z' alpha one 'first prompt' \
+    > "$home/.claude/prompt-log.jsonl"
+  run_exporter "$shell" "$home" "$out" >/dev/null
+  assert_contains "$out" 'fixture · main · claude-code'
+  assert_contains "$out" 'clio:id:one:2026-07-19T10:00:00Z'
+}
+
+mixed_generations_render_once_each() {
+  shell=$1
+  case_dir="$TMP/mixed-$2"
+  home="$case_dir/home"
+  out="$case_dir/note.md"
+  mkdir -p "$home/.claude"
+  {
+    json_line '2026-07-19T10:00:00Z' alpha one 'a substantive legacy session-opening prompt well past the capture threshold'
+    printf '{"timestamp":"2026-08-31T10:00:00Z","repo":"alpha","branch":"main","machine":"fixture","agent":"codex","session_id":"cx1","prompt":"a substantive codex session-opening prompt well past the capture threshold"}\n'
+  } > "$home/.claude/prompt-log.jsonl"
+  run_exporter "$shell" "$home" "$out" >/dev/null
+  # One rendered block per row, each exactly once, agent shown on the new row.
+  assert_count "$out" 'clio:id:one:2026-07-19T10:00:00Z' 1
+  assert_count "$out" 'clio:id:cx1:2026-08-31T10:00:00Z' 1
+  assert_contains "$out" ' · codex'
+  assert_contains "$out" ' · claude-code'
+  # Manifest receipt covers both generations.
+  assert_count "$home/.claude/prompt-log-manifest.txt" 'clio:id:' 2
+  # Re-run renders nothing new (ID dedup across generations).
+  run_exporter "$shell" "$home" "$out" >/dev/null
+  assert_count "$out" 'clio:id:' 2
+}
+
 run_suite() {
   shell=$1
   key=$2
@@ -363,6 +416,9 @@ run_suite() {
   manifest_failure_is_nonfatal "$shell" "$key"
   backfill_then_targeted_repair "$shell" "$key"
   malformed_source_row_is_dropped "$shell" "$key"
+  renders_agent_token "$shell" "$key"
+  legacy_rows_render_claude_code_default "$shell" "$key"
+  mixed_generations_render_once_each "$shell" "$key"
   echo "PASS: $shell"
 }
 

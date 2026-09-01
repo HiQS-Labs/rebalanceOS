@@ -2,9 +2,9 @@
   "mcpb_version": "0.1",
   "name": "rebalance-os",
   "display_name": "rebalance OS",
-  "version": "0.77.0",
-  "description": "Your workday OS — surfaces what matters, flags project imbalances, and answers questions about your own work using your Obsidian vault, GitHub activity, and Google Calendar. All local, all on your data.",
-  "long_description": "rebalance OS ingests your Obsidian vault, GitHub activity, and Google Calendar into a local SQLite database, then lets you ask natural language questions about your own work. It flags over-investment in low-priority projects, surfaces neglected high-priority work, and assembles context for meetings — all running locally on Apple Silicon via MLX.",
+  "version": "0.79.0",
+  "description": "Your workday OS \u2014 surfaces what matters, flags project imbalances, and answers questions about your own work using your Obsidian vault, GitHub activity, and Google Calendar. All local, all on your data.",
+  "long_description": "rebalance OS ingests your Obsidian vault, GitHub activity, and Google Calendar into a local SQLite database, then lets you ask natural language questions about your own work. It flags over-investment in low-priority projects, surfaces neglected high-priority work, and assembles context for meetings \u2014 all running locally on Apple Silicon via MLX.",
   "author": {
     "name": "Hypercart DBA Neochrome, Inc."
   },
@@ -18,7 +18,9 @@
     "entry_point": "server/mcp_server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["${__dirname}/server/mcp_server.py"],
+      "args": [
+        "${__dirname}/server/mcp_server.py"
+      ],
       "env": {
         "REBALANCE_DB": "${user_config.database_path}",
         "REBALANCE_VAULT": "${user_config.vault_path}"
@@ -52,36 +54,119 @@
     }
   },
   "tools": [
-    {"name": "ask", "description": "General-purpose natural language query across all data sources"},
-    {"name": "search_vault", "description": "Full-text keyword search over vault files via TF-IDF index"},
-    {"name": "semantic_query", "description": "Vector search across the unified semantic index (vault chunks + GitHub corpus)"},
-    {"name": "get_next_actions", "description": "Read the latest persisted 'what should we work on next' ranking without recomputing it"},
-    {"name": "list_projects", "description": "List projects from the local project_registry table"},
-    {"name": "github_balance", "description": "Show GitHub activity balance across active projects"},
-    {"name": "github_release_readiness", "description": "Infer current milestone/release readiness from the local GitHub corpus"},
-    {"name": "github_close_candidates", "description": "Suggest open issues that likely map to merged PRs and may be ready to close"},
-    {"name": "diagnose_repo", "description": "Walk the watched-repos + sync funnel for a single GitHub repo"},
-    {"name": "list_watched_repos", "description": "Show which GitHub repos are currently being monitored, and where each came from"},
-    {"name": "list_ask_self_repos", "description": "Inventory every repo on this device that has an ask_self RAG index"},
-    {"name": "index_status", "description": "Snapshot the SQLite knowledge base: per-source counts and last-synced times"},
-    {"name": "refresh_index", "description": "Orchestrated refresh of the local knowledge base"},
-    {"name": "peek_source", "description": "Read the most-recent raw rows from one ingest source table (allowlisted, read-only)"},
-    {"name": "publish_pulse", "description": "Render today's + yesterday's activity into a markdown status page"},
-    {"name": "audit_modules", "description": "Audit ingest collectors, render modules, and scheduled-job infrastructure"},
-    {"name": "create_calendar_event", "description": "Create a Google Calendar event using the local OAuth token"},
-    {"name": "review_timesheet", "description": "Return unclassified calendar events for a given date that need review"},
-    {"name": "classify_event", "description": "Persist a classification decision for an unmatched calendar event"},
-    {"name": "snap_calendar_edges", "description": "Report slightly overlapping calendar events and a clean boundary"},
-    {"name": "ingest_gmail_messages", "description": "Ingest pre-fetched Gmail messages into the local email_messages table"},
-    {"name": "sleuth_sync_reminders", "description": "Pull Slack reminders from the Sleuth Web API and upsert them into SQLite"},
-    {"name": "onboarding_status", "description": "Report the full setup lifecycle: every stage and what remains"},
-    {"name": "skip_onboarding_stage", "description": "Mark (or unmark) an optional setup stage as deliberately skipped"},
-    {"name": "setup_github_token", "description": "Validate a GitHub PAT against the /user endpoint and store it"},
-    {"name": "run_preflight", "description": "Discover project candidates from vault note titles and GitHub"},
-    {"name": "confirm_projects", "description": "Write confirmed projects to the canonical registry and run pull"}
+    {
+      "name": "ask",
+      "description": "General-purpose natural language query across all data sources"
+    },
+    {
+      "name": "search_vault",
+      "description": "Full-text keyword search over vault files via TF-IDF index"
+    },
+    {
+      "name": "semantic_query",
+      "description": "Vector search across the unified semantic index (vault chunks + GitHub corpus)"
+    },
+    {
+      "name": "get_next_actions",
+      "description": "Read the latest persisted 'what should we work on next' ranking without recomputing it"
+    },
+    {
+      "name": "list_projects",
+      "description": "List projects from the local project_registry table"
+    },
+    {
+      "name": "github_balance",
+      "description": "Show GitHub activity balance across active projects"
+    },
+    {
+      "name": "github_release_readiness",
+      "description": "Infer current milestone/release readiness from the local GitHub corpus"
+    },
+    {
+      "name": "github_close_candidates",
+      "description": "Suggest open issues that likely map to merged PRs and may be ready to close"
+    },
+    {
+      "name": "diagnose_repo",
+      "description": "Walk the watched-repos + sync funnel for a single GitHub repo"
+    },
+    {
+      "name": "list_watched_repos",
+      "description": "Show which GitHub repos are currently being monitored, and where each came from"
+    },
+    {
+      "name": "list_ask_self_repos",
+      "description": "Inventory every repo on this device that has an ask_self RAG index"
+    },
+    {
+      "name": "index_status",
+      "description": "Snapshot the SQLite knowledge base: per-source counts and last-synced times"
+    },
+    {
+      "name": "refresh_index",
+      "description": "Orchestrated refresh of the local knowledge base"
+    },
+    {
+      "name": "peek_source",
+      "description": "Read the most-recent raw rows from one ingest source table (allowlisted, read-only)"
+    },
+    {
+      "name": "publish_pulse",
+      "description": "Render today's + yesterday's activity into a markdown status page"
+    },
+    {
+      "name": "audit_modules",
+      "description": "Audit ingest collectors, render modules, and scheduled-job infrastructure"
+    },
+    {
+      "name": "create_calendar_event",
+      "description": "Create a Google Calendar event using the local OAuth token"
+    },
+    {
+      "name": "review_timesheet",
+      "description": "Return unclassified calendar events for a given date that need review"
+    },
+    {
+      "name": "classify_event",
+      "description": "Persist a classification decision for an unmatched calendar event"
+    },
+    {
+      "name": "snap_calendar_edges",
+      "description": "Report slightly overlapping calendar events and a clean boundary"
+    },
+    {
+      "name": "ingest_gmail_messages",
+      "description": "Ingest pre-fetched Gmail messages into the local email_messages table"
+    },
+    {
+      "name": "sleuth_sync_reminders",
+      "description": "Pull Slack reminders from the Sleuth Web API and upsert them into SQLite"
+    },
+    {
+      "name": "onboarding_status",
+      "description": "Report the full setup lifecycle: every stage and what remains"
+    },
+    {
+      "name": "skip_onboarding_stage",
+      "description": "Mark (or unmark) an optional setup stage as deliberately skipped"
+    },
+    {
+      "name": "setup_github_token",
+      "description": "Validate a GitHub PAT against the /user endpoint and store it"
+    },
+    {
+      "name": "run_preflight",
+      "description": "Discover project candidates from vault note titles and GitHub"
+    },
+    {
+      "name": "confirm_projects",
+      "description": "Write confirmed projects to the canonical registry and run pull"
+    }
   ],
   "compatibility": {
-    "platforms": ["darwin"],
+    "platforms": [
+      "darwin"
+    ],
     "runtimes": {
       "python": ">=3.12"
     }
