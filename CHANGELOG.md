@@ -10,6 +10,21 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.78.0] - 2026-08-31
+
+### Added
+
+- The local prompt log now captures submissions from four agent apps instead of one: the
+  existing Claude Code hook, ZCode, Codex (CLI and VS Code extension), and Agy, all funneling
+  into the same append-only log and the same rendered note. Every entry records which agent app
+  produced it next to the device name; older entries render under the original app name without
+  being rewritten. Codex and Agy have no prompt-submission hook, so lightweight read-only
+  watchers follow their own session records with a restart-safe cursor that can only ever land
+  on complete entries and only advances after the log has durably accepted the batch. The plan
+  was reviewed across three models before implementation; the implementation then passed an
+  adversarial review (which caught a duplicate-detection flaw that only appears on large logs)
+  and per-agent QA rounds.
+
 ## [0.76.0] - 2026-08-30
 
 ### Added

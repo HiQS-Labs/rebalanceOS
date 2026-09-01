@@ -140,3 +140,4 @@ DIAGRAM.md
 # They stay on disk for the operator; they do not belong in public history —
 # committing them is what put 433MB of transcripts in this tree in the first place.
 relay-system/
+/.tick/
