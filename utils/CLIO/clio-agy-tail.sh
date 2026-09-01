@@ -216,5 +216,5 @@ while IFS= read -r file; do
   fi
 done < <(find "${SEARCH_ROOTS[@]}" -type f -path '*/.system_generated/logs/transcript_full.jsonl' 2>/dev/null | sort)
 
-echo "clio-agy-tail: delivered=$delivered deferred_files=$skipped"
+echo "clio-agy-tail: delivered=$delivered deferred_files=$skipped" >&2
 exit 0
