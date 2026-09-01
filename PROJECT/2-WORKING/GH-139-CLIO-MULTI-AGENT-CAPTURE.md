@@ -1,6 +1,6 @@
 ---
 title: "CLIO multi-agent capture: ZCode, Codex, Agy alongside Claude Code"
-status: "In progress"
+status: "QA complete — ready for PR"
 created: 2026-08-31
 updated: 2026-08-31
 owner: noel
@@ -31,7 +31,7 @@ non_goals: "No change to clio:id derivation; no rewrite of the exporter's delive
 
 | What was just completed | What's next |
 |---|---|
-| Plan approved (agy r1→r2, codex QA); **Phases 1–3 implemented and committed**: shared writer + Claude shim + ZCode hook registration, exporter `agent` rendering with legacy default, Codex rollout tailer, Agy transcript tailer; 4 CLIO test suites green (21 capture cases, exporter mixed-v1/v2 e2e, both tailer contracts incl. truncation/rotation/busy-lock) + pytest 2053 passed. Two implementation bugs found by the new gates and fixed (bash-3.2 `$()` parse limits; lock-busy path destroying a foreign lock) | Operator live-verify on each machine (ZCode stdin probe, one real prompt per agent, viewer check); then PR to development |
+| **Implemented and QA-complete.** Phases 1–3 shipped on this branch: shared writer + Claude shim + ZCode hook, exporter `agent` rendering, Codex rollout tailer, Agy full-transcript tailer. Tri-model implementation QA closed: GLM adversarial 11/11 confirmed fixed (incl. a reproduced large-log collision bug), codex r3 Approved, agy r2 Approved. All four CLIO suites green (24 capture cases incl. 5000-row scale regression, exporter mixed-v1/v2 e2e, both tailer contracts) + pytest 2053 passed. Version 0.78.0 | Operator live-verify on each machine (ZCode stdin probe, one real prompt per agent, viewer check) at deployment |
 
 
 ## Phase 0 — Prior art review + capture-surface spike
@@ -243,6 +243,28 @@ worked around silently.
   (tailers scan the JSONL ID set before append) and the restart-no-duplicates gates.
 
 ## Review
+
+- **GLM adversarial review (ZCode implementation) — 2026-08-31 — needs fixes; all applied.**
+  1 Blocker + 5 Shoulds + 4 Nits. Blocker (empirically reproduced on a 5k-row log): the
+  collision scan's `jq | grep -q` under pipefail let an early-exit SIGPIPE read a real
+  collision as "no collision" — fixed by capturing the ID set before matching, with a
+  5000-line regression test. Shoulds: bornless locks now fall back to dir mtime; hook mode
+  exits 0 (3 is tailer-only); offset timestamps are normalized to UTC in the tailer
+  extractors; the installer never force-flips a deliberate `enabled:false` (jq `//` filters
+  `false` too — caught in verification, fixed with `has()`); registration failures are
+  reported. Nits: smoke prompt length, probe umask, uninstall guards, `--agent` arity,
+  exporter within-batch ID dedup. Verification pass confirmed 11/11 applied.
+- **codex implementation QA (Phase 2) — 2026-08-31 — r1 changes requested → r3 Approved.**
+  r1: first-sighting persisted raw EOF (partial records lost) and malformed lines were
+  silently consumed — both fixed with a newline-aligned cursor and a traced malformed counter;
+  context is checkpointed with the cursor (no quadratic re-reads); repo/branch resolved from
+  the session cwd. r2 caught the recovery pass's consumed position (absolute vs relative) and
+  single-slot cwd caching — both fixed. r3: Approved.
+- **agy implementation QA (Phase 3) — 2026-08-31 — r1 changes requested → r2 Approved.**
+  r1 Blocker: `transcript.jsonl` truncates large text — the tailer now targets
+  `transcript_full.jsonl`. Should: second concurrent conversation added to the suite (state
+  and ID isolation). Cursor contract, at-least-once integrity, read-only safety and writer
+  integration passed unamended. r2: Approved.
 
 - **codex plan QA — 2026-08-31 — Changes requested; all applied.** 2 Blockers, 4 Shoulds:
   - [Blocker] Upgrade transaction for live installs added to Phase 1 work + a legacy-to-v2

@@ -217,7 +217,7 @@ if [ -d "$HOME/.zcode" ] || [ "${1:-}" = "--with-zcode" ]; then
   if grep -q "clio-capture.sh" "$ZCONFIG" 2>/dev/null; then
     echo "ZCode hook already registered in $ZCONFIG — skipping."
   else
-    if jq '.hooks = ((.hooks // {}) + (if (.hooks.enabled? // null) == null then {enabled: true} else {} end))
+    if jq '.hooks = ((.hooks // {}) + (if (.hooks | has("enabled") | not) then {enabled: true} else {} end))
          | .hooks.events = ((.hooks.events // {}) + {UserPromptSubmit: (((.hooks.events.UserPromptSubmit // [])
              + [{hooks: [{type: "command", command: "$HOME/.claude/hooks/clio-capture.sh --agent zcode"}]}]))})' \
       "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"; then
