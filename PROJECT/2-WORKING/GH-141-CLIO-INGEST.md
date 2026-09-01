@@ -111,3 +111,8 @@ Rules:
 - `src/rebalance/ingest/index_ops.py:208-278` and `ARCHITECTURE.md:116-141` — signal health / source→table fanout patterns to extend for `clio`.
 
 **Status of plan doc:** expanded from stub to a contract-compliant design; QA adjudication above flags all three questions as pass-after-fix (no open blockers). Implementer should treat the stub's underspecified "PR/Issue heuristic matching" as the only material change in scope, per Q2.
+
+## Phase 0 Spike Findings
+- JSONL parsing confirmed on `~/.claude/prompt-log.jsonl`. No malformed rows found in latest.
+- Timestamps are ISO 8601 strings (e.g. `2026-08-31T21:26:07-07:00` or `...Z`).
+- Recall Spike for heuristics: As specified, global extraction creates false positives (`#5` matching wrong repos). I will implement **no heuristics** in v1 as per the Hardened Plan, storing raw prompts to `clio_prompts` and relying entirely on Semantic Index (vector/FTS) for recall.
