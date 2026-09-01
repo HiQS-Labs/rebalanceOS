@@ -104,8 +104,24 @@ complete, consumed = data[:cut], cut + 1
 
 parts = path.split("/")
 session_id = ""
+repo_name = ""
 if "brain" in parts:
-    session_id = parts[parts.index("brain") + 1]
+    brain_idx = parts.index("brain")
+    session_id = parts[brain_idx + 1]
+    import sqlite3, re, urllib.parse
+    db_path = "/".join(parts[:brain_idx]) + "/conversations/" + session_id + ".db"
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT data FROM trajectory_metadata_blob")
+            row = cursor.fetchone()
+            if row and row[0]:
+                data = row[0].decode("utf-8", errors="ignore")
+                m = re.search(r"file:///[a-zA-Z0-9_/%+-]+", data)
+                if m:
+                    repo_name = urllib.parse.unquote(m.group(0).split("/")[-1])
+    except Exception:
+        pass
 
 for line in complete.split(b"\n"):
     if not line.strip():
@@ -121,7 +137,7 @@ for line in complete.split(b"\n"):
         continue
     print(json.dumps({
         "timestamp": norm_ts(str(obj.get("created_at") or "")),
-        "repo": "",
+        "repo": repo_name,
         "branch": "",
         "machine": "",
         "session_id": session_id,

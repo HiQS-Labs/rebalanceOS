@@ -101,7 +101,8 @@ input=$(cat)
 jq_rc=0
 row=$(printf '%s' "$input" | jq -rc --arg ts "$ts" --arg agent "$AGENT" --arg min "$minchars" --arg env_sid "${CLAUDE_SESSION_ID:-}" --arg machine "$machine" --arg repo "$repo" --arg branch "$branch" --argjson record "$RECORD" '
   def clean_prompt:
-    gsub("(?i)<(ide_selection|system-reminder|task-notification|local-command-stdout|local-command-caveat|command-name|command-message|command-args|command-contents|function_results)[^>]*>.*?</\\1>"; ""; "gm")
+    gsub("(?i)<(ide_selection|system-reminder|task-notification|local-command-stdout|local-command-caveat|command-name|command-message|command-args|command-contents|function_results|ADDITIONAL_METADATA|USER_SETTINGS_CHANGE)[^>]*>.*?</\\1>"; ""; "gm")
+    | gsub("(?i)</?USER_REQUEST>"; ""; "g")
     | gsub("\\n[ \\t]*\\n[ \\t]*\\n+"; "\\n\\n")
     | sub("^\\s+"; "") | sub("\\s+$"; "");
   def textval: (if type == "string" then . else "" end);
