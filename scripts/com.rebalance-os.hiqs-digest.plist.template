@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rebalance-os.hiqs-digest</string>
+
+    <!-- Run through the bash wrapper, NOT {{PYTHON}} directly: the health
+         collector shells out to `rebalance doctor`, which reads the
+         TCC-protected ~/Documents vault. A directly-launched interpreter is
+         denied there; the wrapper inherits the existing Full Disk Access
+         grant. See scripts/hiqs_digest.sh for the full note. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{REBALANCE_DIR}}/scripts/hiqs_digest.sh</string>
+    </array>
+
+    <!-- 2× per day: 1:05 PM and 5:05 PM LOCAL time.
+         Local wall clock is deliberate: launchd resolves StartCalendarInterval
+         against the machine's own clock and handles DST itself, which is why
+         this job owns the fire time rather than the consumer side
+         (AEGIS-Sleuth-Slackbot#158 is an open DST defect in that scheduler).
+         :05 not :00 — GH-175 finding 3: no two jobs may share a minute, and
+         the hourly pulse-sync owns :00.
+         RunAtLoad stays false so loading the job never fires an off-schedule
+         post into a team channel. A machine asleep at 13:05 runs the job on
+         next wake; the digest stamps its own generated_at so the post
+         announces its own lateness rather than passing as on-time. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>5</integer></dict>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!--
+        !! NEVER put a real API key in this template file. It is tracked in git. !!
+
+        To pass GEMINI_API_KEY to launchd, copy the rendered plist to
+        ~/Library/LaunchAgents/ (already gitignored as *.plist) and add the key
+        there, or set it in your shell profile before loading the job.
+
+        Kill switch — uncomment in the RENDERED plist to stop the 2 Gemini
+        calls/day without a code change or redeploy:
+            <key>HIQS_DIGEST_LLM_DISABLE</key><string>1</string>
+
+        Destination override — the subdirectory inside the pulse repo that the
+        Sleuth relay watches. Defaults to "digests":
+            <key>HIQS_DIGEST_SUBDIR</key><string>digests</string>
+        -->
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{REBALANCE_DIR}}/temp/logs/hiqs-digest-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{REBALANCE_DIR}}/temp/logs/hiqs-digest-stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
