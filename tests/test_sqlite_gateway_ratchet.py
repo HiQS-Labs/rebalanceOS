@@ -69,12 +69,9 @@ def test_new_bypass_is_new_debt(checker, tmp_path):
 
 
 def test_growth_beyond_baseline_is_new_debt(checker, tmp_path):
-    root = _make_tree(
-        tmp_path,
-        {"src/rebalance/ingest/apple_reminders.py": "x = 1\n" + 'sqlite3.connect("y")\n' * 4},
-    )
-    findings = checker.compare_to_baseline(checker.scan_sqlite_calls(root), checker.load_baseline(BASELINE_PATH))
-    growth = [f for f in findings if f.startswith("src/rebalance/ingest/apple_reminders.py")]
+    root = _make_tree(tmp_path, {"src/probe.py": "x = 1\n" + 'sqlite3.connect("y")\n' * 4})
+    findings = checker.compare_to_baseline(checker.scan_sqlite_calls(root), {"src/probe.py": 3})
+    growth = [f for f in findings if f.startswith("src/probe.py")]
     assert len(growth) == 1
     assert "grew" in growth[0]
 
@@ -82,8 +79,8 @@ def test_growth_beyond_baseline_is_new_debt(checker, tmp_path):
 def test_cleanup_requires_deliberate_baseline_tightening(checker, tmp_path):
     root = _make_tree(tmp_path, {"src/unrelated.py": "x = 1\n"})
     actual = checker.scan_sqlite_calls(root)
-    findings = checker.compare_to_baseline(actual, checker.load_baseline(BASELINE_PATH))
-    stale = [f for f in findings if f.startswith("src/rebalance/doctor.py")]
+    findings = checker.compare_to_baseline(actual, {"src/retired.py": 2})
+    stale = [f for f in findings if f.startswith("src/retired.py")]
     assert len(stale) == 1
     assert "stale baseline" in stale[0]
 
@@ -99,6 +96,22 @@ def test_gateway_dirs_and_tests_are_exempt(checker, tmp_path):
         },
     )
     assert checker.scan_sqlite_calls(root) == {}
+
+
+def test_reasoned_pragma_exempts_a_site(checker, tmp_path):
+    root = _make_tree(
+        tmp_path,
+        {
+            "src/ops.py": 'c = sqlite3.connect("x")  # GATEWAY-OK: one-shot prod surgery (GH-136)\n',
+            "src/plain.py": 'c = sqlite3.connect("y")\n',
+        },
+    )
+    assert checker.scan_sqlite_calls(root) == {"src/plain.py": 1}
+
+
+def test_empty_pragma_reason_still_counts(checker, tmp_path):
+    root = _make_tree(tmp_path, {"src/ops.py": 'c = sqlite3.connect("x")  # GATEWAY-OK:\n'})
+    assert checker.scan_sqlite_calls(root) == {"src/ops.py": 1}
 
 
 def test_unreadable_file_fails_closed(checker, tmp_path, monkeypatch):

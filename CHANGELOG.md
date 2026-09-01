@@ -10,6 +10,25 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.79.0] - 2026-09-01
+
+### Added
+
+- Reviewed exceptions to the SQLite gateway rule are now written down where they happen:
+  a same-line marker with a stated reason exempts a call site from the merge gate, and a
+  marker with no reason is rejected. Four sites carry one — the one-shot production
+  maintenance tool and the self-contained release-ledger app, which keeps its own
+  stricter connection policy (explicit transactions plus a verified foreign-keys
+  invariant the shared gateway does not provide).
+
+### Changed
+
+- Every direct SQLite connection outside the two sanctioned database gateways has been
+  routed through them: the reminders collector, the ask-self metadata read, the health
+  check's read-only probes, the reminder-graph page, and the first-run database bootstrap.
+  The gate's pinned debt list is now empty, so any new direct connection fails the build
+  from a baseline of zero rather than shrinking a backlog.
+
 ## [0.78.0] - 2026-08-31
 
 ### Added

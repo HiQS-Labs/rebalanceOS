@@ -21,6 +21,8 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Callable, Literal
 
 from rebalance.lib.time_ops import now_utc
@@ -2144,19 +2146,21 @@ def freshness_warn_hours(check_name: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _ro_connection(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(f"file:{db_path.absolute().as_posix()}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
-        import sqlite_vec
+@contextmanager
+def _ro_connection(db_path: Path) -> Iterator[sqlite3.Connection]:
+    from rebalance.ingest.db.connection import db_connection_readonly
 
-        if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
-            conn.enable_load_extension(True)
-            sqlite_vec.load(conn)
-            conn.enable_load_extension(False)
-    except Exception:
-        pass
-    return conn
+    with db_connection_readonly(db_path) as conn:
+        try:
+            import sqlite_vec
+
+            if sqlite_vec is not None and hasattr(conn, "enable_load_extension"):
+                conn.enable_load_extension(True)
+                sqlite_vec.load(conn)
+                conn.enable_load_extension(False)
+        except Exception:
+            pass
+        yield conn
 
 
 def _check_orphaned_vectors(db_path: Path) -> list[Check]:

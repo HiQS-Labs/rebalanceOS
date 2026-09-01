@@ -1,11 +1,1 @@
-{
-  "src/rebalance/doctor.py": 1,
-  "src/rebalance/ingest/apple_reminders.py": 3,
-  "src/rebalance/ingest/ask_self_scan.py": 1,
-  "src/rebalance/ingest/sleuth_grouping.py": 1,
-  "src/rebalance/mcp/server.py": 1,
-  "src/rebalance/web.py": 1,
-  "utils/gh250/reclaim.py": 1,
-  "utils/py/releases_app.py": 2,
-  "utils/py/releases_cycle.py": 1
-}
+{}

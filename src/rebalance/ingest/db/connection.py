@@ -88,7 +88,7 @@ def db_connection(
 
 
 @contextmanager
-def db_connection_readonly(database_path: Path) -> Generator[sqlite3.Connection, None, None]:
+def db_connection_readonly(database_path: Path | str) -> Generator[sqlite3.Connection, None, None]:
     """Open an existing SQLite database in read-only mode and close it on exit.
 
     Unlike :func:`get_connection`, this never creates the parent directory or
@@ -96,6 +96,7 @@ def db_connection_readonly(database_path: Path) -> Generator[sqlite3.Connection,
     an optional database should check for its existence before entering the
     context; SQLite raises ``OperationalError`` for a missing read-only file.
     """
+    database_path = Path(database_path)
     conn = sqlite3.connect(f"{database_path.resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:

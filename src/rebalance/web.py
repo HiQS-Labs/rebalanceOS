@@ -1931,13 +1931,10 @@ def sleuth_graph_page() -> HTMLResponse:
         db = resolve_db()
         clients = load_client_mapping()
         groups = grouped_reminders_from_db(db, clients=clients)
-        import sqlite3 as _sqlite3
+        from rebalance.ingest.db.connection import db_connection_readonly
 
-        conn = _sqlite3.connect(db)
-        try:
+        with db_connection_readonly(db) as conn:
             all_reminders = load_active_reminders(conn)
-        finally:
-            conn.close()
         elements = _build_graph_elements(groups, all_reminders, clients)
         total = len(all_reminders)
         error_msg = ""

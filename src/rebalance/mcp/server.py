@@ -31,11 +31,10 @@ def main() -> None:
         # First run: no database exists yet. Create the canonical path so
         # MCP-driven onboarding can proceed — the onboarding tools need
         # the server to be running before any data exists.
-        database_path = canonical_database_path()
-        database_path.parent.mkdir(parents=True, exist_ok=True)
-        import sqlite3
+        from rebalance.ingest.db.connection import get_connection
 
-        sqlite3.connect(database_path).close()
+        database_path = canonical_database_path()
+        get_connection(database_path).close()
         logger.info("Created empty database at %s", database_path)
     server = create_server(database_path=database_path)
     server.run()

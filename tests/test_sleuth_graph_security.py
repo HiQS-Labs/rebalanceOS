@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from rebalance import web
@@ -32,8 +35,16 @@ class SleuthGraphScriptBreakoutTests(unittest.TestCase):
             reminders=[reminder],
         )
 
+        # The route opens the DB read-only through the shared gateway, which
+        # cannot open ":memory:" — give it a real (empty) file instead. The
+        # reads themselves are patched; only the open must succeed.
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as handle:
+            db_file = Path(handle.name)
+        self.addCleanup(db_file.unlink, missing_ok=True)
+        sqlite3.connect(db_file).close()
+
         with (
-            mock.patch.object(web, "resolve_db", return_value=":memory:"),
+            mock.patch.object(web, "resolve_db", return_value=str(db_file)),
             mock.patch(
                 "rebalance.ingest.sleuth_grouping.load_client_mapping",
                 return_value={},
