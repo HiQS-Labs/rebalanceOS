@@ -1,0 +1,34 @@
+{
+  "day_windows": {
+    "src/rebalance/ingest/github_scan.py": 1,
+    "src/rebalance/ingest/next_actions.py": 1,
+    "src/rebalance/ingest/note_builder.py": 1,
+    "src/rebalance/ingest/pulse.py": 1,
+    "src/rebalance/ingest/querier.py": 1,
+    "utils/hiqs_digest.py": 3
+  },
+  "llm_clients": {
+    "scripts/cc_cloud_jobs.py": 3,
+    "scripts/health_issue_reporter.py": 1,
+    "src/rebalance/ingest/note_builder.py": 1,
+    "src/rebalance/repair.py": 1
+  },
+  "sql_emitters": {
+    "scripts/dashboard.py": 9,
+    "src/rebalance/ingest/diagnose.py": 2,
+    "src/rebalance/ingest/focus5_scan.py": 1,
+    "src/rebalance/ingest/github_commit_backfill.py": 2,
+    "src/rebalance/ingest/github_coverage.py": 3,
+    "src/rebalance/ingest/github_direct_commits.py": 3,
+    "src/rebalance/ingest/github_readiness.py": 4,
+    "src/rebalance/ingest/github_reconciliation.py": 3,
+    "src/rebalance/ingest/github_scan.py": 1,
+    "src/rebalance/ingest/github_watch.py": 7,
+    "src/rebalance/ingest/index_ops.py": 1,
+    "src/rebalance/ingest/next_actions.py": 1,
+    "src/rebalance/ingest/note_builder.py": 1,
+    "src/rebalance/ingest/project_inference.py": 4,
+    "src/rebalance/ingest/pulse.py": 7,
+    "utils/hiqs_digest.py": 8
+  }
+}
