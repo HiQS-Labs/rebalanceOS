@@ -599,7 +599,6 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             or 0,
         }
 
-        
         payload["sources"]["clio"] = {
             "prompts": _safe_count(conn, "clio_prompts"),
             "last_synced_at": _safe_max(conn, "clio_prompts", "synced_at"),
@@ -1410,8 +1409,6 @@ def _refresh_email(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     }
 
 
-
-
 def _refresh_figma(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     """Refresh Figma comments (source_type='figma') — the first SourceModule.
 
@@ -1915,6 +1912,8 @@ _sleuth_adapter = _dry_run_adapter(_refresh_sleuth)
 _apple_reminders_adapter = _dry_run_adapter(_refresh_apple_reminders)
 _email_adapter = _dry_run_adapter(_refresh_email)
 _code_adapter = _dry_run_adapter(_refresh_code)
+
+
 def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     if dry_run:
         return {
@@ -1922,10 +1921,11 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "dry_run": True,
             "steps": ["sync_clio_prompts()"],
         }
-    
+
     from rebalance.ingest.clio import sync_clio_prompts
+
     res = sync_clio_prompts(database_path)
-    
+
     if res.skipped:
         return {
             "scope": "clio",
@@ -1934,7 +1934,7 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "reason": res.reason,
             "steps_executed": ["sync_clio_prompts"],
         }
-        
+
     return {
         "scope": "clio",
         "dry_run": False,
@@ -1943,6 +1943,7 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         "prompts_unchanged": res.prompts_unchanged,
         "steps_executed": ["sync_clio_prompts"],
     }
+
 
 _clio_adapter = _dry_run_adapter(_refresh_clio)
 _figma_adapter = _dry_run_adapter(_refresh_figma)

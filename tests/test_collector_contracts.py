@@ -24,7 +24,8 @@ SRC = REPO_ROOT / "src" / "rebalance"
 INDEX_OPS = SRC / "ingest" / "index_ops.py"
 
 # Decision A: the only scopes `all` should expand to are raw incoming sources.
-RAW_SOURCES = {"vault", "github", "calendar", "sleuth", "email"}
+# `clio` joined the set in GH-141 (CLIO prompt logs -> semantic index).
+RAW_SOURCES = {"vault", "github", "calendar", "sleuth", "email", "clio"}
 
 # Leaf ingest functions that user-facing surfaces (CLI/MCP/web) must not call
 # directly — they route through the orchestrator (`refresh_index`) instead.
@@ -98,7 +99,7 @@ def test_known_collectors_are_classified_as_expected():
         assert COLLECTORS[name].kind == expected, f"{name}: {COLLECTORS[name].kind!r} != {expected!r}"
 
 
-def test_raw_source_membership_is_exactly_the_five():
+def test_raw_source_membership_is_exactly_the_declared_set():
     from rebalance.ingest.index_ops import _raw_source_scopes
 
     assert set(_raw_source_scopes()) == RAW_SOURCES

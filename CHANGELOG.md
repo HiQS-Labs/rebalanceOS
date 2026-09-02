@@ -10,6 +10,26 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.79.1] - 2026-09-01
+
+### Fixed
+- **`development` was left red by the GH-141 CLIO ingest merge — all four CI gates now pass again.**
+  The ingest commits landed 31 lint violations (26 blank-lines-with-whitespace, 2 trailing-whitespace,
+  2 unused imports in `tests/test_clio.py`, and one undefined name), three unformatted modules, and a
+  `ROADMAP.md` link still pointing at `PROJECT/2-WORKING/GH-141-CLIO-INGEST.md` after the doc moved to
+  `3-COMPLETED`. Any PR opened against `development` inherited all four failures, so the red read as
+  the PR's own — #143 showed five failing checks for breakage it did not introduce.
+- **The two raw-source ratchets now record `clio` as the sixth source.**
+  GH-141 registered a `clio` collector but left `tests/test_collector_contracts.py` and
+  `tests/test_collector_registry.py` asserting the old five-member set, so three tests failed on
+  `development` itself. The ratchets did their job — a new raw source is meant to require a
+  deliberate edit here — this just records the edit. `test_raw_source_membership_is_exactly_the_five`
+  is renamed to `..._is_exactly_the_declared_set` so the name stops encoding a count that changes.
+- **`clio_semantic_docs`' return annotation no longer refers to an undefined name.**
+  `SemanticDoc` is imported inside the function body to stay out of `semantic_index`'s import cycle,
+  which left the `"Iterator[SemanticDoc]"` annotation unresolvable to both ruff (F821) and mypy. A
+  `TYPE_CHECKING` guard at module scope resolves the forward reference without adding a runtime import.
+
 ## [0.79.0] - 2026-09-01
 
 ### Added
