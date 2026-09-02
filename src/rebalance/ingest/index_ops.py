@@ -273,6 +273,7 @@ _SIGNAL_HEALTH_RULES: dict[str, dict[str, Any]] = {
         "content_label": "a sender or subject",
     },
     "figma": {"freshness_key": "last_synced_at", "window_days": 7, "zero_status": "warn"},
+    "clio": {"freshness_key": "last_synced_at", "window_days": 7, "zero_status": "warn"},
     "ask_self": {"freshness_key": "last_scanned_at", "window_days": 7, "zero_status": "warn"},
 }
 
@@ -284,6 +285,7 @@ _SIGNAL_HEALTH_TOTAL_KEYS: dict[str, tuple[str, ...]] = {
     "apple_reminders": ("reminders",),
     "email": ("messages",),
     "figma": ("comments",),
+    "clio": ("prompts",),
     "ask_self": ("repos",),
 }
 
@@ -593,6 +595,16 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "newest_received_at": _safe_max(conn, "email_messages", "received_at"),
             "recent_row_count_7d": _safe_count_where(
                 conn, "email_messages", "julianday(received_at) >= julianday('now', '-7 days')"
+            )
+            or 0,
+        }
+
+        payload["sources"]["clio"] = {
+            "prompts": _safe_count(conn, "clio_prompts"),
+            "last_synced_at": _safe_max(conn, "clio_prompts", "synced_at"),
+            "newest_prompt_at": _safe_max(conn, "clio_prompts", "timestamp"),
+            "recent_row_count_7d": _safe_count_where(
+                conn, "clio_prompts", "julianday(timestamp) >= julianday('now', '-7 days')"
             )
             or 0,
         }
@@ -1900,6 +1912,40 @@ _sleuth_adapter = _dry_run_adapter(_refresh_sleuth)
 _apple_reminders_adapter = _dry_run_adapter(_refresh_apple_reminders)
 _email_adapter = _dry_run_adapter(_refresh_email)
 _code_adapter = _dry_run_adapter(_refresh_code)
+
+
+def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "scope": "clio",
+            "dry_run": True,
+            "steps": ["sync_clio_prompts()"],
+        }
+
+    from rebalance.ingest.clio import sync_clio_prompts
+
+    res = sync_clio_prompts(database_path)
+
+    if res.skipped:
+        return {
+            "scope": "clio",
+            "dry_run": False,
+            "skipped": True,
+            "reason": res.reason,
+            "steps_executed": ["sync_clio_prompts"],
+        }
+
+    return {
+        "scope": "clio",
+        "dry_run": False,
+        "prompts_fetched": res.prompts_fetched,
+        "prompts_inserted": res.prompts_inserted,
+        "prompts_unchanged": res.prompts_unchanged,
+        "steps_executed": ["sync_clio_prompts"],
+    }
+
+
+_clio_adapter = _dry_run_adapter(_refresh_clio)
 _figma_adapter = _dry_run_adapter(_refresh_figma)
 
 
@@ -2118,6 +2164,18 @@ register_collector(Collector("ask_self", _ask_self_adapter, included_in_all=Fals
 # arm ships DORMANT — figma_candidates yields nothing until a figma_file_keys
 # allow-list turns the collector on.
 from rebalance.ingest.figma import figma_semantic_docs  # noqa: E402
+
+
+from rebalance.ingest.clio import clio_semantic_docs
+
+register_collector(
+    Collector(
+        "clio",
+        _clio_adapter,
+        semantic_docs=clio_semantic_docs,
+        included_in_all=True,
+    )
+)
 
 register_collector(
     Collector(
