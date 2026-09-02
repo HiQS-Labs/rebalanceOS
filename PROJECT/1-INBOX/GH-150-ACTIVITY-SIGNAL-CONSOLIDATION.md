@@ -68,7 +68,7 @@ Evidence is file:line as of 2026-09-02 (commit on `fix/gh147-digest-mirrors-stal
 
 Each phase lands independently; F1 is sequenced first because it is the only finding producing wrong numbers today.
 
-- [ ] **P1 (fe1 extension) — `db/queries.py` with canonical repo identity.** Move `get_github_balance` + `get_all_repo_activity_by_org` + the pulse day/watched aggregations behind one query module whose every GROUP BY / join / dict key routes through `canonical_github_repo_name().lower()`. Mirror-fixture test pattern: `tests/test_hiqs_digest.py::test_org_mirror_rows_collapse_into_one_repo`.
+- [ ] **P1 (fe1 extension) — `db/queries.py` with canonical repo identity.** Move `get_github_balance` + `get_all_repo_activity_by_org` + the pulse day/watched aggregations behind one query module whose every GROUP BY / join / dict key routes through `canonical_github_repo_name().lower()`. Mirror-fixture test pattern: `tests/test_hiqs_digest.py::test_org_mirror_rows_collapse_into_one_repo`. Lands inside [BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p1-shared-read-layer.md](../2-WORKING/BUILD-0.75.0-FLEET-ENGINE/phases-briefs/p1-shared-read-layer.md) — that brief is the executor-facing plan this audit feeds.
 - [ ] **P2 — one synthesis primitive.** `note_builder` imports `querier._synthesize_gemini`; delete its client. Guard: grep-level CI check that exactly one Gemini endpoint implementation exists.
 - [ ] **P3 — one day-bounds helper + one commit-dedupe definition.** Consolidate F3/F4 into the query layer (or `lib/time_ops`); fix weekly_report's naive week arithmetic while there.
 - [ ] **P4 — deletes.** Retire `cc_cloud_jobs.py` (port any operator-facing output to `ingest/claude_cloud`), collapse F6 utilities into one `utils` helper module.
