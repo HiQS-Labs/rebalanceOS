@@ -80,6 +80,27 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 
 **Auto-promotion (GH-124).** `refresh_index(scope=["github"])` also auto-promotes a watched-but-unconfirmed repo into `project_registry` (as a `machine_owned` row, never overwriting a curated one) once the operator has authored `auto_promote_commit_threshold` commits to it (default 3; config in `config.py::get_auto_promote_config()`). So `list_projects()` can grow entries you never explicitly confirmed — check `custom_fields.provenance == "auto_promoted"` before assuming a project was hand-curated. Each promotion is surfaced non-silently: a `project_auto_promoted` event on `/auth-log` and a "New repo added" banner on the pulse dashboard's repo-activity chart.
 
+**Deploy runtime folder.** Scheduled/launchd jobs are pinned to **one checkout**
+(`SCHEDULER.md` § Runbook: plists bake in absolute paths, and `stack.sh up` refuses to
+silently rebind one fleet to another clone). The recommended pattern is to keep that
+checkout **separate from the one you develop in** — a second full clone of this repo,
+its own `.venv`, updated deliberately (`git pull --ff-only origin development`) rather
+than picking up whatever's checked out mid-edit in your dev tree. This is optional: a
+solo operator running everything from one clone is fine, and `stack.sh status`'s
+`BOUND TO` column always tells you which checkout is actually live regardless of which
+pattern you use.
+
+The conventional name for this second checkout's path is `REBALANCE_RUNTIME_DIR`
+(documentation convention today, not yet consumed by the install scripts — they
+still derive their target from whichever checkout you run `install_<job>_scheduler.sh`
+from; see `SCHEDULER.md` § Shared mechanics for the current `{{REBALANCE_DIR}}`
+templating). Record **your own** machine's actual path in your own gitignored
+`temp/RUNTIME.md` (repo root, `/temp` is already ignored) — never in a tracked file,
+since an absolute path leaks your local username/directory layout. `temp/RUNTIME.md`
+is a personal note for quick reference only; `stack.sh status` is ground truth if the
+two ever disagree. Same shape as `config/runtime.env` for 3-Eyes (`ROUTER.md` §
+Routing hints) — gitignored-by-default, per-machine, silent no-op if absent.
+
 ## Communication & Documentation
 
 - Precise, concise chat replies/updates: Short as possible, detailed enough.
