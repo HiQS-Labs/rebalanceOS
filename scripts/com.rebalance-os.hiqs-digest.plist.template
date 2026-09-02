@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rebalance-os.hiqs-digest</string>
+
+    <!-- Run through the bash wrapper, NOT the venv interpreter directly: the
+         health collector shells out to `rebalance doctor`, which reads the
+         TCC-protected ~/Documents vault. A directly-launched interpreter is
+         denied there; the wrapper inherits the existing Full Disk Access
+         grant. See scripts/hiqs_digest.sh for the full note.
+
+         This comment deliberately names no substitution placeholder:
+         install_common.sh sed-substitutes them across the WHOLE file, so a
+         placeholder used as prose here would be rewritten into an absolute home
+         path in the rendered plist. The installer checks the venv explicitly
+         rather than relying on a placeholder appearing somewhere in this file. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{REBALANCE_DIR}}/scripts/hiqs_digest.sh</string>
+    </array>
+
+    <!-- 2× per day: 1:05 PM and 5:05 PM LOCAL time.
+         Local wall clock is deliberate: launchd resolves StartCalendarInterval
+         against the machine's own clock and handles DST itself, which is why
+         this job owns the fire time rather than the consumer side
+         (AEGIS-Sleuth-Slackbot#158 is an open DST defect in that scheduler).
+         :05 not :00 — GH-175 finding 3: no two jobs may share a minute, and
+         the hourly pulse-sync owns :00.
+         RunAtLoad stays false so loading the job never fires an off-schedule
+         post into a team channel. A machine asleep at 13:05 runs the job on
+         next wake; the digest stamps its own generated_at so the post
+         announces its own lateness rather than passing as on-time. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>5</integer></dict>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!--
+        !! NEVER put a real API key in this template file. It is tracked in git. !!
+
+        To pass GEMINI_API_KEY to launchd, copy the rendered plist to
+        ~/Library/LaunchAgents/ (already gitignored as *.plist) and add the key
+        there, or set it in your shell profile before loading the job.
+
+        Kill switch — uncomment in the RENDERED plist to stop the 2 Gemini
+        calls/day without a code change or redeploy:
+            <key>HIQS_DIGEST_LLM_DISABLE</key><string>1</string>
+
+        Destination override — the subdirectory inside the pulse repo that the
+        Sleuth relay watches. Defaults to "digests":
+            <key>HIQS_DIGEST_SUBDIR</key><string>digests</string>
+        -->
+    </dict>
+
+    <!-- Logs live OUTSIDE ~/Documents. launchd opens StandardOutPath/StandardErrorPath
+         ITSELF, before exec'ing the program, so the wrapper's inherited Full Disk Access
+         does not cover them — a path under a TCC-protected folder simply fails to open,
+         with no error anyone sees. ~/Library/Logs is fine. Same note as
+         com.rebalance-os.daily-synthesis.plist.template:36-42.
+         The per-day wrapper log (temp/logs/hiqs_digest_<date>.log, written by
+         rb_job_init) is opened by the wrapper and does inherit the grant. -->
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/Library/Logs/rebalance-os/hiqs-digest.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/Library/Logs/rebalance-os/hiqs-digest.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

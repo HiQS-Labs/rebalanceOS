@@ -21,16 +21,20 @@ Follow Figma (`src/rebalance/ingest/figma.py:284` + `index_ops.py:2122`) as the 
 def sync_clio_prompts(database_path: Path) -> ClioSyncResult: ...
 def clio_semantic_docs(conn) -> Iterator[SemanticDoc]: ...
 
+
 # src/rebalance/ingest/index_ops.py  (bottom, with figma/claude_cloud)
 from rebalance.ingest.clio import clio_semantic_docs
-register_collector(Collector(
-    "clio",
-    _clio_adapter,
-    semantic_docs=clio_semantic_docs,
-    # raw_source, included_in_all=True by default — no PAT, no file-key allow-list,
-    # so it belongs in `all` (AGENTS.md scope taxonomy). If privacy review disagrees,
-    # flip to included_in_all=False (opt-in) — one-line change, no dispatch edit.
-))
+
+register_collector(
+    Collector(
+        "clio",
+        _clio_adapter,
+        semantic_docs=clio_semantic_docs,
+        # raw_source, included_in_all=True by default — no PAT, no file-key allow-list,
+        # so it belongs in `all` (AGENTS.md scope taxonomy). If privacy review disagrees,
+        # flip to included_in_all=False (opt-in) — one-line change, no dispatch edit.
+    )
+)
 ```
 
 - **Kind:** `raw_source` (default). It is incoming data, not a derived scan/projection/export. Only `raw_source` collectors are `all`-eligible (`index_ops.py:135`); derived/projection/export must never be peers in the registry.
