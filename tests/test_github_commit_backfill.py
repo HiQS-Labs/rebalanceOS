@@ -365,3 +365,56 @@ class GitCommitBackfillTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DefaultRootsTests(unittest.TestCase):
+    """#147: on a split install (scheduler pinned to a runtime checkout, development
+    elsewhere) the parent of the RUNNING checkout is not where the operator's clones
+    live. The machine's configured repo scan roots must be part of the fallback, or
+    every clone beyond the depth-bounded walk is stamped uncoverable — silencing the
+    zero-API commit backstop exactly when the rate-limited API path needs it most."""
+
+    def test_scan_roots_are_included_when_local_repo_roots_unset(self) -> None:
+        from unittest import mock
+
+        from rebalance.ingest import config as config_module
+        from rebalance.ingest.github_commit_backfill import default_roots
+
+        with (
+            mock.patch.object(config_module, "get_local_repo_roots", return_value=[]),
+            mock.patch.object(config_module, "get_repo_scan_roots", return_value=["/clones/gh"]),
+            mock.patch.object(config_module, "get_focus5_scan_roots", return_value=["/clones/f5"]),
+        ):
+            roots = default_roots()
+
+        self.assertIn("/clones/gh", roots)
+        self.assertIn("/clones/f5", roots)
+
+    def test_configured_local_repo_roots_win_exclusively(self) -> None:
+        from unittest import mock
+
+        from rebalance.ingest import config as config_module
+        from rebalance.ingest.github_commit_backfill import default_roots
+
+        with mock.patch.object(config_module, "get_local_repo_roots", return_value=["/explicit"]):
+            self.assertEqual(default_roots(), ["/explicit"])
+
+    def test_own_checkout_parent_still_included(self) -> None:
+        """The pre-existing sibling-clones fallback must survive the widening."""
+        from unittest import mock
+
+        from rebalance.ingest import config as config_module
+        from rebalance.ingest.github_commit_backfill import default_roots, _git
+
+        with (
+            mock.patch.object(config_module, "get_local_repo_roots", return_value=[]),
+            mock.patch.object(config_module, "get_repo_scan_roots", return_value=[]),
+            mock.patch.object(config_module, "get_focus5_scan_roots", return_value=[]),
+        ):
+            roots = default_roots()
+
+        here = Path(__file__).resolve().parent.parent
+        code, out, _ = _git(here, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        self.assertEqual(code, 0)
+        expected_parent = str(Path(out).parent.parent)
+        self.assertIn(expected_parent, roots)

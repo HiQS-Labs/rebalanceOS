@@ -1,6 +1,6 @@
 # SOP — Standard Operating Procedure
 
-Do not store any credentials or secrets in this file, other repo files, or any PII in public facing GH issues.
+Do not store any credentials or secrets in this file, other repo files, or any PII in public facing GH issues. The same rule covers machine-specific absolute paths (e.g. a deploy runtime folder's real location) — keep those in your own gitignored `temp/RUNTIME.md`, never in a tracked file. See the pattern in `AGENTS.md` § "Deploy runtime folder".
 
 This document codifies how work in this repo gets **evidenced**. It is written for
 whoever picks up the next task, human or model, and it is binding on both.

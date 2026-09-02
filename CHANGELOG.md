@@ -10,6 +10,20 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.81.0] - 2026-09-02
+
+### Added
+- A renamed-org alias map (`github_org_aliases` in operator config) with one canonical repo-name helper, so a repo synced under both its old and new org spellings collapses to a single identity everywhere repos are resolved — the watched set, the twice-daily digest, and the watchlist guard. Renamed orgs keep their old URLs alive via redirects, which let mirror copies of every row sit beside the real ones and double every count. Only exact owner matches alias; same-named forks under other owners are untouched. (#147)
+- Digest freshness signal: the progress digest now carries a stale-repos list — watched repos whose last per-repo sync trails the clock by hours, or whose commit corpus the local-git backfill marked unverifiable — surfaced in the prompt's HEALTH section and in the footer, so ingest lag reads as "data stale since ..." instead of a silently quiet repo. (#147)
+
+### Changed
+- The local-git commit backfill's zero-config root discovery also walks the machine's configured repo scan roots, not just the parent of the running checkout. On a split install (scheduler pinned to a runtime checkout, development elsewhere) the old fallback pointed at a directory containing no clones and stamped every clone beyond its depth-bounded walk `uncoverable` — silencing the zero-API commit backstop exactly when the rate-limited API path needed it most. (#147)
+- The digest prompt no longer buries repos that pushed commits or opened PRs but merged nothing yet: they get a compact line instead of being dropped outright, which previously turned any ingest lag into a silent omission. (#147)
+- Watched-set merging dedupes on the case-insensitive repo key, so mixed-casing rows from different sources no longer turn one repo into two sync targets. (#147)
+
+### Fixed
+- The watchlist coverage guard no longer alarms on an org rename or a casing variant: its snapshot diff collapses alias spellings and compares case-insensitively on both sides, while real coverage drops still warn. (#147)
+
 ## [0.80.0] - 2026-09-01
 
 ### Added

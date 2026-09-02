@@ -199,6 +199,13 @@ The MCP server speaks standard JSON-RPC — no LLM-specific logic inside it. Any
 
 The scheduled side of the diagram (the launchd fleet: daily/hourly syncs, pulse publishing, health checks) is governed by the policy table in [SCHEDULER.md](SCHEDULER.md) — job cadences, scopes, prerequisites, and the runbook live there.
 
+Running the scheduled fleet long-term? It's worth keeping that checkout separate from
+the one you actively develop in — a second clone the background jobs are pinned to, so
+in-progress edits in your dev tree never reach what's actually running. This is
+optional (one clone is fine for casual/solo use) and never requires committing any
+machine-specific path — see **Deploy runtime folder** in [AGENTS.md](AGENTS.md) for
+the pattern.
+
 For layer roles, tool surface, server configuration, and host adapter setup (Claude Desktop, Cursor, VS Code, Continue), see **[MCP.md](MCP.md)**.
 
 ---

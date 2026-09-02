@@ -46,7 +46,7 @@ Four things that look like details and are not:
     straight to a branch), DEDUPED on (repo, sha). Reading only the first makes the post
     contradict itself: an empty commit list beside per-repo counts of 14. Reading both
     without the dedupe overstates the day, because a commit pushed to a branch and later
-    attached to a PR is in both tables — see DAY_COMMITS_CTE.
+    attached to a PR is in both tables — see _day_commits_cte.
   * by_repo is derived from those same day-bounded tables, NOT from github_activity.
     github_activity has a scan_date column and looks per-day; it is not. Every row holds a
     14-to-30-day event-window total stamped with today's date, for watched-repo rollups
@@ -123,15 +123,19 @@ about thirty seconds.
 Cover all three, in this order, and nothing else:
 
 1. SHIPPED — what actually landed today, grouped by repo or theme. Lead with merged work.
+   After the merged work, add ONE compact line for repos that pushed >= 5 commits or opened
+   PRs today but merged nothing yet (e.g. "acme/api: 20 commits in flight") — a busy
+   in-progress repo is signal, not noise. Repos whose only activity is opened issues may be
+   omitted.
 2. IN FLIGHT — one or two lines, only if `semantic.hits` shows themes that are NOT already
    covered by the shipped items. If it adds nothing new, omit this section entirely.
 3. HEALTH — if `health.problem_count` is greater than zero, ONE line naming the problems.
-   If it is zero, write nothing about health.
+   If `github.stale_repos` is non-empty, ONE line naming those repos and why — a repo
+   listed there may be under-reported today (sync lag or a failed collector), so never
+   present its quietness as a quiet day. If both are empty, write nothing about health.
 
 Hard rules:
 - Do NOT invent anything. Every claim must trace to the data below.
-- NEVER list a repository that shipped nothing. A repo with commits but no merged work is
-  only worth a mention if it is the bulk of the day's activity.
 - The `*_total` fields are the real counts. The lists beside them are truncated samples —
   never present a list's length as a total.
 - No preamble, no sign-off, no restating the counts (a footer already carries them).
@@ -290,9 +294,50 @@ def _semantic_prefilter_bound(start_utc: str) -> str:
 #
 # MIN(source) resolves the label: 'pr' sorts before 'push', so a commit in both tables is
 # reported as PR-attached, which is the more specific truth.
-DAY_COMMITS_CTE = """
+#
+# The grouping key is the CANONICAL repo expression (see _repo_canonicalizer), not bare
+# LOWER(repo_full_name): a renamed org's old spelling still syncs via GitHub redirects,
+# so the same repo can hold rows under both spellings (#147) — without the canonical key
+# those mirror rows split every count in two.
+
+
+def _repo_canonicalizer() -> tuple[str, dict[str, str]]:
+    """(sql_expr, params) mapping a repo_full_name column through the org-alias collapse.
+
+    The expression lowercases the name and rewrites a renamed org's old owner
+    segment to its current spelling — the same collapse
+    ``config.canonical_github_repo_name`` applies in Python (#147). Mirrored rows
+    (one repo synced under both spellings) then GROUP BY together instead of
+    double-counting. Alias values travel as bound parameters so operator config
+    never interpolates into the SQL string. With no aliases configured the
+    expression is a plain LOWER({col}) and the parameter dict is empty.
+    """
+    try:
+        from rebalance.ingest.config import get_github_org_aliases
+
+        aliases = get_github_org_aliases()
+    except Exception:  # noqa: BLE001 — a config read must never break the collector
+        aliases = {}
+    if not isinstance(aliases, dict) or not aliases:
+        return "LOWER({col})", {}
+    params: dict[str, str] = {}
+    whens: list[str] = []
+    for i, (old, new) in enumerate(sorted(aliases.items())):
+        # THEN appends the repo segment after the canonical owner — the owner alone
+        # is not a repo name, and the first cut of this expression lost it.
+        whens.append(f"WHEN :alias_old_{i} THEN :alias_new_{i} || substr({{col}}, instr({{col}}, '/'))")
+        params[f"alias_old_{i}"] = str(old).lower()
+        params[f"alias_new_{i}"] = str(new).lower()
+    case = "LOWER(CASE LOWER(substr({col}, 1, instr({col}, '/') - 1)) " + " ".join(whens) + " ELSE {col} END)"
+    return case, params
+
+
+def _day_commits_cte(canon_expr: str) -> str:
+    """DAY_COMMITS_CTE with *canon_expr* (from _repo_canonicalizer) as the repo key."""
+    canonical = canon_expr.format(col="repo_full_name")
+    return f"""
     WITH day_commits AS (
-        SELECT repo_full_name,
+        SELECT {canonical}      AS repo_full_name,
                sha,
                MIN(message)      AS message,
                MIN(author_login) AS author_login,
@@ -307,7 +352,7 @@ DAY_COMMITS_CTE = """
             FROM github_direct_commits
             WHERE datetime(committed_at) >= :start AND datetime(committed_at) < :end
         )
-        GROUP BY LOWER(repo_full_name), sha
+        GROUP BY {canonical}, sha
     )
 """
 
@@ -321,6 +366,10 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
     """Today's GitHub activity. No LLM, no parsing — the typed columns already carry it."""
     start_utc, end_utc = bounds
     window = {"start": start_utc, "end": end_utc}
+    canon_expr, alias_params = _repo_canonicalizer()
+    canonical = canon_expr.format(col="repo_full_name")
+    cte = _day_commits_cte(canon_expr)
+    window.update(alias_params)
     try:
         # db_connection_readonly already sets row_factory = sqlite3.Row (connection.py:101).
         with db_connection_readonly(db) as conn:
@@ -342,12 +391,18 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
             # Its scan_date is also written from now_utc(), so filtering it by a LOCAL date
             # string dropped an evening's work outright for anyone off UTC — the same class
             # of bug the commit tables were already fixed for.
+            #
+            # The GROUP BY is the canonical repo expression (#147): lowercased, with a
+            # renamed org's old owner spelling rewritten to the current one. Casing
+            # variants AND org mirrors of one repo collapse into a single line, so a
+            # transfer/rename can no longer inflate the "N active repos" footer with a
+            # repo that does not exist.
             repos = [
                 dict(r)
                 for r in conn.execute(
-                    DAY_COMMITS_CTE
-                    + """
-                    SELECT LOWER(repo_full_name) AS repo_full_name,
+                    cte
+                    + f"""
+                    SELECT {canonical}        AS repo_full_name,
                            SUM(commits)        AS commits,
                            SUM(prs_merged)     AS prs_merged,
                            SUM(prs_opened)     AS prs_opened,
@@ -372,13 +427,7 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                         FROM github_items
                         WHERE datetime(created_at) >= :start AND datetime(created_at) < :end
                     )
-                    -- LOWER, matching config.normalize_github_repo_name ("exact lowercased
-                    -- owner/name form"). The tables carry rows written under different
-                    -- casings of the SAME owner/name, and grouping on the raw string counted
-                    -- that repo twice — inflating the "N active repos" footer with a repo
-                    -- that does not exist. (Owner RENAMES also split a repo; that needs an
-                    -- alias map at ingest time and is parked, see PARKED/2026-09-01-*.md.)
-                    GROUP BY LOWER(repo_full_name)
+                    GROUP BY {canonical}
                     ORDER BY commits DESC, prs_merged DESC
                     """,
                     window,
@@ -387,11 +436,11 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
 
             # No ORDER BY inside the COUNT — SQLite would materialise and sort the whole
             # day's rows just to count them.
-            commit_total = conn.execute(DAY_COMMITS_CTE + "SELECT COUNT(*) FROM day_commits", window).fetchone()[0]
+            commit_total = conn.execute(cte + "SELECT COUNT(*) FROM day_commits", window).fetchone()[0]
             commits = [
                 dict(r)
                 for r in conn.execute(
-                    DAY_COMMITS_CTE
+                    cte
                     + """
                     SELECT repo_full_name, message, author_login, committed_at, source
                     FROM day_commits
@@ -402,26 +451,32 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                 )
             ]
 
-            # item_type = 'pull_request' on BOTH the total and the detail. The by_repo
-            # prs_merged branch has always carried that filter, so leaving it off here let
-            # any non-PR row that ever acquires a merged_at push the footer's "N merged"
-            # above the sum of the per-repo lines the model was shown — the self-
-            # contradicting post the by_repo design note exists to prevent. (Zero such rows
-            # today; the point is that the two numbers now share one predicate.)
+            # item_type = 'pull_request' on BOTH the total and the detail, and the count
+            # is DISTINCT on (canonical repo, number): a repo mirrored under two org
+            # spellings holds the SAME PR number twice (#147), and a plain COUNT(*) read
+            # "10 merged" on a day that shipped five. The by_repo prs_merged branch and
+            # the detail query below share both predicates, so the footer's total, the
+            # per-repo lines and the model's item list cannot disagree.
             merged_total = conn.execute(
-                "SELECT COUNT(*) FROM github_items "
-                "WHERE item_type = 'pull_request' "
-                "AND datetime(merged_at) >= :start AND datetime(merged_at) < :end",
+                f"""
+                SELECT COUNT(DISTINCT {canonical} || '#' || number)
+                FROM github_items
+                WHERE item_type = 'pull_request'
+                  AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
+                """,
                 window,
             ).fetchone()[0]
             merged = [
                 dict(r)
                 for r in conn.execute(
-                    """
-                    SELECT repo_full_name, item_type, number, title, author_login
+                    f"""
+                    SELECT {canonical} AS repo_full_name,
+                           number, MAX(title) AS title, author_login,
+                           MAX(merged_at)    AS merged_at
                     FROM github_items
                     WHERE item_type = 'pull_request'
                       AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
+                    GROUP BY {canonical}, number
                     ORDER BY datetime(merged_at) DESC
                     LIMIT :limit
                     """,
@@ -430,20 +485,26 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
             ]
 
             # closed_not_merged deliberately spans BOTH item types — a closed issue is
-            # part of the day's work.
+            # part of the day's work — and dedupes on (canonical repo, number) for the
+            # same mirror reason as merged_total.
             closed_total = conn.execute(
-                "SELECT COUNT(*) FROM github_items "
-                "WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end AND merged_at IS NULL",
+                f"""
+                SELECT COUNT(DISTINCT {canonical} || '#' || number)
+                FROM github_items
+                WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end AND merged_at IS NULL
+                """,
                 window,
             ).fetchone()[0]
             closed = [
                 dict(r)
                 for r in conn.execute(
-                    """
-                    SELECT repo_full_name, item_type, number, title
+                    f"""
+                    SELECT {canonical} AS repo_full_name,
+                           item_type, number, MAX(title) AS title
                     FROM github_items
                     WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end
                       AND merged_at IS NULL
+                    GROUP BY {canonical}, number
                     ORDER BY datetime(closed_at) DESC
                     LIMIT :limit
                     """,
@@ -473,6 +534,94 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
         "closed_not_merged": closed,
         "detail_capped_at": {"commits": COMMIT_DETAIL_LIMIT, "items": ITEM_DETAIL_LIMIT},
     }
+
+
+# How stale a watched repo's per-repo sync timestamp may be before the digest names it.
+# The hourly github-sync walks ~60+ repos sequentially and a full run can take over an
+# hour, so the floor must clear one whole cadence plus one whole run; 180 min does.
+# A repo failing its sync (rate-limit 403, see #147/#148) crosses this and is reported
+# instead of reading as a quiet day. Same "never imply a quiet day when a collector
+# failed" contract as the prompt's error rule.
+STALE_REPO_LAG_MINUTES = 180
+STALE_REPO_DETAIL_LIMIT = 8
+
+
+def collect_repo_freshness(db: Path, now: datetime) -> list[dict[str, Any]]:
+    """Watched repos whose data may under-report today (#147).
+
+    Two signals, both canonicalized through the org-alias collapse:
+
+    - ``github_repo_meta.fetched_at`` — written by every successful per-repo sync, so a
+      repo trailing *now* by more than :data:`STALE_REPO_LAG_MINUTES` has missed at least
+      one full sync cycle (rate-limit 403, sync overrun, watchlist churn). This catches
+      exactly the #147 shape: a repo merged 3 PRs while its rows were last touched hours
+      earlier, and the digest said nothing.
+    - ``github_repo_coverage`` rows in a non-ok state — the local-git backfill's verdict
+      (``uncoverable``/``stale``) with its reason, so a repo whose commit corpus cannot be
+      verified is named rather than trusted.
+
+    Only repos in the CURRENT watched set are reported: a repo that aged out of
+    monitoring legitimately has a frozen timestamp, and re-reporting it forever would
+    train the channel to ignore the line.
+    """
+    try:
+        from rebalance.ingest.config import canonical_github_repo_name
+        from rebalance.ingest.index_ops import get_watched_repos
+
+        watched_lower = {canonical_github_repo_name(r).lower() for r in get_watched_repos(Path(db))["watched"]}
+    except Exception as e:  # noqa: BLE001 — freshness must never kill the digest
+        return [{"error": _scrub(f"watched-set resolve failed: {e}")}]
+
+    entries: dict[str, dict[str, Any]] = {}
+    try:
+        with db_connection_readonly(db) as conn:
+            rows = conn.execute(
+                "SELECT repo_full_name, MAX(fetched_at) AS last_fetched FROM github_repo_meta GROUP BY repo_full_name"
+            ).fetchall()
+            for r in rows:
+                repo = canonical_github_repo_name(r["repo_full_name"] or "")
+                if repo.lower() not in watched_lower:
+                    continue
+                fetched = _as_utc(r["last_fetched"] or "")
+                if fetched is None:
+                    continue
+                lag_minutes = (now - fetched).total_seconds() / 60  # raw-ok: staleness, not an event duration
+                if lag_minutes >= STALE_REPO_LAG_MINUTES:
+                    entries[repo.lower()] = {
+                        "repo": repo,
+                        "reason": f"not synced since {r['last_fetched']} ({round(lag_minutes / 60)}h ago)",
+                    }
+            try:
+                coverage_rows = conn.execute(
+                    "SELECT repo_full_name, state, reason FROM github_repo_coverage WHERE state != 'ok'"
+                ).fetchall()
+            except sqlite3.Error:
+                coverage_rows = []  # table may not exist on a fresh install
+            for r in coverage_rows:
+                repo = canonical_github_repo_name(r["repo_full_name"] or "")
+                if repo.lower() not in watched_lower:
+                    continue
+                reason = f"commit corpus {r['state']}"
+                if r["reason"]:
+                    reason += f" ({_scrub(str(r['reason']))})"
+                existing = entries.get(repo.lower())
+                if existing:
+                    existing["reason"] += f"; {reason}"
+                else:
+                    entries[repo.lower()] = {"repo": repo, "reason": reason}
+    except sqlite3.Error as e:
+        # Partial data plus the error — the rows already gathered still name real
+        # stale repos; dropping them to report only the error would hide signal.
+        partial = sorted(entries.values(), key=lambda entry: entry["repo"])
+        partial.append({"error": _scrub(f"freshness query failed: {e}")})
+        return partial
+
+    stale = sorted(entries.values(), key=lambda e: e["repo"])
+    if len(stale) > STALE_REPO_DETAIL_LIMIT:
+        trimmed = stale[:STALE_REPO_DETAIL_LIMIT]
+        trimmed.append({"repo": f"+{len(stale) - STALE_REPO_DETAIL_LIMIT} more", "reason": "list truncated"})
+        return trimmed
+    return stale
 
 
 def collect_health() -> dict[str, Any]:
@@ -597,12 +746,17 @@ def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
 def build_facts(db: Path, now: datetime) -> dict[str, Any]:
     today = now.strftime("%Y-%m-%d")
     bounds = _utc_day_bounds(now)
+    github = collect_github(db, bounds)
+    # Freshness is attached separately so a failure in either half cannot take out
+    # the other: the day's counts and the "which repos may be under-reported" verdict
+    # are independent facts (#147).
+    github.setdefault("stale_repos", collect_repo_freshness(db, now))
     return {
         "date": today,
         "generated_at": now.isoformat(timespec="seconds"),
         "window": "midnight to now, local time",
         "window_utc": {"start": bounds[0], "end": bounds[1]},
-        "github": collect_github(db, bounds),
+        "github": github,
         "health": collect_health(),
         "semantic": collect_semantic(db, bounds),
     }
@@ -679,6 +833,12 @@ def render(summary: str, facts: dict[str, Any], now: datetime) -> str:
         # nothing). The footer and the prose have to mean the same thing by "active".
         shipped = [r for r in gh.get("by_repo", []) if (r.get("commits") or 0) or (r.get("prs_merged") or 0)]
         counts.append(f"{len(shipped)} active repos")
+        # Stale repos ride in the footer so the caveat survives even a model that
+        # fumbles the HEALTH line: "10 merged · 4 active repos · 2 repos data-stale"
+        # cannot be misread the way a silent omission can (#147).
+        stale = [r for r in gh.get("stale_repos", []) if isinstance(r, dict) and r.get("repo") and "error" not in r]
+        if stale:
+            counts.append(f"{len(stale)} repos data-stale")
     health = facts.get("health", {})
     if "error" not in health and health.get("problem_count"):
         counts.append(f"{health['problem_count']} health warnings")
