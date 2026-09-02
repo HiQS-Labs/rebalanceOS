@@ -28,8 +28,18 @@
 
   Counts cover every contributor, and include work pushed straight to a branch as well as
   work that arrived through a pull request — reading only one of those made the summary
-  contradict its own totals. Day boundaries follow the machine's local calendar day rather
-  than UTC, so an evening's work is not attributed to tomorrow.
+  contradict its own totals. The per-repository breakdown and the totals underneath it are
+  measured from the same day's records, so the post cannot disagree with itself: an earlier
+  draft read the per-repository figures from a rolling two-to-four-week tally and would have
+  told the channel a project shipped a fortnight's work in a day. Day boundaries follow the
+  machine's local calendar day rather than UTC, so an evening's work is not attributed to
+  tomorrow, and they are measured against the real timezone — the two days a year that are
+  23 or 25 hours long are counted at their true length rather than assumed to be 24.
+
+  A run that the machine slept through is handled as a late copy of the run it missed, not
+  as a fresh one: it overwrites its own post rather than taking the next slot's place, and
+  a run that surfaces after midnight skips instead of publishing a nearly empty summary of
+  a day that has barely started.
 
   Synthesis can be switched off with an environment variable for cost control; doing so is
   treated as an operator decision rather than a failure, so it does not show up as a broken

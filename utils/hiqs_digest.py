@@ -25,20 +25,32 @@ Design contract (mirrors utils/daily_synthesis.py, which this is modeled on):
                            raw clock. The relay's seen-set is filename-keyed, so a late
                            catch-up or a manual re-run must land on the SAME filename and
                            overwrite its own slot rather than minting a third name and
-                           posting the day twice.
+                           posting the day twice. --slot is choices-constrained, because
+                           an unvalidated one defeats the whole scheme.
   * Single write path    — reuses pulse._commit_and_push_if_changed, and reports its real
                            result rather than assuming success.
 
-Two things that look like details and are not:
+Four things that look like details and are not:
 
-  * Day bounds are computed in UTC from the LOCAL day, and every timestamp comparison goes
-    through SQLite's datetime(). The tables mix formats — github_commits stores
-    '...T23:55:26Z', github_direct_commits stores '...T16:45:05-07:00' — and a raw string
-    compare against a local date silently drops or misattributes an evening's work for
-    anyone not on UTC.
+  * Day bounds are computed in UTC from the LOCAL day, each boundary resolved through the
+    real zone (a DST day is 23 or 25 hours long, so start + 1 day is not its end), and
+    every timestamp comparison goes through SQLite's datetime(). The tables mix formats —
+    github_commits stores '...T23:55:26Z', github_direct_commits stores
+    '...T16:45:05-07:00' — and a raw string compare against a local date silently drops or
+    misattributes an evening's work for anyone not on UTC. The one filter that CANNOT use
+    datetime() is the semantic index (db/semantic.py compares updated_at raw), so that one
+    is handed bounds pre-shaped to the column's ISO-Z format instead.
   * Commits come from BOTH github_commits (PR-attached) and github_direct_commits (pushes
     straight to a branch). Reading only the first makes the post contradict itself: an
     empty commit list beside per-repo counts of 14.
+  * by_repo is derived from those same day-bounded tables, NOT from github_activity.
+    github_activity has a scan_date column and looks per-day; it is not. Every row holds a
+    14-to-30-day event-window total stamped with today's date, for watched-repo rollups
+    (github_watch.py:118) and owned-login scans (github_scan.py:259) alike. Sourcing
+    by_repo there published a repo's fortnight as its day.
+  * A run before the 13:05 slot is a post-midnight catch-up of a job that was missed, not
+    a digest of the new day, and it skips — same rule daily-synthesis already carries.
+    Nothing downstream could tell that post apart from a quiet morning.
 
 Semantic slot: source_filter=["github"] is REQUIRED, not tuning. A bake-off against live
 data showed the unfiltered query returns near-duplicate vault prompt logs, because ~85%
@@ -62,26 +74,33 @@ import os
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from rebalance.ingest.db.connection import db_connection_readonly
-from rebalance.paths import resolve_database_path
+from rebalance.paths import resolve_database_path, resolve_project_root
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# AGENTS.md → "Use the shared resolvers […] no parents[N] repo-root walks". This is the
+# cwd for the `rebalance doctor` subprocess, so a parents[N] walk would silently run
+# doctor against the wrong tree if this file ever moves or is vendored a level deeper.
+# resolve_project_root also honours ~/.config/rebalance/runtime-root, the mechanism
+# install_common.sh uses to bind the launchd job to one checkout (GH-36, GH-59).
+REPO_ROOT = resolve_project_root(Path(__file__))
 
 # CB-1 from scripts/health_issue_reporter.py:31-38 — the hard kill switch, and the only
 # breaker this job takes. The quota and per-run caps there guard up to 8 LLM calls a day;
 # this job makes 2. Add them when a third caller shares the budget.
 LLM_DISABLE_ENV = "HIQS_DIGEST_LLM_DISABLE"
 
-# The two scheduled slots. A run at any other time buckets to whichever it belongs to, so a
-# launchd catch-up overwrites its own slot file instead of minting a new filename the
-# relay's seen-set has nothing to match on.
+# The two scheduled slots, and the local times SCHEDULER.md fires them at. A run at any
+# other time buckets to whichever it belongs to, so a launchd catch-up overwrites its own
+# slot file instead of minting a new filename the relay's seen-set has nothing to match on.
 SLOT_MIDDAY = "1305"
 SLOT_EVENING = "1705"
-SLOT_BOUNDARY_HOUR = 15
+FIRE_MIDDAY = time(13, 5)
+FIRE_EVENING = time(17, 5)
 
 SEMANTIC_SOURCES = ["github"]
 SEMANTIC_QUERY = "what work shipped today"
@@ -147,8 +166,28 @@ def slot_for(now: datetime) -> str:
 
     The filename-keyed dedupe in the Sleuth relay only works if the slot is one of two
     fixed values. A catch-up run at 14:12 must produce the 1305 file, not a 1412 file.
+
+    The boundary is the EVENING FIRE TIME, not an arbitrary mid-afternoon hour. launchd
+    runs a slept-through job on the next wake, so a 13:05 job missed by a sleeping Mac can
+    fire at 15:30 — and with a 15:00 boundary that midday run wrote the *1705* filename.
+    The 17:05 job then overwrote it, the relay had already seen that name, and NEITHER
+    digest reached the channel. Bucketing on the fire time makes any catch-up before 17:05
+    the midday slot, which is what was actually scheduled.
     """
-    return SLOT_MIDDAY if now.hour < SLOT_BOUNDARY_HOUR else SLOT_EVENING
+    return SLOT_MIDDAY if now.timetz().replace(tzinfo=None) < FIRE_EVENING else SLOT_EVENING
+
+
+def _local_midnight(day: date, tz: Any) -> datetime:
+    """Local midnight on *day*, carrying THAT instant's UTC offset.
+
+    `datetime.now().astimezone()` returns a FIXED-OFFSET tzinfo captured at the current
+    instant, so `.replace(hour=0)` on it stamps midnight with the afternoon's offset — an
+    hour wrong on both DST transition days. A real ZoneInfo re-resolves the offset for the
+    local time it is attached to; for anything else, `.astimezone()` on a naive datetime
+    resolves it through the platform's real zone, which also knows about DST.
+    """
+    naive = datetime.combine(day, time.min)
+    return naive.replace(tzinfo=tz) if isinstance(tz, ZoneInfo) else naive.astimezone()
 
 
 def _utc_day_bounds(now: datetime) -> tuple[str, str]:
@@ -156,9 +195,13 @@ def _utc_day_bounds(now: datetime) -> tuple[str, str]:
 
     Returned in SQLite's datetime() output format so they compare directly against
     `datetime(<column>)`, which normalizes both the 'Z' and '+HH:MM' forms in these tables.
+
+    Each boundary is resolved independently — a DST day is 23 or 25 hours long, so
+    `start + timedelta(days=1)` is not its end.
     """
-    start_local = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_local = start_local + timedelta(days=1)
+    tz = now.tzinfo
+    start_local = _local_midnight(now.date(), tz)
+    end_local = _local_midnight(now.date() + timedelta(days=1), tz)
     fmt = "%Y-%m-%d %H:%M:%S"
     return (
         start_local.astimezone(timezone.utc).strftime(fmt),
@@ -166,41 +209,91 @@ def _utc_day_bounds(now: datetime) -> tuple[str, str]:
     )
 
 
+def _utc_bounds_iso_z(bounds: tuple[str, str]) -> tuple[str, str]:
+    """The same bounds as '...T...Z', for raw string compares against ISO-Z columns.
+
+    semantic_documents.updated_at stores '2026-09-02T00:15:46Z' and the semantic search
+    filters it with a RAW `>=`, not `datetime()`. Handing that a space-separated bound
+    silently compares wrong: 'T' (0x54) sorts above ' ' (0x20), so every document on the
+    boundary day passes regardless of its time.
+    """
+    return tuple(f"{b.replace(' ', 'T')}Z" for b in bounds)  # type: ignore[return-value]
+
+
 # --- Collectors ----------------------------------------------------------------
 # Each returns a dict. On failure it returns {"error": "..."} rather than empty data,
 # so the synthesizer can say "unavailable" instead of implying a quiet day.
 
 
-def collect_github(db: Path, today: str, bounds: tuple[str, str]) -> dict[str, Any]:
+def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
     """Today's GitHub activity. No LLM, no parsing — the typed columns already carry it."""
     start_utc, end_utc = bounds
     try:
         with db_connection_readonly(db) as conn:
             conn.row_factory = sqlite3.Row
 
-            # SUM/GROUP BY, not raw rows: github_activity is keyed (login, repo, scan_date),
-            # so a multi-contributor repo has one row PER LOGIN. Selecting raw rows would
-            # list the repo twice with split counts and inflate the active-repo count.
-            # Operator choice (GH-142): count ALL contributors — this is a team channel.
+            # by_repo is derived from the SAME day-bounded event tables as commit_total and
+            # merged_total, so the per-repo lines and the footer cannot disagree.
+            #
+            # It deliberately does NOT read github_activity. That table looks per-day —
+            # it has a scan_date column — but _summarize_by_repo() (github_scan.py:259)
+            # counts every event in the fetched window (scan_github days=30; watched-repo
+            # rollups use since_days=14) and stamps the whole total with scan_date=today.
+            # github_watch.derive_watched_repo_activity() says so in its own docstring:
+            # "scan_date = today and window-total counts".
+            #
+            # Measured against live data for 2026-09-01: github_activity said rebalanceOS
+            # shipped 13 commits when 2 landed, said XYZ-forge shipped 5 when 42 landed,
+            # and listed two repos with zero commits that day as active. For a job whose
+            # contract is "never present a false number", that is the largest source of one.
+            #
+            # Its scan_date is also written from now_utc(), so filtering it by a LOCAL date
+            # string dropped an evening's work outright for anyone off UTC — the same class
+            # of bug the commit tables were already fixed for.
             repos = [
                 dict(r)
                 for r in conn.execute(
                     """
-                    SELECT repo_full_name,
+                    SELECT LOWER(repo_full_name) AS repo_full_name,
                            SUM(commits)        AS commits,
-                           SUM(prs_opened)     AS prs_opened,
                            SUM(prs_merged)     AS prs_merged,
+                           SUM(prs_opened)     AS prs_opened,
                            SUM(issues_opened)  AS issues_opened,
-                           SUM(reviews)        AS reviews,
-                           COUNT(DISTINCT login) AS contributors
-                    FROM github_activity
-                    WHERE scan_date = ?
-                    GROUP BY repo_full_name
-                    HAVING SUM(commits + prs_opened + prs_merged
-                               + issues_opened + issue_comments + reviews) > 0
+                           COUNT(DISTINCT author_login) AS contributors
+                    FROM (
+                        -- PR-attached commits
+                        SELECT repo_full_name, author_login,
+                               1 AS commits, 0 AS prs_merged, 0 AS prs_opened, 0 AS issues_opened
+                        FROM github_commits
+                        WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
+                        UNION ALL
+                        -- Direct branch pushes. Their absence here is what previously made
+                        -- push-only repos vanish from the digest entirely.
+                        SELECT repo_full_name, author_login, 1, 0, 0, 0
+                        FROM github_direct_commits
+                        WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
+                        UNION ALL
+                        SELECT repo_full_name, author_login, 0, 1, 0, 0
+                        FROM github_items
+                        WHERE item_type = 'pull_request'
+                          AND datetime(merged_at) >= ? AND datetime(merged_at) < ?
+                        UNION ALL
+                        SELECT repo_full_name, author_login, 0, 0,
+                               CASE WHEN item_type = 'pull_request' THEN 1 ELSE 0 END,
+                               CASE WHEN item_type = 'issue' THEN 1 ELSE 0 END
+                        FROM github_items
+                        WHERE datetime(created_at) >= ? AND datetime(created_at) < ?
+                    )
+                    -- LOWER, matching config.normalize_github_repo_name ("exact lowercased
+                    -- owner/name form"). The tables carry rows written under different
+                    -- casings of the SAME owner/name, and grouping on the raw string counted
+                    -- that repo twice — inflating the "N active repos" footer with a repo
+                    -- that does not exist. (Owner RENAMES also split a repo; that needs an
+                    -- alias map at ingest time and is parked, see PARKED/2026-09-01-*.md.)
+                    GROUP BY LOWER(repo_full_name)
                     ORDER BY commits DESC, prs_merged DESC
                     """,
-                    (today,),
+                    (start_utc, end_utc) * 4,
                 )
             ]
 
@@ -323,11 +416,17 @@ def collect_health() -> dict[str, Any]:
     }
 
 
-def collect_semantic(db: Path, today: str) -> dict[str, Any]:
+def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
     """Date-bounded semantic search over the BGE index, filtered to GitHub sources.
 
     source_filter is REQUIRED — see the module docstring. Titles are deduped because the
     index legitimately holds several near-identical chunks of the same document.
+
+    Takes the same UTC *bounds* as collect_github rather than a local date string.
+    search_semantic_documents filters with a RAW `sd.updated_at >= ?` (db/semantic.py:507)
+    — no datetime() normalization — so a local date admitted the previous evening's work
+    as "in flight today" for anyone off UTC, and the format has to match the column's
+    ISO-Z shape or the compare is meaningless.
     """
     try:
         from rebalance.ingest import semantic_index
@@ -339,12 +438,13 @@ def collect_semantic(db: Path, today: str) -> dict[str, Any]:
         # propagate out of run() and kill the whole digest over one degraded slot.
         return _fail("semantic index unavailable", e)
 
+    start_iso, end_iso = _utc_bounds_iso_z(bounds)
     try:
         rows = semantic_index.query(
             db,
             SEMANTIC_QUERY,
             top_k=SEMANTIC_TOP_K,
-            updated_after=today,
+            updated_after=start_iso,
             source_filter=SEMANTIC_SOURCES,
         )
     except Exception as e:  # noqa: BLE001 — any failure degrades this slot, never the run
@@ -353,9 +453,18 @@ def collect_semantic(db: Path, today: str) -> dict[str, Any]:
     seen: set[str] = set()
     hits: list[dict[str, Any]] = []
     for r in rows:
-        title = (r.get("title") or r.get("source_id") or "").strip()
+        # source_pk, not source_id: query() builds its result dicts by hand
+        # (semantic_index.py:824-838) and there is no source_id key, so the old fallback was
+        # always None. title is already normalized to '' there, so a titleless github
+        # document hit `if not title: continue` and was dropped in silence — the IN FLIGHT
+        # section read as "nothing in flight" when the truth was a degraded query.
+        title = (r.get("title") or r.get("source_pk") or "").strip()
         key = title.lower()
         if not title or key in seen:
+            continue
+        # query() has no upper bound (db/semantic.py has no updated_before), so a document
+        # stamped in the future would otherwise ride into today's digest.
+        if (r.get("updated_at") or "") >= end_iso:
             continue
         seen.add(key)
         hits.append({"title": title[:160], "source_type": r.get("source_type")})
@@ -371,9 +480,9 @@ def build_facts(db: Path, now: datetime) -> dict[str, Any]:
         "generated_at": now.isoformat(timespec="seconds"),
         "window": "midnight to now, local time",
         "window_utc": {"start": bounds[0], "end": bounds[1]},
-        "github": collect_github(db, today, bounds),
+        "github": collect_github(db, bounds),
         "health": collect_health(),
-        "semantic": collect_semantic(db, today),
+        "semantic": collect_semantic(db, bounds),
     }
 
 
@@ -487,13 +596,17 @@ def publish(content: str, now: datetime, slot: str, *, dry_run: bool, push: bool
     unchanged = result.get("reason") == "no content change"
     published = bool(result.get("committed")) and (bool(result.get("pushed")) or not push)
     if not (unchanged or published):
+        # The spread goes FIRST. _commit_and_push_if_changed returns its own "reason" on
+        # the wrote-file-but-nothing-staged path (pulse.py:1045) — e.g. the pulse repo
+        # gitignores digests/ — and with the spread last that bare "nothing staged"
+        # overwrote the diagnostic below, hiding the only text naming the cause.
         return {
+            **result,
             "ok": False,
             "reason": _scrub(f"git publish failed: {result.get('git_error') or result}"),
             "file_rel": file_rel,
-            **result,
         }
-    return {"ok": True, "file_rel": file_rel, **result}
+    return {**result, "ok": True, "file_rel": file_rel}
 
 
 # --- Orchestration -------------------------------------------------------------
@@ -508,7 +621,26 @@ def run(
     now: datetime | None = None,
 ) -> int:
     now = now or datetime.now().astimezone()
+    explicit_slot = slot is not None
     slot = slot or slot_for(now)
+
+    # Post-midnight catch-up guard, mirroring daily-synthesis's RUN_HOUR_FLOOR
+    # (daily_synthesis.py:63-67; SCHEDULER.md records it as "a post-midnight catch-up
+    # skips itself"). launchd derives nothing from the fire time it MISSED: a 17:05 job
+    # slept through on Sep 1 and run at 07:00 on Sep 2 would build `today` and `slot` from
+    # the wake time and publish hiqs-2026-09-02-1305.md summarizing seven empty hours of a
+    # brand-new day — while Sep 1's evening work is never digested at all. That post does
+    # not read as late; it reads as an on-time, quiet midday digest, so generated_at (this
+    # job's entire observability design) cannot save it.
+    #
+    # Exit 0: a skipped catch-up is correct behaviour, not a failed job.
+    if not (dry_run or facts_only or explicit_slot) and now.timetz().replace(tzinfo=None) < FIRE_MIDDAY:
+        log(
+            f"SKIP: {now:%H:%M} is before the {FIRE_MIDDAY:%H:%M} midday slot — this is a "
+            "post-midnight catch-up of a missed run, and today has barely started. "
+            "Pass --slot to publish anyway."
+        )
+        return 0
 
     try:
         db = resolve_database_path()
@@ -560,7 +692,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("--dry-run", action="store_true", help="print the digest; write nothing")
     parser.add_argument("--facts-only", action="store_true", help="print collected facts as JSON; no LLM call")
-    parser.add_argument("--slot", help=f"slot label (default: {SLOT_MIDDAY} or {SLOT_EVENING})")
+    # choices=, not a free string. The slot IS the filename the relay dedupes on, so
+    # `--slot 1412` mints a name it has never seen and posts the day a third time, and
+    # `--slot ../../notes` escapes the digests/ directory it watches entirely.
+    parser.add_argument(
+        "--slot",
+        choices=(SLOT_MIDDAY, SLOT_EVENING),
+        help=f"slot label (default: bucketed from the clock — {SLOT_MIDDAY} or {SLOT_EVENING})",
+    )
     parser.add_argument("--no-push", action="store_true", help="commit locally but do not push")
     args = parser.parse_args()
     return run(

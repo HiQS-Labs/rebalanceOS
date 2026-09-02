@@ -39,11 +39,23 @@ rb_job_init "hiqs-digest" 14
 # guesses it logs a different value than the filename actually uses.
 log "=== rebalance hiqs-digest starting ${*:+(args: $*)} ==="
 
-if "$PYTHON" utils/hiqs_digest.py "$@" >> "$LOG_FILE" 2>&1; then
-    EXIT_CODE=0
+# tee, not >>: --dry-run print()s the rendered digest so the operator can read it before
+# publishing, and the installer tells them to run exactly that through this wrapper. With a
+# plain redirect they saw only the two timestamped lines here and concluded nothing ran.
+# Under launchd stdout goes to the plist's StandardOutPath, so the log still gets it twice.
+#
+# set +e around the pipeline, and PIPESTATUS read on the very next line: with `pipefail`
+# and `errexit` a non-zero python would abort the script before the log line below, and
+# PIPESTATUS is reset by the NEXT command to run — including a bare `[ ... ]` test — so it
+# has to be captured before anything else touches it.
+set +e
+"$PYTHON" utils/hiqs_digest.py "$@" 2>&1 | tee -a "$LOG_FILE"
+EXIT_CODE="${PIPESTATUS[0]}"
+set -e
+
+if [ "$EXIT_CODE" -eq 0 ]; then
     log "=== hiqs-digest complete ==="
 else
-    EXIT_CODE=$?
     # Exit 1 is also how the script reports "synthesis unavailable, nothing
     # written" — a deliberate skip, not a crash. The log line above it in
     # $LOG_FILE says which. Both are surfaced as job_failed so a silent

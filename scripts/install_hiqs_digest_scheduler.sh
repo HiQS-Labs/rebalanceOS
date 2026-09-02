@@ -47,7 +47,17 @@ if [ -f "$DEST" ] && grep -q "GEMINI_API_KEY" "$DEST"; then
     echo
 fi
 
-rb_install_launchd_job "com.rebalance-os.hiqs-digest"
+# launchd opens StandardOutPath/StandardErrorPath itself and does NOT create missing parent
+# directories — the redirect just fails, silently, and the job's output goes nowhere. Same
+# line as install_daily_synthesis_scheduler.sh:32 and install_obsidian_rollover_scheduler.sh:26;
+# rb_install_launchd_job only creates $REBALANCE_DIR/temp/logs, not this one.
+mkdir -p "$HOME/Library/Logs/rebalance-os"
+
+# The wrapper argument is not optional here: it makes rb_install_launchd_job verify the
+# script exists and chmod +x it. Omitted, both guards are skipped, and any deploy that
+# loses the file mode (rsync/tarball, core.fileMode=false) installs a job launchd cannot
+# exec — failing at 13:05 with a bare "Operation not permitted" and no install-time warning.
+rb_install_launchd_job "com.rebalance-os.hiqs-digest" "scripts/hiqs_digest.sh"
 
 echo
 echo "Verify without publishing anything:"
