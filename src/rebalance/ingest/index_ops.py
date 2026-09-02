@@ -968,37 +968,58 @@ def get_watched_repos(
     """Return the canonical view of which repos are monitored.
 
     The merged ``watched`` list = (project_repos ∪ activity_repos ∪
-    pushed_repos ∪ external_repos) − ignored. Callers (``refresh_index``,
+    pushed_repos ∪ external_repos) − ignored, with every source list collapsed
+    through ``canonical_github_repo_name`` first (#147): a renamed org's old
+    spelling still syncs via GitHub redirects, so without the collapse the
+    mirror spelling rides back in from stale registry/activity rows and each
+    mirrored repo is synced — and counted — twice. Callers (``refresh_index``,
     ``list_watched_repos`` MCP tool, the ``raw`` diagnostic) consume the
     same source of truth so the user can never wonder "what's actually
     being synced?". ``external_repos`` are third-party repos monitored for
     everyone's activity (see ``rebalance.ingest.github_watch``).
     """
-    from rebalance.ingest.config import get_github_ignored_repos
+    from rebalance.ingest.config import canonical_github_repo_name, get_github_ignored_repos
 
-    project = _project_repos(database_path)
-    activity = _activity_repos(database_path, since_days=since_days)
-    pushed = _pushed_repos(database_path, since_days=since_days)
-    external = _external_repos(database_path)
+    def _collapse(repos: list[str]) -> list[str]:
+        collapsed: list[str] = []
+        for repo in repos:
+            canonical = canonical_github_repo_name(repo.strip())
+            if canonical and canonical not in collapsed:
+                collapsed.append(canonical)
+        return collapsed
+
+    project = _collapse(_project_repos(database_path))
+    activity = _collapse(_activity_repos(database_path, since_days=since_days))
+    pushed = _collapse(_pushed_repos(database_path, since_days=since_days))
+    external = _collapse(_external_repos(database_path))
     ignored = sorted(get_github_ignored_repos())
     # Ignored entries are stored lowercased (CLI normalizes on add);
     # watched-set sources keep GitHub's original casing. Compare on lowercase
     # so e.g. an "xpressbase/athenacomply" entry blocks "xpressbase/athenaComply".
     ignored_lower = {r.lower() for r in ignored}
 
-    project_set = set(project)
-    activity_set = set(activity)
-    pushed_set = set(pushed)
-
+    # GitHub repo identity is case-insensitive, and the source tables demonstrably
+    # carry mixed casings of one repo (registry "Owner/Repo" vs events "owner/repo").
+    # Dedupe on the lowercased key so neither an org alias nor a casing variant
+    # syncs the same repo twice (#147); first occurrence wins, so the operator's
+    # registry casing is the one that reaches the API.
     watched: list[str] = []
+    watched_keys: set[str] = set()
     for repo in project + external + activity + pushed:
-        if repo.lower() in ignored_lower:
+        key = repo.lower()
+        if key in ignored_lower or key in watched_keys:
             continue
-        if repo not in watched:
-            watched.append(repo)
+        watched.append(repo)
+        watched_keys.add(key)
 
+    def _by_key(names: list[str]) -> dict[str, str]:
+        return {name.lower(): name for name in names}
+
+    project_keys = _by_key(project)
     auto_discovered = sorted(
-        repo for repo in (activity_set | pushed_set) - project_set if repo.lower() not in ignored_lower
+        name
+        for key, name in {**_by_key(activity), **_by_key(pushed)}.items()
+        if key not in project_keys and key not in ignored_lower
     )
 
     return {

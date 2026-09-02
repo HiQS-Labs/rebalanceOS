@@ -268,6 +268,58 @@ def normalize_github_repo_name(repo: str) -> str:
     return normalized.lower()
 
 
+def get_github_org_aliases() -> dict[str, str]:
+    """Renamed GitHub orgs: old owner (lowercased) → current canonical spelling.
+
+    A renamed org keeps its old URLs alive via GitHub redirects, so a stale
+    spelling still syncs successfully — and writes a second, mirror copy of
+    every row under the old name (#147). Consumers collapse those spellings to
+    one repo identity through :func:`canonical_github_repo_name`. Only exact
+    owner matches alias; same-named repos under *other* owners (forks) are
+    untouched.
+
+    Config key: ``github_org_aliases`` (e.g. ``{"hiqs-suite": "HiQS-Labs"}``).
+    """
+    config = _read_config()
+    raw = config.get("github_org_aliases")
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(old).strip().lower(): str(new).strip()
+        for old, new in raw.items()
+        if str(old).strip() and str(new).strip() and "/" not in str(old).strip()
+    }
+
+
+def set_github_org_aliases(aliases: dict[str, str]) -> None:
+    """Store the old→current org alias map. Config key: ``github_org_aliases``."""
+    config = _read_config()
+    config["github_org_aliases"] = {
+        str(old).strip().lower(): str(new).strip()
+        for old, new in aliases.items()
+        if str(old).strip() and str(new).strip() and "/" not in str(old).strip()
+    }
+    _write_config(config)
+
+
+def canonical_github_repo_name(repo: str) -> str:
+    """*repo* with a renamed org's old spelling rewritten to the current one.
+
+    Only the owner segment is compared (case-insensitively) against
+    :func:`get_github_org_aliases`; on a match the owner is replaced by the
+    alias target and the name keeps its original casing, which also merges
+    casing variants of an aliased org into one form. Anything unaliased is
+    returned unchanged — this never raises and never touches the repo segment,
+    so it is safe to run on arbitrary stored names.
+    """
+    name = (repo or "").strip()
+    if not name or "/" not in name:
+        return name
+    owner, _, rest = name.partition("/")
+    target = get_github_org_aliases().get(owner.lower())
+    return f"{target}/{rest}" if target else name
+
+
 def _normalize_github_repo_list(repos: list[str] | tuple[str, ...] | set[str]) -> list[str]:
     normalized: list[str] = []
     for repo in repos:

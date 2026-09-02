@@ -492,8 +492,8 @@ def test_render_counts_only_repos_that_shipped_as_active():
 
     On a day when three people merely filed issues in three otherwise-idle repos, a
     len(by_repo) footer announced "3 active repos" while the model — correctly following
-    the prompt's "NEVER list a repository that shipped nothing" — named none of them. The
-    reader saw three active repos and no explanation of what they did.
+    the prompt's issue-only-omission rule — named none of them. The reader saw three
+    active repos and no explanation of what they did.
     """
     facts = {
         "date": "2026-09-01",
@@ -978,3 +978,215 @@ def test_run_exits_nonzero_when_every_collector_fails(monkeypatch, tmp_path: Pat
 
     assert hiqs_digest.run(dry_run=True, now=datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)) == 1
     assert published == [], "must not publish when there is nothing to summarize"
+
+
+# --- Org-alias mirror collapse (#147) -------------------------------------------
+
+
+@pytest.fixture
+def org_alias(monkeypatch):
+    """hiqs-suite → HiQS-Labs, as configured on the live machine.
+
+    Patched on the config module (not the digest) because the alias map is read
+    at call time by both the digest's SQL builder and the watched-set resolver —
+    patching the one source keeps every consumer consistent.
+    """
+    from rebalance.ingest import config as config_module
+
+    aliases = {"hiqs-suite": "HiQS-Labs"}
+    monkeypatch.setattr(config_module, "get_github_org_aliases", lambda: aliases)
+    return aliases
+
+
+def _merged_pr(conn, repo: str, number: int, merged_at: str, title: str = "fix") -> None:
+    conn.execute(
+        "INSERT INTO github_items (repo_full_name, item_type, number, title, state, is_merged, "
+        "merged_at, created_at, fetched_at) VALUES (?, 'pull_request', ?, ?, 'closed', 1, ?, ?, 'x')",
+        (repo, number, title, merged_at, merged_at),
+    )
+
+
+def test_org_mirror_rows_collapse_into_one_repo(db: Path, org_alias):
+    """The #147 footer said "10 merged · 6 active repos" for ~5 merged across 3 repos.
+
+    A renamed org keeps its old URLs alive via redirects, so the same repo held
+    rows under both spellings — same PR numbers, same commit SHAs — and every
+    count read double.
+    """
+    now = datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        _commit(conn, "HiQS-Suite/xyz-forge", "old spelling", "2026-09-02T18:00:00Z", sha="abc123")
+        _commit(conn, "HiQS-Labs/XYZ-forge", "new spelling", "2026-09-02T18:30:00Z", sha="abc123")
+        _merged_pr(conn, "HiQS-Suite/xyz-forge", 10, "2026-09-02T19:00:00Z")
+        _merged_pr(conn, "HiQS-Labs/XYZ-forge", 10, "2026-09-02T19:10:00Z")
+
+    facts = hiqs_digest.collect_github(db, _bounds(now))
+
+    assert [r["repo_full_name"] for r in facts["by_repo"]] == ["hiqs-labs/xyz-forge"]
+    assert facts["by_repo"][0]["commits"] == 1, "same sha under both spellings is one commit"
+    assert facts["commit_total"] == 1
+    assert facts["merged_total"] == 1, "same PR number under both spellings is one merge"
+    assert len(facts["merged"]) == 1
+
+
+def test_a_same_named_fork_is_not_collapsed_into_the_org(db: Path, org_alias):
+    """Forks share the repo segment but not the owner; only exact owner matches alias."""
+    now = datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        _commit(conn, "arnoldadero/xyz-forge", "fork work", "2026-09-02T18:00:00Z", sha="f1")
+        _commit(conn, "HiQS-Labs/xyz-forge", "upstream work", "2026-09-02T18:30:00Z", sha="f2")
+
+    by_repo = hiqs_digest.collect_github(db, _bounds(now))["by_repo"]
+
+    assert sorted(r["repo_full_name"] for r in by_repo) == ["arnoldadero/xyz-forge", "hiqs-labs/xyz-forge"]
+
+
+def test_closed_items_dedupe_on_canonical_identity_too(db: Path, org_alias):
+    now = datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        for repo in ("HiQS-Suite/xyz-forge", "HiQS-Labs/XYZ-forge"):
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, "
+                "closed_at, created_at, fetched_at) VALUES (?, 'issue', 7, 'wontfix', 'closed', ?, ?, 'x')",
+                (repo, "2026-09-02T18:00:00Z", "2026-09-02T17:00:00Z"),
+            )
+
+    facts = hiqs_digest.collect_github(db, _bounds(now))
+
+    assert facts["closed_not_merged_total"] == 1
+    assert len(facts["closed_not_merged"]) == 1
+
+
+# --- Repo freshness (#147): a repo the sync missed is named, never implied quiet --
+
+
+def _watched_via_push(conn, repo: str, at: str = "2026-09-02T00:00:00Z") -> None:
+    """Make *repo* currently-watched via the pushed-repos window (14d)."""
+    conn.execute(
+        "INSERT INTO github_pushed_repos (repo_full_name, pushed_at, first_seen_at, last_seen_at) "
+        "VALUES (?,?,?,?)",
+        (repo, at, at, at),
+    )
+
+
+def _repo_meta(conn, repo: str, fetched_at: str) -> None:
+    conn.execute(
+        "INSERT INTO github_repo_meta (repo_full_name, fetched_at) VALUES (?,?)",
+        (repo, fetched_at),
+    )
+
+
+def test_a_repo_the_sync_missed_is_named_stale(db: Path, org_alias):
+    """The exact #147 shape: rate-limit 403s left one repo hours behind the fleet."""
+    now = datetime(2026, 9, 2, 14, 0, tzinfo=timezone.utc)
+    with sqlite3.connect(db) as conn:
+        _watched_via_push(conn, "HiQS-Labs/fresh")
+        _watched_via_push(conn, "HiQS-Suite/stale")  # watched under the old spelling
+        _repo_meta(conn, "HiQS-Labs/fresh", "2026-09-02T13:30:00Z")
+        _repo_meta(conn, "hiqs-suite/stale", "2026-09-02T09:00:00Z")  # 5h behind
+
+    stale = hiqs_digest.collect_repo_freshness(db, now)
+
+    named = [e for e in stale if "error" not in e]
+    assert [e["repo"] for e in named] == ["HiQS-Labs/stale"], "canonical name, fresh repo absent"
+    assert "not synced since" in named[0]["reason"]
+
+
+def test_an_uncoverable_commit_corpus_is_named_with_its_reason(db: Path, org_alias):
+    now = datetime(2026, 9, 2, 14, 0, tzinfo=timezone.utc)
+    with sqlite3.connect(db) as conn:
+        _watched_via_push(conn, "HiQS-Labs/noclone")
+        _repo_meta(conn, "HiQS-Labs/noclone", "2026-09-02T13:30:00Z")  # item sync is fresh
+        conn.execute(
+            "INSERT INTO github_repo_coverage (repo_full_name, state, reason, checked_at) "
+            "VALUES ('HiQS-Labs/noclone', 'uncoverable', "
+            "'no local clone found under configured local_repo_roots', '2026-09-02T13:00:00Z')",
+        )
+
+    stale = hiqs_digest.collect_repo_freshness(db, now)
+
+    assert [e["repo"] for e in stale] == ["HiQS-Labs/noclone"]
+    assert "uncoverable" in stale[0]["reason"]
+    assert "no local clone" in stale[0]["reason"]
+
+
+def test_a_repo_that_left_the_watched_set_is_not_reported_forever(db: Path):
+    """A repo that aged out of monitoring has a legitimately frozen timestamp."""
+    now = datetime(2026, 9, 2, 14, 0, tzinfo=timezone.utc)
+    with sqlite3.connect(db) as conn:
+        _repo_meta(conn, "old/gone", "2026-08-01T00:00:00Z")  # stale, but not watched
+
+    assert hiqs_digest.collect_repo_freshness(db, now) == []
+
+
+def test_the_stale_list_is_capped_with_an_overflow_marker(db: Path):
+    now = datetime(2026, 9, 2, 14, 0, tzinfo=timezone.utc)
+    with sqlite3.connect(db) as conn:
+        for i in range(hiqs_digest.STALE_REPO_DETAIL_LIMIT + 3):
+            repo = f"org/stale-{i}"
+            _watched_via_push(conn, repo)
+            _repo_meta(conn, repo, "2026-09-01T00:00:00Z")
+
+    stale = hiqs_digest.collect_repo_freshness(db, now)
+
+    assert len(stale) == hiqs_digest.STALE_REPO_DETAIL_LIMIT + 1
+    assert stale[-1]["repo"] == "+3 more"
+
+
+def test_build_facts_attaches_freshness_to_the_github_half(monkeypatch, db: Path):
+    monkeypatch.setattr(hiqs_digest, "collect_health", lambda: {"problem_count": 0})
+    monkeypatch.setattr(hiqs_digest, "collect_semantic", lambda *a: {"hits": []})
+    entry = {"repo": "x/y", "reason": "not synced since earlier"}
+    monkeypatch.setattr(hiqs_digest, "collect_repo_freshness", lambda *a: [entry])
+
+    facts = hiqs_digest.build_facts(db, datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC))
+
+    assert facts["github"]["stale_repos"] == [entry]
+
+
+def test_render_footer_names_stale_repos():
+    facts = {
+        "date": "2026-09-02",
+        "github": {
+            "commit_total": 3,
+            "merged_total": 1,
+            "by_repo": [{"repo_full_name": "org/a", "commits": 3, "prs_merged": 1}],
+            "stale_repos": [
+                {"repo": "org/late", "reason": "not synced since 09:00 (5h ago)"},
+                {"repo": "org/late2", "reason": "not synced since 09:00 (5h ago)"},
+            ],
+        },
+        "health": {"problem_count": 0},
+    }
+
+    out = hiqs_digest.render("summary", facts, datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC))
+
+    assert "2 repos data-stale" in out
+
+
+def test_render_does_not_count_a_freshness_error_as_a_stale_repo():
+    facts = {
+        "date": "2026-09-02",
+        "github": {
+            "commit_total": 0,
+            "merged_total": 0,
+            "by_repo": [],
+            "stale_repos": [{"error": "freshness query failed: boom"}],
+        },
+        "health": {"problem_count": 0},
+    }
+
+    out = hiqs_digest.render("summary", facts, datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC))
+
+    assert "data-stale" not in out
+
+
+def test_the_prompt_names_stale_repos_and_no_longer_buries_commit_only_repos():
+    """#147 cause 2: the old 'NEVER list a repository that shipped nothing' rule turned
+    any ingest lag into a silent omission — with stale data, a repo carrying 21% of the
+    day's commits was dropped outright."""
+    prompt = hiqs_digest.PROMPT_TEMPLATE
+
+    assert "github.stale_repos" in prompt, "HEALTH must be able to name stale repos"
+    assert "NEVER list a repository that shipped nothing" not in prompt
+    assert ">= 5 commits or opened" in prompt, "commit-only repos get a compact line"

@@ -103,16 +103,28 @@ def default_roots() -> list[str]:
     place per fact — but a feature that requires manual configuration before it
     does anything will simply never run.
 
-    The fallback is the parent of this installation's own repository: sibling
-    clones under a shared dev directory are the overwhelmingly common layout,
-    and `walk_repo_candidates` is depth-bounded and stops descending at a
-    ``.git``, so this stays cheap. Explicit config always wins.
+    The fallback is the parent of this installation's own repository PLUS the
+    machine's configured repo scan roots (the same roots the Focus 5 / repo
+    discovery collectors walk): sibling clones under a shared dev directory are
+    the overwhelmingly common layout, but a split install — scheduler pinned to
+    a runtime checkout, development in another tree — makes the parent of THIS
+    checkout the wrong answer alone. Found live (#147): the runtime checkout's
+    parent did not contain the operator's clone directory, every clone under it
+    was beyond the depth-bounded walk, and each hourly sync stamped the repos
+    ``uncoverable`` — silencing the zero-API commit backstop exactly when the
+    rate-limited API path needed it most. Explicit config always wins.
     """
-    from rebalance.ingest.config import get_local_repo_roots
+    from rebalance.ingest.config import get_focus5_scan_roots, get_local_repo_roots, get_repo_scan_roots
 
     configured = get_local_repo_roots()
     if configured:
         return configured
+
+    roots: list[str] = []
+
+    def _add(root: str | None) -> None:
+        if root and root not in roots:
+            roots.append(root)
 
     # Resolve via git rather than walking for a `.git` entry. In a worktree
     # `.git` is a FILE pointing elsewhere, so a naive walk stops at the worktree
@@ -121,10 +133,18 @@ def default_roots() -> list[str]:
     # are running from the main tree or any worktree of it.
     here = Path(__file__).resolve().parent
     code, out, _ = _git(here, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    if code != 0 or not out:
-        return []
-    main_repo_root = Path(out).parent
-    return [str(main_repo_root.parent)]
+    if code == 0 and out:
+        _add(str(Path(out).parent.parent))
+
+    # The machine's own answer to "where do repos live" — already configured for
+    # the other repo-discovery collectors, so this is one fact, not a second
+    # knob. get_focus5_scan_roots() falls back to get_repo_scan_roots() itself;
+    # reading both honours a focus5-only override on machines that never set the
+    # shared key.
+    for root in (*get_repo_scan_roots(), *get_focus5_scan_roots()):
+        _add(str(Path(root).expanduser()))
+
+    return roots
 
 
 @lru_cache(maxsize=8)

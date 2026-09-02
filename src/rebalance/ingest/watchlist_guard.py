@@ -133,18 +133,32 @@ def snapshot_and_detect(
     if prev_ts is None:
         return {"baseline": True, "snapshot_ts": ts, "watched": len(curr)}
 
-    prev_set = set(prev_buckets)
-    removed = sorted(prev_set - curr)
-    added = sorted(curr - prev_set)
+    # Collapse org-alias spellings on BOTH sides of the diff (#147): get_watched_repos
+    # now canonicalizes, so a pre-collapse snapshot row (old org spelling) would
+    # otherwise diff as a removal and alarm on what is only a rename — the repo is
+    # present in `curr` under its current name. Comparison is on the lowercased
+    # canonical key because GitHub repo identity is case-insensitive and snapshot
+    # rows carry whatever casing their source wrote. Real drops still alarm.
+    from rebalance.ingest.config import canonical_github_repo_name
+
+    prev_canon: dict[str, tuple[str, set[str]]] = {}
+    for repo, buckets in prev_buckets.items():
+        key = canonical_github_repo_name(repo).lower()
+        name, merged = prev_canon.get(key, (repo, set()))
+        prev_canon[key] = (name, merged | buckets)
+    curr_canon = {canonical_github_repo_name(repo).lower() for repo in curr}
+
+    removed = sorted(key for key in prev_canon if key not in curr_canon)
+    added = sorted(curr_canon - {key for key in prev_canon})
     ignored_lower = {r.lower() for r in get_github_ignored_repos()}
 
     warn_removed: list[dict[str, Any]] = []
     info_churn: list[str] = []
-    for repo in removed:
+    for key in removed:
         # An intentional opt-out (just-ignored) is not a coverage loss (agy r1).
-        if repo.lower() in ignored_lower:
+        if key in ignored_lower:
             continue
-        last_buckets = prev_buckets.get(repo, set())
+        repo, last_buckets = prev_canon.get(key, (key, set()))
         if classify_removal(last_buckets) == "warn":
             warn_removed.append({"repo": repo, "last_buckets": sorted(last_buckets)})
         else:

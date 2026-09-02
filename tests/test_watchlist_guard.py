@@ -168,6 +168,36 @@ class SnapshotAndDetectTests(unittest.TestCase):
         self.assertEqual(res["removed"], [])
         self.assertEqual(res["added"], ["example/owned"])
 
+    def test_org_alias_rename_is_not_a_reduction(self) -> None:
+        """#147: after hiqs-suite maps to HiQS-Labs, the watched set carries the current
+        spelling. A pre-alias snapshot row under the old spelling must diff as a match,
+        not as a lost repo — the canonical name is present, only renamed."""
+        self._add_project_repo("HiQS-Suite/xyz-forge")
+        snapshot_and_detect(self.db_path, now_ts=7_000_000)  # baseline, old spelling
+
+        config_module.set_github_org_aliases({"hiqs-suite": "HiQS-Labs"})
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
+            res = snapshot_and_detect(self.db_path, now_ts=7_000_100)
+
+        emit.assert_not_called()
+        self.assertEqual(res["removed"], [])
+        self.assertEqual(res["added"], [])
+        self.assertEqual(self._snapshot_rows(7_000_100), ["HiQS-Labs/xyz-forge"])
+
+    def test_casing_variants_across_snapshots_are_one_repo(self) -> None:
+        """Snapshot rows carry whatever casing their source wrote; GitHub identity is
+        case-insensitive, so the diff must be too."""
+        self._add_project_repo("example/Widget")
+        snapshot_and_detect(self.db_path, now_ts=8_000_000)  # baseline: example/Widget
+
+        self._remove_project_repo()
+        self._add_project_repo("example/widget")  # same repo, events casing
+        with mock.patch("rebalance.ingest.auth_log.log_watched_repos_reduced") as emit:
+            res = snapshot_and_detect(self.db_path, now_ts=8_000_100)
+
+        emit.assert_not_called()
+        self.assertEqual(res["removed"], [])
+
     def test_old_snapshots_are_pruned(self) -> None:
         self._add_project_repo("example/owned")
         snapshot_and_detect(self.db_path, now_ts=6_000_000)  # baseline (old)

@@ -75,6 +75,55 @@ class WatchedReposTests(unittest.TestCase):
         self.assertNotIn("example/starred", watched["activity_repos"])
         self.assertEqual(watched["watched"], ["example/worked"])
 
+    def test_renamed_org_spellings_collapse_to_one_watched_repo(self) -> None:
+        """#147: an org rename leaves stale spellings in activity/pushed rows, and the
+        old URL still syncs via redirects — without the collapse each mirrored repo is
+        synced (and counted) twice."""
+        db_path = Path(self._tmp.name) / "rebalance.db"
+        config_module.set_github_org_aliases({"hiqs-suite": "HiQS-Labs"})
+        with db_connection(db_path) as conn:
+            ensure_github_schema(conn)
+            for repo in ("HiQS-Suite/xyz-forge", "hiqs-labs/xyz-forge", "HiQS-Labs/XYZ-forge"):
+                conn.execute(
+                    """
+                    INSERT INTO github_activity
+                        (login, repo_full_name, scan_date, commits, pushes, prs_opened, prs_merged,
+                         issues_opened, issue_comments, reviews, last_active_at, scanned_at)
+                    VALUES (?, ?, date('now'), 1, 0, 0, 0, 0, 0, 0, '2026-05-04T12:00:00Z',
+                            '2026-05-04T12:05:00Z')
+                    """,
+                    ("tester", repo),
+                )
+            conn.commit()
+
+        watched = get_watched_repos(db_path)
+
+        self.assertEqual(len(watched["watched"]), 1, "three spellings of one repo, one entry")
+        self.assertEqual(watched["watched"][0].lower(), "hiqs-labs/xyz-forge")
+
+    def test_casing_variants_of_one_repo_sync_once(self) -> None:
+        """GitHub repo identity is case-insensitive; mixed-casing rows in the source
+        tables must not become two sync targets."""
+        db_path = Path(self._tmp.name) / "rebalance.db"
+        with db_connection(db_path) as conn:
+            ensure_github_schema(conn)
+            for repo in ("SomeOrg/Widget", "someorg/widget"):
+                conn.execute(
+                    """
+                    INSERT INTO github_activity
+                        (login, repo_full_name, scan_date, commits, pushes, prs_opened, prs_merged,
+                         issues_opened, issue_comments, reviews, last_active_at, scanned_at)
+                    VALUES (?, ?, date('now'), 1, 0, 0, 0, 0, 0, 0, '2026-05-04T12:00:00Z',
+                            '2026-05-04T12:05:00Z')
+                    """,
+                    ("tester", repo),
+                )
+            conn.commit()
+
+        watched = get_watched_repos(db_path)
+
+        self.assertEqual(len(watched["watched"]), 1)
+
     def test_active_project_repo_is_watched_even_without_recent_activity(self) -> None:
         db_path = Path(self._tmp.name) / "rebalance.db"
         with db_connection(db_path) as conn:
