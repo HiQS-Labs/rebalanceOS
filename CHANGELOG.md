@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.82.0] - 2026-09-02
+
+### Added
+- Refreshes accept an optional narrower window for the per-item GitHub artifact sync — the issues/PRs/comments/check-runs fan-out that dominates a refresh's API cost (measured 5-7k calls/run over the 30-day default, exceeding the hourly rate budget on its own). The hourly sync now uses a 7-day artifact window; the daily full refresh keeps the 30-day sweep, and watched-set resolution, the events scan and watched-repo rollups keep the wide window on both cadences, so no other consumer's semantics move. (#148)
+
 ## [0.81.0] - 2026-09-02
 
 ### Added
