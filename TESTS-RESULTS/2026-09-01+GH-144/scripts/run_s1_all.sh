@@ -47,6 +47,17 @@ for py in 3.12 3.13; do
   for r in 1 2 3; do $PY "$S" suite --py "$py" --kind c3 --suite tests --cell M7 --run "$r"; done
 done
 
+echo "=== M7IGN + M7b: C3 gate — remaining root green with seam ignored, seam green with the extra ==="
+# Seam files derived from M7's outcome deltas at 8f733ce (analyze.py re-derives
+# and checks them; a new embeddings-dependent test outside these files must
+# fail M7IGN red — that is the fail-closed property, do not paper over it).
+IGN="--ignore=tests/test_embedder.py --ignore=tests/test_embedder_metal_unavailable.py"
+SEAM="tests/test_embedder.py tests/test_embedder_metal_unavailable.py"
+for py in 3.12 3.13; do
+  for r in 1 2 3; do $PY "$S" suite --py "$py" --kind c3 --suite tests --cell M7IGN --run "$r" --pytest-args="$IGN"; done
+  for r in 1 2 3; do $PY "$S" suite --py "$py" --kind c0 --suite seam --paths "$SEAM" --cell M7b --run "$r"; done
+done
+
 echo "=== M8/M9 xdist root suite (c4) ==="
 for py in 3.12 3.13; do
   for r in 1 2 3; do $PY "$S" setup --py "$py" --kind c4 --mode warm --run "$r" || exit 1; done

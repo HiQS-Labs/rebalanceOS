@@ -8,13 +8,17 @@ per that checker's own docstring). Campaign artifacts legitimately quote such
 paths (QA transcripts from advisors, pip/pytest console captures, argv
 provenance records), so every artifact is passed through this *mechanical,
 disclosed* substitution before commit. Substitution is prefix-level only; no
-content is paraphrased or removed. The substitution table is the definition —
-if a pattern is not in the table it is not sanitized.
+content is paraphrased or removed. The literal table plus the generic regex
+pass below are the definition — if a pattern is not in them it is not
+sanitized. The regex pass exists because MACHINE_LOCAL matches ANY username
+under /Users/, not just this operator's.
 
 Usage: python3 sanitize_artifacts.py FILE [FILE ...]   (edits in place)
 """
+
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -23,13 +27,15 @@ REPO = Path(__file__).resolve().parents[3]
 SUBS: list[tuple[str, str]] = [
     # longest/most-specific first; order is load-bearing
     (str(REPO), "<repo>"),
-    ("/Users/noelsaw", "~"),
     ("/private/var/folders/", "<var-folders>/"),
     ("/private/tmp/", "<ptmp>/"),
     ("/private/var/", "<var>/"),
     ("/tmp/", "<tmp>/"),
     ("/home/", "<home>/"),
 ]
+
+# any other user's home prefix — mirrors MACHINE_LOCAL's generic /Users/
+USER_HOME = re.compile(r"/Users/[A-Za-z0-9_.-]+/")
 
 
 def sanitize(text: str) -> tuple[str, int]:
@@ -38,7 +44,8 @@ def sanitize(text: str) -> tuple[str, int]:
         if old in text:
             n += text.count(old)
             text = text.replace(old, new)
-    return text, n
+    text, k = USER_HOME.subn("<userhome>/", text)
+    return text, n + k
 
 
 def main() -> None:

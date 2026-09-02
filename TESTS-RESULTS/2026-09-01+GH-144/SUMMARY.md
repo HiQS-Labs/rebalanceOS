@@ -129,6 +129,13 @@ cuts are inside it.
   (P2), and S2 run 1 invalidated by the repo's own machine-local-path ratchet
   firing on campaign artifacts (P5 — the guard was right, the artifacts got
   the disclosed `.txt` + prefix-sanitization treatment).
+- **S2 spike-job cache-key sharing:** `c2-root` and `c4-xdist` share one
+  pip-cache key (`gh144-p1`, keyed on `pyproject.toml`) because their
+  dependency sets are identical apart from the small `pytest-xdist` wheel —
+  one cache per lockfile is the production-realistic setup, but it means the
+  c4 jobs' install phase can be served a cache primed by c2-root. This
+  slightly flatters c4's install step, not its test execution; the D1 margins
+  (36 % vs the ≥20 % bar) are far larger than a wheel-sized effect.
 - **Inventory maps contain strings like `/tmp/abs` inside parametrized node
   ids** (path-escape test data, `tests/test_hiqs_digest.py`). They are
   byte-exact test identifiers, not paths, and must not be "sanitized"; the
@@ -138,18 +145,43 @@ cuts are inside it.
 
 `runs.jsonl` (S1 primitive, schema 1) + `ci-job-timings.jsonl` (S2) carry
 every number above; `scripts/` contains the runner, driver, analyzer, map
-regenerator, CI-union checker, sanitizer, and the spike workflow as run
-(`phase0-measure.yml.as-run.yaml`). CI-side records link run/job URLs; local
-junit files (sha256 in `runs.jsonl`) live in gitignored `temp/gh144/artifacts/`
-and regenerate from the same commands. Scripts as run:
+regenerator, CI-union checker, sanitizer, headline-table generator, and the
+spike workflow as run (`phase0-measure.yml.as-run.yaml`). CI-side records
+link run/job URLs; local junit files (sha256 in `runs.jsonl`) live in
+gitignored `temp/gh144/artifacts/` and regenerate from the same commands.
+The D1 decision table above is emitted by `make_headline_table.py` from
+`ci-job-timings.jsonl` (verified byte-identical to the published numbers —
+no hand-typed drift). Scripts as run:
 
 ```bash
-bash TESTS-RESULTS/2026-09-01+GH-144/scripts/run_s1_all.sh          # M1–M9
-python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/regen_outcome_maps.py # P2 regen
-python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/analyze.py           # D2 tables
+bash TESTS-RESULTS/2026-09-01+GH-144/scripts/run_s1_all.sh          # M1–M9 + M7IGN/M7b
+python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/regen_outcome_maps.py # map regen (fails loudly on unmatched junit)
+python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/analyze.py           # S1 summary + D2 (incl. M7IGN+M7b union)
+python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/make_headline_table.py # D1 table from ci-job-timings.jsonl
 python3 TESTS-RESULTS/2026-09-01+GH-144/scripts/check_ci_union.py temp/gh144/s2artifacts 33595630182
 bash   TESTS-RESULTS/2026-09-01+GH-144/scripts/m10_witness.sh        # lane controls
 ```
+
+## Post-review instrumentation fixes (2026-09-02)
+
+The campaign scripts were reviewed on PR #145 (Claude Code). The measurement
+data and every headline number above are unchanged; the fixes close
+recomputability gaps in the published tooling: `analyze.py` now checks the
+authoritative C3 union (`M7IGN ∪ M7b`, previously only computed inline) and
+derives outside-seam from outcome deltas (the old key-set diff was empty by
+construction — verified to fire via negative control); `regen_outcome_maps.py`
+matches `M7IGN` and hard-errors on unmatched junit files (M7IGN's regenerated
+map verified byte-identical to the committed one); `check_ci_union.py`
+bootstraps its artifacts dir and surfaces `gh` failures; `analyze.py` no
+longer crashes on M10 control records; `run_s1.py` idempotence only skips
+green setup/collection records (a failed attempt stays retryable — the P1
+mechanism); `run_s1_all.sh` now drives M7IGN/M7b; `m10_witness.sh` guards
+venv existence and records the real failing node + `python`/`run_index`.
+Accepted as documented limitations: the as-run workflow's shared cache key
+(threat above), py3.12-only witness lanes (protocol §8), and stdlib-only
+scripts (they must run before any venv exists, so importing
+`src/rebalance/lib` helpers is a chicken-and-egg the campaign scripts don't
+take on).
 
 ## What Phase 0 did NOT do
 

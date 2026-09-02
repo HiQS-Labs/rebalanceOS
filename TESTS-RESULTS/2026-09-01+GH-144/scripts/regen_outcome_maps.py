@@ -10,6 +10,7 @@ inventory/outcomes-*.jsonl deterministically from the SAME junit files whose
 sha256 is recorded in runs.jsonl — the audit chain is junit -> this script ->
 map. Run once after the driver finishes.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,14 +25,16 @@ CAMP = Path(__file__).resolve().parents[1]
 ARTIFACTS = CAMP.parents[1] / "temp" / "gh144" / "artifacts"
 INVENT = CAMP / "inventory"
 
-PAT = re.compile(r"junit-(M\d+b?)-(c0|c2root|c2hiqs|c3|c4)-(tests|hiqs|seam)-py(3\.1[23])-r(\d)\.xml")
+PAT = re.compile(r"junit-([A-Za-z0-9]+)-(c0|c2root|c2hiqs|c3|c4)-(tests|hiqs|seam)-py(3\.1[23])-r(\d)\.xml")
 
 
 def main() -> None:
     n = 0
+    unmatched = []
     for xml in sorted(ARTIFACTS.glob("junit-*.xml")):
         m = PAT.match(xml.name)
         if not m:
+            unmatched.append(xml.name)
             continue
         cell, kind, suite, py, run = m.groups()
         parsed = parse_junit(xml)
@@ -41,6 +44,10 @@ def main() -> None:
                 f.write(json.dumps({"nodeid": nid, "outcome": o}, sort_keys=True) + "\n")
         n += 1
         print(f"{xml.name} -> {omap.name} ({len(parsed['outcomes'])} nodes)")
+    # A junit file this script cannot map is an audit-chain break, not a skip:
+    # the "regenerated every map" claim is only true if nothing fell through.
+    if unmatched:
+        raise SystemExit(f"UNMATCHED junit files (pattern cannot parse them): {unmatched}")
     print(f"regenerated {n} maps")
 
 

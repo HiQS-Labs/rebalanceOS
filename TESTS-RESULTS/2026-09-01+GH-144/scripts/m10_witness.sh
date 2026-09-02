@@ -13,40 +13,47 @@ def test_gh144_witnessed_red_negative_control():
     assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
 '
 
-record() { # label phase exit_code wall_s console_path extra_json
+record() { # label phase exit_code wall_s console_path python failing_node
   python3 - "$@" <<'PY'
 import json, sys, uuid, subprocess, datetime
-label, phase, rc, wall, cpath, extra = sys.argv[1:7]
+label, phase, rc, wall, cpath, py, failing = sys.argv[1:8]
 rec = {"schema_version":1, "run_id":uuid.uuid4().hex[:12], "campaign":"2026-09-01+GH-144",
        "commit":subprocess.run(["git","rev-parse","HEAD"],capture_output=True,text=True).stdout.strip(),
        "evidence_source":"S1", "cell":"M10", "candidate":"witnessed-red", "lane":label,
-       "phase":phase, "exit_code":int(rc), "wall_s":float(wall),
-       "console_path":cpath, "recorded_at":datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
-if extra and extra != "-":
-    rec.update(json.loads(extra))
+       "python":py, "run_index":1, "phase":phase, "exit_code":int(rc), "wall_s":float(wall),
+       "console_path":cpath, "failing_node":failing,
+       "recorded_at":datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
 open("TESTS-RESULTS/2026-09-01+GH-144/runs.jsonl","a").write(json.dumps(rec, sort_keys=True)+"\n")
 PY
+}
+
+first_failed() { # console_path -> first FAILED node line, or the placeholder
+  grep -m1 "^FAILED" "$1" 2>/dev/null | sed 's/^FAILED //;s/ - .*//' || echo "(no FAILED line captured)"
 }
 
 witness() { # label file venv_python pytest_args...
   local label=$1 file=$2 venv=$3; shift 3
   local args="$*"
   echo "=== $label: mutation -> red -> revert -> green ==="
+  if [ ! -x "$venv" ]; then
+    echo "  VENV MISSING: $venv — run run_s1_all.sh first; refusing to record"
+    exit 1
+  fi
   cp "$file" "$file.gh144bak"
   printf '%s\n' "$MUT" >> "$file"
   git diff -- "$file" > "$CON/M10-$label-mutation.diff"
   local t0=$(date +%s) rc=0
   "$venv" -m pytest $args -q > "$CON/M10-$label-red.txt" 2>&1 || rc=$?
   local t1=$(date +%s)
-  record "$label" "red" "$rc" "$((t1-t0))" "$CON/M10-$label-red.txt" '{"failing_node":"tests_or_hiqs::test_gh144_witnessed_red_negative_control"}'
-  echo "  red: exit=$rc wall=$((t1-t0))s"
+  record "$label" "red" "$rc" "$((t1-t0))" "$CON/M10-$label-red.txt" "3.12" "$(first_failed "$CON/M10-$label-red.txt")"
+  echo "  red: exit=$rc wall=$((t1-t0))s node=$(first_failed "$CON/M10-$label-red.txt")"
   mv "$file.gh144bak" "$file"
   git status --porcelain -- "$file" | grep -q . && { echo "  REVERT FAILED"; exit 1; }
   echo "  revert: tree clean"
   t0=$(date +%s); rc=0
   "$venv" -m pytest $args -q > "$CON/M10-$label-postgreen.txt" 2>&1 || rc=$?
   t1=$(date +%s)
-  record "$label" "post-green" "$rc" "$((t1-t0))" "$CON/M10-$label-postgreen.txt" '-'
+  record "$label" "post-green" "$rc" "$((t1-t0))" "$CON/M10-$label-postgreen.txt" "3.12" "-"
   echo "  post-green: exit=$rc wall=$((t1-t0))s"
 }
 
@@ -67,12 +74,16 @@ witness seam-lane      tests/test_embedder_metal_unavailable.py "$PY312_C0" test
 # (which ignores seam files) must stay GREEN — the failure belongs to the seam
 # lane, which went red above.
 echo "=== c3-root-routing: seam mutation must NOT fail the ignoring lane ==="
+if [ ! -x "$PY312_C3" ]; then
+  echo "  VENV MISSING: $PY312_C3 — run run_s1_all.sh first; refusing to record"
+  exit 1
+fi
 cp tests/test_embedder_metal_unavailable.py tests/test_embedder_metal_unavailable.py.gh144bak
 printf '%s\n' "$MUT" >> tests/test_embedder_metal_unavailable.py
 t0=$(date +%s); rc=0
 "$PY312_C3" -m pytest tests/ $IGN -q > "$CON/M10-c3root-routing-green.txt" 2>&1 || rc=$?
 t1=$(date +%s)
-record "c3-root-routing" "green-under-seam-mutation" "$rc" "$((t1-t0))" "$CON/M10-c3root-routing-green.txt" '-'
+record "c3-root-routing" "green-under-seam-mutation" "$rc" "$((t1-t0))" "$CON/M10-c3root-routing-green.txt" "3.12" "-"
 echo "  c3-root green under seam mutation: exit=$rc wall=$((t1-t0))s"
 mv tests/test_embedder_metal_unavailable.py.gh144bak tests/test_embedder_metal_unavailable.py
 git status --porcelain -- tests/ | grep -q . && { echo "  REVERT FAILED"; exit 1; }

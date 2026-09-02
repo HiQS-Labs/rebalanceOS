@@ -13,12 +13,12 @@ Subcommands:
   collect --py 3.12 --kind c0 --suite tests|hiqs --run N
   suite   --py 3.12 --kind c0 --suite tests|hiqs --cell M4 --run N [--pytest-args ...]
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
 import platform
 import subprocess
 import sys
@@ -91,10 +91,18 @@ def venv_dir(py: str, kind: str, mode: str) -> Path:
     return VENV_ROOT / f"py{py}-{kind}{suffix}"
 
 
+_HOST_INFO: dict | None = None
+
+
 def host_info() -> dict:
-    chip = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True).stdout.strip()
-    macos = subprocess.run(["sw_vers", "-productVersion"], capture_output=True, text=True).stdout.strip()
-    return {"platform": platform.platform(), "macos": macos, "chip": chip, "host": platform.node()}
+    global _HOST_INFO
+    if _HOST_INFO is None:
+        chip = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
+        ).stdout.strip()
+        macos = subprocess.run(["sw_vers", "-productVersion"], capture_output=True, text=True).stdout.strip()
+        _HOST_INFO = {"platform": platform.platform(), "macos": macos, "chip": chip, "host": platform.node()}
+    return _HOST_INFO
 
 
 def sha256_file(path: Path) -> str:
@@ -132,10 +140,14 @@ def run_cmd(argv: list[str], console_path: Path, cwd: Path) -> tuple[float, int]
     return time.monotonic() - t0, proc.returncode
 
 
-def already_recorded(want: dict) -> bool:
+def already_recorded(want: dict, require_success: bool = False) -> bool:
     """Idempotence: a cell interrupted mid-campaign (e.g. transient DNS) can be
     re-driven without duplicating records. Skips on exact (cell, candidate,
-    python, run_index, ...) match."""
+    python, run_index, ...) match. With require_success, only a green record
+    (exit_code 0) suppresses a retry — a failed attempt stays retryable, which
+    is the case the docstring describes (P1: a failed install step otherwise
+    blocks the cell forever). Suite cells keep require_success=False because a
+    red suite run is data, not an interruption."""
     if not RUNS.exists():
         return False
     with open(RUNS) as f:
@@ -145,14 +157,24 @@ def already_recorded(want: dict) -> bool:
             except json.JSONDecodeError:
                 continue
             if all(r.get(k) == v for k, v in want.items()):
+                if require_success and r.get("exit_code") != 0:
+                    continue
                 return True
     return False
 
 
 def cmd_setup(args) -> None:
-    if already_recorded({"cell": "M1" if args.mode == "cold" else "M2", "candidate": args.kind,
-                         "python": args.py, "run_index": args.run, "mode": args.mode}):
-        print(f"skip (already recorded): setup {args.kind} py{args.py} {args.mode} r{args.run}")
+    if already_recorded(
+        {
+            "cell": "M1" if args.mode == "cold" else "M2",
+            "candidate": args.kind,
+            "python": args.py,
+            "run_index": args.run,
+            "mode": args.mode,
+        },
+        require_success=True,
+    ):
+        print(f"skip (already recorded green): setup {args.kind} py{args.py} {args.mode} r{args.run}")
         return
     vp = venv_dir(args.py, args.kind, args.mode)
     if vp.exists():
@@ -165,21 +187,39 @@ def cmd_setup(args) -> None:
     for i, step in enumerate(steps_for(args.kind, args.mode, venv_python), start=1):
         cpath = CONSOLE / f"{cell}-{args.kind}-py{args.py}-{args.mode}-step{i}-r{args.run}.txt"
         wall, rc = run_cmd(step, cpath, REPO)
-        record(cell=cell, candidate=args.kind, lane=f"install-step{i}", python=args.py,
-               argv=step, cwd=str(REPO), wall_s=round(wall, 3), exit_code=rc,
-               console_path=str(cpath.relative_to(REPO)), console_sha256=sha256_file(cpath),
-               run_index=args.run, mode=args.mode)
+        record(
+            cell=cell,
+            candidate=args.kind,
+            lane=f"install-step{i}",
+            python=args.py,
+            argv=step,
+            cwd=str(REPO),
+            wall_s=round(wall, 3),
+            exit_code=rc,
+            console_path=str(cpath.relative_to(REPO)),
+            console_sha256=sha256_file(cpath),
+            run_index=args.run,
+            mode=args.mode,
+        )
         if rc != 0:
             sys.exit(f"install step {i} failed rc={rc}; see {cpath}")
     freeze_path = ARTIFACTS / f"freeze-{args.kind}-py{args.py}-{args.mode}.txt"
     subprocess.run([venv_python, "-m", "pip", "freeze"], cwd=REPO, stdout=open(freeze_path, "w"), check=True)
-    print(f"setup done: {vp} ({time.monotonic()-t0:.1f}s total)")
+    print(f"setup done: {vp} ({time.monotonic() - t0:.1f}s total)")
 
 
 def cmd_collect(args) -> None:
-    if already_recorded({"cell": "M3", "candidate": args.kind, "python": args.py,
-                         "run_index": args.run, "lane": f"collect-{args.suite}"}):
-        print(f"skip (already recorded): collect {args.suite} py{args.py} r{args.run}")
+    if already_recorded(
+        {
+            "cell": "M3",
+            "candidate": args.kind,
+            "python": args.py,
+            "run_index": args.run,
+            "lane": f"collect-{args.suite}",
+        },
+        require_success=True,
+    ):
+        print(f"skip (already recorded green): collect {args.suite} py{args.py} r{args.run}")
         return
     vp = venv_dir(args.py, args.kind, "warm")
     venv_python = str(vp / "bin" / "python")
@@ -188,14 +228,29 @@ def cmd_collect(args) -> None:
     argv = [venv_python, "-m", "pytest", suite, "--collect-only", "-q"]
     wall, rc = run_cmd(argv, cpath, REPO)
     text = cpath.read_text()
-    nodes = sorted(line.strip() for line in text.splitlines() if "::" in line)
+    # Node lines are "path/file.py[::Class]::test..." — the .py guard keeps
+    # warnings-summary lines that merely contain "::" out of the pinned list.
+    nodes = sorted(
+        line.strip() for line in text.splitlines() if "::" in line and line.strip().split("::")[0].endswith(".py")
+    )
     list_path = INVENT / f"nodes-{args.suite}-py{args.py}.txt"
     list_path.write_text("\n".join(nodes) + "\n")
-    record(cell="M3", candidate=args.kind, lane=f"collect-{args.suite}", python=args.py,
-           argv=argv, cwd=str(REPO), wall_s=round(wall, 3), exit_code=rc,
-           collected=len(nodes), node_list_path=str(list_path.relative_to(REPO)),
-           node_list_sha256=sha256_file(list_path), console_path=str(cpath.relative_to(REPO)),
-           console_sha256=sha256_file(cpath), run_index=args.run)
+    record(
+        cell="M3",
+        candidate=args.kind,
+        lane=f"collect-{args.suite}",
+        python=args.py,
+        argv=argv,
+        cwd=str(REPO),
+        wall_s=round(wall, 3),
+        exit_code=rc,
+        collected=len(nodes),
+        node_list_path=str(list_path.relative_to(REPO)),
+        node_list_sha256=sha256_file(list_path),
+        console_path=str(cpath.relative_to(REPO)),
+        console_sha256=sha256_file(cpath),
+        run_index=args.run,
+    )
     if rc != 0:
         sys.exit(f"collection FAILED rc={rc} (fail-closed, cell invalid); see {cpath}")
     print(f"collected {len(nodes)} nodes rc={rc} wall={wall:.1f}s")
@@ -230,7 +285,7 @@ def parse_junit(path: Path) -> dict:
             o = "passed"
         # xfail/xpass: pytest marks via skip/failure with type attr containing "xfail"
         for k in kids:
-            t = (k.get("type") or "")
+            t = k.get("type") or ""
             if "xfail" in t.lower() or "xpass" in t.lower():
                 o = "xfailed" if "xpass" not in t.lower() else "xpassed"
         counts[o] = counts.get(o, 0) + 1
@@ -239,8 +294,15 @@ def parse_junit(path: Path) -> dict:
 
 
 def cmd_suite(args) -> None:
-    if already_recorded({"cell": args.cell, "candidate": args.kind, "python": args.py,
-                         "run_index": args.run, "lane": f"suite-{args.suite}"}):
+    if already_recorded(
+        {
+            "cell": args.cell,
+            "candidate": args.kind,
+            "python": args.py,
+            "run_index": args.run,
+            "lane": f"suite-{args.suite}",
+        }
+    ):
         print(f"skip (already recorded): suite {args.cell} {args.kind} py{args.py} r{args.run}")
         return
     vp = venv_dir(args.py, args.kind, "warm")
@@ -253,8 +315,12 @@ def cmd_suite(args) -> None:
         suite = ["tests/"] if args.suite == "tests" else ["HiQS/tests"]
     junit = ARTIFACTS / f"junit-{args.cell}-{args.kind}-{suite_label}-py{args.py}-r{args.run}.xml"
     cpath = CONSOLE / f"{args.cell}-{args.kind}-{suite_label}-py{args.py}-r{args.run}.txt"
-    argv = [venv_python, "-m", "pytest"] + suite + ["-q", "--durations=50",
-            f"--junitxml={junit}"] + (args.pytest_args.split() if args.pytest_args else [])
+    argv = (
+        [venv_python, "-m", "pytest"]
+        + suite
+        + ["-q", "--durations=50", f"--junitxml={junit}"]
+        + (args.pytest_args.split() if args.pytest_args else [])
+    )
     wall, rc = run_cmd(argv, cpath, REPO)
     parsed = parse_junit(junit) if junit.exists() else {"counts": {}, "outcomes": {}}
     # publish the per-node outcome map once per cell (identical across runs iff deterministic;
@@ -264,31 +330,55 @@ def cmd_suite(args) -> None:
         with open(omap, "w") as f:
             for nid, o in sorted(parsed["outcomes"].items()):
                 f.write(json.dumps({"nodeid": nid, "outcome": o}, sort_keys=True) + "\n")
-    record(cell=args.cell, candidate=args.kind, lane=f"suite-{args.suite}", python=args.py,
-           argv=argv, cwd=str(REPO), wall_s=round(wall, 3), exit_code=rc,
-           counts=parsed["counts"], executed=len(parsed["outcomes"]),
-           junit_path=str(junit.relative_to(REPO)), junit_sha256=sha256_file(junit) if junit.exists() else None,
-           outcome_map_path=str(omap.relative_to(REPO)), outcome_map_sha256=sha256_file(omap),
-           console_path=str(cpath.relative_to(REPO)), console_sha256=sha256_file(cpath),
-           run_index=args.run, cache_hit=None)
-    print(f"{args.cell} {args.kind} {args.suite} py{args.py} r{args.run}: rc={rc} wall={wall:.1f}s "
-          f"executed={len(parsed['outcomes'])} counts={parsed['counts']}")
+    record(
+        cell=args.cell,
+        candidate=args.kind,
+        lane=f"suite-{args.suite}",
+        python=args.py,
+        argv=argv,
+        cwd=str(REPO),
+        wall_s=round(wall, 3),
+        exit_code=rc,
+        counts=parsed["counts"],
+        executed=len(parsed["outcomes"]),
+        junit_path=str(junit.relative_to(REPO)),
+        junit_sha256=sha256_file(junit) if junit.exists() else None,
+        outcome_map_path=str(omap.relative_to(REPO)),
+        outcome_map_sha256=sha256_file(omap),
+        console_path=str(cpath.relative_to(REPO)),
+        console_sha256=sha256_file(cpath),
+        run_index=args.run,
+        cache_hit=None,
+    )
+    print(
+        f"{args.cell} {args.kind} {args.suite} py{args.py} r{args.run}: rc={rc} wall={wall:.1f}s "
+        f"executed={len(parsed['outcomes'])} counts={parsed['counts']}"
+    )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("setup"); s.add_argument("--py", required=True); s.add_argument("--kind", required=True)
-    s.add_argument("--mode", choices=["cold", "warm"], required=True); s.add_argument("--run", type=int, default=1)
+    s = sub.add_parser("setup")
+    s.add_argument("--py", required=True)
+    s.add_argument("--kind", required=True)
+    s.add_argument("--mode", choices=["cold", "warm"], required=True)
+    s.add_argument("--run", type=int, default=1)
     s.set_defaults(fn=cmd_setup)
-    c = sub.add_parser("collect"); c.add_argument("--py", required=True); c.add_argument("--kind", default="c0")
-    c.add_argument("--suite", choices=["tests", "hiqs"], required=True); c.add_argument("--run", type=int, default=1)
+    c = sub.add_parser("collect")
+    c.add_argument("--py", required=True)
+    c.add_argument("--kind", default="c0")
+    c.add_argument("--suite", choices=["tests", "hiqs"], required=True)
+    c.add_argument("--run", type=int, default=1)
     c.set_defaults(fn=cmd_collect)
-    u = sub.add_parser("suite"); u.add_argument("--py", required=True); u.add_argument("--kind", required=True)
+    u = sub.add_parser("suite")
+    u.add_argument("--py", required=True)
+    u.add_argument("--kind", required=True)
     u.add_argument("--suite", choices=["tests", "hiqs", "seam"], required=True)
     u.add_argument("--paths", type=str, default=None, help="space-separated test paths (overrides --suite target)")
     u.add_argument("--cell", required=True)
-    u.add_argument("--run", type=int, default=1); u.add_argument("--pytest-args", type=str, default=None)
+    u.add_argument("--run", type=int, default=1)
+    u.add_argument("--pytest-args", type=str, default=None)
     u.set_defaults(fn=cmd_suite)
     args = ap.parse_args()
     CONSOLE.mkdir(parents=True, exist_ok=True)
