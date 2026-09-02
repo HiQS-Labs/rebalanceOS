@@ -5,11 +5,17 @@
     <key>Label</key>
     <string>com.rebalance-os.hiqs-digest</string>
 
-    <!-- Run through the bash wrapper, NOT {{PYTHON}} directly: the health
-         collector shells out to `rebalance doctor`, which reads the
+    <!-- Run through the bash wrapper, NOT the venv interpreter directly: the
+         health collector shells out to `rebalance doctor`, which reads the
          TCC-protected ~/Documents vault. A directly-launched interpreter is
          denied there; the wrapper inherits the existing Full Disk Access
-         grant. See scripts/hiqs_digest.sh for the full note. -->
+         grant. See scripts/hiqs_digest.sh for the full note.
+
+         This comment deliberately names no substitution placeholder:
+         install_common.sh sed-substitutes them across the WHOLE file, so a
+         placeholder used as prose here would be rewritten into an absolute home
+         path in the rendered plist. The installer checks the venv explicitly
+         rather than relying on a placeholder appearing somewhere in this file. -->
     <key>ProgramArguments</key>
     <array>
         <string>{{REBALANCE_DIR}}/scripts/hiqs_digest.sh</string>

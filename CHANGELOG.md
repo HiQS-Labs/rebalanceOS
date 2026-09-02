@@ -43,7 +43,30 @@
 
   Synthesis can be switched off with an environment variable for cost control; doing so is
   treated as an operator decision rather than a failure, so it does not show up as a broken
-  job twice a day.
+  job twice a day. Switching it off now also skips collection, so the saving is real: the
+  check moved ahead of the work rather than sitting after it. A machine that was simply
+  never given an API key is likewise reported as unconfigured rather than failed — the key
+  is hand-added after install and a reinstall removes it, so "not set up" is a normal state
+  and should not raise an alert twice a day that is indistinguishable from a real outage.
+
+  Commit counts are deduplicated across the two records a commit can appear in. A commit
+  pushed to a branch and later attached to a pull request is stored in both, so counting
+  both overstated the day, listed the same change twice for the model, and inflated the
+  per-repository lines — on current data roughly one commit in eight. The in-flight themes
+  are now filtered on real instants rather than on text: that index stores timestamps in
+  two different formats and comparing them as strings quietly dropped about one in twenty
+  of a day's documents, which reads in the channel as a quiet day rather than as a partial
+  answer. The "active repositories" figure counts repositories that actually shipped
+  something, matching the prose above it, instead of also counting a repository where the
+  day's only event was someone opening an issue.
+
+  Absolute paths are stripped from everything the post can carry — commit subjects and
+  pull request titles as well as error text — so a message that happens to mention a file
+  path does not publish a home directory, and with it a username, to a team channel. The
+  destination directory is validated like the slot label already was; unchecked, it could
+  write the digest outside the repository it is meant to land in. A health check that
+  returns an unexpected shape is now recorded as a failed collector rather than ending the
+  whole run, which was the one collector that could take the job down with it.
 
 ## [0.79.0] - 2026-09-01
 

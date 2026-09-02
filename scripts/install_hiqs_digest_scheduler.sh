@@ -53,6 +53,17 @@ fi
 # rb_install_launchd_job only creates $REBALANCE_DIR/temp/logs, not this one.
 mkdir -p "$HOME/Library/Logs/rebalance-os"
 
+# The wrapper hard-codes $REBALANCE_DIR/.venv/bin/python (scheduler_common.sh:28), so the
+# venv has to exist or the job dies at 13:05 with "No such file or directory". This check
+# is explicit because rb_install_launchd_job's own venv guard only fires for templates
+# containing the {{PYTHON}} placeholder, and this one substitutes nothing into its
+# ProgramArguments — it runs the bash wrapper.
+if [ ! -x "$REBALANCE_DIR/.venv/bin/python" ]; then
+    echo "ERROR: expected the project virtualenv at $REBALANCE_DIR/.venv/bin/python" >&2
+    echo "       scripts/hiqs_digest.sh runs that interpreter directly; create the venv first." >&2
+    exit 1
+fi
+
 # The wrapper argument is not optional here: it makes rb_install_launchd_job verify the
 # script exists and chmod +x it. Omitted, both guards are skipped, and any deploy that
 # loses the file mode (rsync/tarball, core.fileMode=false) installs a job launchd cannot

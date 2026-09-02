@@ -27,8 +27,9 @@ import sqlite3
 import sys
 import time
 import types
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -88,11 +89,11 @@ def _commit(conn, repo: str, msg: str, at: str, *, login: str = "me", sha: str |
     )
 
 
-def _direct_commit(conn, repo: str, msg: str, at: str, *, login: str = "me") -> None:
+def _direct_commit(conn, repo: str, msg: str, at: str, *, login: str = "me", sha: str | None = None) -> None:
     conn.execute(
         "INSERT INTO github_direct_commits (repo_full_name, sha, event_id, author_login, message, "
         "committed_at, discovered_at, fetched_at) VALUES (?,?,?,?,?,?,'x','x')",
-        (repo, f"dsha-{msg}-{at}", f"ev-{msg}", login, msg, at),
+        (repo, sha or f"dsha-{msg}-{at}", f"ev-{msg}", login, msg, at),
     )
 
 
@@ -116,6 +117,57 @@ def test_quiet_day_is_not_an_error(db: Path):
     assert "error" not in facts
     assert facts["by_repo"] == []
     assert facts["commit_total"] == 0
+
+
+def test_a_commit_in_both_tables_is_counted_once(db: Path):
+    """The two commit tables OVERLAP — a branch push that later lands in a PR is in both.
+
+    Measured on the live database: 4,156 of 33,073 github_direct_commits rows share
+    (repo, sha) with a github_commits row. A plain UNION ALL therefore overstated
+    commit_total, double-counted the commit in by_repo, and handed the model the same
+    subject twice — in a job whose contract is "never present a false number".
+    pulse.py:255-263 reads the same pair of tables and has always guarded this.
+    """
+    conn = sqlite3.connect(db)
+    _commit(conn, "org/a", "one thing", "2026-09-01T18:00:00Z", sha="deadbeef")
+    _direct_commit(conn, "org/a", "one thing", "2026-09-01T18:00:00Z", sha="deadbeef")
+    conn.commit()
+    conn.close()
+
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+
+    assert facts["commit_total"] == 1, "one commit in both tables is still one commit"
+    assert [r["commits"] for r in facts["by_repo"]] == [1]
+    assert len(facts["commits"]) == 1, "the model must not be shown the same subject twice"
+    assert facts["commits"][0]["source"] == "pr", "'pr' is the more specific truth"
+
+
+def test_duplicate_rows_within_github_commits_are_collapsed(db: Path):
+    """github_commits alone has 2,680 repo+sha groups with more than one row on live data."""
+    conn = sqlite3.connect(db)
+    _commit(conn, "org/a", "one thing", "2026-09-01T18:00:00Z", sha="cafe")
+    _commit(conn, "org/a", "one thing", "2026-09-01T18:00:00Z", sha="cafe")
+    conn.commit()
+    conn.close()
+
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+
+    assert facts["commit_total"] == 1
+
+
+def test_distinct_commits_are_not_collapsed(db: Path):
+    """The dedupe must key on (repo, sha) — not flatten a busy day into one row."""
+    conn = sqlite3.connect(db)
+    _commit(conn, "org/a", "first", "2026-09-01T18:00:00Z", sha="aaa")
+    _direct_commit(conn, "org/a", "second", "2026-09-01T19:00:00Z", sha="bbb")
+    _direct_commit(conn, "org/b", "third", "2026-09-01T20:00:00Z", sha="aaa")  # same sha, other repo
+    conn.commit()
+    conn.close()
+
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+
+    assert facts["commit_total"] == 3
+    assert sorted(r["commits"] for r in facts["by_repo"]) == [1, 2]
 
 
 def test_broken_db_reports_an_error_rather_than_a_quiet_day(tmp_path: Path):
@@ -359,28 +411,51 @@ def pacific_process_tz():
         time.tzset()
 
 
-@pytest.mark.parametrize(
-    ("moment", "start", "end"),
-    [
-        (datetime(2026, 11, 1, 13, 5), "2026-11-01 07:00:00", "2026-11-02 08:00:00"),
-        (datetime(2026, 3, 8, 13, 5), "2026-03-08 08:00:00", "2026-03-09 07:00:00"),
-        (datetime(2026, 9, 1, 13, 5), "2026-09-01 07:00:00", "2026-09-02 07:00:00"),
-    ],
-)
-def test_day_bounds_are_dst_correct_for_the_fixed_offset_now_that_run_builds(
-    pacific_process_tz, moment: datetime, start: str, end: str
-):
-    """run() calls datetime.now().astimezone(), which returns a FIXED-OFFSET tzinfo.
+def test_run_resolves_now_through_a_real_zone_not_a_fixed_offset(pacific_process_tz, monkeypatch):
+    """This is the test that keeps the DST bug fixed.
 
-    THIS is the test that pins the production bug. The ZoneInfo cases above cannot:
-    .replace(hour=0) on a real zone re-resolves the offset by itself, so they pass against
-    the broken code too — verified by reverting the fix and watching them stay green. A
-    fixed offset freezes whatever was in force at the moment of the call, so midnight gets
-    stamped with the afternoon's offset and the window slips an hour on a transition day.
+    The three DST cases above cannot: `.replace(tzinfo=zone)` on a real ZoneInfo
+    re-resolves the offset by itself, so they pass against a broken _local_midnight too.
+    What actually protects the window is that run() builds `now` with time_ops.local_tz(),
+    a real ZoneInfo. `datetime.now().astimezone()` returns a FIXED-OFFSET tzinfo that
+    freezes whatever was in force at the moment of the call, so midnight gets stamped with
+    the afternoon's offset and the window slips an hour on a transition day — and a fixed
+    offset is also deaf to REBALANCE_TZ and the configured pulse timezone.
     """
-    now = moment.astimezone()  # exactly the shape run() hands to _utc_day_bounds
+    seen: dict[str, Any] = {}
 
-    assert hiqs_digest._utc_day_bounds(now) == (start, end)
+    def _capture(db, now):
+        seen["now"] = now
+        raise SystemExit(0)  # stop run() before it does any real work
+
+    monkeypatch.setattr(hiqs_digest, "build_facts", _capture)
+    monkeypatch.setattr(hiqs_digest, "resolve_database_path", lambda: Path(__file__))
+
+    with pytest.raises(SystemExit):
+        hiqs_digest.run(slot="1305")
+
+    assert isinstance(seen["now"].tzinfo, ZoneInfo), (
+        "run() must resolve now through time_ops.local_tz(); a fixed-offset tzinfo is "
+        "DST-blind and ignores REBALANCE_TZ"
+    )
+
+
+def test_local_midnight_honours_an_explicitly_passed_zone(pacific_process_tz):
+    """A caller-supplied zone is used, not silently replaced by the machine's.
+
+    An earlier version fell back to `naive.astimezone()` for any tz that was not a
+    ZoneInfo, which DISCARDED the argument. run(now=<UTC+9 datetime>) under a Pacific
+    process then bounded the day in Pacific while build_facts labelled the payload with the
+    UTC+9 date — a digest with a plausible date, a window hours away from it, and zero rows
+    in every collector.
+    """
+    tokyo = timezone(timedelta(hours=9))
+    now = datetime(2026, 9, 2, 6, 0, tzinfo=tokyo)
+
+    start, end = hiqs_digest._utc_day_bounds(now)
+
+    # Local midnight in UTC+9 on Sep 2 is 2026-09-01 15:00 UTC, whatever the machine is set to.
+    assert (start, end) == ("2026-09-01 15:00:00", "2026-09-02 15:00:00")
 
 
 # --- Rendering ------------------------------------------------------------------
@@ -391,7 +466,15 @@ def test_render_surfaces_generated_at_and_real_totals():
     now = datetime(2026, 9, 1, 23, 40, tzinfo=PACIFIC)
     facts = {
         "date": "2026-09-01",
-        "github": {"commit_total": 177, "merged_total": 22, "commits": [1, 2], "by_repo": [1, 2]},
+        "github": {
+            "commit_total": 177,
+            "merged_total": 22,
+            "commits": [1, 2],
+            "by_repo": [
+                {"repo_full_name": "org/a", "commits": 170, "prs_merged": 20},
+                {"repo_full_name": "org/b", "commits": 7, "prs_merged": 2},
+            ],
+        },
         "health": {"problem_count": 2},
     }
 
@@ -400,7 +483,35 @@ def test_render_surfaces_generated_at_and_real_totals():
     assert "23:40" in out, "generated_at must be rendered, not just stored"
     assert "177 commits" in out, "the footer reports the total, not the capped detail length"
     assert "22 merged" in out
+    assert "2 active repos" in out
     assert "2 health warnings" in out
+
+
+def test_render_counts_only_repos_that_shipped_as_active():
+    """by_repo carries issue-only repos so the model can see them; the footer must not.
+
+    On a day when three people merely filed issues in three otherwise-idle repos, a
+    len(by_repo) footer announced "3 active repos" while the model — correctly following
+    the prompt's "NEVER list a repository that shipped nothing" — named none of them. The
+    reader saw three active repos and no explanation of what they did.
+    """
+    facts = {
+        "date": "2026-09-01",
+        "github": {
+            "commit_total": 4,
+            "merged_total": 0,
+            "by_repo": [
+                {"repo_full_name": "org/shipped", "commits": 4, "prs_merged": 0, "issues_opened": 0},
+                {"repo_full_name": "org/issue-only", "commits": 0, "prs_merged": 0, "issues_opened": 1},
+                {"repo_full_name": "org/merged-only", "commits": 0, "prs_merged": 1, "issues_opened": 0},
+            ],
+        },
+        "health": {"problem_count": 0},
+    }
+
+    out = hiqs_digest.render("a summary", facts, datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC))
+
+    assert "2 active repos" in out, "commits or merges count as active; an opened issue does not"
 
 
 def test_render_survives_a_failed_collector():
@@ -539,18 +650,49 @@ def test_semantic_always_filters_to_github_sources(monkeypatch, db: Path):
     assert index.kwargs["source_filter"] == ["github"]
 
 
-def test_semantic_is_bounded_by_utc_in_the_columns_own_format(monkeypatch, db: Path):
-    """search_semantic_documents compares updated_at RAW — no datetime() normalization.
+def test_semantic_sql_bound_is_widened_because_the_column_mixes_formats(monkeypatch, db: Path):
+    """The SQL bound only PREFILTERS; it is deliberately looser than the real window.
 
-    A local date string admitted the previous evening's work as today's in-flight themes,
-    and a space-separated bound compares wrong against an ISO-Z column ('T' sorts above ' ').
+    search_semantic_documents compares updated_at RAW — no datetime() normalization — and
+    the column is not one format: 24,509 of 60,431 github rows on the live index carry a
+    numeric offset ('2026-09-01T16:45:05-07:00') rather than 'Z'. For an offset-form row
+    the leading characters are LOCAL time, so a bound correct for one form is wrong for the
+    other: a row stamped '2026-09-01T06:00:00-07:00' is 13:00 UTC, squarely inside the Sep 1
+    Pacific day, yet '06' < '07' excludes it from a '2026-09-01T07:00:00Z' bound.
+
+    So the bound is pushed back by the widest possible UTC offset (14h) and the real window
+    is applied in Python. Over-fetching is safe; under-fetching reads to the channel as a
+    quiet day.
     """
     index = _RecordingIndex()
     monkeypatch.setattr(rebalance.ingest, "semantic_index", index, raising=False)
 
     hiqs_digest.collect_semantic(db, _bounds(datetime(2026, 9, 1, 17, 5, tzinfo=PACIFIC)))
 
-    assert index.kwargs["updated_after"] == "2026-09-01T07:00:00Z", "UTC start of the LOCAL day, ISO-Z"
+    # Local midnight Sep 1 Pacific is 2026-09-01 07:00 UTC; minus the 14h widening.
+    assert index.kwargs["updated_after"] == "2026-08-31T17:00:00Z"
+
+
+def test_semantic_keeps_offset_form_rows_inside_the_window(monkeypatch, db: Path):
+    """The real window is applied on PARSED instants, so both stored forms are honoured.
+
+    This is the row the raw string compare dropped: 06:00 local at UTC-7 is 13:00 UTC, well
+    inside the Sep 1 Pacific day, but it sorts below an ISO-Z bound of 07:00. Measured on
+    live data, the raw filter admitted 479 documents for that day where 501 were genuinely
+    in-window.
+    """
+    index = _RecordingIndex(
+        [
+            {"title": "offset-form, inside", "source_type": "github", "updated_at": "2026-09-01T06:00:00-07:00"},
+            {"title": "offset-form, yesterday", "source_type": "github", "updated_at": "2026-08-31T20:00:00-07:00"},
+            {"title": "z-form, inside", "source_type": "github", "updated_at": "2026-09-01T18:00:00Z"},
+        ]
+    )
+    monkeypatch.setattr(rebalance.ingest, "semantic_index", index, raising=False)
+
+    hits = hiqs_digest.collect_semantic(db, _bounds(datetime(2026, 9, 1, 17, 5, tzinfo=PACIFIC)))["hits"]
+
+    assert [h["title"] for h in hits] == ["offset-form, inside", "z-form, inside"]
 
 
 def test_semantic_falls_back_to_source_pk_not_a_key_that_never_exists(monkeypatch, db: Path):
@@ -650,6 +792,70 @@ def test_publish_failure_keeps_its_diagnosis_when_the_result_carries_a_reason(mo
     assert "nothing staged" in result["reason"], "and must still name the underlying cause"
 
 
+def test_publish_writes_the_slot_into_the_filename(monkeypatch, tmp_path: Path):
+    """The filename IS the contract — nothing else pinned it.
+
+    The Sleuth relay's seen-set is keyed on the filename, so `hiqs-<date>-<slot>.md` is the
+    single load-bearing invariant of this design. Every run() test stubs publish out and
+    the other publish tests only read result["ok"], so swapping the now/slot arguments,
+    dropping the slot from the f-string, or building the date from a different clock all
+    passed the suite green while breaking the dedupe.
+    """
+    seen: dict[str, Any] = {}
+
+    def _record(**kw):
+        seen.update(kw)
+        return {"wrote_file": True, "committed": True, "pushed": True}
+
+    repo = tmp_path / "pulse"
+    (repo / ".git").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setitem(
+        sys.modules,
+        "rebalance.ingest.pulse",
+        type("M", (), {"_commit_and_push_if_changed": staticmethod(_record)}),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "rebalance.ingest.config",
+        type("C", (), {"get_pulse_config": staticmethod(lambda: {"pulse_target_path": str(repo)})}),
+    )
+
+    result = hiqs_digest.publish("body", datetime(2026, 9, 1, 17, 5, tzinfo=PACIFIC), "1705", dry_run=False, push=True)
+
+    assert seen["file_rel"] == "digests/hiqs-2026-09-01-1705.md"
+    assert result["file_rel"] == "digests/hiqs-2026-09-01-1705.md"
+
+
+@pytest.mark.parametrize("subdir", ["../../../../tmp/escape", "/tmp/abs", "digests/../..", ""])
+def test_publish_rejects_a_subdir_that_escapes_the_repo(monkeypatch, tmp_path: Path, subdir: str):
+    """HIQS_DIGEST_SUBDIR is interpolated into the path, exactly like --slot was.
+
+    _commit_and_push_if_changed mkdir -p's and writes the file BEFORE git sees it, and
+    `target_repo / file_rel` discards target_repo entirely for an absolute file_rel — so an
+    unvalidated value writes the digest somewhere arbitrary and then fails at `git add`
+    with an error that never names the real cause.
+    """
+    called: list[dict] = []
+    repo = tmp_path / "pulse"
+    (repo / ".git").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setitem(
+        sys.modules,
+        "rebalance.ingest.pulse",
+        type("M", (), {"_commit_and_push_if_changed": staticmethod(lambda **kw: called.append(kw) or {})}),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "rebalance.ingest.config",
+        type("C", (), {"get_pulse_config": staticmethod(lambda: {"pulse_target_path": str(repo)})}),
+    )
+    monkeypatch.setenv("HIQS_DIGEST_SUBDIR", subdir)
+
+    result = hiqs_digest.publish("body", datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC), "1305", dry_run=False, push=True)
+
+    assert result["ok"] is False
+    assert not called, "nothing may be written for a rejected subdir"
+
+
 def test_publish_treats_an_unchanged_file_as_success(monkeypatch, tmp_path: Path):
     """A same-slot re-run with identical content has nothing to do — that is not failure."""
     _stub_pulse(
@@ -663,10 +869,90 @@ def test_publish_treats_an_unchanged_file_as_success(monkeypatch, tmp_path: Path
     assert result["ok"] is True
 
 
+def test_an_unconfigured_machine_exits_zero_rather_than_reporting_a_failed_job(monkeypatch):
+    """No API key is operator state, like the kill switch — not a failure of this run.
+
+    The installer says the key is hand-added to the RENDERED plist and that a reinstall
+    overwrites it, so "never configured" is a normal state for a device. Exiting 1 wrote
+    job_failed to auth_activity.jsonl twice a day, which doctor's _check_auth_failures
+    raises as an auth:launchd ERROR and health_issue_reporter files as a GitHub issue —
+    indistinguishable from a real Gemini outage.
+    """
+    monkeypatch.delenv(hiqs_digest.LLM_DISABLE_ENV, raising=False)
+    monkeypatch.setattr(hiqs_digest, "resolve_database_path", lambda: Path(__file__))
+    monkeypatch.setattr(hiqs_digest, "build_facts", lambda db, now: {n: {} for n in ("github", "health", "semantic")})
+    monkeypatch.setattr(
+        hiqs_digest,
+        "synthesize",
+        lambda facts: (_ for _ in ()).throw(hiqs_digest.SynthesisUnconfigured("no Gemini API key")),
+    )
+
+    assert hiqs_digest.run(slot="1305") == 0
+
+
+def test_a_failed_synthesis_still_exits_non_zero(monkeypatch):
+    """ "Tried and failed" is a real failure and must stay distinguishable from "never set up"."""
+    monkeypatch.delenv(hiqs_digest.LLM_DISABLE_ENV, raising=False)
+    monkeypatch.setattr(hiqs_digest, "resolve_database_path", lambda: Path(__file__))
+    monkeypatch.setattr(hiqs_digest, "build_facts", lambda db, now: {n: {} for n in ("github", "health", "semantic")})
+    monkeypatch.setattr(hiqs_digest, "synthesize", lambda facts: None)
+
+    assert hiqs_digest.run(slot="1305") == 1
+
+
+def test_kill_switch_skips_collection_entirely(monkeypatch):
+    """The switch exists to stop this job's COST, which is mostly collection.
+
+    Checked after build_facts, it still paid a `rebalance doctor` subprocess (180s cap) and
+    an MLX embedding load twice a day in order to publish nothing.
+    """
+    monkeypatch.setenv(hiqs_digest.LLM_DISABLE_ENV, "1")
+
+    def _never(*a, **k):
+        raise AssertionError("collection must not run when the kill switch is set")
+
+    monkeypatch.setattr(hiqs_digest, "build_facts", _never)
+
+    assert hiqs_digest.run(slot="1305") == 0
+
+
 def test_llm_kill_switch_never_calls_the_model(monkeypatch):
     monkeypatch.setenv(hiqs_digest.LLM_DISABLE_ENV, "1")
 
     assert hiqs_digest.synthesize({"anything": True}) is None
+
+
+def test_doctor_payload_with_a_null_checks_key_is_recorded_not_raised(monkeypatch):
+    """`payload.get("checks", [])` only defaults when the key is ABSENT.
+
+    A doctor emitting {"checks": null} yielded None, and the comprehension raised
+    TypeError out of the collector, out of build_facts and out of run() — killing the whole
+    digest. This is the one collector that shells out to another program, so it is the one
+    most able to be handed an unexpected shape; the contract is that it records the failure
+    in the facts.
+    """
+
+    class FakeRun:
+        stdout = '{"verdict": "ok", "checks": null}'
+        returncode = 0
+
+    monkeypatch.setattr(hiqs_digest.subprocess, "run", lambda *a, **k: FakeRun())
+
+    out = hiqs_digest.collect_health()
+
+    assert out["problem_count"] == 0, "a null checks list is an empty one, not a crash"
+
+
+def test_doctor_payload_that_is_not_an_object_is_recorded_not_raised(monkeypatch):
+    class FakeRun:
+        stdout = "[1, 2, 3]"
+        returncode = 0
+
+    monkeypatch.setattr(hiqs_digest.subprocess, "run", lambda *a, **k: FakeRun())
+
+    out = hiqs_digest.collect_health()
+
+    assert "error" in out and "problems" not in out
 
 
 def test_llm_kill_switch_exits_zero_not_failed(monkeypatch, tmp_path: Path):

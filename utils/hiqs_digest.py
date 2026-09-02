@@ -32,17 +32,21 @@ Design contract (mirrors utils/daily_synthesis.py, which this is modeled on):
 
 Four things that look like details and are not:
 
-  * Day bounds are computed in UTC from the LOCAL day, each boundary resolved through the
-    real zone (a DST day is 23 or 25 hours long, so start + 1 day is not its end), and
-    every timestamp comparison goes through SQLite's datetime(). The tables mix formats —
-    github_commits stores '...T23:55:26Z', github_direct_commits stores
+  * Day bounds are computed in UTC from the LOCAL day — resolved through time_ops.local_tz()
+    so REBALANCE_TZ and the configured zone are honoured, and each boundary resolved
+    independently (a DST day is 23 or 25 hours long, so start + 1 day is not its end).
+    Every SQL timestamp comparison goes through SQLite's datetime(). The tables mix formats
+    — github_commits stores '...T23:55:26Z', github_direct_commits stores
     '...T16:45:05-07:00' — and a raw string compare against a local date silently drops or
     misattributes an evening's work for anyone not on UTC. The one filter that CANNOT use
-    datetime() is the semantic index (db/semantic.py compares updated_at raw), so that one
-    is handed bounds pre-shaped to the column's ISO-Z format instead.
+    datetime() is the semantic index (db/semantic.py compares updated_at raw), and that
+    column mixes both forms too, so no string bound is correct for both: it gets a widened
+    prefilter and the real window is applied in Python on parsed instants.
   * Commits come from BOTH github_commits (PR-attached) and github_direct_commits (pushes
-    straight to a branch). Reading only the first makes the post contradict itself: an
-    empty commit list beside per-repo counts of 14.
+    straight to a branch), DEDUPED on (repo, sha). Reading only the first makes the post
+    contradict itself: an empty commit list beside per-repo counts of 14. Reading both
+    without the dedupe overstates the day, because a commit pushed to a branch and later
+    attached to a PR is in both tables — see DAY_COMMITS_CTE.
   * by_repo is derived from those same day-bounded tables, NOT from github_activity.
     github_activity has a scan_date column and looks per-day; it is not. Every row holds a
     14-to-30-day event-window total stamped with today's date, for watched-repo rollups
@@ -77,9 +81,9 @@ import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from rebalance.ingest.db.connection import db_connection_readonly
+from rebalance.lib.time_ops import local_tz
 from rebalance.paths import resolve_database_path, resolve_project_root
 
 # AGENTS.md → "Use the shared resolvers […] no parents[N] repo-root walks". This is the
@@ -147,13 +151,27 @@ def log(msg: str) -> None:
 def _scrub(text: str) -> str:
     """Replace the home directory with ~ so absolute paths don't ride into Slack.
 
-    Applied to EVERY string that can reach the prompt, not just doctor details: the prompt
-    instructs the model to report failed sections, so a collector's error text is published
-    verbatim-ish. A sqlite error carries the full database path, and with it a username.
+    Applied to every string that can reach the prompt: collector errors (the prompt
+    instructs the model to report failed sections, so error text is published verbatim-ish,
+    and a sqlite error carries the full database path and with it a username), doctor
+    details, commit subjects, PR/issue titles, and semantic hit titles. If you add a field
+    to the facts payload that came from outside this process, scrub it here too.
     """
     if not text:
         return text
     return text.replace(str(Path.home()), "~")
+
+
+def _is_safe_subdir(subdir: str) -> bool:
+    """True if *subdir* is a plain relative directory path inside the pulse repo.
+
+    Rejects the empty string, absolute paths, anything containing a '..' segment, and
+    Windows-style drive/UNC prefixes. See publish() for why this is not cosmetic.
+    """
+    if not subdir or subdir.startswith(("/", "\\")) or ":" in subdir:
+        return False
+    parts = [p for p in subdir.replace("\\", "/").split("/") if p]
+    return bool(parts) and all(p not in ("..", ".") for p in parts)
 
 
 def _fail(where: str, error: object) -> dict[str, Any]:
@@ -174,7 +192,7 @@ def slot_for(now: datetime) -> str:
     digest reached the channel. Bucketing on the fire time makes any catch-up before 17:05
     the midday slot, which is what was actually scheduled.
     """
-    return SLOT_MIDDAY if now.timetz().replace(tzinfo=None) < FIRE_EVENING else SLOT_EVENING
+    return SLOT_MIDDAY if now.time() < FIRE_EVENING else SLOT_EVENING
 
 
 def _local_midnight(day: date, tz: Any) -> datetime:
@@ -182,12 +200,19 @@ def _local_midnight(day: date, tz: Any) -> datetime:
 
     `datetime.now().astimezone()` returns a FIXED-OFFSET tzinfo captured at the current
     instant, so `.replace(hour=0)` on it stamps midnight with the afternoon's offset — an
-    hour wrong on both DST transition days. A real ZoneInfo re-resolves the offset for the
-    local time it is attached to; for anything else, `.astimezone()` on a naive datetime
-    resolves it through the platform's real zone, which also knows about DST.
+    hour wrong on both DST transition days. That is why run() resolves `now` through
+    time_ops.local_tz(), which returns a real ZoneInfo: attaching one to a naive midnight
+    re-resolves the offset for the local time it is attached to.
+
+    *tz* is honoured whatever it is. A fixed-offset tzinfo has no DST to re-resolve, so
+    `replace` is exactly right for it too; an earlier version fell back to `.astimezone()`
+    for the non-ZoneInfo case, which DISCARDED the caller's zone and silently bounded the
+    day in the machine's zone while `build_facts` labelled it with the caller's.
     """
     naive = datetime.combine(day, time.min)
-    return naive.replace(tzinfo=tz) if isinstance(tz, ZoneInfo) else naive.astimezone()
+    if tz is None:
+        return naive.astimezone()
+    return naive.replace(tzinfo=tz)
 
 
 def _utc_day_bounds(now: datetime) -> tuple[str, str]:
@@ -209,15 +234,82 @@ def _utc_day_bounds(now: datetime) -> tuple[str, str]:
     )
 
 
-def _utc_bounds_iso_z(bounds: tuple[str, str]) -> tuple[str, str]:
-    """The same bounds as '...T...Z', for raw string compares against ISO-Z columns.
+# The widest UTC offset any timestamp can carry (UTC+14 .. UTC-12). Used to widen the
+# semantic prefilter — see _semantic_prefilter_bound.
+_MAX_UTC_OFFSET = timedelta(hours=14)
 
-    semantic_documents.updated_at stores '2026-09-02T00:15:46Z' and the semantic search
-    filters it with a RAW `>=`, not `datetime()`. Handing that a space-separated bound
-    silently compares wrong: 'T' (0x54) sorts above ' ' (0x20), so every document on the
-    boundary day passes regardless of its time.
+
+def _as_utc(stamp: str) -> datetime | None:
+    """Parse an ISO-8601 stamp in EITHER stored form to an aware UTC datetime.
+
+    semantic_documents.updated_at is not one format. Measured on the live index, 24,509 of
+    60,431 github rows carry a numeric offset ('2026-09-01T16:45:05-07:00') and the rest
+    are 'Z'. Returns None for anything unparseable rather than raising, so one malformed
+    row cannot take out the collector.
     """
-    return tuple(f"{b.replace(' ', 'T')}Z" for b in bounds)  # type: ignore[return-value]
+    if not stamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _semantic_prefilter_bound(start_utc: str) -> str:
+    """A DELIBERATELY LOOSE lower bound for search_semantic_documents' raw compare.
+
+    db/semantic.py filters `sd.updated_at >= ?` as a raw string, with no datetime()
+    normalization, and the column mixes 'Z' and '+HH:MM' forms. For an offset-form row the
+    leading characters are LOCAL time, so no single string bound is correct for both forms:
+    a row stamped '2026-09-01T06:00:00-07:00' is 13:00 UTC — squarely inside a Sep 1
+    Pacific day — yet '06' < '07' against a '2026-09-01T07:00:00Z' bound excludes it.
+
+    So the SQL bound only prefilters: it is pushed back by the widest possible UTC offset,
+    which cannot drop an in-window row in either format. collect_semantic then applies the
+    real window in Python, on parsed instants. Over-fetching is safe; under-fetching reads
+    to the channel as a quiet day, which is the failure this job exists to avoid.
+    """
+    widened = datetime.strptime(start_utc, "%Y-%m-%d %H:%M:%S") - _MAX_UTC_OFFSET
+    return widened.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# One row per (repo, sha) for the local day, across BOTH commit tables.
+#
+# The two tables overlap. github_commits holds PR-attached commits; github_direct_commits
+# holds branch pushes — and a commit pushed to a branch that later lands in a PR is in
+# both. Measured on the live database: 4,156 of 33,073 direct rows share (repo, sha) with
+# a github_commits row, and github_commits ALONE has 2,680 repo+sha groups with more than
+# one row. A plain UNION ALL therefore overstated commit_total, double-counted the same
+# commit in by_repo, and handed the model the same subject twice — in a job whose contract
+# is "never present a false number". pulse.py:255-263 reads this same pair of tables and
+# has always guarded it with a NOT EXISTS; this is the same guard, expressed as a GROUP BY
+# so it also collapses the duplicates WITHIN github_commits.
+#
+# MIN(source) resolves the label: 'pr' sorts before 'push', so a commit in both tables is
+# reported as PR-attached, which is the more specific truth.
+DAY_COMMITS_CTE = """
+    WITH day_commits AS (
+        SELECT repo_full_name,
+               sha,
+               MIN(message)      AS message,
+               MIN(author_login) AS author_login,
+               MIN(committed_at) AS committed_at,
+               MIN(source)       AS source
+        FROM (
+            SELECT repo_full_name, sha, message, author_login, committed_at, 'pr' AS source
+            FROM github_commits
+            WHERE datetime(committed_at) >= :start AND datetime(committed_at) < :end
+            UNION ALL
+            SELECT repo_full_name, sha, message, author_login, committed_at, 'push' AS source
+            FROM github_direct_commits
+            WHERE datetime(committed_at) >= :start AND datetime(committed_at) < :end
+        )
+        GROUP BY LOWER(repo_full_name), sha
+    )
+"""
 
 
 # --- Collectors ----------------------------------------------------------------
@@ -228,10 +320,10 @@ def _utc_bounds_iso_z(bounds: tuple[str, str]) -> tuple[str, str]:
 def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
     """Today's GitHub activity. No LLM, no parsing — the typed columns already carry it."""
     start_utc, end_utc = bounds
+    window = {"start": start_utc, "end": end_utc}
     try:
+        # db_connection_readonly already sets row_factory = sqlite3.Row (connection.py:101).
         with db_connection_readonly(db) as conn:
-            conn.row_factory = sqlite3.Row
-
             # by_repo is derived from the SAME day-bounded event tables as commit_total and
             # merged_total, so the per-repo lines and the footer cannot disagree.
             #
@@ -253,7 +345,8 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
             repos = [
                 dict(r)
                 for r in conn.execute(
-                    """
+                    DAY_COMMITS_CTE
+                    + """
                     SELECT LOWER(repo_full_name) AS repo_full_name,
                            SUM(commits)        AS commits,
                            SUM(prs_merged)     AS prs_merged,
@@ -261,28 +354,23 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                            SUM(issues_opened)  AS issues_opened,
                            COUNT(DISTINCT author_login) AS contributors
                     FROM (
-                        -- PR-attached commits
+                        -- Deduped commits from BOTH tables. Reading only github_commits
+                        -- made push-only repos vanish from the digest; reading both
+                        -- without the dedupe counted shared commits twice.
                         SELECT repo_full_name, author_login,
                                1 AS commits, 0 AS prs_merged, 0 AS prs_opened, 0 AS issues_opened
-                        FROM github_commits
-                        WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
-                        UNION ALL
-                        -- Direct branch pushes. Their absence here is what previously made
-                        -- push-only repos vanish from the digest entirely.
-                        SELECT repo_full_name, author_login, 1, 0, 0, 0
-                        FROM github_direct_commits
-                        WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
+                        FROM day_commits
                         UNION ALL
                         SELECT repo_full_name, author_login, 0, 1, 0, 0
                         FROM github_items
                         WHERE item_type = 'pull_request'
-                          AND datetime(merged_at) >= ? AND datetime(merged_at) < ?
+                          AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
                         UNION ALL
                         SELECT repo_full_name, author_login, 0, 0,
                                CASE WHEN item_type = 'pull_request' THEN 1 ELSE 0 END,
                                CASE WHEN item_type = 'issue' THEN 1 ELSE 0 END
                         FROM github_items
-                        WHERE datetime(created_at) >= ? AND datetime(created_at) < ?
+                        WHERE datetime(created_at) >= :start AND datetime(created_at) < :end
                     )
                     -- LOWER, matching config.normalize_github_repo_name ("exact lowercased
                     -- owner/name form"). The tables carry rows written under different
@@ -293,31 +381,38 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                     GROUP BY LOWER(repo_full_name)
                     ORDER BY commits DESC, prs_merged DESC
                     """,
-                    (start_utc, end_utc) * 4,
+                    window,
                 )
             ]
 
-            # Both commit tables. github_commits is PR-attached only; direct branch pushes
-            # live in github_direct_commits. Reading one makes the post contradict itself.
-            commit_sql = """
-                SELECT repo_full_name, message, author_login, committed_at, source FROM (
-                    SELECT repo_full_name, message, author_login, committed_at, 'pr' AS source
-                    FROM github_commits
-                    WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
-                    UNION ALL
-                    SELECT repo_full_name, message, author_login, committed_at, 'push' AS source
-                    FROM github_direct_commits
-                    WHERE datetime(committed_at) >= ? AND datetime(committed_at) < ?
+            # No ORDER BY inside the COUNT — SQLite would materialise and sort the whole
+            # day's rows just to count them.
+            commit_total = conn.execute(DAY_COMMITS_CTE + "SELECT COUNT(*) FROM day_commits", window).fetchone()[0]
+            commits = [
+                dict(r)
+                for r in conn.execute(
+                    DAY_COMMITS_CTE
+                    + """
+                    SELECT repo_full_name, message, author_login, committed_at, source
+                    FROM day_commits
+                    ORDER BY datetime(committed_at) DESC
+                    LIMIT :limit
+                    """,
+                    {**window, "limit": COMMIT_DETAIL_LIMIT},
                 )
-                ORDER BY datetime(committed_at) DESC
-            """
-            commit_args = (start_utc, end_utc, start_utc, end_utc)
-            commit_total = conn.execute(f"SELECT COUNT(*) FROM ({commit_sql})", commit_args).fetchone()[0]
-            commits = [dict(r) for r in conn.execute(f"{commit_sql} LIMIT {COMMIT_DETAIL_LIMIT}", commit_args)]
+            ]
 
+            # item_type = 'pull_request' on BOTH the total and the detail. The by_repo
+            # prs_merged branch has always carried that filter, so leaving it off here let
+            # any non-PR row that ever acquires a merged_at push the footer's "N merged"
+            # above the sum of the per-repo lines the model was shown — the self-
+            # contradicting post the by_repo design note exists to prevent. (Zero such rows
+            # today; the point is that the two numbers now share one predicate.)
             merged_total = conn.execute(
-                "SELECT COUNT(*) FROM github_items WHERE datetime(merged_at) >= ? AND datetime(merged_at) < ?",
-                (start_utc, end_utc),
+                "SELECT COUNT(*) FROM github_items "
+                "WHERE item_type = 'pull_request' "
+                "AND datetime(merged_at) >= :start AND datetime(merged_at) < :end",
+                window,
             ).fetchone()[0]
             merged = [
                 dict(r)
@@ -325,18 +420,21 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                     """
                     SELECT repo_full_name, item_type, number, title, author_login
                     FROM github_items
-                    WHERE datetime(merged_at) >= ? AND datetime(merged_at) < ?
+                    WHERE item_type = 'pull_request'
+                      AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
                     ORDER BY datetime(merged_at) DESC
-                    LIMIT ?
+                    LIMIT :limit
                     """,
-                    (start_utc, end_utc, ITEM_DETAIL_LIMIT),
+                    {**window, "limit": ITEM_DETAIL_LIMIT},
                 )
             ]
 
+            # closed_not_merged deliberately spans BOTH item types — a closed issue is
+            # part of the day's work.
             closed_total = conn.execute(
                 "SELECT COUNT(*) FROM github_items "
-                "WHERE datetime(closed_at) >= ? AND datetime(closed_at) < ? AND merged_at IS NULL",
-                (start_utc, end_utc),
+                "WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end AND merged_at IS NULL",
+                window,
             ).fetchone()[0]
             closed = [
                 dict(r)
@@ -344,20 +442,26 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                     """
                     SELECT repo_full_name, item_type, number, title
                     FROM github_items
-                    WHERE datetime(closed_at) >= ? AND datetime(closed_at) < ?
+                    WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end
                       AND merged_at IS NULL
                     ORDER BY datetime(closed_at) DESC
-                    LIMIT ?
+                    LIMIT :limit
                     """,
-                    (start_utc, end_utc, ITEM_DETAIL_LIMIT),
+                    {**window, "limit": ITEM_DETAIL_LIMIT},
                 )
             ]
     except sqlite3.Error as e:
         return _fail("github collector failed", e)
 
     # First line of each commit message is the subject; the body is noise for a digest.
+    # Scrubbed like every other string bound for the prompt: a commit subject such as
+    # "fix: point the loader at /Users/<name>/Library/..." otherwise carries a home path,
+    # and with it a username, verbatim into a team channel.
     for c in commits:
-        c["message"] = (c.get("message") or "").splitlines()[0][:140] if c.get("message") else ""
+        subject = (c.get("message") or "").splitlines()[0][:140] if c.get("message") else ""
+        c["message"] = _scrub(subject)
+    for item in (*merged, *closed):
+        item["title"] = _scrub(item.get("title") or "")
 
     return {
         "by_repo": repos,
@@ -399,6 +503,18 @@ def collect_health() -> dict[str, Any]:
     except json.JSONDecodeError as e:
         return _fail("doctor output was not JSON", e)
 
+    # Shape-check before iterating. `payload.get("checks", [])` only defaults when the key
+    # is ABSENT — a doctor that emits {"checks": null} yields None and the for-loop raises
+    # TypeError out of this collector, out of build_facts and out of run(), killing the
+    # whole digest. This is the one collector that shells out to another program, so it is
+    # the one most able to be handed a shape it did not expect; the documented contract is
+    # that a collector records its failure IN the facts instead.
+    if not isinstance(payload, dict):
+        return _fail("doctor output was not a JSON object", type(payload).__name__)
+    checks = payload.get("checks") or []
+    if not isinstance(checks, list):
+        return _fail("doctor 'checks' was not a list", type(checks).__name__)
+
     problems = [
         {
             "name": c.get("name"),
@@ -406,8 +522,8 @@ def collect_health() -> dict[str, Any]:
             "disposition": c.get("disposition"),
             "detail": _scrub(c.get("detail") or "")[:200],
         }
-        for c in payload.get("checks", [])
-        if c.get("disposition") == "problem"
+        for c in checks
+        if isinstance(c, dict) and c.get("disposition") == "problem"
     ]
     return {
         "verdict": payload.get("verdict"),
@@ -424,9 +540,9 @@ def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
 
     Takes the same UTC *bounds* as collect_github rather than a local date string.
     search_semantic_documents filters with a RAW `sd.updated_at >= ?` (db/semantic.py:507)
-    — no datetime() normalization — so a local date admitted the previous evening's work
-    as "in flight today" for anyone off UTC, and the format has to match the column's
-    ISO-Z shape or the compare is meaningless.
+    — no datetime() normalization — and the column mixes 'Z' and '+HH:MM' forms, so no
+    single string bound is correct for both. The SQL bound is therefore only a widened
+    prefilter and the real window is applied here on parsed instants.
     """
     try:
         from rebalance.ingest import semantic_index
@@ -438,13 +554,15 @@ def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
         # propagate out of run() and kill the whole digest over one degraded slot.
         return _fail("semantic index unavailable", e)
 
-    start_iso, end_iso = _utc_bounds_iso_z(bounds)
+    start_utc, end_utc = bounds
+    window_start = datetime.strptime(start_utc, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    window_end = datetime.strptime(end_utc, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     try:
         rows = semantic_index.query(
             db,
             SEMANTIC_QUERY,
             top_k=SEMANTIC_TOP_K,
-            updated_after=start_iso,
+            updated_after=_semantic_prefilter_bound(start_utc),
             source_filter=SEMANTIC_SOURCES,
         )
     except Exception as e:  # noqa: BLE001 — any failure degrades this slot, never the run
@@ -453,18 +571,22 @@ def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
     seen: set[str] = set()
     hits: list[dict[str, Any]] = []
     for r in rows:
+        # The SQL bound only prefilters (see _semantic_prefilter_bound); the real window is
+        # applied here, on parsed instants, because updated_at mixes 'Z' and '+HH:MM' forms
+        # and a raw string compare is meaningless across the two. This also supplies the
+        # upper bound db/semantic.py has no parameter for, so a future-stamped document
+        # cannot ride into today's digest.
+        updated = _as_utc(r.get("updated_at") or "")
+        if updated is None or not (window_start <= updated < window_end):
+            continue
         # source_pk, not source_id: query() builds its result dicts by hand
         # (semantic_index.py:824-838) and there is no source_id key, so the old fallback was
         # always None. title is already normalized to '' there, so a titleless github
         # document hit `if not title: continue` and was dropped in silence — the IN FLIGHT
         # section read as "nothing in flight" when the truth was a degraded query.
-        title = (r.get("title") or r.get("source_pk") or "").strip()
+        title = _scrub((r.get("title") or r.get("source_pk") or "").strip())
         key = title.lower()
         if not title or key in seen:
-            continue
-        # query() has no upper bound (db/semantic.py has no updated_before), so a document
-        # stamped in the future would otherwise ride into today's digest.
-        if (r.get("updated_at") or "") >= end_iso:
             continue
         seen.add(key)
         hits.append({"title": title[:160], "source_type": r.get("source_type")})
@@ -489,11 +611,27 @@ def build_facts(db: Path, now: datetime) -> dict[str, Any]:
 # --- Synthesis -----------------------------------------------------------------
 
 
+class SynthesisUnconfigured(Exception):
+    """The machine was never set up to synthesize — not a failure of this run.
+
+    A missing Gemini key is operator state, like the kill switch, and the installer says so
+    explicitly: the key is hand-added to the RENDERED plist and a reinstall overwrites it
+    (install_hiqs_digest_scheduler.sh:19-23). Treating that as a failed job writes
+    job_failed to auth_activity.jsonl twice a day, which doctor's _check_auth_failures
+    raises as an `auth:launchd` ERROR and health_issue_reporter files as a GitHub issue —
+    for a machine that is merely unconfigured, and indistinguishably from a real Gemini
+    outage. run() returns 0 for this and non-zero for everything else.
+    """
+
+
 def synthesize(facts: dict[str, Any]) -> str | None:
-    """Gemini-only. Returns None if unavailable or failed — the caller writes nothing.
+    """Gemini-only. Returns None if the call failed — the caller writes nothing.
 
     NO fallback model. A degraded summary posted to a team channel is worse than silence,
     because nobody can tell it apart from a good one.
+
+    Raises SynthesisUnconfigured when the machine has no API key, so run() can exit 0 for
+    "never set up" while still exiting non-zero for "tried and failed".
     """
     # Belt and braces with run()'s check. run() owns the EXIT CODE decision (the kill
     # switch is an operator no-op, not a failure); this guard owns the API call, so any
@@ -512,7 +650,7 @@ def synthesize(facts: dict[str, Any]) -> str | None:
     key = get_gemini_api_key()
     if not key:
         log("SKIP: no Gemini API key — refusing to write a fallback summary.")
-        return None
+        raise SynthesisUnconfigured("no Gemini API key")
 
     prompt = PROMPT_TEMPLATE.format(data=json.dumps(facts, indent=2, default=str))
     try:
@@ -533,7 +671,14 @@ def render(summary: str, facts: dict[str, Any], now: datetime) -> str:
         # Real totals, not len() of the truncated detail lists.
         counts.append(f"{gh.get('commit_total', 0)} commits")
         counts.append(f"{gh.get('merged_total', 0)} merged")
-        counts.append(f"{len(gh.get('by_repo', []))} active repos")
+        # "Active" means shipped something — a commit or a merge. by_repo deliberately
+        # also carries repos whose only event was an opened issue, so the model can see
+        # them, but len(by_repo) as the footer count announced "3 active repos" on a day
+        # when three people merely filed issues in three idle repos, while the model
+        # correctly named none of them (prompt rule 2: never list a repo that shipped
+        # nothing). The footer and the prose have to mean the same thing by "active".
+        shipped = [r for r in gh.get("by_repo", []) if (r.get("commits") or 0) or (r.get("prs_merged") or 0)]
+        counts.append(f"{len(shipped)} active repos")
     health = facts.get("health", {})
     if "error" not in health and health.get("problem_count"):
         counts.append(f"{health['problem_count']} health warnings")
@@ -572,7 +717,15 @@ def publish(content: str, now: datetime, slot: str, *, dry_run: bool, push: bool
         return {"ok": False, "reason": _scrub(f"pulse_target_path is not a git repo: {target_repo}")}
 
     # Read at call time, not import time, so the value is overridable and honestly named.
-    subdir = os.environ.get("HIQS_DIGEST_SUBDIR", "digests")
+    #
+    # Validated for the same reason --slot is choices-constrained. This value is
+    # interpolated into a path that _commit_and_push_if_changed mkdir -p's and writes
+    # BEFORE git sees it, so '../../../../tmp/x' or an absolute '/tmp/x' (pathlib discards
+    # the left operand for an absolute right one) writes the digest to an arbitrary
+    # location and then fails at `git add` with an error that never names the real cause.
+    subdir = os.environ.get("HIQS_DIGEST_SUBDIR", "digests").strip()
+    if not _is_safe_subdir(subdir):
+        return {"ok": False, "reason": f"HIQS_DIGEST_SUBDIR is not a relative path inside the repo: {subdir!r}"}
     file_rel = f"{subdir}/hiqs-{now:%Y-%m-%d}-{slot}.md"
 
     if dry_run:
@@ -620,7 +773,12 @@ def run(
     push: bool = True,
     now: datetime | None = None,
 ) -> int:
-    now = now or datetime.now().astimezone()
+    # time_ops.local_tz() returns a real ZoneInfo and honours REBALANCE_TZ — the same
+    # resolver pulse.py, doctor.py and next_actions.py use. `datetime.now().astimezone()`
+    # returns a FIXED-OFFSET tzinfo instead, which is both DST-blind for the day bounds and
+    # deaf to the configured zone, so this job's "today" could disagree with the pulse page
+    # sitting next to it in the same repo.
+    now = now or datetime.now(local_tz())
     explicit_slot = slot is not None
     slot = slot or slot_for(now)
 
@@ -634,12 +792,21 @@ def run(
     # job's entire observability design) cannot save it.
     #
     # Exit 0: a skipped catch-up is correct behaviour, not a failed job.
-    if not (dry_run or facts_only or explicit_slot) and now.timetz().replace(tzinfo=None) < FIRE_MIDDAY:
+    if not (dry_run or facts_only or explicit_slot) and now.time() < FIRE_MIDDAY:
         log(
             f"SKIP: {now:%H:%M} is before the {FIRE_MIDDAY:%H:%M} midday slot — this is a "
             "post-midnight catch-up of a missed run, and today has barely started. "
             "Pass --slot to publish anyway."
         )
+        return 0
+
+    # The kill switch is checked BEFORE collection, not after. Collecting costs a
+    # `rebalance doctor` subprocess (180s cap) and an MLX embedding load for the semantic
+    # query; an operator who set the switch to stop this job's cost should not still pay
+    # both twice a day to publish nothing. --facts-only deliberately still collects: it
+    # makes no LLM call, so the switch has no bearing on it.
+    if not facts_only and os.environ.get(LLM_DISABLE_ENV) == "1":
+        log(f"{LLM_DISABLE_ENV}=1 — synthesis disabled by operator; nothing collected or published.")
         return 0
 
     try:
@@ -669,14 +836,14 @@ def run(
         log("FATAL: every collector failed — nothing to publish.")
         return 1
 
-    # The documented kill switch is an operator-requested no-op, NOT a failure. Returning
-    # non-zero here would make the dashboard show a red job twice a day forever,
-    # indistinguishable from a Gemini outage.
-    if os.environ.get(LLM_DISABLE_ENV) == "1":
-        log(f"{LLM_DISABLE_ENV}=1 — synthesis disabled by operator; nothing published.")
+    # An unconfigured machine is operator state, not a failed run — same reasoning as the
+    # kill switch above. Exit 0 so the dashboard does not show a red job twice a day
+    # forever on a device where the API key was simply never added.
+    try:
+        summary = synthesize(facts)
+    except SynthesisUnconfigured as e:
+        log(f"{e} — this machine is not set up to synthesize; nothing published.")
         return 0
-
-    summary = synthesize(facts)
     if summary is None:
         log("Nothing written (no synthesis).")
         return 1
