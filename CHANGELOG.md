@@ -10,6 +10,31 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.80.0] - 2026-09-01
+
+### Added
+
+- A twice-daily progress digest. At 1:05 PM and 5:05 PM local time a new scheduled job
+  summarizes the day so far — what shipped, what is in flight, and any live health
+  problems — and publishes it to the shared pulse repository, where AEGIS Sleuth picks it
+  up and posts it to the team's Slack channel. Each post covers midnight to the moment it
+  was written and carries its own generation time, so a run delayed by a sleeping machine
+  says so in the channel instead of passing as current.
+
+  The three collectors are deterministic: the model is given the facts and writes only the
+  prose. If the model is unavailable the job publishes nothing rather than a degraded
+  summary, on the grounds that nobody reading the channel could tell the two apart. A
+  collector that fails says so in the post; it never reports a quiet day it did not verify.
+
+  Counts cover every contributor, and include work pushed straight to a branch as well as
+  work that arrived through a pull request — reading only one of those made the summary
+  contradict its own totals. Day boundaries follow the machine's local calendar day rather
+  than UTC, so an evening's work is not attributed to tomorrow.
+
+  Synthesis can be switched off with an environment variable for cost control; doing so is
+  treated as an operator decision rather than a failure, so it does not show up as a broken
+  job twice a day.
+
 ## [0.79.0] - 2026-09-01
 
 ### Added

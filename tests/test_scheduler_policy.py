@@ -183,6 +183,23 @@ POLICY = {
         "wrapper_must_contain": ["daily_synthesis.py"],
         "doc_tokens": ["daily 18:20", "daily_synthesis.sh"],
     },
+    "hiqs-digest": {
+        # :05, not :00 (GH-175) — pulse-sync owns :00.
+        # Local wall clock is deliberate: launchd resolves StartCalendarInterval against
+        # the machine's own clock and handles DST itself, which is why this job owns the
+        # fire time rather than the Slack-side consumer (AEGIS-Sleuth-Slackbot#158 is an
+        # open DST defect in that scheduler).
+        "calendar": [{"Hour": 13, "Minute": 5}, {"Hour": 17, "Minute": 5}],
+        # Loading must never fire an off-schedule post into a team channel.
+        "run_at_load": False,
+        "keep_alive": False,
+        "wrapper": "scripts/hiqs_digest.sh",
+        "wrapper_must_contain": [
+            'rb_job_init "hiqs-digest" 14',
+            "utils/hiqs_digest.py",
+        ],
+        "doc_tokens": ["13:05, 17:05", "hiqs_digest.sh"],
+    },
 }
 
 INSTALLERS = {
@@ -197,6 +214,7 @@ INSTALLERS = {
     "health-check-triage": "install_health_check_triage_scheduler.sh",
     "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
     "daily-synthesis": "install_daily_synthesis_scheduler.sh",
+    "hiqs-digest": "install_hiqs_digest_scheduler.sh",
 }
 
 

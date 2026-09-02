@@ -51,11 +51,18 @@
         -->
     </dict>
 
+    <!-- Logs live OUTSIDE ~/Documents. launchd opens StandardOutPath/StandardErrorPath
+         ITSELF, before exec'ing the program, so the wrapper's inherited Full Disk Access
+         does not cover them — a path under a TCC-protected folder simply fails to open,
+         with no error anyone sees. ~/Library/Logs is fine. Same note as
+         com.rebalance-os.daily-synthesis.plist.template:36-42.
+         The per-day wrapper log (temp/logs/hiqs_digest_<date>.log, written by
+         rb_job_init) is opened by the wrapper and does inherit the grant. -->
     <key>StandardOutPath</key>
-    <string>{{REBALANCE_DIR}}/temp/logs/hiqs-digest-stdout.log</string>
+    <string>{{HOME}}/Library/Logs/rebalance-os/hiqs-digest.log</string>
 
     <key>StandardErrorPath</key>
-    <string>{{REBALANCE_DIR}}/temp/logs/hiqs-digest-stderr.log</string>
+    <string>{{HOME}}/Library/Logs/rebalance-os/hiqs-digest.log</string>
 
     <key>RunAtLoad</key>
     <false/>
