@@ -31,7 +31,13 @@ from rebalance.paths import resolve_database_path
 
 db_path = resolve_database_path()
 print(f"database={db_path}")
-result = refresh_index(db_path, scope=["github", "focus5"])
+# GH-148: the hourly run narrows ONLY the per-item artifact sync window (the
+# issues/PRs/comments/check-runs fan-out measured at 5-7k API calls/run over the
+# 30-day default). Watched-set resolution, the events scan and the watched-repo
+# rollups keep the wide window; the 06:30 daily-sync still does the full 30-day
+# sweep, so nothing loses coverage — the hourly job just stops re-reading
+# month-old PRs every hour.
+result = refresh_index(db_path, scope=["github", "focus5"], artifact_sync_days=7)
 print(json.dumps(result, indent=2, default=str))
 sys.exit(1 if result.get("errors") else 0)
 PY

@@ -734,3 +734,106 @@ class SignalHealthAgreesWithDoctorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArtifactSyncWindowTests(unittest.TestCase):
+    """GH-148: artifact_sync_days narrows ONLY the per-item artifact fan-out.
+
+    The hourly job sets it so sync_github_repo's expensive walk (per-PR detail +
+    comments + reviews + commits + check-runs, per-issue comments) covers a short
+    window. The rest — watched-set resolution, events scan, watched-repo rollups —
+    must keep the wide since_days, because narrowing those would silently drop
+    dormant repos from the hourly watched set and flip the digest's stale-repos
+    signal into a false-alarm generator.
+    """
+
+    def _run_refresh(self, **extra):
+        """_refresh_github against patched ingest leaves; returns the mocks."""
+        from rebalance.ingest.github_knowledge import GitHubKnowledgeSyncResult
+        from rebalance.ingest.project_inference import AutoPromoteSummary
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            fake_sync_result = GitHubKnowledgeSyncResult(
+                repo_full_name="example/repo",
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                milestones_synced=0,
+                labels_synced=0,
+                releases_synced=0,
+                elapsed_seconds=0.0,
+            )
+            with (
+                patch(
+                    "rebalance.ingest.index_ops._resolve_repos_for_refresh",
+                    return_value=["example/repo"],
+                ),
+                # "example/repo" is also external, so the watched-repo reconcile
+                # loop runs and its window assertion is exercisable.
+                patch("rebalance.ingest.index_ops._external_repos", return_value=["example/repo"]),
+                patch("rebalance.ingest.github_scan.sync_pushed_repos") as mock_pushed,
+                patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+                patch(
+                    "rebalance.ingest.github_scan.filter_ignored_repo_activity",
+                    return_value=[],
+                ),
+                patch("rebalance.ingest.github_scan.upsert_github_activity"),
+                patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_repo,
+                patch("rebalance.ingest.github_watch.reconcile_watched_repo") as mock_reconcile,
+                patch("rebalance.ingest.github_direct_commits.capture_direct_commits") as mock_capture,
+                patch("rebalance.ingest.github_commit_backfill.backfill_repos", return_value=[]),
+                patch("rebalance.ingest.github_direct_commits.sync_direct_commit_documents", return_value={}),
+                patch("rebalance.ingest.semantic_index.sync_github_documents", return_value={}),
+                patch("rebalance.ingest.github_knowledge.embed_github_documents") as mock_embed,
+                patch("rebalance.ingest.watchlist_guard.snapshot_and_detect", return_value={"ok": True}),
+                patch("rebalance.ingest.project_inference.sync_commit_threshold_promotions") as mock_auto_promote,
+            ):
+                mock_pushed.return_value.fetched = 0
+                mock_pushed.return_value.inserted = 0
+                mock_pushed.return_value.updated = 0
+                mock_pushed.return_value.unchanged = 0
+                mock_pushed.return_value.skipped_archived = 0
+                mock_pushed.return_value.error = None
+                mock_scan.return_value.login = "tester"
+                mock_scan.return_value.total_events = 0
+                mock_scan.return_value.repo_activity = []
+                mock_scan.return_value.events = []
+                mock_capture.return_value.as_dict.return_value = {}
+                mock_embed.return_value.total_docs = 0
+                mock_embed.return_value.embedded_docs = 0
+                mock_embed.return_value.skipped_unchanged = 0
+                mock_embed.return_value.elapsed_seconds = 0.0
+                mock_auto_promote.return_value = AutoPromoteSummary(
+                    enabled=False, threshold=3, candidates_evaluated=0, promoted=[]
+                )
+                mock_sync_repo.return_value = fake_sync_result
+
+                result = _refresh_github(
+                    db_path,
+                    token="test-token",
+                    since_days=30,
+                    repos=[],
+                    dry_run=False,
+                    **extra,
+                )
+        return result, mock_sync_repo, mock_scan, mock_reconcile
+
+    def test_narrow_window_reaches_only_the_artifact_sync(self) -> None:
+        result, mock_sync_repo, mock_scan, mock_reconcile = self._run_refresh(artifact_sync_days=7)
+
+        self.assertEqual(mock_sync_repo.call_args.kwargs["since_days"], 7, "artifact fan-out narrowed")
+        self.assertEqual(mock_scan.call_args.kwargs["days"], 30, "events scan keeps the wide window")
+        self.assertEqual(mock_reconcile.call_args.kwargs["since_days"], 30, "rollups keep the wide window")
+        self.assertEqual(result["item_sync_days"], 7)
+
+    def test_unset_window_behaves_exactly_as_before(self) -> None:
+        result, mock_sync_repo, mock_scan, _ = self._run_refresh()
+
+        self.assertEqual(mock_sync_repo.call_args.kwargs["since_days"], 30)
+        self.assertEqual(mock_scan.call_args.kwargs["days"], 30)
+        self.assertEqual(result["item_sync_days"], 30)

@@ -1047,7 +1047,17 @@ def _refresh_github(
     repos: list[str],
     dry_run: bool,
     backfill_since: str | None = None,
+    artifact_sync_days: int | None = None,
 ) -> dict[str, Any]:
+    # GH-148: the per-item artifact fan-out (PR detail/comments/reviews/commits/
+    # check-runs, per-issue comment walks) is the dominant API cost of a refresh —
+    # measured 5-7k calls/run over the default 30-day window (#148). A caller on an
+    # hourly cadence can narrow JUST that window; the wide sweep stays the job of the
+    # daily full refresh. Falls back to since_days when unset or nonsensical.
+    item_sync_days = since_days
+    if artifact_sync_days is not None and int(artifact_sync_days) > 0:
+        item_sync_days = int(artifact_sync_days)
+
     initial_target_repos = _resolve_repos_for_refresh(database_path, repos)
     external_count = len(
         [r for r in initial_target_repos if r.lower() in {e.lower() for e in _external_repos(database_path)}]
@@ -1057,7 +1067,8 @@ def _refresh_github(
         f"github_scan(days={since_days})",
         "capture_direct_commits(events, watched_repos, cap=5/20)",
         "backfill_repos(local git walk, 0 API calls)",
-        f"sync_github_repo() x ~{len(initial_target_repos)} repos (after auto-discovery)",
+        f"sync_github_repo() x ~{len(initial_target_repos)} repos (after auto-discovery)"
+        + (f" [item window {item_sync_days}d]" if item_sync_days != since_days else ""),
         f"reconcile_watched_repo() x {external_count} external repos (rollup or purge)",
         "embed_github_documents()",
     ]
@@ -1112,7 +1123,7 @@ def _refresh_github(
                 database_path=database_path,
                 repo_full_name=repo,
                 token=token,
-                since_days=since_days,
+                since_days=item_sync_days,
             )
             repo_results.append(
                 {
@@ -1198,6 +1209,7 @@ def _refresh_github(
     return {
         "scope": "github",
         "dry_run": False,
+        "item_sync_days": item_sync_days,
         "watchlist_guard": watchlist_guard,
         "auto_promote": auto_promote_result,
         "pushed_repos_sync": {
@@ -1620,6 +1632,7 @@ def refresh_index(
     dry_run: bool = False,
     update_dashboard_note: bool = True,
     precompute_next_actions: bool = True,
+    artifact_sync_days: int | None = None,
 ) -> dict[str, Any]:
     """Run the configured ingest pipelines for ``scope`` and return a summary.
 
@@ -1704,6 +1717,13 @@ def refresh_index(
         "since_days": since_days,
         "repos": repos_list,
         "dry_run": dry_run,
+        # GH-148: optional NARROWER window for the per-item artifact sync only
+        # (sync_github_repo's issues/PRs/comments/check-runs fan-out). The hourly
+        # job sets this so its expensive fan-out covers a short window while the
+        # daily full refresh keeps since_days' wide sweep. Everything else —
+        # watched-set resolution, events scan, watched-repo rollups — keeps
+        # since_days, so no other consumer's semantics move.
+        "artifact_sync_days": artifact_sync_days,
     }
 
     # Bring the database schema to the latest version before any collector
@@ -1921,6 +1941,7 @@ def _github_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
             since_days=opts["since_days"],
             repos=opts.get("repos") or [],
             dry_run=opts["dry_run"],
+            artifact_sync_days=opts.get("artifact_sync_days"),
         )
     )
 
