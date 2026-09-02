@@ -1,0 +1,13 @@
+........F                                                                [100%]
+=================================== FAILURES ===================================
+__________________ test_gh144_witnessed_red_negative_control ___________________
+
+    def test_gh144_witnessed_red_negative_control():
+>       assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
+E       AssertionError: GH-144 Phase 0 witnessed-red negative control (M10)
+E       assert False
+
+tests/test_embedder_metal_unavailable.py:119: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_embedder_metal_unavailable.py::test_gh144_witnessed_red_negative_control
+1 failed, 8 passed in 8.66s

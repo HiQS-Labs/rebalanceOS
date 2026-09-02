@@ -1,0 +1,12 @@
+diff --git a/tests/test_embedder_metal_unavailable.py b/tests/test_embedder_metal_unavailable.py
+index 6947193..d1b5ef8 100644
+--- a/tests/test_embedder_metal_unavailable.py
++++ b/tests/test_embedder_metal_unavailable.py
+@@ -114,3 +114,7 @@ def test_instrument_embedding_pass_skips_mlx_when_metal_unavailable():
+     with patch.object(embedder, "metal_available", return_value=False) as mock_available:
+         embedder.instrument_embedding_pass("test_site")
+     mock_available.assert_called_once()
++
++def test_gh144_witnessed_red_negative_control():
++    assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
++

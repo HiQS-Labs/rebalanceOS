@@ -1,0 +1,12 @@
+diff --git a/tests/test_querier.py b/tests/test_querier.py
+index 888fbf2..b1517ad 100644
+--- a/tests/test_querier.py
++++ b/tests/test_querier.py
+@@ -264,3 +264,7 @@ class HiqsFieldContractTests(unittest.TestCase):
+ 
+ if __name__ == "__main__":
+     unittest.main()
++
++def test_gh144_witnessed_red_negative_control():
++    assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
++

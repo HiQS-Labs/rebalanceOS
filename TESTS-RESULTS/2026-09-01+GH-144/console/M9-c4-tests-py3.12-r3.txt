@@ -1,0 +1,96 @@
+bringing up nodes...
+bringing up nodes...
+
+...................uuuuuu....uuuu....................................... [  2%]
+........................................................................ [  6%]
+.........................................uuuuuuuuuuuuuuuu............... [  8%]
+........................................................................ [ 12%]
+.......................u...uu.....uuu..uuuuu............................ [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 21%]
+........x..x.....x...x....................x.x..xxx...................... [ 25%]
+........................................................................ [ 28%]
+...........................................................uu.uu.uu.uu.. [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+...................................................................uu... [ 44%]
+........................................................................ [ 48%]
+.........uuuu........................................................... [ 51%]
+...................................................uuuuuuuuuuuuuuuuu.uuu [ 53%]
+uuuuuuuuuuuuuu.......................................................... [ 56%]
+............s.ssssssss.sssssss.......................................... [ 59%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+....uuu................................................................. [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+..................x..................................................... [ 83%]
+..uuuu........................uuuuuuu.........................uuuuuuuuuu [ 85%]
+uu...uuuuuuuuuuuuu.......uuuu........................................uuu [ 87%]
+uuuu.................................................................... [ 91%]
+........................................................................ [ 94%]
+.uu..........................ssss....................................... [ 97%]
+................................uu...uuuu................                [100%]
+=============================== warnings summary ===============================
+temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages/fastapi/testclient.py:1
+temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages/fastapi/testclient.py:1
+temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages/fastapi/testclient.py:1
+temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages/fastapi/testclient.py:1
+  <repo>/temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 50 durations =============================
+7.43s call     tests/test_next_actions_parity.py::CrossSurfaceParityTests::test_ask_reads_persisted_cache_and_never_recomputes
+6.88s call     tests/test_querier.py::QueryResultContractTests::test_calendar_context_is_dict_with_upcoming_and_recent
+4.59s call     tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+3.06s call     tests/test_querier.py::QueryResultContractTests::test_temporal_context_tomorrow_field_shape
+3.05s call     tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+1.98s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_database_location_split
+1.94s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_repair_failure_propagates_error
+1.83s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_schema_corrupt_should_not_skip
+1.75s call     tests/test_health_issue_reporter.py::TestLLMTriage::test_real_api_call_gemini
+1.64s call     tests/test_gh250_fencing.py::test_verify_fails_when_writer_loaded
+1.58s call     tests/test_doc_links.py::RepoTests::test_repo_is_clean
+1.58s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_gmail_mcp_no_messages
+1.56s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_launchd_single_nonzero_exit
+1.55s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_github_token_missing_should_not_skip
+1.54s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_calendar_token_missing
+1.51s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_sleuth_env_missing
+1.48s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_stale_github_data
+1.46s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_db_not_found_should_not_skip
+1.46s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_default_scope_covers_branches_outside_the_default_branch
+1.37s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_keeps_last_run_when_a_repo_scan_fails
+1.37s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_backfill_skips_rows_already_present_in_pulse_file
+1.30s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_self_migrates_legacy_slugged_device_id
+1.20s call     tests/test_gh250_fencing.py::test_fence_interrupt_restores_and_idempotent
+1.18s call     tests/test_gh250_fencing.py::test_already_paused_writer_gets_neither_pause_nor_resume
+1.18s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_skips_unborn_repo_without_failing
+1.16s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_stages_pdda_registry_projection
+1.14s call     tests/test_local_repos.py::ScanTests::test_scan_finds_repos_counts_unpushed_and_filters_non_github
+1.10s call     tests/test_stickies2obsidian_cli.py::StickiesToObsidianTests::test_imports_new_notes_and_deduplicates_on_second_run
+1.04s call     tests/test_github_coverage.py::CoverageCheckTests::test_stale_clone_reports_stale_not_zero
+1.04s call     tests/test_gh250_fencing.py::test_verify_fails_on_unknown_rebalance_job
+1.02s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_rerun_is_a_no_op
+1.02s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_failed_fetch_warns_instead_of_claiming_coverage
+1.01s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_backfill_captures_direct_commit_with_full_message_and_paths
+1.00s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_self_repair_on_push_rejection
+0.99s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_explicit_branch_scopes_the_walk
+0.97s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_backfill_makes_no_api_calls
+0.96s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_merge_commits_are_captured_with_their_paths
+0.95s call     tests/test_focus5_scan.py::Focus5RankOracleTests::test_oracle_real_git_webmerge_only_repo_drops_off_roster
+0.94s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_pr_commits_are_not_duplicated
+0.94s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_content_survives_repair
+0.94s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_later_unavailable_write_cannot_downgrade_complete_row
+0.92s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_off_roster_drops_repo_removed_from_disk_without_resync
+0.91s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_sync_ranks_persists_and_surfaces_off_roster
+0.87s call     tests/test_github_coverage.py::CoverageCheckTests::test_projection_gap_is_measured_separately_from_collection
+0.85s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_unavailable_row_is_upgraded_to_complete
+0.82s call     tests/test_git_pulse_view_cli.py::GitPulseViewCliTests::test_include_local_unsynced_writes_combined_output_file
+0.82s call     tests/test_pulse_reconcile.py::test_local_commits_preserved_on_rebase
+0.81s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_roster_drops_repo_removed_from_disk_without_resync
+0.79s call     tests/test_gh250_fencing.py::test_fence_records_pre_state
+0.78s call     tests/test_git_pulse_install_cli.py::GitPulseInstallCliTests::test_copy_mode_installs_working_health_launcher_with_shared_module
+2116 passed, 20 skipped, 10 xfailed, 4 warnings, 143 subtests passed in 55.20s

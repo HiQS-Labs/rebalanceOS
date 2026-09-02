@@ -1,0 +1,259 @@
+name: Phase 0 measure (GH-144 spike)
+
+# THROWAWAY measurement workflow for the GH-144 Phase 0 campaign
+# (TESTS-RESULTS/2026-09-01+GH-144/). Never merged; the branch is deleted
+# after the campaign. ci.yml is untouched. Each job mirrors the incumbent
+# `test` job's steps exactly, per protocol §4.1; job wall times are read from
+# the Actions API afterwards (cell M11). Three samples come from re-running
+# this workflow on the same SHA twice.
+on:
+  push:
+    branches: [spike/gh144-phase0-lanes]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- C0: incumbent, verbatim, no cache (cold reference x3 via re-runs) ----
+  c0-incumbent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest
+          pip install -e HiQS/
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Root suite
+        run: python -m pytest tests/ -q --durations=50 --junitxml=temp/junit-root.xml
+      - name: HiQS suite (isolated)
+        run: python -m pytest HiQS/tests -q --durations=50 --junitxml=temp/junit-hiqs.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c0-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+
+  # ---- C1: incumbent + pip cache ----
+  c1-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-p1-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'HiQS/pyproject.toml') }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest
+          pip install -e HiQS/
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Root suite
+        run: python -m pytest tests/ -q --durations=50 --junitxml=temp/junit-root.xml
+      - name: HiQS suite (isolated)
+        run: python -m pytest HiQS/tests -q --durations=50 --junitxml=temp/junit-hiqs.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c1-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+
+  # ---- C2: HiQS split into its own job, HiQS-only deps ----
+  c2-root:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-p1-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install dependencies (root only — HiQS deliberately absent)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Root suite
+        run: python -m pytest tests/ -q --durations=50 --junitxml=temp/junit-root.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c2-root-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+
+  c2-hiqs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-hiqs-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('HiQS/pyproject.toml') }}
+      - name: Install dependencies (HiQS only — no root package, no torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e HiQS/ pytest
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: HiQS suite (isolated)
+        run: python -m pytest HiQS/tests -q --durations=50 --junitxml=temp/junit-hiqs.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c2-hiqs-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+
+  # ---- C4: xdist on the root lane (C2's root job + pytest-xdist) ----
+  c4-xdist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+        workers: [2, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-p1-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install dependencies (root only + xdist)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest pytest-xdist
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Root suite (xdist)
+        run: python -m pytest tests/ -q --durations=50 -n ${{ matrix.workers }} --dist load --junitxml=temp/junit-root.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c4-xdist${{ matrix.workers }}-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+  # ---- C3: embeddings seam split (pushed only after the S1 M7 gate passed) ----
+  c3-root-noembed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-c3-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install dependencies (no embeddings extra — no torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[calendar,server]" pytest
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Root suite excluding the seam files
+        run: python -m pytest tests/ -q --durations=50 --ignore=tests/test_embedder.py --ignore=tests/test_embedder_metal_unavailable.py --junitxml=temp/junit-root.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c3-root-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml
+
+  c3-embed-seam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: gh144-p1-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install dependencies (with embeddings)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[calendar,server,embeddings]" pytest
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@rebalance-os.invalid"
+          git config --global user.name "rebalance-OS CI"
+          git config --global init.defaultBranch main
+      - name: Embeddings seam suite
+        run: python -m pytest tests/test_embedder.py tests/test_embedder_metal_unavailable.py -q --durations=50 --junitxml=temp/junit-seam.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c3-seam-junit-${{ matrix.python-version }}
+          path: temp/junit-*.xml

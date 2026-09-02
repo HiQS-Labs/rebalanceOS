@@ -1,0 +1,14 @@
+Collecting pytest-xdist
+  Using cached pytest_xdist-3.8.0-py3-none-any.whl.metadata (3.0 kB)
+Collecting execnet>=2.1 (from pytest-xdist)
+  Using cached execnet-2.1.2-py3-none-any.whl.metadata (2.9 kB)
+Requirement already satisfied: pytest>=7.0.0 in ./temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages (from pytest-xdist) (9.1.1)
+Requirement already satisfied: iniconfig>=1.0.1 in ./temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages (from pytest>=7.0.0->pytest-xdist) (2.3.0)
+Requirement already satisfied: packaging>=22 in ./temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages (from pytest>=7.0.0->pytest-xdist) (26.3)
+Requirement already satisfied: pluggy<2,>=1.5 in ./temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages (from pytest>=7.0.0->pytest-xdist) (1.6.0)
+Requirement already satisfied: pygments>=2.7.2 in ./temp/gh144/venvs/py3.12-c4/lib/python3.12/site-packages (from pytest>=7.0.0->pytest-xdist) (2.21.0)
+Using cached pytest_xdist-3.8.0-py3-none-any.whl (46 kB)
+Using cached execnet-2.1.2-py3-none-any.whl (40 kB)
+Installing collected packages: execnet, pytest-xdist
+
+Successfully installed execnet-2.1.2 pytest-xdist-3.8.0

@@ -1,0 +1,1295 @@
+**NO FIRSTHAND VERIFICATION CITED** — treat conclusions as conditional (codex's answer carries an unsupported [Pass]/verified/confirmed-style claim with no quoted span or file:line citation nearby, despite the consult PREAMBLE asking advisors to cite evidence.)
+
+> **ATTESTATION**
+> Model: gpt-5.6-sol
+> Provider: openai
+> Sandbox: read-only
+
+Reading additional input from stdin...
+2026-09-02T04:10:34.407013Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 98 column 5
+OpenAI Codex v0.144.6
+--------
+workdir: <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/consult-wt-72680-y0uopejj
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a0604f-c1e1-71e2-8824-5dd26fbcd8c1
+--------
+user
+You are an INDEPENDENT advisor in a one-shot cross-model consult. Another model is answering the SAME question separately and a coordinator will reconcile both answers, so give your own honest, specific read — do not hedge toward a consensus you cannot see. Read any repo files the question references (cite file:line). Respond with: (1) a short direct ANSWER; (2) graded FINDINGS — [Blocker]/[Should]/[Nit]/[Pass] — where applicable; (3) a one-line RECOMMENDATION. You are ADVISORY ONLY: output your analysis as text; do not rely on writing files (you are running in a throwaway copy).
+
+=== CONSULT QUESTION ===
+Advisory pre-registration review (SOP.md §3.3). Read these three files in this repo before answering:
+
+1. PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md — the protocol under review (frozen, amendable only via dated deviation notes before runs start)
+2. .github/workflows/ci.yml — the incumbent "test" job being measured
+3. SOP.md and TESTS-RESULTS/README.md — the evidence bar this campaign must clear
+
+Context: issue #144 (HiQS-Labs/rebalanceOS) proposes optimizing CI with measured, dependency-isolated test lanes. Phase 0 is a 1-2h measured spike comparing, in order: pip caching only; moving the already-isolated HiQS suite to its own parallel job (HiQS-only deps); an embeddings seam lane (only if the root suite passes without the embeddings extra); pytest-xdist at 2/4 workers with serial exclusions. Constraints: #7 HiQS must stay a separate pytest process; #67 cwd-dependent test history; #127 clean-clone install contract; 3-Eyes is deferred and out of scope.
+
+Review adversarially, with concrete amendments (not general praise):
+(a) Does the decision rule (§1, D1-D4) actually decide — can it return "stop at C1/C2" or "keep incumbent" under plausible data, or is it rigged toward complexity? Is the ≥20% threshold defensible?
+(b) Fatal gaps in the run matrix (§6) or metrics (§5) that would make published numbers non-recomputable or the recommendation unsound? Anything missing that the issue's Phase 0 bullets require but the protocol drops?
+(c) Is the local-macOS-as-structure-proxy + GitHub-API-for-absolute-times hybrid (§3) coherent, or a way to fool ourselves? Where does it break?
+(d) Anything that violates the repo's own rules (#7, #67, #127, SOP witnessed-red §3.6, TESTS-RESULTS publication conventions)?
+(e) The inventory-hash method (§7): is collection-only + runtime counts a sound fingerprint for "executed test inventory unchanged"?
+
+Deliver: a numbered list of required amendments (Blocking), optional improvements (Optional), and explicit non-issues (Dismiss), each with one-line justification. You are advisory; the coordinator reconciles.
+
+hook: SessionStart
+hook: SessionStart Completed
+codex
+I’ll review the frozen protocol against the incumbent workflow and both evidence rulebooks, then test each decision branch and fingerprint claim against the stated run matrix. I’ll stay advisory and cite exact file lines.
+exec
+/bin/zsh -lc 'wc -l PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md .github/workflows/ci.yml SOP.md TESTS-RESULTS/README.md && nl -ba PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md && nl -ba .github/workflows/ci.yml' in <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/consult-wt-72680-y0uopejj
+ succeeded in 0ms:
+     237 PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md
+     166 .github/workflows/ci.yml
+     159 SOP.md
+      88 TESTS-RESULTS/README.md
+     650 total
+     1	---
+     2	gh_issue: 144
+     3	source: https://github.com/HiQS-Labs/rebalanceOS/issues/144
+     4	title: "GH-144 Phase 0 protocol — measured CI lane spike"
+     5	status: "Protocol frozen 2026-09-01, pending independent review"
+     6	created: 2026-09-01
+     7	owner: noel
+     8	doc_type: protocol
+     9	goal: >
+    10	  Measure the incumbent CI test job and the four candidates from issue #144 on
+    11	  the same commit and executed-test inventory, and publish the campaign under
+    12	  TESTS-RESULTS/2026-09-01+GH-144/ before any workflow change or speedup claim.
+    13	effort: 2
+    14	complexity: 2
+    15	risk: 1
+    16	phases: 1
+    17	ratings_provisional: false
+    18	---
+    19	
+    20	# GH-144 Phase 0 — measured CI lane spike protocol
+    21	
+    22	## TOC
+    23	
+    24	1. [Question and decision rule](#1-question-and-decision-rule)
+    25	2. [Constraints inherited from prior issues](#2-constraints-inherited-from-prior-issues)
+    26	3. [Provenance and environments](#3-provenance-and-environments)
+    27	4. [Candidates under comparison](#4-candidates-under-comparison)
+    28	5. [Metrics](#5-metrics)
+    29	6. [Run matrix](#6-run-matrix)
+    30	7. [Inventory pinning](#7-inventory-pinning)
+    31	8. [Witnessed-red negative controls](#8-witnessed-red-negative-controls)
+    32	9. [Publication plan](#9-publication-plan)
+    33	10. [Pre-declared threats to validity](#10-pre-declared-threats-to-validity)
+    34	11. [Checklist](#11-checklist)
+    35	
+    36	This protocol is **frozen before any measurement number is generated** (SOP §3.1).
+    37	Deviations after freeze are permitted only with a dated note in §12 and a matching
+    38	entry in the campaign `SUMMARY.md`.
+    39	
+    40	## 1. Question and decision rule
+    41	
+    42	**Question.** Which is the least complex change to the CI test lane that materially
+    43	reduces the required PR critical path **without** changing the executed test
+    44	inventory or the failure semantics?
+    45	
+    46	**Decision rule (frozen).** Evaluate candidates in the issue's fixed order
+    47	(C1 → C4). Adopt the first candidate that satisfies **all** of:
+    48	
+    49	- **D1 — material.** Reduces the per-Python test-job critical path by ≥ 20 %,
+    50	  measured as median wall time of the job's longest lane (setup + suite), against
+    51	  the incumbent's job wall time on the same evidence source (see §3).
+    52	- **D2 — inventory-preserving.** Executed-test inventory hash (§7) identical to
+    53	  the incumbent's, per suite, per Python. Collected/passed/skipped/xfailed counts
+    54	  identical; zero new failures; zero tests silently not run.
+    55	- **D3 — witnessed-red.** Every lane the candidate makes *required* has a
+    56	  green→red→green negative control (§8).
+    57	- **D4 — isolation-preserving.** The HiQS suite still runs in its own pytest
+    58	  process (#7). No candidate may merge the two suites into one process.
+    59	
+    60	Results that would embarrass the current design, recorded so they cannot be
+    61	rationalised away: HiQS suite failing in a root-free venv (kills C2, indicts
+    62	HiQS's standalone claim); root suite failing collection without the embeddings
+    63	extra beyond the known seam tests (kills C3); xdist changing counts or failing
+    64	tests that pass serially (kills C4 until serial exclusions are enumerated).
+    65	
+    66	If no candidate clears D1–D4, the incumbent stands and Phase 0 publishes that.
+    67	
+    68	## 2. Constraints inherited from prior issues
+    69	
+    70	- **#7** — real cross-package state leak; HiQS suite must stay a separate pytest
+    71	  process. Binding on all candidates.
+    72	- **#67** — tests whose results depended on invoking cwd (fixed 0.70.0, but the
+    73	  *class* of host/global-state coupling is why C4 needs determinism evidence, not
+    74	  just speed).
+    75	- **#127** — clean-clone install contract; CI installs `.[calendar,server,embeddings]`
+    76	  + pytest + `-e HiQS/`. Local venv setups mirror these exact commands.
+    77	- **3-Eyes** — deferred; nothing here runs, repairs, or references its tests.
+    78	
+    79	## 3. Provenance and environments
+    80	
+    81	| Item | Value |
+    82	|---|---|
+    83	| Commit | `8f733ce` (origin/development at campaign start; recorded per record) |
+    84	| Local platform | macOS arm64 (this operator machine), Python 3.12.x and 3.13.x Homebrew |
+    85	| CI evidence source | GitHub Actions API — real job timings for the incumbent `test` matrix on `development` |
+    86	| Local role | structure probe: lane decomposition, inventory, determinism, witnessed-red |
+    87	
+    88	Two evidence sources, stated separately and never blended:
+    89	
+    90	- **CI-side (authoritative for absolute incumbent wall time).** Job durations for
+    91	  recent `ci.yml` runs on `development`, pulled via `gh api`. This captures the
+    92	  real runner (ubuntu-latest, CPU-torch wheel, cold pip cache).
+    93	- **Local-side (authoritative for structure).** Cold/warm install decomposition,
+    94	  collection time, per-suite durations, candidate deltas, inventory hashes,
+    95	  witnessed-red. Absolute values are platform-proxies; §10 records this.
+    96	
+    97	Candidate *speedup ratios* are claimed only within one evidence source. The
+    98	published recommendation states which source carries it.
+    99	
+   100	## 4. Candidates under comparison
+   101	
+   102	All commands run from the repo root of the campaign clone. `PY` = the venv's
+   103	python. Mirrors `.github/workflows/ci.yml` exactly.
+   104	
+   105	- **C0 — incumbent (baseline).** One venv per Python:
+   106	  1. `pip install --index-url https://download.pytorch.org/whl/cpu torch`
+   107	  2. `pip install -e ".[calendar,server,embeddings]" pytest`
+   108	  3. `pip install -e HiQS/`
+   109	  4. `pytest tests/ -q` then `pytest HiQS/tests -q` (separate processes, as CI).
+   110	- **C1 — pip caching only.** Same commands; measure install times cold
+   111	  (`--no-cache-dir`, empty venv) vs warm (populated pip cache). The CI-side
+   112	  translation is an actions/cache step; local numbers only size the prize.
+   113	- **C2 — HiQS job split.** Root lane = C0 steps 1–2 + `pytest tests/ -q`.
+   114	  HiQS lane = fresh venv, `pip install -e HiQS/ pytest` only, then
+   115	  `pytest HiQS/tests -q`. Feasibility gate: HiQS suite green with **no** root
+   116	  package, **no** torch in the venv.
+   117	- **C3 — embeddings seam lane.** Root lane venv drops the embeddings extra:
+   118	  `pip install -e ".[calendar,server]" pytest`. Feasibility gate: `pytest tests/ -q`
+   119	  collects and passes with failures confined to the sentence-transformers seam
+   120	  set (expected: `tests/test_embedder*.py`, per the GH-81 note in
+   121	  `pyproject.toml`). The seam set then defines a candidate embeddings lane
+   122	  (C0 install + `pytest <seam files> -q`). If failures fall outside the seam
+   123	  set, C3 dies (recorded, not patched around).
+   124	- **C4 — pytest-xdist.** Root suite with `-n 2` then `-n 4` (serial HiQS
+   125	  unchanged — the process boundary binds). Feasibility gate: counts identical
+   126	  to C0 serial, zero new failures, across all repeats.
+   127	
+   128	## 5. Metrics
+   129	
+   130	Per run record (JSONL primitive, one line per measurement):
+   131	
+   132	- `wall_s` — monotonic wall time of the measured command.
+   133	- Setup decomposition (C0/C1): `wall_s` per install step, cold and warm.
+   134	- Collection: `pytest --collect-only -q` wall time and collected count, per suite.
+   135	- Suite runs: `-q --durations=50` console retained verbatim; parsed
+   136	  collected/passed/failed/skipped/xfailed/xpassed/deselected counts; pytest and
+   137	  plugin versions.
+   138	- Inventory: node-ID list hash per suite (§7).
+   139	- Environment: python version, platform, venv path, commit, run index.
+   140	
+   141	Reporting: median and min–max spread over ≥ 3 runs per cell. No mean-only
+   142	reporting.
+   143	
+   144	## 6. Run matrix
+   145	
+   146	| # | Cell | Python | Runs |
+   147	|---|---|---|---|
+   148	| M1 | C0 install, cold (`--no-cache-dir`, fresh venv) | 3.12, 3.13 | 1 each (destructive to repeat cheaply; spread comes from warm/cold contrast + CI data) |
+   149	| M2 | C0 install, warm (populated cache, fresh venv) | 3.12, 3.13 | 3 each |
+   150	| M3 | Collection per suite | 3.12, 3.13 | 3 each |
+   151	| M4 | C0 root suite `pytest tests/ -q` | 3.12, 3.13 | 3 each |
+   152	| M5 | C0 HiQS suite `pytest HiQS/tests -q` | 3.12, 3.13 | 3 each |
+   153	| M6 | C2 HiQS-lane venv install + suite | 3.12, 3.13 | 3 each |
+   154	| M7 | C3 root suite without embeddings extra | 3.12, 3.13 | 1 each (feasibility probe; expands to 3 only if it gates cleanly) |
+   155	| M8 | C4 root suite `-n 2` | 3.12, 3.13 | 3 each |
+   156	| M9 | C4 root suite `-n 4` | 3.12, 3.13 | 3 each |
+   157	| M10 | Witnessed-red controls (§8) | 3.12 | 1 per lane |
+   158	| M11 | CI-side incumbent job durations (API) | 3.12, 3.13 | last ≥ 10 completed runs on `development` |
+   159	
+   160	Suites run sequentially — never two pytest processes at once — so timings are
+   161	uncontaminated (also the honest way given #67's lesson about host state).
+   162	
+   163	## 7. Inventory pinning
+   164	
+   165	For each suite × Python × candidate:
+   166	
+   167	```
+   168	pytest --collect-only -q <suite> | grep '::' | sort | shasum -a 256
+   169	```
+   170	
+   171	The hash plus the collected count is the executed-inventory fingerprint. D2
+   172	requires fingerprint equality against C0 for the same suite and Python.
+   173	(Collection-only is immune to runtime skips; runtime counts from M4/M5 carry
+   174	the executed side.)
+   175	
+   176	## 8. Witnessed-red negative controls
+   177	
+   178	One per lane a candidate would make required. Each: mutate one test in the
+   179	lane's scope to `assert False`, run **only the lane command**, record non-zero
+   180	exit + failing node, revert, record green. Lanes:
+   181	
+   182	- Root lane (`pytest tests/ -q`) — covers C1–C3.
+   183	- HiQS lane (`pytest HiQS/tests -q` in the C2 venv) — proves the split lane
+   184	  cannot silently pass while its suite is broken.
+   185	- Embeddings seam lane (if C3 survives §4's gate) — same procedure on a seam test.
+   186	- xdist root lane (`pytest tests/ -q -n 4`) — proves a worker-routed failure
+   187	  still fails the lane (and serially, to show equivalence).
+   188	
+   189	Controls run on Python 3.12 only (routing is structural, not interpreter-specific).
+   190	
+   191	## 9. Publication plan
+   192	
+   193	`TESTS-RESULTS/2026-09-01+GH-144/`:
+   194	
+   195	- `SUMMARY.md` — header block, headline table, findings, threats to validity.
+   196	- `runs.jsonl` — the primitive (§5 schema, `schema_version: 1`).
+   197	- `console/` — raw console per numbered cell, including `--durations=50` output.
+   198	- `scripts/` — the runner scripts as executed.
+   199	- `qa/` — protocol review transcripts verbatim.
+   200	- `ci-job-timings.jsonl` — M11 records with run URLs.
+   201	
+   202	Progress is filed to issue #144 at protocol-freeze and at publication.
+   203	
+   204	## 10. Pre-declared threats to validity
+   205	
+   206	- **Platform proxy.** Local macOS arm64 ≠ ubuntu-latest x86_64 (torch wheel size,
+   207	  I/O, core count). Mitigated by the two-source rule in §3; speedup ratios stay
+   208	  within-source.
+   209	- **Local pip cache warmth** is the operator's daily cache, not a pristine CI
+   210	  cache restore. C1's local numbers size the prize only; the claim needs the
+   211	  CI-side cache step A/B in implementation.
+   212	- **Shared host.** Background processes on this machine add noise to wall times;
+   213	  medians over 3 runs and min–max spread are reported, runs are sequential.
+   214	- **M1 single run.** Cold installs are destructively slow to repeat; the cold
+   215	  figure is a lower bound on variance, cross-checked against CI-side install
+   216	  steps where the API exposes step timing.
+   217	- **Witnessed-red on 3.12 only** — assumes failure routing is not
+   218	  interpreter-dependent.
+   219	- **Not measured:** runner queue time, artifact upload time, lint/typecheck/docs
+   220	  jobs (unchanged by this issue), HiQS-under-xdist (out of scope: process
+   221	  boundary + HiQS suite is small).
+   222	
+   223	## 11. Checklist
+   224	
+   225	- [ ] Protocol reviewed by an independent reviewer before any run (SOP §3.3)
+   226	- [ ] M1–M5 incumbent measured, both Pythons
+   227	- [ ] M6 C2 feasibility + timings
+   228	- [ ] M7 C3 feasibility probe (expand or kill)
+   229	- [ ] M8–M9 C4 xdist counts + timings
+   230	- [ ] M10 witnessed-red, one per surviving lane
+   231	- [ ] M11 CI-side incumbent timings pulled
+   232	- [ ] Campaign published under `TESTS-RESULTS/2026-09-01+GH-144/`
+   233	- [ ] Recommendation + evidence linked in issue #144; no workflow changed
+   234	
+   235	## 12. Deviations after freeze
+   236	
+   237	(none yet)
+     1	name: CI
+     2	
+     3	# `development` is the integration branch and the repo default — every feature
+     4	# branch is cut from it and merged back into it. Triggering on `main` alone meant
+     5	# the branch that receives all the work had ZERO checks, which is how GH-124
+     6	# merged 10 failing tests on 2026-07-11 and went unnoticed for 9 days (GH-178).
+     7	# `main` stays listed so release merges are still gated. (GH-177)
+     8	on:
+     9	  push:
+    10	    branches: [main, development]
+    11	  pull_request:
+    12	    branches: [main, development]
+    13	
+    14	jobs:
+    15	  # Recovered from the retiring repo's stranded PR queue (GH-5 Phase R, old
+    16	  # PR #302 / GH-298): the same lint gate, with the baseline resolved against
+    17	  # THIS tree. Two real bugs surfaced by the ruff baseline: an F821 NameError
+    18	  # in the commit-backfill error path (the error handler itself crashed) and a
+    19	  # latent F821 annotation in doctor.py.
+    20	  lint:
+    21	    runs-on: ubuntu-latest
+    22	    timeout-minutes: 5
+    23	    steps:
+    24	      - uses: actions/checkout@v4
+    25	      - name: Set up Python
+    26	        uses: actions/setup-python@v5
+    27	        with:
+    28	          python-version: "3.12"
+    29	      - name: Install ruff
+    30	        run: pip install ruff
+    31	      - name: Lint
+    32	        run: ruff check .
+    33	      - name: Format check
+    34	        run: ruff format --check .
+    35	      # GH-136: no direct sqlite3.connect outside the two gateway directories
+    36	      # (src/rebalance/ingest/db/ and HiQS/hiqs/ — separate stores by design, not
+    37	      # to be converged). The exact per-file baseline only shrinks: a new bypass
+    38	      # fails, and so does a baseline left stale after a bypass is retired. The
+    39	      # wider banned-import ratchet wiring stays with #126.
+    40	      - name: SQLite gateway ratchet (GH-136)
+    41	        run: python utils/pdda/check_banned_imports.py --check
+    42	
+    43	  # GH-92. GH-88 found 136 broken relative links in tracked docs (ROADMAP.md alone
+    44	  # held 107) and 45% breakage overall, none of which any test could catch -- a doc
+    45	  # link is never exercised, so nothing fails until someone audits. This holds the
+    46	  # count at zero and blocks committed machine-local paths, which have leaked twice.
+    47	  docs:
+    48	    runs-on: ubuntu-latest
+    49	    timeout-minutes: 5
+    50	    steps:
+    51	      - uses: actions/checkout@v4
+    52	      - name: Set up Python
+    53	        uses: actions/setup-python@v5
+    54	        with:
+    55	          python-version: "3.12"
+    56	      - name: Check documentation links
+    57	        run: python3 scripts/check_doc_links.py
+    58	      - name: Front-door health board (FRONTDOOR.md)
+    59	        run: bash utils/frontdoor-check.sh
+    60	
+    61	  typecheck:
+    62	    runs-on: ubuntu-latest
+    63	    timeout-minutes: 10
+    64	    steps:
+    65	      - uses: actions/checkout@v4
+    66	      - name: Set up Python 3.12
+    67	        uses: actions/setup-python@v5
+    68	        with:
+    69	          python-version: "3.12"
+    70	      - name: Install mypy
+    71	        run: pip install mypy
+    72	      - name: Type check
+    73	        run: mypy src/
+    74	
+    75	  test:
+    76	    runs-on: ubuntu-latest
+    77	    timeout-minutes: 25
+    78	    strategy:
+    79	      matrix:
+    80	        python-version: ["3.12", "3.13"]
+    81	
+    82	    steps:
+    83	      - uses: actions/checkout@v4
+    84	
+    85	      - name: Set up Python ${{ matrix.python-version }}
+    86	        uses: actions/setup-python@v5
+    87	        with:
+    88	          python-version: ${{ matrix.python-version }}
+    89	
+    90	      - name: Install dependencies
+    91	        run: |
+    92	          python -m pip install --upgrade pip
+    93	          # server extra: rebalance.web imports FastAPI at module level, so
+    94	          # the web-surface tests need it. pytest: the suite is pytest-run
+    95	          # locally and some modules are pytest-style (unittest discover
+    96	          # can't collect them, and one imports pytest at module scope).
+    97	          # embeddings extra: tests/test_embedder*.py patch sentence_transformers,
+    98	          # which requires it to be importable (GH-81). It pulls torch, which is
+    99	          # why the job timeout above is 25 rather than 10 minutes.
+   100	          #
+   101	          # Install torch from PyTorch's CPU index FIRST. On Linux, plain
+   102	          # `pip install torch` resolves to the CUDA build — several GB of
+   103	          # nvidia-* wheels this runner has no GPU to use. Satisfying the
+   104	          # requirement up front with the CPU wheel keeps the install small;
+   105	          # the line below then finds torch already present.
+   106	          pip install --index-url https://download.pytorch.org/whl/cpu torch
+   107	          pip install -e ".[calendar,server,embeddings]" pytest
+   108	          # HiQS is a standalone package with its own pyproject, and the step below runs its
+   109	          # suite. That step was added without this line, so it had never once passed: every
+   110	          # run since died collecting four test modules on `No module named 'numpy'`, which
+   111	          # HiQS declares and nothing installed. Installing the package rather than
+   112	          # hand-listing the missing import is deliberate — HiQS's own dependency note warns
+   113	          # that hand-picking is how a declared requirement gets silently omitted, and this
+   114	          # way a dependency added there tomorrow is installed here tomorrow.
+   115	          pip install -e HiQS/
+   116	
+   117	      # tests/test_pulse_reconcile.py drives real `git pull --rebase` against a
+   118	      # throwaway clone. Without an identity that dies with code 128 on a fresh
+   119	      # runner — a CI-environment gap, not a product bug, and one only CI ever
+   120	      # hits (developer machines always have a global identity). (GH-177)
+   121	      - name: Configure git identity for tests
+   122	        run: |
+   123	          git config --global user.email "ci@rebalance-os.invalid"
+   124	          git config --global user.name "rebalance-OS CI"
+   125	          git config --global init.defaultBranch main
+   126	
+   127	      # 3-Eyes is deferred (2026-08-17, operator decision) — its tests are NOT run
+   128	      # here. It is documented alpha and outside the supported core, and gating the
+   129	      # core suite on it meant an unsupported component could hold up supported work.
+   130	      # The code stays in the tree; this is a pause, not a removal. To resume, add
+   131	      # `utils/3-eyes/tests` back to this line.
+   132	      - name: Run tests
+   133	        run: python -m pytest tests/ -q
+   134	
+   135	      # HiQS runs as its OWN pytest process, not appended to the line above.
+   136	      # It is a standalone package with its own pyproject, destined for
+   137	      # extraction to HiQS-Labs/HiQS — running it in the incumbent's process is
+   138	      # the very coupling its clean-room gate exists to prevent, and it is not
+   139	      # hypothetical: sharing a process makes
+   140	      # test_github_failure_continues_logs_error_and_keeps_watermark fail on
+   141	      # state leaked from tests/ (reproduced on pristine main; tracked separately).
+   142	      # This step is how HiQS will run after extraction. It shipped without the install
+   143	      # its own package needed, so it was red from the day it was added — see the install
+   144	      # step above.
+   145	      - name: HiQS suite (isolated — standalone package)
+   146	        run: python -m pytest HiQS/tests -q
+   147	
+   148	      # The 3-Eyes registry/dashboard sync check was removed here on 2026-08-17 for
+   149	      # the same reason as its test run above. Restoring it means re-adding a step
+   150	      # that runs `python -m three_eyes.dashboard --check` from `utils/3-eyes`.
+   151	
+   152	      - name: Check for raw datetime parsing (use parse_calendar_dt)
+   153	        run: |
+   154	          if grep -rn "replace('Z'" src/rebalance/ingest/ --include="*.py" \
+   155	               | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+   156	            echo "::error::Raw Z-replace found — use parse_calendar_dt() from calendar_helpers.py"
+   157	            exit 1
+   158	          fi
+   159	
+   160	      - name: Check for raw duration calculation (use event_duration_minutes)
+   161	        run: |
+   162	          if grep -rn "total_seconds() / 60" src/rebalance/ --include="*.py" \
+   163	               | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+   164	            echo "::error::Raw duration calc found — use event_duration_minutes() from calendar_helpers.py"
+   165	            exit 1
+   166	          fi
+
+exec
+/bin/zsh -lc 'nl -ba SOP.md && nl -ba TESTS-RESULTS/README.md' in <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/consult-wt-72680-y0uopejj
+ succeeded in 0ms:
+     1	# SOP — Standard Operating Procedure
+     2	
+     3	Do not store any credentials or secrets in this file, other repo files, or any PII in public facing GH issues.
+     4	
+     5	This document codifies how work in this repo gets **evidenced**. It is written for
+     6	whoever picks up the next task, human or model, and it is binding on both.
+     7	
+     8	---
+     9	
+    10	## 1. The rule
+    11	
+    12	> **Verified beats plausible. A claim whose evidence is unpublished is an assertion.**
+    13	
+    14	If you state that something was measured — in a GitHub issue, a PR body, a commit
+    15	message, `ROADMAP.md`, a code comment, or a reply to the operator — the measurement
+    16	must be retained in [`TESTS-RESULTS/`](TESTS-RESULTS) where a reader can check it
+    17	without access to your machine.
+    18	
+    19	This exists because it has already failed here. A retrieval change was tested on 5
+    20	queries with no ground truth, the result looked negative, the improvement was
+    21	reverted, and the conclusion was reported as settled. It was noise. Re-run properly
+    22	(39 queries, hand-established targets, paired significance test) the same change won
+    23	decisively — 14 improved, 0 regressed, p=0.0137 — and the earlier call had been
+    24	suppressing a real fix for weeks. See
+    25	[`TESTS-RESULTS/2026-08-20+GH-81/`](TESTS-RESULTS/2026-08-20+GH-81).
+    26	
+    27	The lesson is not "test more." It is: **a small unverifiable test is worse than no
+    28	test**, because it manufactures false confidence and then gets cited.
+    29	
+    30	## 2. When a campaign is required
+    31	
+    32	Run one — and publish it — before any of these:
+    33	
+    34	- **Choosing or replacing a model, library, or algorithm** where the claim is that one performs better than another.
+    35	- **Reverting or rejecting a change on empirical grounds.** "I tried it, it didn't help" is a claim and needs the same evidence as "I tried it, it helped." This is the specific failure above.
+    36	- **Any performance, retrieval-quality, or accuracy number** that will appear in an issue, PR, or doc.
+    37	- **Declaring a system healthy or a defect fixed** where the proof is behavioural rather than a passing unit test.
+    38	
+    39	Not required for: ordinary code changes covered by the test suite, refactors with no
+    40	behavioural claim, or documentation.
+    41	
+    42	**If it is not worth a campaign, it is not worth an empirical claim.** Say "not
+    43	measured" instead. That is a legitimate and useful thing to write.
+    44	
+    45	## 3. How to run one
+    46	
+    47	### 3.1 Write the protocol first, and freeze it
+    48	
+    49	Before generating a single number, write down: the question, what is being compared,
+    50	the dataset, the metrics, and — critically — **the decision rule**: what result would
+    51	lead to which action, including the results that would embarrass the current design.
+    52	
+    53	Put it in `PROJECT/2-WORKING/`. A decision rule written after seeing results is not a
+    54	decision rule; it is a rationalisation.
+    55	
+    56	### 3.2 Establish ground truth by hand
+    57	
+    58	For retrieval, ranking, or classification work, the correct answer must be determined
+    59	by a person **reading the artifact** — not by another model, and not by the system
+    60	under test. Discard any item whose correct answer cannot be established; do not guess
+    61	it. Record how many you discarded.
+    62	
+    63	Watch for near-duplicates. If several items would legitimately satisfy the same query,
+    64	single-target scoring is invalid and will silently penalise every system equally
+    65	while looking like a real measurement.
+    66	
+    67	### 3.3 Get the protocol reviewed before running it
+    68	
+    69	Use `/relay-xyz` (or an equivalent independent review) on the **protocol**, not just
+    70	the results. Review after the fact can only rationalise; review before can still
+    71	change the experiment.
+    72	
+    73	On GH-81 it changed the experiment twice, and one of those changes is why the
+    74	headline finding was detectable at all — the original significance rule would have
+    75	returned "no measurable difference, keep the incumbent" almost regardless of the
+    76	data. Transcripts: [`qa/`](TESTS-RESULTS/2026-08-20+GH-81/qa).
+    77	
+    78	### 3.4 Include a dumb baseline
+    79	
+    80	Always score the boring option — keyword search, the previous version, a constant, a
+    81	coin flip. Without it you cannot tell "our system is good" from "this task is easy."
+    82	On GH-81 the shipped configuration scored **below plain SQLite full-text search**,
+    83	which is not a fact any amount of comparing sophisticated options to each other would
+    84	have surfaced.
+    85	
+    86	### 3.5 Use a paired test when systems answer the same inputs
+    87	
+    88	Comparing independent per-system confidence intervals throws away the pairing and
+    89	buries real effects under between-item difficulty. Use a paired test (Wilcoxon
+    90	signed-rank for bounded/tied metrics), correct for multiple comparisons (Holm), and
+    91	report **effect size alongside p** — a significant tiny effect is a real and
+    92	reportable outcome.
+    93	
+    94	Report "no significant difference" plainly when that is the answer. It is a result.
+    95	
+    96	### 3.6 Prove the instrument constrains
+    97	
+    98	Before trusting a new test, **make it fail on purpose.** Revert the fix and confirm
+    99	the test goes red. A test that passes against broken code measures nothing, and a
+   100	green suite full of them is worse than no suite because it is trusted.
+   101	
+   102	### 3.7 Publish
+   103	
+   104	Follow [`TESTS-RESULTS/README.md`](TESTS-RESULTS/README.md): campaign folder named
+   105	`YYYY-MM-DD+GH-<issue>`, `SUMMARY.md`, the primitive `.jsonl`, the scripts as run,
+   106	the QA transcripts verbatim, the raw console output.
+   107	
+   108	Every aggregate in the summary must be recomputable from the primitive records. If it
+   109	isn't, the primitive is incomplete or the number is unsupported.
+   110	
+   111	## 4. Reporting
+   112	
+   113	### 4.1 Threats to validity are mandatory
+   114	
+   115	Every `SUMMARY.md` ends with what would make the result wrong: sample size, sampling
+   116	bias, lack of blinding, deviations from protocol, what was *not* measured. Write them
+   117	even when — especially when — the result came out the way you hoped.
+   118	
+   119	State deviations explicitly. On GH-81, one model ran at a reduced context window
+   120	because the full one exhausted GPU memory; that is recorded, along with the check
+   121	showing it did not explain the outcome.
+   122	
+   123	### 4.2 Retract loudly
+   124	
+   125	If a campaign overturns an earlier published conclusion, **say so in the same place
+   126	the original was published**, link both, and state what was wrong with the first
+   127	attempt. Do not quietly supersede it. Someone is relying on the old claim.
+   128	
+   129	### 4.3 Do not overstate scope
+   130	
+   131	Say what was measured, not what it implies. GH-81 measured the vector retriever in
+   132	isolation, while production fuses vector and lexical search — so "no model beat
+   133	keyword search" was a component-level result and would have been badly misleading
+   134	stated as a system-level one. That correction is in the summary because it was caught
+   135	before publication; catching it after would have meant a retraction under §4.2.
+   136	
+   137	## 5. Naming things precisely
+   138	
+   139	Ambiguous names cost real time and cause real errors. When identifying a model,
+   140	library, or version, use the **full identifier**, and verify it against the artifact
+   141	rather than repeating it from memory or a doc.
+   142	
+   143	- Not "BGE small" → **`BAAI/bge-small-en-v1.5`**
+   144	- Not "the embedding model" → the full repo ID and dimension
+   145	
+   146	Model families use several independent axes at once — family, size tier, language,
+   147	and release version — and collapsing any of them creates questions like "is this the
+   148	small one or the v1.5 one?" when the answer is *both*. See
+   149	[`docs/EMBEDDING-MODELS.md`](docs/EMBEDDING-MODELS.md) for this repo's naming
+   150	conventions and the current model's exact identity.
+   151	
+   152	Verify from ground truth: the code constant, the recorded run metadata, and the
+   153	downloaded artifact should agree. Where they disagree, say which one governs.
+   154	
+   155	---
+   156	
+   157	**Related:** [`TESTS-RESULTS/README.md`](TESTS-RESULTS/README.md) (structure and
+   158	conventions) · [`AGENTS.md`](AGENTS.md) (working agreements) ·
+   159	[`ROUTER.md`](ROUTER.md) (prior-art checks before building)
+     1	# Test Results & Artifacts (`TESTS-RESULTS/`)
+     2	
+     3	Committed execution artifacts, benchmark datasets, and structured telemetry from
+     4	measurement campaigns — model bake-offs, performance runs, retrieval evaluations,
+     5	harness tests.
+     6	
+     7	## Purpose
+     8	
+     9	**A claim whose evidence is unpublished is an assertion.** When an issue, PR,
+    10	`ROADMAP.md` entry, or code comment says a thing was measured, the measurement has
+    11	to be retained somewhere a reader can check it without access to the machine that
+    12	produced it. That is what this directory is for.
+    13	
+    14	This is not archival tidiness. The GH-81 campaign overturned a conclusion this repo
+    15	had already acted on — a "we tested it, it didn't help" call made on 5 samples with
+    16	no ground truth, which had been used to revert a real improvement. The correction
+    17	was only possible because the second run published its per-query records. Retained
+    18	evidence is what lets a wrong call get found.
+    19	
+    20	## Directory structure
+    21	
+    22	One folder per campaign, named `YYYY-MM-DD+GH-<issue>`:
+    23	
+    24	```
+    25	TESTS-RESULTS/
+    26	├── README.md
+    27	└── YYYY-MM-DD+GH-<issue>/
+    28	    ├── SUMMARY.md              # human-readable rollup: config, findings, threats to validity
+    29	    ├── <primitive>.jsonl       # the auditable primitive — one record per measurement
+    30	    ├── <aggregate>.jsonl       # derived metrics, if any
+    31	    ├── <console>.txt           # raw stdout of the run that produced the numbers
+    32	    ├── scripts/                # the code, as run
+    33	    └── qa/                     # third-party review transcripts, verbatim
+    34	```
+    35	
+    36	The date is when the campaign **ran**, not when it was written up.
+    37	
+    38	### What each part is for
+    39	
+    40	**`SUMMARY.md`** — the only file most readers will open. Leads with a header block
+    41	(date, tracking issue, working doc, systems under test, duration, output files),
+    42	then the headline table, then findings, then **threats to validity**. That last
+    43	section is not optional: a summary that reports only what worked is a sales
+    44	document.
+    45	
+    46	**The primitive `.jsonl`** — one record per individual measurement, carrying
+    47	`schema_version`, a `run_id`, and enough context to be read standalone. Every
+    48	aggregate in `SUMMARY.md` must be recomputable from it. If a number in the summary
+    49	cannot be derived from the primitive, either the primitive is incomplete or the
+    50	number is unsupported.
+    51	
+    52	**`scripts/`** — copies of what actually ran, not a description of it. Scripts that
+    53	live only in `temp/` (gitignored) are not published.
+    54	
+    55	**`qa/`** — review transcripts verbatim, not paraphrased. A summary of a review is
+    56	the reviewed party grading their own homework.
+    57	
+    58	## Conventions
+    59	
+    60	- **JSONL, not JSON**, for record streams: appendable, greppable, diffable per line, and a truncated file still parses up to the break.
+    61	- **`schema_version` on every record.** Bump it when fields change meaning; add fields freely without bumping.
+    62	- **Never rewrite a published campaign's records.** A run that was wrong gets a *new* campaign folder and a note in the old `SUMMARY.md` pointing forward. The audit trail is the point.
+    63	- **Large regenerable inputs stay out.** Sidecar databases, model weights, and corpus snapshots belong in `temp/` (gitignored) with the `SUMMARY.md` recording the seed and command needed to rebuild them.
+    64	- **Secrets never appear here** — not in logs, not in console captures, not in scripts. Check the console dump before committing it.
+    65	
+    66	## Campaigns
+    67	
+    68	| Campaign | Subject | Outcome |
+    69	|---|---|---|
+    70	| [`2026-08-20+GH-81`](2026-08-20+GH-81) | Embedding model bake-off: BGE-small vs Qwen3-0.6B vs Gemini vs FTS5 baseline, 39 queries × 6 lanes | Shipped BGE's query prefix (MRR@10 0.572 → 0.751, p=0.0137); retracted an earlier conclusion; declined Gemini; kept BGE over Qwen |
+    71	
+    72	## Inspecting a run
+    73	
+    74	```bash
+    75	# headline metrics for every lane
+    76	jq -r 'select(.slice=="ALL") | "\(.lane)\t\(.["mrr@10"])"' \
+    77	  TESTS-RESULTS/2026-08-20+GH-81/lane_metrics.jsonl | sort -k2 -rn
+    78	
+    79	# only the statistically significant comparisons
+    80	jq -r 'select(.significant) | "\(.lane_a) vs \(.lane_b)  p=\(.p_holm)"' \
+    81	  TESTS-RESULTS/2026-08-20+GH-81/pairwise_tests.jsonl
+    82	
+    83	# where did one lane actually lose?
+    84	jq -r 'select(.lane=="bge" and .rank!=1) | "\(.qid)\trank=\(.rank)\t\(.query)"' \
+    85	  TESTS-RESULTS/2026-08-20+GH-81/per_query_results.jsonl
+    86	```
+    87	
+    88	See [`../SOP.md`](../SOP.md) for when a campaign is required and how to run one.
+
+codex
+The core tension is already visible: the protocol’s D1 is phrased as an end-to-end critical-path rule, but several matrix cells measure isolated components or a local proxy rather than a complete candidate CI path. I’m checking the issue’s exact Phase 0 wording and dependency contracts now so the amendments distinguish a protocol defect from an intentional limitation.
+web search: 
+web search: site:github.com/HiQS-Labs/rebalanceOS/issues/144 CI lane protocol ...
+web search: 
+web search: https://github.com/HiQS-Labs/rebalanceOS/issues/144
+2026-09-02T04:11:17.033223Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 98 column 5
+exec
+/bin/zsh -lc "rg -n \"(\\[project.optional-dependencies\\]|embeddings|pytest|xdist|testpaths|addopts|markers|dependencies)\" pyproject.toml HiQS/pyproject.toml tests/conftest.py | head -160 && nl -ba pyproject.toml | sed -n '1,180p' && nl -ba HiQS/pyproject.toml | sed -n '1,120p'" in <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/consult-wt-72680-y0uopejj
+ succeeded in 0ms:
+tests/conftest.py:1:"""Shared pytest fixtures for the rebalance-OS test suite."""
+tests/conftest.py:8:import pytest
+tests/conftest.py:17:# without the `embeddings` extra, which is what `pip install -e ".[calendar,server]"` gives.
+tests/conftest.py:91:def pytest_configure(config):
+tests/conftest.py:93:        "markers",
+tests/conftest.py:100:def pytest_collection_modifyitems(config, items):
+tests/conftest.py:112:                pytest.mark.xfail(
+tests/conftest.py:120:                    pytest.mark.skip(
+tests/conftest.py:131:@pytest.fixture(autouse=True)
+tests/conftest.py:145:@pytest.fixture(autouse=True)
+tests/conftest.py:170:@pytest.fixture(autouse=True, scope="session")
+tests/conftest.py:195:@pytest.fixture(autouse=True, scope="session")
+tests/conftest.py:205:    again — an unattended `pytest` run stalls on a prompt loop it cannot answer.
+HiQS/pyproject.toml:10:dependencies = [
+HiQS/pyproject.toml:21:[project.optional-dependencies]
+HiQS/pyproject.toml:22:dev = ["pytest"]
+HiQS/pyproject.toml:31:embeddings = ["sentence-transformers"]
+pyproject.toml:11:dependencies = [
+pyproject.toml:24:[project.optional-dependencies]
+pyproject.toml:30:embeddings = [
+pyproject.toml:31:  # GH-81 moved the embedder off mlx-embeddings to sentence-transformers
+pyproject.toml:51:  "pytest>=8.0.0",
+     1	[build-system]
+     2	requires = ["setuptools>=69", "wheel"]
+     3	build-backend = "setuptools.build_meta"
+     4	
+     5	[project]
+     6	name = "rebalance-os"
+     7	version = "0.80.0"
+     8	description = "Local-first workday operating system with MCP tools and Obsidian ingest"
+     9	readme = "README.md"
+    10	requires-python = ">=3.12"
+    11	dependencies = [
+    12	  "typer>=0.12.0",
+    13	  "rich>=13.7.0",
+    14	  "pydantic>=2.8.0",
+    15	  "PyYAML>=6.0.1",
+    16	  "questionary>=2.0.1",
+    17	  # Capped at <2: mcp 2.0.0 removed mcp.server.fastmcp, which src/rebalance/mcp/
+    18	  # imports in 8 modules. See GH-225.
+    19	  "mcp>=1.0.0,<2",
+    20	  "sqlite-vec>=0.1.6",
+    21	  "keyring>=25.0.0",
+    22	]
+    23	
+    24	[project.optional-dependencies]
+    25	calendar = [
+    26	  "google-api-python-client>=2.0.0",
+    27	  "google-auth-oauthlib>=1.0.0",
+    28	  "google-auth-httplib2>=0.2.0",
+    29	]
+    30	embeddings = [
+    31	  # GH-81 moved the embedder off mlx-embeddings to sentence-transformers
+    32	  # (BAAI/bge-small-en-v1.5). The extra was left declaring the old package,
+    33	  # so CI installed it and then died importing the new one — three tests in
+    34	  # tests/test_embedder*.py on ModuleNotFoundError. Declare what the code
+    35	  # actually imports.
+    36	  "sentence-transformers>=3.0.0",
+    37	]
+    38	local-llm = [
+    39	  # GH-108: mlx-lm powers local Qwen LLM synthesis (Mac Apple Silicon).
+    40	  "mlx-lm>=0.19.0",
+    41	]
+    42	server = [
+    43	  "fastapi>=0.110.0",
+    44	  "uvicorn[standard]>=0.29.0",
+    45	]
+    46	gcp = [
+    47	  "google-cloud-secret-manager>=2.0.0",
+    48	]
+    49	dev = [
+    50	  "mypy>=1.11",
+    51	  "pytest>=8.0.0",
+    52	  "ruff>=0.6",
+    53	]
+    54	
+    55	[project.scripts]
+    56	rebalance = "rebalance.cli:app"
+    57	
+    58	[tool.setuptools]
+    59	package-dir = {"" = "src"}
+    60	
+    61	[tool.setuptools.packages.find]
+    62	where = ["src"]
+    63	
+    64	[tool.setuptools.package-data]
+    65	# Ship SQL migration files inside the wheel so run_migrations() can find them.
+    66	"rebalance.ingest.db" = ["migrations/*.sql"]
+    67	
+    68	
+    69	[tool.ruff]
+    70	line-length = 120
+    71	target-version = "py312"
+    72	# Lint scope is the product trees; everything else at the repo root is
+    73	# vendored, generated, or process artifacts. (Exclude list re-validated
+    74	# against THIS repo when the old repo's stranded lint PR was recovered —
+    75	# entries that only existed there were dropped.)
+    76	extend-exclude = [
+    77	  # .claude skills are prose documentation whose embedded code snippets are
+    78	  # illustrative, not product code the formatter should gate (GH-34).
+    79	  ".claude",
+    80	  # Restored predecessor documents (GH-88). Same reasoning as .claude above, plus one more:
+    81	  # these are an archival record of another repo. Reformatting their embedded snippets would
+    82	  # edit history to satisfy a formatter.
+    83	  "PROJECT/4-MISC/ARCHIVED-PREDECESSOR",
+    84	  "macOS",
+    85	  "vscode-extensions",
+    86	  "temp",
+    87	  "ask_self",
+    88	  "experimental",
+    89	  ".swe-diagram",
+    90	  # Vendored verbatim from XYZ-forge (the release-ledger app). Linting it here
+    91	  # would fork it from upstream over B007/B023 style nits, and the next
+    92	  # `xyz-sync` would silently revert the fix. Named individually, not as
+    93	  # `utils/py/`, so first-party code added beside them is still linted.
+    94	  "utils/py/releases_app.py",
+    95	  "utils/py/releases_cycle.py",
+    96	]
+    97	
+    98	[tool.ruff.lint]
+    99	select = ["E", "F", "W", "B"]
+   100	ignore = [
+   101	  # Long-line backlog: burn down and re-enable (GH-298 / GH-5 Phase R).
+   102	  "E501",
+   103	  # typer.Option(...) defaults are the CLI framework's idiom, not a bug.
+   104	  "B008",
+   105	  # Optional heavy deps are deliberately lazy-imported after capability checks.
+   106	  "E402",
+   107	  # Legacy raise-without-from and unbounded zip() sites; tighten in a follow-up.
+   108	  "B904",
+   109	  "B905",
+   110	]
+   111	
+   112	[tool.ruff.lint.per-file-ignores]
+   113	# Broad assertRaises(Exception) is acceptable in tests for now.
+   114	"tests/**" = ["B017"]
+   115	"utils/3-eyes/tests/**" = ["B017"]
+   116	"HiQS/tests/**" = ["B017"]
+   117	# Legacy re-export shim: domain names stay importable from the old paths.
+   118	"src/rebalance/cli/__init__.py" = ["F401"]
+   119	
+   120	[tool.mypy]
+   121	python_version = "3.12"
+   122	ignore_missing_imports = true
+   123	no_implicit_optional = false
+   124	warn_unused_ignores = true
+   125	warn_redundant_casts = true
+   126	exclude = [
+   127	  "macOS",
+   128	  "vscode-extensions",
+   129	  "temp",
+   130	  "ask_self",
+   131	  "experimental",
+   132	  ".swe-diagram",
+   133	]
+     1	[build-system]
+     2	requires = ["setuptools>=68"]
+     3	build-backend = "setuptools.build_meta"
+     4	
+     5	[project]
+     6	name = "hiqs"
+     7	version = "0.1.0"
+     8	description = "High-integrity query system"
+     9	requires-python = ">=3.11"
+    10	dependencies = [
+    11	    "mcp",
+    12	    # Direct, not transitive. search.py imports numpy for the cosine leg; it happens to arrive with
+    13	    # sentence-transformers, but a module that imports a package declares it — otherwise the staged
+    14	    # install (torch deferred until the vector-leg gate) silently omits it, which is how the p3 gate
+    15	    # failed with ModuleNotFoundError on an otherwise-approved phase.
+    16	    "numpy",
+    17	    "google-auth-oauthlib",
+    18	    "keyring",
+    19	]
+    20	
+    21	[project.optional-dependencies]
+    22	dev = ["pytest"]
+    23	# sentence-transformers pulls torch, which is a 527 MB wheel on linux before its CUDA
+    24	# transitives. Every import of it in this package is already deferred to inside a function
+    25	# body, and get_default_embedder turns a missing install into an actionable RuntimeError
+    26	# rather than a crash — that is the shape of an optional dependency, and the note above
+    27	# already describes torch as deferred "until the vector-leg gate". Declaring it required
+    28	# anyway bought nothing and cost CI the whole download to run a suite whose embedder is a
+    29	# stub. numpy stays required for exactly the reason stated above: search.py imports it
+    30	# unconditionally, so it is not optional and must not ride in on this extra.
+    31	embeddings = ["sentence-transformers"]
+    32	
+    33	[project.entry-points."hiqs.sources"]
+    34	vault = "hiqs.sources.vault:SOURCE"
+    35	github = "hiqs.sources.github:SOURCE"
+    36	
+    37	[tool.setuptools.packages.find]
+    38	include = ["hiqs*"]
+
+2026-09-02T04:12:33.426666Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 98 column 5
+exec
+/bin/zsh -lc "nl -ba tests/conftest.py | sed -n '1,230p' && rg -n \"serial|xdist|worker_id|pytest.mark\" tests HiQS/tests --glob '*.py' | head -200" in <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/consult-wt-72680-y0uopejj
+ succeeded in 0ms:
+     1	"""Shared pytest fixtures for the rebalance-OS test suite."""
+     2	
+     3	import importlib.machinery
+     4	import os
+     5	import sys
+     6	import types
+     7	
+     8	import pytest
+     9	
+    10	from rebalance.lib.metal_probe import metal_available
+    11	
+    12	# GH-225: stand in for MLX when it is not installed, so the MLX tests can run anywhere.
+    13	#
+    14	# mlx is Apple-Silicon-only and CI runs ubuntu-latest, so `import mlx` there raises
+    15	# ModuleNotFoundError — 2 failures and 6 fixture errors across tests/test_mlx_cache_cap.py
+    16	# and tests/test_mlx_instrumentation.py. It is equally absent from a local venv built
+    17	# without the `embeddings` extra, which is what `pip install -e ".[calendar,server]"` gives.
+    18	#
+    19	# Those tests do not need MLX to work. Every one of them replaces it with a MagicMock or a
+    20	# hand-written double (MockMLXCore / MockMLXCoreForCap); the real `import mlx` exists only to
+    21	# obtain the module OBJECT that patch.object() then rebinds. The two test NAMES that read like
+    22	# they need a missing MLX -- test_degrades_safely_when_mlx_unavailable,
+    23	# test_instrumentation_degrades_when_mlx_absent -- are about MLX's methods RAISING
+    24	# (RuntimeError("no Metal device")) and about telemetry not becoming a new crash path. Neither
+    25	# is about the package being uninstalled, so skipping them on CI would remove real coverage of
+    26	# the degradation paths rather than deferring an environment problem.
+    27	#
+    28	# `core` is bound as an ATTRIBUTE of the parent, not merely registered in sys.modules. This is
+    29	# load-bearing and is documented in test_mlx_instrumentation.py:13-17: `import mlx.core as mx`
+    30	# resolves through getattr(mlx, "core"), so a sys.modules-only stub is ignored, real MLX gets
+    31	# exercised, and the mock's counters silently stay at zero.
+    32	#
+    33	# Guarded by ImportError so a machine WITH MLX (this project's target platform) keeps testing
+    34	# against the real package; the stub is a fallback, never an override.
+    35	# Each stub carries a real `__spec__`. `types.ModuleType` leaves it None, and a
+    36	# sys.modules entry with `__spec__ is None` makes `importlib.util.find_spec()`
+    37	# raise `ValueError: mlx.__spec__ is None` rather than return None. Nothing
+    38	# called find_spec on "mlx" until GH-81 put sentence-transformers in the CI
+    39	# install: it pulls `transformers`, whose utils/generic.py runs
+    40	# `is_mlx_available()` at import time, which is that exact call. The three
+    41	# tests/test_embedder*.py tests died on it. With a spec present, transformers
+    42	# proceeds to `importlib.metadata.version("mlx")`, gets PackageNotFoundError,
+    43	# and correctly concludes MLX is absent — which is the truth on CI.
+    44	try:  # pragma: no cover - depends on the host platform
+    45	    import mlx  # noqa: F401
+    46	    import mlx.core  # noqa: F401
+    47	except ImportError:  # pragma: no cover - the CI / no-extras path
+    48	    _mlx_stub = types.ModuleType("mlx")
+    49	    _mlx_core_stub = types.ModuleType("mlx.core")
+    50	    # submodule_search_locations marks "mlx" as a package, so "mlx.core" is a
+    51	    # coherent submodule name rather than an attribute of a plain module.
+    52	    _mlx_stub.__spec__ = importlib.machinery.ModuleSpec("mlx", loader=None, is_package=True)
+    53	    _mlx_core_stub.__spec__ = importlib.machinery.ModuleSpec("mlx.core", loader=None)
+    54	    _mlx_stub.core = _mlx_core_stub
+    55	    sys.modules.setdefault("mlx", _mlx_stub)
+    56	    sys.modules.setdefault("mlx.core", _mlx_core_stub)
+    57	
+    58	#: GH-178 quarantine. These failed at GH-124's own final commit (536de83,
+    59	#: 2026-07-11) and were merged red — nothing caught it because CI did not run on
+    60	#: `development` until GH-177. Verified to fail identically on macOS and on clean
+    61	#: Ubuntu CI, so they are real product bugs, not environment artifacts.
+    62	#:
+    63	#: They are quarantined rather than deleted so CI regains signal NOW: a red run
+    64	#: means *new* breakage instead of the same 10 forever, which is the state that
+    65	#: trains people to ignore CI. This list must shrink to empty — every entry is a
+    66	#: real defect in commit-threshold auto-promotion.
+    67	#:
+    68	#: DO NOT add to this list to make a red build green. Fix the test or the code.
+    69	KNOWN_FAILING_GH178 = {
+    70	    "tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates",
+    71	    "tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync",
+    72	    "tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold",
+    73	    "tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits",
+    74	    "tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate",
+    75	    "tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting",
+    76	    "tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine",
+    77	    "tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold",
+    78	    "tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert",
+    79	    "tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only",
+    80	}
+    81	
+    82	
+    83	# GH-250 / GH-42: `metal_available()` (probes for a usable Metal device
+    84	# OUT OF PROCESS, since MLX aborts rather than raising when none is reachable)
+    85	# now lives in rebalance.lib.metal_probe so both this fixture and the
+    86	# production embedder (src/rebalance/ingest/embedder.py) share one
+    87	# implementation instead of drifting copies. See that module's docstring for
+    88	# the full abort-vs-raise explanation.
+    89	
+    90	
+    91	def pytest_configure(config):
+    92	    config.addinivalue_line(
+    93	        "markers",
+    94	        "requires_metal: needs a real Metal device. Skipped when MLX cannot "
+    95	        "create one — probed out-of-process because MLX aborts rather than "
+    96	        "raising, which no in-test guard can catch (GH-250).",
+    97	    )
+    98	
+    99	
+   100	def pytest_collection_modifyitems(config, items):
+   101	    """Mark the GH-178 quarantine xfail, non-strict; skip Metal-only tests.
+   102	
+   103	    Non-strict on purpose: if one starts passing the run stays green (XPASS) and
+   104	    the entry is simply stale. Strict would turn someone else's unrelated fix
+   105	    into a red build, which is the opposite of the point.
+   106	    """
+   107	    # Probe lazily: only pay for the subprocess if something actually asks.
+   108	    metal_skip = None
+   109	    for item in items:
+   110	        if item.nodeid in KNOWN_FAILING_GH178:
+   111	            item.add_marker(
+   112	                pytest.mark.xfail(
+   113	                    reason="GH-178: known-failing since GH-124 (536de83); quarantined by GH-177",
+   114	                    strict=False,
+   115	                )
+   116	            )
+   117	        if item.get_closest_marker("requires_metal") is not None:
+   118	            if metal_skip is None:
+   119	                metal_skip = (
+   120	                    pytest.mark.skip(
+   121	                        reason="no usable Metal device (probed out-of-process; "
+   122	                        "MLX would abort this run rather than raise) — GH-250"
+   123	                    )
+   124	                    if not metal_available()
+   125	                    else False
+   126	                )
+   127	            if metal_skip is not False:
+   128	                item.add_marker(metal_skip)
+   129	
+   130	
+   131	@pytest.fixture(autouse=True)
+   132	def _disable_job_guard(monkeypatch):
+   133	    """Turn off the GH-172 embedding guard for the whole suite.
+   134	
+   135	    The guard takes a real ``flock`` and starts a memory watchdog whose
+   136	    ``preflight()`` REFUSES to start when the machine is low on available
+   137	    memory. Left on, tests that call ``embed_pending``/``embed_chunks`` would
+   138	    fail spuriously on a busy machine and serialise against any real ingest
+   139	    running on the same box. Guard behaviour itself is covered explicitly in
+   140	    ``tests/test_job_guard_wiring.py``, which re-enables it per-test.
+   141	    """
+   142	    monkeypatch.setenv("REBALANCE_JOB_GUARD", "0")
+   143	
+   144	
+   145	@pytest.fixture(autouse=True)
+   146	def _isolate_secret_store(tmp_path_factory):
+   147	    """Redirect the out-of-repo secret store to a fresh tmp dir for EACH test.
+   148	
+   149	    The GitHub/Figma dual-store helpers (`config.py`) now write/read the
+   150	    permission-enforced secret store at `~/.config/rebalance-os/secrets`. Without
+   151	    isolation, suite runs pollute the operator's real secret dir and — because
+   152	    secret files are last-write-wins (unlike the append-only auth log) — leak
+   153	    values across tests. Per-test scope gives every test a clean store.
+   154	    `secret_store.secret_store_root()` honors `REBALANCE_SECRET_STORE_DIR`; tests
+   155	    that need a specific path override `secret_store.SECRET_STORE_DIR` (module
+   156	    seam), which takes precedence.
+   157	    """
+   158	    store_dir = tmp_path_factory.mktemp("secret_store")
+   159	    previous = os.environ.get("REBALANCE_SECRET_STORE_DIR")
+   160	    os.environ["REBALANCE_SECRET_STORE_DIR"] = str(store_dir)
+   161	    try:
+   162	        yield
+   163	    finally:
+   164	        if previous is None:
+   165	            os.environ.pop("REBALANCE_SECRET_STORE_DIR", None)
+   166	        else:
+   167	            os.environ["REBALANCE_SECRET_STORE_DIR"] = previous
+   168	
+   169	
+   170	@pytest.fixture(autouse=True, scope="session")
+   171	def _isolate_auth_log(tmp_path_factory):
+   172	    """Redirect the unified auth-activity log to a throwaway tmp dir for the
+   173	    whole test session.
+   174	
+   175	    Several code paths (gmail/calendar `_load_credentials`, the 403 scope probe,
+   176	    etc.) call `auth_log` helpers that append to `temp/logs/auth_activity.jsonl`.
+   177	    Without this, running the suite injects fake `token_missing` /
+   178	    `scope_insufficient` events into the *real* log, which then shows up as false
+   179	    failures in `rebalance doctor`. `auth_log._log_dir()` honors
+   180	    `REBALANCE_AUTH_LOG_DIR`, so pointing it at a tmp dir keeps the suite from
+   181	    touching the repo's log.
+   182	    """
+   183	    log_dir = tmp_path_factory.mktemp("auth_log")
+   184	    previous = os.environ.get("REBALANCE_AUTH_LOG_DIR")
+   185	    os.environ["REBALANCE_AUTH_LOG_DIR"] = str(log_dir)
+   186	    try:
+   187	        yield
+   188	    finally:
+   189	        if previous is None:
+   190	            os.environ.pop("REBALANCE_AUTH_LOG_DIR", None)
+   191	        else:
+   192	            os.environ["REBALANCE_AUTH_LOG_DIR"] = previous
+   193	
+   194	
+   195	@pytest.fixture(autouse=True, scope="session")
+   196	def _disable_keyring():
+   197	    """Route every keyring helper to its no-op path for the whole session.
+   198	
+   199	    `config.py` reads credentials with `keyring.get_password(KEYRING_SERVICE, key)`
+   200	    (`KEYRING_SERVICE = "rebalance-os"`). On macOS that is the real login Keychain,
+   201	    so any test that touches a config getter triggers a Security-framework
+   202	    authorization prompt. Keychain ACLs are per-(binary, item), and there is one
+   203	    item per credential (github / calendar / gmail / figma / sleuth / gemini), so
+   204	    "Always Allow" grants one item to one interpreter and the next request prompts
+   205	    again — an unattended `pytest` run stalls on a prompt loop it cannot answer.
+   206	
+   207	    This never surfaced in CI because CI runs on ubuntu-latest, where `keyring` has
+   208	    no Keychain backend and `config.py`'s `except Exception  # noqa: BLE001` swallows
+   209	    the failure. The suite was therefore only cleanly runnable on Linux, on a project
+   210	    that requires macOS.
+   211	
+   212	    `REBALANCE_NO_KEYRING` is the seam `config.py:42` already provides for this. The
+   213	    dedicated keyring tests (`test_gmail_keyring.py`, `test_sleuth_keyring.py`,
+   214	    `test_calendar_keyring.py`, `test_config_github_token.py`) patch the `keyring`
+   215	    module directly, so they are unaffected; tests that want the stricter hermetic
+   216	    mode still opt in per-test via `patch.dict` (`test_lifecycle_contract.py:211`).
+   217	    """
+   218	    previous = os.environ.get("REBALANCE_NO_KEYRING")
+   219	    os.environ["REBALANCE_NO_KEYRING"] = "1"
+   220	    try:
+   221	        yield
+   222	    finally:
+   223	        if previous is None:
+   224	            os.environ.pop("REBALANCE_NO_KEYRING", None)
+   225	        else:
+   226	            os.environ["REBALANCE_NO_KEYRING"] = previous
+HiQS/tests/test_events.py:63:@pytest.mark.parametrize("invalid_status", ["healthy", "failed", "OK", ""])
+HiQS/tests/test_cli.py:36:@pytest.mark.parametrize("arguments", [(), ("--json",)])
+HiQS/tests/test_cli.py:48:@pytest.mark.parametrize(
+HiQS/tests/test_contract.py:146:@pytest.mark.xfail(strict=True, reason="M3 owns ranking; this protects the fake-source path until then.")
+HiQS/tests/test_docs_index.py:15:    deserialize_vector,
+HiQS/tests/test_docs_index.py:19:    serialize_vector,
+HiQS/tests/test_docs_index.py:511:def test_vector_serialization_roundtrip():
+HiQS/tests/test_docs_index.py:512:    """Test vector float array serialization and deserialization."""
+HiQS/tests/test_docs_index.py:514:    dim, blob = serialize_vector(vec)
+HiQS/tests/test_docs_index.py:516:    recovered = deserialize_vector(blob)
+tests/test_pulse_web_timestamp_disambiguation.py:39:    That payload is a serialised copy of the problem list, so it legitimately
+tests/test_next_actions_privacy.py:140:        # anywhere in the serialized export payload.
+tests/test_mlx_instrumentation.py:27:pytestmark = pytest.mark.skip(reason="MLX embeddings pipeline superseded by SentenceTransformer (GH-81)")
+tests/test_mlx_instrumentation.py:162:@pytest.mark.parametrize(
+HiQS/tests/test_search.py:11:from hiqs.docs_index import deserialize_vector, serialize_vector
+HiQS/tests/test_search.py:64:                dim, blob = serialize_vector(vec)
+HiQS/tests/test_search.py:97:    _vec_list = [serialize_vector(deserialize_vector(r[2]))[1] for r in raw_unfiltered_rows]
+HiQS/tests/test_search.py:103:    deserialized_list = [deserialize_vector(r[2]) for r in raw_unfiltered_rows]
+HiQS/tests/test_search.py:105:        np.array(deserialized_list, dtype=np.float32)
+tests/test_lifecycle_contract.py:326:        _json.dumps(rows)  # MCP-serializable
+HiQS/tests/test_plugins.py:12:@pytest.mark.parametrize(
+tests/test_daily_synthesis.py:75:@pytest.mark.parametrize(
+tests/test_daily_synthesis.py:95:@pytest.mark.parametrize(
+tests/test_sleuth_graph_security.py:79:        # The serialized JSON must still be valid JSON and unescape back to original text
+tests/test_hiqs_digest.py:528:@pytest.mark.parametrize(
+tests/test_hiqs_digest.py:829:@pytest.mark.parametrize("subdir", ["../../../..<tmp>/escape", "<tmp>/abs", "digests/../..", ""])
+tests/conftest.py:112:                pytest.mark.xfail(
+tests/conftest.py:120:                    pytest.mark.skip(
+tests/conftest.py:138:    fail spuriously on a busy machine and serialise against any real ingest
+tests/test_embedder_metal_unavailable.py:64:@pytest.mark.skipif(
+tests/test_job_guard_wiring.py:88:    """Cumulative memory means they must serialise against each other."""
+tests/test_job_guard_wiring.py:99:@pytest.mark.parametrize("value", ["0", "false", "no", "off", ""])
+tests/test_sync_snapshot.py:258:        # Defense in depth: no person label survives anywhere in the serialized
+tests/test_mlx_cache_cap.py:7:pytestmark = pytest.mark.skip(reason="MLX embeddings pipeline superseded by SentenceTransformer (GH-81)")
+tests/test_mlx_cache_cap.py:115:@pytest.mark.requires_metal
+tests/test_mlx_cache_cap.py:205:@pytest.mark.parametrize(
+tests/test_querier.py:4:cli/query.py silently (both re-serialize by field name with no shared helper).
+tests/test_querier.py:79:        """temporal_context must have 'today' and 'tomorrow' — keys MCP serializer reads."""
+tests/test_querier.py:152:    """The MCP ask tool re-serializes QueryResult by field name — all keys must survive."""
+tests/test_querier.py:177:    def test_mcp_serialization_preserves_all_keys(self) -> None:
+tests/test_querier.py:180:        serialized = {
+tests/test_querier.py:194:        self.assertEqual(set(serialized.keys()), self.EXPECTED_KEYS)
+
+2026-09-02T04:12:38.037005Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 98 column 5
+codex
+## ANSWER
+
+Do not start the campaign yet. The decision rule can legitimately select C1, C2, or the incumbent and is not rigged toward complexity, but the current matrix cannot compute D1 as written. C3 is internally contradictory, C4 omits the required serial-exclusion configuration, and the inventory hash proves collection—not unchanged execution. The macOS/GitHub hybrid is coherent for feasibility and structure, but insufficient for an adoption-level CI speedup claim.
+
+## FINDINGS — Blocking
+
+1. **[Blocker] Add end-to-end candidate critical-path cells.** Measure ≥3 complete C0 and surviving-candidate lanes on the same SHA, including checkout, Python setup, pip upgrade/cache restore, dependency install, git configuration, suites, and retained post-test checks; the present matrix only times components locally and historical incumbent jobs remotely, so D1’s same-source comparison is not computable (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:42-51`, `:88-98`, `:146-159`; `.github/workflows/ci.yml:82-146`, `:152-165`).
+
+2. **[Blocker] Make D1 mathematically unambiguous.** Define whether candidates are standalone or cumulative, the exact formula for `max(lanes)` and `max(Python versions)`, whether both Pythons must clear 20%, and how ties/regressions are handled; 20% is a reasonable predeclared practical threshold only if tied to an explicit feedback-time or maintenance-cost target (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:46-66`).
+
+3. **[Blocker] Repair the repetition and sampling plan.** M1 and initially M7 use one run despite the protocol’s own “≥3 runs per cell” rule; warm/cold contrast is not variance, and M11 must either filter repeated runs of the exact SHA/workflow or be labeled contextual rather than decision evidence (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:10-12`, `:141-159`).
+
+4. **[Blocker] Replace C3 with a runnable final configuration.** “Collects and passes with failures confined” is contradictory, and there is no matrix row for the final embeddings lane; require the issue’s actual gate—remaining root tests green without the extra—then specify mutually exclusive root/seam commands, three runs per Python, and an exact-once union comparison (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:117-123`, `:154`, `:185`). The [issue’s Phase 0 text](https://github.com/HiQS-Labs/rebalanceOS/issues/144) explicitly requires the remaining root suite to collect and pass.
+
+5. **[Blocker] Add the missing C4 serial-exclusion experiment.** Pin/install `pytest-xdist`, declare its distribution mode, identify unsafe tests, specify how parallel and serial subsets execute without omission or duplication, and rerun the final 2/4-worker configurations; currently only raw `-n 2/-n 4` exists and the incumbent install does not include xdist (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:124-126`, `:155-157`; `.github/workflows/ci.yml:90-115`).
+
+6. **[Blocker] Replace the “executed-inventory hash” with node-level evidence.** Retain the canonical collection list, collection exit code, and structured `nodeid + runtime outcome` records; compare the multiset union of required lanes against C0 exactly once, because identical collection hashes plus aggregate counts can hide swapped skips/xfails or duplicated seam tests (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:52-54`, `:130-139`, `:163-174`).
+
+7. **[Blocker] Make collection hashing fail closed.** The grep pipeline can hash partial output after a pytest collection failure unless pipe failure and exit status are recorded; publish the sorted node-ID file itself and its checksum rather than only the checksum (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:165-174`; `SOP.md:108-109`).
+
+8. **[Blocker] Enforce the clean-clone contract literally.** Use pristine checkouts at the pinned SHA, fresh non-system-site venvs, repo-root cwd, `python -m pip install --upgrade pip`, exact install commands, git identity, and retained dependency resolution; the claim that C0 “mirrors exactly” omits incumbent steps material to #127 and some root tests (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:75-76`, `:102-109`; `.github/workflows/ci.yml:90-125`).
+
+9. **[Blocker] Strengthen witnessed-red to cover the final required commands.** Retain pre-green, mutation diff/hash, red exit code and failing node, and post-revert green for every final lane—including any C4 serial sublane—and distinguish local command failure from an Actions required-check routing proof (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:55-58`, `:176-189`; `SOP.md:96-100`).
+
+10. **[Blocker] Fully specify recomputable primitives.** Every record needs `run_id`, exact argv/cwd, start/end timestamps, exit status, candidate/lane/Python, SHA, evidence source, cache key/hit state, dependency freeze, console path/checksum, and host/runner identity; retain raw API responses and selection criteria, then scrub console artifacts for secrets before publication (`SOP.md:102-109`; `TESTS-RESULTS/README.md:46-64`; `PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:130-140`, `:193-200`).
+
+## FINDINGS — Optional
+
+1. **[Should] Interleave or randomize candidate order.** Sequential C0→C4 execution confounds cache warming, thermal state, and background-load drift; paired/interleaved repeats would make local ratios more credible (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:141-161`).
+
+2. **[Should] Report tails and cost alongside median latency.** Lane splitting may reduce critical path while increasing billed runner-minutes or queue exposure; retain p90/max and total compute as secondary metrics (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:141-142`, `:219-221`).
+
+3. **[Should] Measure cache miss, hit, restore, and save separately.** A warm operator pip cache is not an Actions cache restore, and the first run after a key change is necessarily a miss (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:110-112`, `:209-211`).
+
+4. **[Nit] Name the exact Python patch versions and runner image revision in the protocol header.** The primitive plans to capture some of this, but the declared environment still says only `3.12.x/3.13.x` and `ubuntu-latest` (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:81-95`, `:139`).
+
+## FINDINGS — Dismiss
+
+1. **[Pass] The decision rule is not inherently rigged.** “First candidate satisfying all gates” explicitly favors simplicity, while “incumbent stands” provides a real null outcome (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:46-66`).
+
+2. **[Pass] The two-source design is not itself invalid.** It clearly separates CI absolute timing from local structural evidence and forbids cross-source ratios; the defect is allowing proxy timing to drive adoption, not using macOS for feasibility (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:88-98`, `:204-218`).
+
+3. **[Pass] #7 is respected.** HiQS remains a distinct pytest process in every defined candidate (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:55-58`, `:70-71`, `:124-126`).
+
+4. **[Pass] #67 and 3-Eyes are explicitly accommodated.** Commands are rooted at the repository and 3-Eyes remains excluded (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:70-77`, `:102-103`, `:160-161`).
+
+5. **[Pass] The publication skeleton and frozen-deviation mechanism match repository conventions.** The folder, summary, JSONL, scripts, raw console, and verbatim QA transcript are all planned; only the primitive schema needs strengthening (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:36-38`, `:191-202`; `TESTS-RESULTS/README.md:20-64`).
+
+6. **[Pass] Witnessed-red on Python 3.12 only is defensible for routing structure.** It is predeclared and recorded as a threat; interpreter-specific behavioral equivalence is separately covered by both-Python candidate runs (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:189`, `:217-218`).
+
+## RECOMMENDATION
+
+Amend before running: make D1 computable from complete same-source paths, define runnable cumulative lane configurations, and replace aggregate inventory checks with exact node-level runtime evidence.
+tokens used
+59,285
+## ANSWER
+
+Do not start the campaign yet. The decision rule can legitimately select C1, C2, or the incumbent and is not rigged toward complexity, but the current matrix cannot compute D1 as written. C3 is internally contradictory, C4 omits the required serial-exclusion configuration, and the inventory hash proves collection—not unchanged execution. The macOS/GitHub hybrid is coherent for feasibility and structure, but insufficient for an adoption-level CI speedup claim.
+
+## FINDINGS — Blocking
+
+1. **[Blocker] Add end-to-end candidate critical-path cells.** Measure ≥3 complete C0 and surviving-candidate lanes on the same SHA, including checkout, Python setup, pip upgrade/cache restore, dependency install, git configuration, suites, and retained post-test checks; the present matrix only times components locally and historical incumbent jobs remotely, so D1’s same-source comparison is not computable (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:42-51`, `:88-98`, `:146-159`; `.github/workflows/ci.yml:82-146`, `:152-165`).
+
+2. **[Blocker] Make D1 mathematically unambiguous.** Define whether candidates are standalone or cumulative, the exact formula for `max(lanes)` and `max(Python versions)`, whether both Pythons must clear 20%, and how ties/regressions are handled; 20% is a reasonable predeclared practical threshold only if tied to an explicit feedback-time or maintenance-cost target (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:46-66`).
+
+3. **[Blocker] Repair the repetition and sampling plan.** M1 and initially M7 use one run despite the protocol’s own “≥3 runs per cell” rule; warm/cold contrast is not variance, and M11 must either filter repeated runs of the exact SHA/workflow or be labeled contextual rather than decision evidence (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:10-12`, `:141-159`).
+
+4. **[Blocker] Replace C3 with a runnable final configuration.** “Collects and passes with failures confined” is contradictory, and there is no matrix row for the final embeddings lane; require the issue’s actual gate—remaining root tests green without the extra—then specify mutually exclusive root/seam commands, three runs per Python, and an exact-once union comparison (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:117-123`, `:154`, `:185`). The [issue’s Phase 0 text](https://github.com/HiQS-Labs/rebalanceOS/issues/144) explicitly requires the remaining root suite to collect and pass.
+
+5. **[Blocker] Add the missing C4 serial-exclusion experiment.** Pin/install `pytest-xdist`, declare its distribution mode, identify unsafe tests, specify how parallel and serial subsets execute without omission or duplication, and rerun the final 2/4-worker configurations; currently only raw `-n 2/-n 4` exists and the incumbent install does not include xdist (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:124-126`, `:155-157`; `.github/workflows/ci.yml:90-115`).
+
+6. **[Blocker] Replace the “executed-inventory hash” with node-level evidence.** Retain the canonical collection list, collection exit code, and structured `nodeid + runtime outcome` records; compare the multiset union of required lanes against C0 exactly once, because identical collection hashes plus aggregate counts can hide swapped skips/xfails or duplicated seam tests (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:52-54`, `:130-139`, `:163-174`).
+
+7. **[Blocker] Make collection hashing fail closed.** The grep pipeline can hash partial output after a pytest collection failure unless pipe failure and exit status are recorded; publish the sorted node-ID file itself and its checksum rather than only the checksum (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:165-174`; `SOP.md:108-109`).
+
+8. **[Blocker] Enforce the clean-clone contract literally.** Use pristine checkouts at the pinned SHA, fresh non-system-site venvs, repo-root cwd, `python -m pip install --upgrade pip`, exact install commands, git identity, and retained dependency resolution; the claim that C0 “mirrors exactly” omits incumbent steps material to #127 and some root tests (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:75-76`, `:102-109`; `.github/workflows/ci.yml:90-125`).
+
+9. **[Blocker] Strengthen witnessed-red to cover the final required commands.** Retain pre-green, mutation diff/hash, red exit code and failing node, and post-revert green for every final lane—including any C4 serial sublane—and distinguish local command failure from an Actions required-check routing proof (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:55-58`, `:176-189`; `SOP.md:96-100`).
+
+10. **[Blocker] Fully specify recomputable primitives.** Every record needs `run_id`, exact argv/cwd, start/end timestamps, exit status, candidate/lane/Python, SHA, evidence source, cache key/hit state, dependency freeze, console path/checksum, and host/runner identity; retain raw API responses and selection criteria, then scrub console artifacts for secrets before publication (`SOP.md:102-109`; `TESTS-RESULTS/README.md:46-64`; `PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:130-140`, `:193-200`).
+
+## FINDINGS — Optional
+
+1. **[Should] Interleave or randomize candidate order.** Sequential C0→C4 execution confounds cache warming, thermal state, and background-load drift; paired/interleaved repeats would make local ratios more credible (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:141-161`).
+
+2. **[Should] Report tails and cost alongside median latency.** Lane splitting may reduce critical path while increasing billed runner-minutes or queue exposure; retain p90/max and total compute as secondary metrics (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:141-142`, `:219-221`).
+
+3. **[Should] Measure cache miss, hit, restore, and save separately.** A warm operator pip cache is not an Actions cache restore, and the first run after a key change is necessarily a miss (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:110-112`, `:209-211`).
+
+4. **[Nit] Name the exact Python patch versions and runner image revision in the protocol header.** The primitive plans to capture some of this, but the declared environment still says only `3.12.x/3.13.x` and `ubuntu-latest` (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:81-95`, `:139`).
+
+## FINDINGS — Dismiss
+
+1. **[Pass] The decision rule is not inherently rigged.** “First candidate satisfying all gates” explicitly favors simplicity, while “incumbent stands” provides a real null outcome (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:46-66`).
+
+2. **[Pass] The two-source design is not itself invalid.** It clearly separates CI absolute timing from local structural evidence and forbids cross-source ratios; the defect is allowing proxy timing to drive adoption, not using macOS for feasibility (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:88-98`, `:204-218`).
+
+3. **[Pass] #7 is respected.** HiQS remains a distinct pytest process in every defined candidate (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:55-58`, `:70-71`, `:124-126`).
+
+4. **[Pass] #67 and 3-Eyes are explicitly accommodated.** Commands are rooted at the repository and 3-Eyes remains excluded (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:70-77`, `:102-103`, `:160-161`).
+
+5. **[Pass] The publication skeleton and frozen-deviation mechanism match repository conventions.** The folder, summary, JSONL, scripts, raw console, and verbatim QA transcript are all planned; only the primitive schema needs strengthening (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:36-38`, `:191-202`; `TESTS-RESULTS/README.md:20-64`).
+
+6. **[Pass] Witnessed-red on Python 3.12 only is defensible for routing structure.** It is predeclared and recorded as a threat; interpreter-specific behavioral equivalence is separately covered by both-Python candidate runs (`PROJECT/2-WORKING/GH-144-CI-LANE-PROTOCOL.md:189`, `:217-218`).
+
+## RECOMMENDATION
+
+Amend before running: make D1 computable from complete same-source paths, define runnable cumulative lane configurations, and replace aggregate inventory checks with exact node-level runtime evidence.
