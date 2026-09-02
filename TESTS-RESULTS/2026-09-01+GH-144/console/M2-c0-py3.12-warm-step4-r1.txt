@@ -1,0 +1,61 @@
+Obtaining file://~/Documents/GH%20Repos/rebalanceOS-gh144/HiQS
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: mcp in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from hiqs==0.1.0) (1.29.1)
+Requirement already satisfied: numpy in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from hiqs==0.1.0) (2.5.2)
+Requirement already satisfied: google-auth-oauthlib in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from hiqs==0.1.0) (1.4.1)
+Requirement already satisfied: keyring in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from hiqs==0.1.0) (25.7.0)
+Requirement already satisfied: google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from google-auth-oauthlib->hiqs==0.1.0) (2.57.0)
+Requirement already satisfied: requests-oauthlib>=0.7.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from google-auth-oauthlib->hiqs==0.1.0) (2.0.0)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0->google-auth-oauthlib->hiqs==0.1.0) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0->google-auth-oauthlib->hiqs==0.1.0) (50.0.1)
+Requirement already satisfied: cffi>=2.0.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from cryptography>=38.0.3->google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0->google-auth-oauthlib->hiqs==0.1.0) (2.1.1)
+Requirement already satisfied: pycparser in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0->google-auth-oauthlib->hiqs==0.1.0) (3.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from pyasn1-modules>=0.2.1->google-auth!=2.43.0,!=2.44.0,!=2.45.0,<3.0.0,>=2.15.0->google-auth-oauthlib->hiqs==0.1.0) (0.6.4)
+Requirement already satisfied: oauthlib>=3.0.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (3.3.1)
+Requirement already satisfied: requests>=2.0.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (2.34.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests>=2.0.0->requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (3.5.1)
+Requirement already satisfied: idna<4,>=2.5 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests>=2.0.0->requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (3.19)
+Requirement already satisfied: urllib3<3,>=1.26 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests>=2.0.0->requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (2.7.0)
+Requirement already satisfied: certifi>=2023.5.7 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from requests>=2.0.0->requests-oauthlib>=0.7.0->google-auth-oauthlib->hiqs==0.1.0) (2026.7.22)
+Requirement already satisfied: jaraco.classes in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from keyring->hiqs==0.1.0) (3.4.0)
+Requirement already satisfied: jaraco.functools in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from keyring->hiqs==0.1.0) (4.6.0)
+Requirement already satisfied: jaraco.context in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from keyring->hiqs==0.1.0) (6.1.2)
+Requirement already satisfied: more-itertools in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from jaraco.classes->keyring->hiqs==0.1.0) (11.1.0)
+Requirement already satisfied: anyio>=4.5 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (4.14.2)
+Requirement already satisfied: httpx-sse>=0.4 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (0.4.3)
+Requirement already satisfied: httpx<1.0.0,>=0.27.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (0.28.1)
+Requirement already satisfied: jsonschema>=4.20.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (4.26.0)
+Requirement already satisfied: pydantic-settings>=2.5.2 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (2.15.0)
+Requirement already satisfied: pydantic<3.0.0,>=2.11.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (2.13.5)
+Requirement already satisfied: pyjwt>=2.10.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from pyjwt[crypto]>=2.10.1->mcp->hiqs==0.1.0) (2.13.0)
+Requirement already satisfied: python-multipart>=0.0.9 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (0.0.32)
+Requirement already satisfied: sse-starlette>=1.6.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (3.4.8)
+Requirement already satisfied: starlette>=0.27 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (1.6.0)
+Requirement already satisfied: typing-extensions>=4.9.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (4.16.0)
+Requirement already satisfied: typing-inspection>=0.4.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (0.4.4)
+Requirement already satisfied: uvicorn>=0.31.1 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from mcp->hiqs==0.1.0) (0.52.4)
+Requirement already satisfied: httpcore==1.* in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from httpx<1.0.0,>=0.27.1->mcp->hiqs==0.1.0) (1.0.9)
+Requirement already satisfied: h11>=0.16 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from httpcore==1.*->httpx<1.0.0,>=0.27.1->mcp->hiqs==0.1.0) (0.16.0)
+Requirement already satisfied: annotated-types>=0.6.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from pydantic<3.0.0,>=2.11.0->mcp->hiqs==0.1.0) (0.8.0)
+Requirement already satisfied: pydantic-core==2.46.5 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from pydantic<3.0.0,>=2.11.0->mcp->hiqs==0.1.0) (2.46.5)
+Requirement already satisfied: attrs>=22.2.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from jsonschema>=4.20.0->mcp->hiqs==0.1.0) (26.1.0)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from jsonschema>=4.20.0->mcp->hiqs==0.1.0) (2025.9.1)
+Requirement already satisfied: referencing>=0.28.4 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from jsonschema>=4.20.0->mcp->hiqs==0.1.0) (0.37.0)
+Requirement already satisfied: rpds-py>=0.25.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from jsonschema>=4.20.0->mcp->hiqs==0.1.0) (2026.6.3)
+Requirement already satisfied: python-dotenv>=0.21.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from pydantic-settings>=2.5.2->mcp->hiqs==0.1.0) (1.2.3)
+Requirement already satisfied: click>=7.0 in ./temp/gh144/venvs/py3.12-c0/lib/python3.12/site-packages (from uvicorn>=0.31.1->mcp->hiqs==0.1.0) (8.5.0)
+Building wheels for collected packages: hiqs
+  Building editable for hiqs (pyproject.toml): started
+  Building editable for hiqs (pyproject.toml): finished with status 'done'
+  Created wheel for hiqs: filename=hiqs-0.1.0-0.editable-py3-none-any.whl size=2992 sha256=e7bddc2e6f3c92f406eed403e101b27313a2e3f271c4a84f5734be8100fe0f6a
+  Stored in directory: <var-folders>/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pip-ephem-wheel-cache-ap9ga1s_/wheels/03/bb/e6/170e26c675ad9d97d51367e3eb7211626e7f14f8fe877c24b2
+Successfully built hiqs
+Installing collected packages: hiqs
+Successfully installed hiqs-0.1.0

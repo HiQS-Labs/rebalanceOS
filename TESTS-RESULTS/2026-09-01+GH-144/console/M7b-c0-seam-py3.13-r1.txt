@@ -1,0 +1,7 @@
+........                                                                 [100%]
+============================= slowest 50 durations =============================
+9.97s call     tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+3.11s call     tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+
+(22 durations < 0.005s hidden.  Use -vv to show these durations.)
+8 passed in 13.31s

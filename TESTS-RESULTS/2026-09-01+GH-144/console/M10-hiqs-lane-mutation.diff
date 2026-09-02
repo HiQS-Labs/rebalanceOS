@@ -1,0 +1,12 @@
+diff --git a/HiQS/tests/test_events.py b/HiQS/tests/test_events.py
+index 3999696..d9b6652 100644
+--- a/HiQS/tests/test_events.py
++++ b/HiQS/tests/test_events.py
+@@ -96,3 +96,7 @@ def test_status_reads_latest_measured_quality_and_search_degradation(event_datab
+     }
+     assert state["ranking"]["quality"]["top_5_overlap"] == 0.8
+     assert state["ranking"]["quality"]["measured_at"]
++
++def test_gh144_witnessed_red_negative_control():
++    assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
++

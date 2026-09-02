@@ -1,0 +1,275 @@
+........................................................................ [  3%]
+............xx.x.x..x.x..xxx............................................ [  6%]
+........................................................................ [ 10%]
+.............................................................. [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 19%]
+........................................................ [ 22%]
+................................................................ [ 25%]
+............................................................. [ 28%]
+..................FF..FF................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+...................................................................... [ 48%]
+........................................................................ [ 51%]
+.................................................................... [ 54%]
+........................................................................ [ 58%]
+.............................................................................................................. [ 63%]
+.......................ssssssssssssssss................................. [ 66%]
+........................................................................ [ 69%]
+...............x........................................................ [ 73%]
+................................................................................................................................... [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+.......................................................... [ 88%]
+........................................... [ 90%]
+........................................................................ [ 94%]
+........................................................................ [ 97%]
+..........................ssss.........................                [100%]
+=================================== FAILURES ===================================
+_______________ EmbedderTests.test_embed_vault_chunks_end_to_end _______________
+
+self = <test_embedder.EmbedderTests testMethod=test_embed_vault_chunks_end_to_end>
+
+    def test_embed_vault_chunks_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            with db_connection(db_path, ensure_schema) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO vault_files (rel_path, title, content_hash, ingested_at, file_size_bytes, last_modified)
+                    VALUES ('note.md', 'Test Note', 'hash1', '2026-08-19T00:00:00Z', 100, '2026-08-19T00:00:00Z')
+                    """
+                )
+                file_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                conn.execute(
+                    """
+                    INSERT INTO chunks (file_id, chunk_index, heading, heading_level, body, char_count, content_hash)
+                    VALUES (?, 0, 'Heading', 1, 'Body content of the test note', 30, 'chash1')
+                    """,
+                    (file_id,),
+                )
+                conn.commit()
+    
+            mock_model = MagicMock()
+            mock_model.encode.return_value = [[0.1] * EMBEDDING_DIM]
+    
+>           with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1481: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x100f884a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+___________ EmbedderTests.test_load_and_embed_batch_with_mock_model ____________
+
+self = <test_embedder.EmbedderTests testMethod=test_load_and_embed_batch_with_mock_model>
+
+    def test_load_and_embed_batch_with_mock_model(self) -> None:
+        mock_model = MagicMock()
+        mock_model.encode.return_value = [[0.5] * EMBEDDING_DIM, [0.8] * EMBEDDING_DIM]
+    
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1481: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x100f884a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_______________ test_real_model_loads_and_embeds_on_this_machine _______________
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+>           from sentence_transformers import SentenceTransformer
+E           ModuleNotFoundError: No module named 'sentence_transformers'
+
+src/rebalance/ingest/embedder.py:134: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.mark.skipif(
+        not _model_is_cached(DEFAULT_MODEL),
+        reason=f"{DEFAULT_MODEL} is not in the local HF cache; refusing to download ~130MB mid-suite",
+    )
+    def test_real_model_loads_and_embeds_on_this_machine():
+        """The un-mocked one: load the real model and produce a real vector.
+    
+        Every other test in this module mocks `SentenceTransformer`, so none of them
+        can tell a working install from a broken one. This is the test that would
+        catch a wrong model name, a sentence-transformers API change, a torch/Metal
+        load failure, or a dimension drift between `EMBEDDING_DIM` and what the model
+        actually emits.
+    
+        Asserting the dimension matters beyond "it ran": `EMBEDDING_DIM` is baked
+        into the vec0 table declarations in `db/schema.py`, so a model whose true
+        output width disagrees with that constant produces a database that rejects
+        every insert.
+        """
+        from rebalance.ingest.embedder import EMBEDDING_DIM, _embed_batch
+    
+>       model, tokenizer = _load_model(DEFAULT_MODEL)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+>           raise RuntimeError("sentence-transformers package is required for embeddings") from exc
+E           RuntimeError: sentence-transformers package is required for embeddings
+
+src/rebalance/ingest/embedder.py:136: RuntimeError
+_____________ test_load_model_succeeds_even_when_metal_unavailable _____________
+
+    def test_load_model_succeeds_even_when_metal_unavailable():
+        """Wiring only (mocked): `_load_model` must not require a Metal device.
+    
+        Proves the CPU fallback path is reachable. Does NOT prove the real library
+        loads — see `test_real_model_loads_and_embeds_on_this_machine` for that.
+        """
+        mock_st = MagicMock()
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_st):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1481: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x100f884a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+=============================== warnings summary ===============================
+temp/gh144/venvs/py3.13-c3/lib/python3.13/site-packages/fastapi/testclient.py:1
+  <repo>/temp/gh144/venvs/py3.13-c3/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 50 durations =============================
+2.51s call     tests/test_doc_links.py::RepoTests::test_repo_is_clean
+1.91s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_stale_github_data
+1.77s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_gmail_mcp_no_messages
+1.76s call     tests/test_health_issue_reporter.py::TestLLMTriage::test_real_api_call_gemini
+1.73s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_launchd_single_nonzero_exit
+1.71s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_database_location_split
+1.69s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_repair_failure_propagates_error
+1.67s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_db_not_found_should_not_skip
+1.66s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_schema_corrupt_should_not_skip
+1.64s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_calendar_token_missing
+1.49s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_sleuth_env_missing
+1.33s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_github_token_missing_should_not_skip
+1.18s call     tests/test_gh250_fencing.py::test_verify_fails_when_writer_loaded
+1.07s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_keeps_last_run_when_a_repo_scan_fails
+1.01s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_self_migrates_legacy_slugged_device_id
+0.99s call     tests/test_local_repos.py::ScanTests::test_scan_finds_repos_counts_unpushed_and_filters_non_github
+0.98s call     tests/test_gh250_fencing.py::test_verify_fails_on_unknown_rebalance_job
+0.96s call     tests/test_focus5_scan.py::Focus5RankOracleTests::test_oracle_real_git_webmerge_only_repo_drops_off_roster
+0.96s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_backfill_skips_rows_already_present_in_pulse_file
+0.94s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_skips_unborn_repo_without_failing
+0.90s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_stages_pdda_registry_projection
+0.86s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_content_survives_repair
+0.83s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_default_scope_covers_branches_outside_the_default_branch
+0.81s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_self_repair_on_push_rejection
+0.76s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_rerun_is_a_no_op
+0.76s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_roster_drops_repo_removed_from_disk_without_resync
+0.73s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_off_roster_drops_repo_removed_from_disk_without_resync
+0.72s call     tests/test_gh250_fencing.py::test_already_paused_writer_gets_neither_pause_nor_resume
+0.71s call     tests/test_gh250_fencing.py::test_fence_interrupt_restores_and_idempotent
+0.71s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_backfill_makes_no_api_calls
+0.70s call     tests/test_git_pulse_install_cli.py::GitPulseInstallCliTests::test_copy_mode_installs_working_health_launcher_with_shared_module
+0.69s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_explicit_branch_scopes_the_walk
+0.69s call     tests/test_github_coverage.py::CoverageCheckTests::test_stale_clone_reports_stale_not_zero
+0.68s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_backfill_captures_direct_commit_with_full_message_and_paths
+0.67s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_merge_commits_are_captured_with_their_paths
+0.67s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_unavailable_row_is_upgraded_to_complete
+0.65s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_failed_fetch_warns_instead_of_claiming_coverage
+0.65s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_later_unavailable_write_cannot_downgrade_complete_row
+0.65s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_sync_ranks_persists_and_surfaces_off_roster
+0.63s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_pr_commits_are_not_duplicated
+0.63s call     tests/test_stickies2obsidian_cli.py::StickiesToObsidianTests::test_imports_new_notes_and_deduplicates_on_second_run
+0.62s call     tests/test_git_pulse_view_cli.py::GitPulseViewCliTests::test_include_local_unsynced_drops_apostrophes_in_slugged_device_id
+0.62s call     tests/test_github_knowledge.py::GitHubKnowledgeTests::test_sync_does_not_hold_write_lock_across_network_fetch
+0.62s call     tests/test_git_pulse_view_cli.py::GitPulseViewCliTests::test_include_local_unsynced_writes_combined_output_file
+0.59s call     tests/test_gh250_fencing.py::test_fence_records_pre_state
+0.58s call     tests/test_pulse_reconcile.py::test_conflict_raises_and_leaves_no_lingering_rebase
+0.57s call     tests/test_git_pulse_install_cli.py::GitPulseInstallCliTests::test_install_discovers_local_github_repos_and_updates_config
+0.52s call     tests/test_pulse_reconcile.py::test_local_commits_preserved_on_rebase
+0.51s call     tests/test_focus5_scan.py::SyncSummarizeTests::test_resync_replaces_roster_without_duplicates
+0.49s call     tests/test_github_commit_backfill.py::GitCommitBackfillTests::test_cap_is_reported_not_silent
+=========================== short test summary info ============================
+FAILED tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+FAILED tests/test_embedder.py::EmbedderTests::test_load_and_embed_batch_with_mock_model
+FAILED tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+FAILED tests/test_embedder_metal_unavailable.py::test_load_model_succeeds_even_when_metal_unavailable
+4 failed, 2112 passed, 20 skipped, 10 xfailed, 1 warning, 143 subtests passed in 104.98s (0:01:44)

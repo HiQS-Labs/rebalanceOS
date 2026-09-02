@@ -1,0 +1,15 @@
+....s...................................x............................... [ 43%]
+............................F........................................... [ 86%]
+......................                                                   [100%]
+=================================== FAILURES ===================================
+__________________ test_gh144_witnessed_red_negative_control ___________________
+
+    def test_gh144_witnessed_red_negative_control():
+>       assert False, "GH-144 Phase 0 witnessed-red negative control (M10)"
+E       AssertionError: GH-144 Phase 0 witnessed-red negative control (M10)
+E       assert False
+
+HiQS/tests/test_events.py:101: AssertionError
+=========================== short test summary info ============================
+FAILED HiQS/tests/test_events.py::test_gh144_witnessed_red_negative_control
+1 failed, 163 passed, 1 skipped, 1 xfailed in 2.26s

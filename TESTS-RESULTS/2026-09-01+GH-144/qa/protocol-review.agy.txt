@@ -1,0 +1,35 @@
+**SINGLE-MODEL — NOT RECONCILED** (only agy answered; 1 of 2 requested advisor(s) failed — this is one model's read, not a cross-model consult. Do not treat any claim below as cross-verified.)
+
+### 1. ANSWER
+The protocol successfully establishes a rigorous deterministic baseline via inventory hashing and sound negative controls (witnessed-red). However, it is fatally compromised by an un-computable decision rule that relies on an invalid local hardware proxy, and it contains critical gaps in its run matrix and candidate definitions that render C2 and C3 mathematically incomplete and destined to fail in CI.
+
+### 2. FINDINGS
+
+1. **[Blocker] D1 decision rule is un-computable or rigged via false proxy (a, c)**
+   D1 (`GH-144-CI-LANE-PROTOCOL.md:49`) requires a ≥20% speedup on the "same evidence source." The run matrix (§6, `GH-144-CI-LANE-PROTOCOL.md:144`) only measures candidates C1–C4 locally; M11 only pulls the *incumbent* from CI. If D1 uses the local macOS proxy, it will falsely adopt C4 (a 10-core Mac vastly overstates `xdist` gains vs a standard 2/4-core CI runner) and C1 (local disk cache does not proxy CI network cache; as admitted in `GH-144-CI-LANE-PROTOCOL.md:111`). If D1 requires CI data, it cannot compute the decision because CI candidates are never run.
+   *Fix*: Mandate running C1–C4 in a draft PR to populate M11 with actual CI candidate timings, and evaluate D1 strictly on CI wall time.
+
+2. **[Blocker] C3 root lane fails by definition (b, d)**
+   C3's feasibility gate (`GH-144-CI-LANE-PROTOCOL.md:118`) discovers the seam set by observing which tests fail when the `embeddings` extra is dropped. However, the protocol never specifies how the actual C3 root lane will *exclude* these failing tests. Without explicit exclusion (e.g., `--ignore`), the root lane will predictably and perpetually fail with `ImportError`s, directly violating D2 ("zero new failures", `GH-144-CI-LANE-PROTOCOL.md:54`).
+   *Fix*: Explicitly state that the C3 root lane command must exclude the discovered seam set.
+
+3. **[Blocker] Missing measurements for C3's seam lane (b)**
+   M7 (`GH-144-CI-LANE-PROTOCOL.md:154`) measures C3's root suite (without embeddings), but the matrix completely omits running and timing the C3 "embeddings seam lane" itself. You cannot calculate the "job's longest lane" (D1) for C3 without measuring both of its concurrent halves.
+   *Fix*: Add a run matrix cell for the C3 seam lane (`C0 install + seam tests`).
+
+4. **[Blocker] Missing feasibility and measurement for C2's root lane (b)**
+   C2 splits HiQS out. The gate proves HiQS runs without the root package (`GH-144-CI-LANE-PROTOCOL.md:115`, M6). However, the matrix never proves or times the inverse: the root suite running *without the HiQS package installed*. M4 runs in the C0 venv, which *does* have HiQS installed (step 3, `GH-144-CI-LANE-PROTOCOL.md:108`). If `tests/` implicitly imports `HiQS`, C2's root lane will fail, but the protocol's matrix will not catch it.
+   *Fix*: Add a feasibility gate and matrix cell for C2's root lane (fresh venv, install root only, run root suite).
+
+5. **[Should] D1 longest lane calculation is implicit (a)**
+   D1 says "longest lane (setup + suite)" (`GH-144-CI-LANE-PROTOCOL.md:50`). The protocol implies but doesn't explicitly state that the critical path for split lanes (C2, C3) is the `max(Lane A, Lane B)` rather than their sum.
+   *Fix*: Clarify in D1 that parallel lane wall times are calculated as the maximum of their concurrent execution times.
+
+6. **[Pass] Inventory hash method (e)**
+   The combination of `pytest --collect-only` hashes and runtime `passed/skipped/failed` counts (`GH-144-CI-LANE-PROTOCOL.md:173`) correctly isolates static inventory from dynamic skip/fail states. If C3 introduces dynamic skips, the runtime counts will misalign (more skips, fewer passes) and properly kill the candidate under D2. 
+
+7. **[Pass] Witnessed-red controls (d)**
+   Mutating a test to `assert False` and observing a non-zero exit from the lane command (`GH-144-CI-LANE-PROTOCOL.md:178`) correctly satisfies `SOP.md:98`. The instrument being tested is the CI lane routing, not the test logic, so this is exactly the correct negative control.
+
+### 3. RECOMMENDATION
+Block freeze until the run matrix measures all separated lanes, C3 explicitly ignores its seam failures, and D1 is re-anchored to require actual draft-PR CI timings rather than a structurally flawed local proxy.
