@@ -36,9 +36,7 @@ class OrgAliasConfigTests(unittest.TestCase):
 
     def test_malformed_entries_are_dropped(self) -> None:
         # A repo name is not an org alias; blanks are noise. Neither may survive.
-        config_module.set_github_org_aliases(
-            {"hiqs-suite": "HiQS-Labs", "a/b": "c", "": "x", "ok": "  "}
-        )
+        config_module.set_github_org_aliases({"hiqs-suite": "HiQS-Labs", "a/b": "c", "": "x", "ok": "  "})
 
         self.assertEqual(config_module.get_github_org_aliases(), {"hiqs-suite": "HiQS-Labs"})
 

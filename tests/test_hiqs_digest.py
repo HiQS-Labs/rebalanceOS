@@ -1063,8 +1063,7 @@ def test_closed_items_dedupe_on_canonical_identity_too(db: Path, org_alias):
 def _watched_via_push(conn, repo: str, at: str = "2026-09-02T00:00:00Z") -> None:
     """Make *repo* currently-watched via the pushed-repos window (14d)."""
     conn.execute(
-        "INSERT INTO github_pushed_repos (repo_full_name, pushed_at, first_seen_at, last_seen_at) "
-        "VALUES (?,?,?,?)",
+        "INSERT INTO github_pushed_repos (repo_full_name, pushed_at, first_seen_at, last_seen_at) VALUES (?,?,?,?)",
         (repo, at, at, at),
     )
 

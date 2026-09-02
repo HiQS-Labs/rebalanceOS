@@ -568,9 +568,7 @@ def collect_repo_freshness(db: Path, now: datetime) -> list[dict[str, Any]]:
         from rebalance.ingest.config import canonical_github_repo_name
         from rebalance.ingest.index_ops import get_watched_repos
 
-        watched_lower = {
-            canonical_github_repo_name(r).lower() for r in get_watched_repos(Path(db))["watched"]
-        }
+        watched_lower = {canonical_github_repo_name(r).lower() for r in get_watched_repos(Path(db))["watched"]}
     except Exception as e:  # noqa: BLE001 — freshness must never kill the digest
         return [{"error": _scrub(f"watched-set resolve failed: {e}")}]
 
@@ -578,8 +576,7 @@ def collect_repo_freshness(db: Path, now: datetime) -> list[dict[str, Any]]:
     try:
         with db_connection_readonly(db) as conn:
             rows = conn.execute(
-                "SELECT repo_full_name, MAX(fetched_at) AS last_fetched FROM github_repo_meta "
-                "GROUP BY repo_full_name"
+                "SELECT repo_full_name, MAX(fetched_at) AS last_fetched FROM github_repo_meta GROUP BY repo_full_name"
             ).fetchall()
             for r in rows:
                 repo = canonical_github_repo_name(r["repo_full_name"] or "")
