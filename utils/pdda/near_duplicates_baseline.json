@@ -1,0 +1,9 @@
+[
+  "scripts/pulse_web.py:_read_json_list ~ src/rebalance/ingest/audit.py:_load_entries",
+  "src/rebalance/ingest/apple_reminders.py:_iso ~ src/rebalance/ingest/sleuth_reminders.py:_iso_or_none",
+  "src/rebalance/ingest/apple_reminders_write.py:ensure_apple_reminders_write_schema ~ src/rebalance/ingest/db/schema.py:ensure_email_schema",
+  "src/rebalance/ingest/db/github.py:delete_github_embeddings_for_docs ~ src/rebalance/ingest/db/semantic.py:delete_semantic_embeddings_for_docs",
+  "src/rebalance/ingest/db/github.py:insert_github_document ~ src/rebalance/ingest/db/semantic.py:insert_semantic_document",
+  "src/rebalance/ingest/db/github.py:set_github_embedding_meta ~ src/rebalance/ingest/db/semantic.py:insert_semantic_embedding ~ src/rebalance/ingest/db/semantic.py:set_semantic_embedding_meta",
+  "utils/daily_synthesis.py:log ~ utils/obsidian_daily_rollover.py:log"
+]

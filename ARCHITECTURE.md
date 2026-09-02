@@ -222,6 +222,73 @@ Project Registry ────▶ registry.py +              MD registry → proj
 > local clone (`base_url` is a `file://`/local path). No SSH tunnel, no open port.
 > See [SLEUTH_SYNC.md](SLEUTH_SYNC.md). (Dev still hits the API directly.)
 
+### Source → Consumer fanout (report & synthesis surfaces)
+
+The GH-150 contract: every surface that reads the activity signal — script entrypoint,
+scheduled job, MCP tool — has a row here, so "is this new report needed, and what does
+it read?" is answered in the diff instead of buried in a 400-line file.
+`tests/test_consumer_catalog.py` enumerates entrypoints (`__main__` under `utils/` +
+`scripts/`, minus the pdda tooling and the stood-down 3-Eyes tree), scheduled-job
+scripts (the SCHEDULER.md policy table), and MCP tools (`@mcp.tool()` in
+`src/rebalance/mcp/tools/`) and fails on any surface without a row
+(`uncataloged consumer`). Column rules the test enforces: **LLM primitive** is `querier`,
+`none`, or `own (R2-baseline: <path>)` — a private client may only exist by naming the
+ratchet baseline that will shrink when it dies; **Input path** containing "own SQL"
+must name its `R1-baseline:` file the same way; **Replaces** is `—` or an existing
+Surface. When fe1's shared read layer lands, new rows must read `db/queries.py` and the
+baseline references become violations.
+
+| Surface | Entrypoint | Cadence | Input path | LLM primitive | Channel | Replaces |
+|---|---|---|---|---|---|---|
+| Daily full refresh | scripts/daily_sync.sh | daily 06:30 | orchestrator (`refresh_index`) | none | DB write | — |
+| Hourly GitHub sync | scripts/github_sync.sh | hourly :45 | orchestrator (`refresh_index`, artifact window 7d) | none | DB write | — |
+| Vault embeddings job | scripts/obsidian_vault_embeddings.sh | hourly :15 | orchestrator (`refresh_index` vault+semantic) | none | DB write | — |
+| Pulse page | scripts/pulse_sync.sh | hourly :00 | pulse renderer (own SQL R1-baseline: src/rebalance/ingest/pulse.py) | none | pulse repo README | — |
+| Pulse web render | scripts/pulse_web_sync.sh, scripts/pulse_web.py | 30 min | pulse renderer (same snapshot) | none | web/pulse.html | Pulse page |
+| Pulse server | scripts/pulse_server.sh, scripts/pulse_server.py | daemon | DB read layer + pulse renderer | none | localhost:8767 | — |
+| Pulse warning watch | scripts/pulse_warning_watch.py | 15 min | HTTP probe of pulse-server | none | temp JSONL | — |
+| Health issue reporter | scripts/health_issue_reporter.py | hourly :10 + 3×/day triage | doctor subprocess + GitHub API | own (R2-baseline: scripts/health_issue_reporter.py) | GitHub issues | — |
+| Daily note rollover | utils/obsidian_rollover.sh, utils/obsidian_daily_rollover.py | daily 00:40 | vault filesystem | none | Obsidian daily note | — |
+| Progress digest | scripts/hiqs_digest.sh, utils/hiqs_digest.py | 2×/day 13:05/17:05 | own SQL (R1-baseline: utils/hiqs_digest.py) + doctor + semantic | querier | pulse repo digests/ → Slack relay | — |
+| Daily synthesis | utils/daily_synthesis.sh, utils/daily_synthesis.py | daily 18:20 | pulse.collect_pulse_snapshot + git-pulse device files | querier | Obsidian note + CLIO log | — |
+| Dashboard note | src/rebalance/ingest/note_builder.py | on refresh | own SQL (R1-baseline: src/rebalance/ingest/note_builder.py) + calendar | own (R2-baseline: src/rebalance/ingest/note_builder.py) | vault dashboard note | — |
+| Claude Cloud signal grade | utils/claude_cloud_daily_grade.py | daily | ingest/claude_cloud sessions API | none | Obsidian block | — |
+| Claude Cloud jobs POC | scripts/cc_cloud_jobs.py | manual | api.anthropic.com fetch (R2-baseline: scripts/cc_cloud_jobs.py) + gh | none | stdout + temp/ | Claude Cloud signal grade |
+| Web dashboard data | scripts/dashboard.py | manual | own SQL (R1-baseline: scripts/dashboard.py) | none | dashboard payload | — |
+| Morning brief spike | scripts/spike_morning_brief.py | manual | spike harness | none | stdout | — |
+| Welcome status spike | scripts/spike_welcome_status.py | manual | spike harness | none | stdout | — |
+| Chat eval | scripts/chat_eval.py | manual | eval corpus | none | stdout | — |
+| Module audit | scripts/audit_modules.py | manual / MCP | repo tree + docs | none | audit report | — |
+| Doc link check | scripts/check_doc_links.py | manual | repo docs | none | stdout | — |
+| Extension build | scripts/build_extension.py | manual | capabilities tree | none | built artifacts | — |
+| Capabilities index | scripts/generate_capabilities_index.py | manual | repo tree | none | capabilities index | — |
+| Calendar OAuth setup | scripts/setup_calendar_oauth.py | manual | OAuth flow | none | keyring/token | — |
+| Gmail OAuth setup | scripts/setup_gmail_oauth.py | manual | OAuth flow | none | keyring/token | — |
+| Cloud daily grade helpers | utils/job_guard.py | per job | process guard | none | job lifecycle | — |
+| Vector store reclaim | utils/gh250/reclaim.py | manual (historical) | vector store | none | store maintenance | — |
+| Releases ledger CLI | utils/py/releases_app.py | manual | releases.db | none | ledger + dump | — |
+| Releases cycle rollup | utils/py/releases_cycle.py | on demand | releases.db (read-only) | none | rollup markdown/dashboard | — |
+| MCP: index_status | src/rebalance/mcp/tools/index.py | on demand | status snapshot (coverage probe) | none | MCP | — |
+| MCP: refresh_index | src/rebalance/mcp/tools/index.py | on demand | orchestrator | none | MCP | — |
+| MCP: diagnose_repo | src/rebalance/mcp/tools/index.py | on demand | own SQL (R1-baseline: src/rebalance/ingest/diagnose.py) | none | MCP | — |
+| MCP: list_watched_repos | src/rebalance/mcp/tools/index.py | on demand | watched-set view | none | MCP | — |
+| MCP: list_ask_self_repos | src/rebalance/mcp/tools/index.py | on demand | ask_self index | none | MCP | — |
+| MCP: publish_pulse | src/rebalance/mcp/tools/index.py | on demand | pulse renderer | none | MCP | — |
+| MCP: peek_source | src/rebalance/mcp/tools/index.py | on demand | parameterized table peek | none | MCP | — |
+| MCP: get_next_actions | src/rebalance/mcp/tools/index.py | on demand | next_actions engine (R1-baseline: src/rebalance/ingest/next_actions.py) | querier | MCP | — |
+| MCP: semantic_query | src/rebalance/mcp/tools/index.py | on demand | semantic index | none | MCP | — |
+| MCP: audit_modules | src/rebalance/mcp/tools/hygiene.py | on demand | repo tree + docs | none | MCP | — |
+| MCP: calendar tools | src/rebalance/mcp/tools/calendar.py | on demand | calendar_events | none | MCP | — |
+| MCP: onboarding tools | src/rebalance/mcp/tools/onboarding.py | on demand | registry/lifecycle + gmail push | none | MCP | — |
+| MCP: projects tools | src/rebalance/mcp/tools/projects.py | on demand | registry; github_balance → own SQL (R1-baseline: src/rebalance/ingest/github_scan.py) | none | MCP | — |
+| MCP: retrieval tools | src/rebalance/mcp/tools/retrieval.py | on demand | vault FTS; readiness → own SQL (R1-baseline: src/rebalance/ingest/github_readiness.py) | querier | MCP | — |
+| MCP: sleuth tools | src/rebalance/mcp/tools/sleuth.py | on demand | sleuth source | none | MCP | — |
+
+Grouped rows (one row covering several same-shape tools, e.g. "MCP: calendar tools")
+name their module; the test resolves them. Two surfaced read paths have no entrypoint
+of their own and are carried by the rows above: `pulse.collect_pulse_snapshot`
+(daily synthesis) and the querier synthesis primitive itself.
+
 ### Credentials
 
 | Source | Secret store | Mechanism |

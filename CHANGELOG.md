@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.83.0] - 2026-09-02
+
+### Added
+- Read-layer sprawl ratchets (#150): SQL reads over the GitHub activity tables, private LLM endpoint clients, and re-implemented day-window helpers are each pinned to an exact per-file baseline that fails on growth AND on shrink, with a same-line pragma for reviewed exceptions. The freeze surfaced two findings the original audit missed — a fourth independent Gemini client and a re-typed helper pair — both now baselined for retirement. A structural near-duplicate canary (AST fingerprints, identifier-normalized) pins cross-file re-typed functions the same way.
+- Consumer catalog (#150): every activity-signal surface — script entrypoints, scheduled-job scripts, MCP tools — must carry a row in the architecture doc's Source→Consumer table declaring its input path, LLM primitive, output channel, and what it replaces. Uncataloged consumers fail CI; a private SQL path or LLM client may only be declared by naming the ratchet baseline it will shrink.
+
 ## [0.82.0] - 2026-09-02
 
 ### Added
