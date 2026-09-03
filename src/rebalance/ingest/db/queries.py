@@ -75,6 +75,24 @@ def _canonical_name(repo: str, alias_map: dict[str, str] | None = None) -> str:
     return name
 
 
+def _all_repo_spellings(repo: str, alias_map: dict[str, str] | None = None) -> list[str]:
+    """Return all lowercase equivalent spellings of a repo (canonical, aliases, raw)."""
+    aliases = alias_map if alias_map is not None else _get_alias_map()
+    name = (repo or "").strip()
+    if not name:
+        return []
+    canon = _canonical_name(name, aliases)
+    canon_owner, _, rest = canon.partition("/")
+    canon_lower = canon.lower()
+    spellings = {name.lower(), canon_lower}
+    if rest:
+        rest_lower = rest.lower()
+        for alias_k, alias_v in aliases.items():
+            if alias_v.lower() == canon_owner.lower():
+                spellings.add(f"{alias_k.lower()}/{rest_lower}")
+    return sorted(spellings)
+
+
 def _author_filter_sql(column: str, cloud_authors: tuple[str, ...] = CLOUD_AGENT_AUTHORS) -> str:
     """SQL snippet matching an author column against operator login or bot logins."""
     bot_placeholders = ", ".join("?" for _ in cloud_authors)
@@ -85,12 +103,17 @@ def _author_filter_sql(column: str, cloud_authors: tuple[str, ...] = CLOUD_AGENT
     )
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    """Normalize datetime to timezone-aware UTC datetime."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _utc_iso_floor(dt: datetime) -> str:
     """Return *dt* minus 2 hours as a UTC ISO 8601 string for >= SQL queries."""
-    floor_dt = dt - timedelta(hours=2)
-    if floor_dt.tzinfo is not None:
-        return floor_dt.astimezone(timezone.utc).isoformat()
-    return floor_dt.isoformat()
+    floor_dt = _ensure_utc(dt) - timedelta(hours=2)
+    return floor_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _in_window(iso_str: str | None, start: datetime, end: datetime) -> bool:
@@ -102,7 +125,9 @@ def _in_window(iso_str: str | None, start: datetime, end: datetime) -> bool:
     parsed = parse_utc_iso(iso_str)
     if parsed is None:
         return False
-    return start <= parsed < end
+    start_utc = _ensure_utc(start)
+    end_utc = _ensure_utc(end)
+    return start_utc <= parsed < end_utc
 
 
 # ---------------------------------------------------------------------------
@@ -733,10 +758,8 @@ def fetch_repo_diagnostics(
 ) -> dict[str, Any]:
     """Diagnostic data for a single repo: meta, table counts, commits, and PRs."""
     alias_map = _get_alias_map()
-    raw_lower = (repo_name or "").strip().lower()
     canon_name = _canonical_name(repo_name, alias_map)
-    canon_lower = canon_name.lower()
-    spellings = list({raw_lower, canon_lower})
+    spellings = _all_repo_spellings(repo_name, alias_map)
     placeholders = ",".join("?" * len(spellings))
 
     # Meta
@@ -748,14 +771,14 @@ def fetch_repo_diagnostics(
     counts: dict[str, int] = {"items": 0, "commits": 0, "comments": 0, "documents": 0}
     last_synced: str | None = None
 
-    for table, key in (
-        ("github_items", "items"),
-        ("github_commits", "commits"),
-        ("github_comments", "comments"),
-        ("github_documents", "documents"),
+    for table, key, distinct_expr in (
+        ("github_items", "items", "DISTINCT item_type || ':' || number"),
+        ("github_commits", "commits", "DISTINCT sha"),
+        ("github_comments", "comments", "DISTINCT COALESCE(github_comment_id, item_type || ':' || item_number || ':' || created_at)"),
+        ("github_documents", "documents", "DISTINCT source_type || ':' || source_number || ':' || doc_type"),
     ):
         row = conn.execute(
-            f"SELECT COUNT(*) AS c, MAX(fetched_at) AS m FROM {table} WHERE LOWER(repo_full_name) IN ({placeholders})",
+            f"SELECT COUNT({distinct_expr}) AS c, MAX(fetched_at) AS m FROM {table} WHERE LOWER(repo_full_name) IN ({placeholders})",
             spellings,
         ).fetchone()
         if row:
@@ -774,24 +797,30 @@ def fetch_repo_diagnostics(
         rows = conn.execute(
             f"""
             SELECT sha, item_type, item_number, author_login,
-                   committed_at, message, html_url
+                   committed_at, message, html_url, repo_full_name
             FROM github_commits
             WHERE LOWER(repo_full_name) IN ({placeholders}) AND LOWER(sha) LIKE ?
-            LIMIT 5
+            ORDER BY CASE WHEN repo_full_name = ? THEN 0 ELSE 1 END, committed_at DESC
             """,
-            (*spellings, f"{sha_clean}%"),
+            (*spellings, f"{sha_clean}%", canon_name),
         ).fetchall()
+        seen_shas: set[str] = set()
         for r in rows:
-            commit_matches.append(
-                {
-                    "sha": r["sha"],
-                    "associated": f"{r['item_type']}#{r['item_number']}",
-                    "author": r["author_login"],
-                    "committed_at": r["committed_at"],
-                    "message_first_line": (r["message"] or "").splitlines()[0][:200] if r["message"] else "",
-                    "html_url": r["html_url"],
-                }
-            )
+            s = r["sha"]
+            if s not in seen_shas:
+                seen_shas.add(s)
+                commit_matches.append(
+                    {
+                        "sha": r["sha"],
+                        "associated": f"{r['item_type']}#{r['item_number']}",
+                        "author": r["author_login"],
+                        "committed_at": r["committed_at"],
+                        "message_first_line": (r["message"] or "").splitlines()[0][:200] if r["message"] else "",
+                        "html_url": r["html_url"],
+                    }
+                )
+                if len(commit_matches) >= 5:
+                    break
 
     # PR lookup
     pr_data: dict[str, Any] | None = None
@@ -800,15 +829,19 @@ def fetch_repo_diagnostics(
             f"""
             SELECT title, state, is_merged, author_login, created_at,
                    updated_at, merged_at, comments_count,
-                   commits_count, fetched_at, html_url
+                   commits_count, fetched_at, html_url, repo_full_name
             FROM github_items
             WHERE LOWER(repo_full_name) IN ({placeholders})
               AND item_type = 'pull_request' AND number = ?
+            ORDER BY CASE WHEN repo_full_name = ? THEN 0 ELSE 1 END, updated_at DESC
+            LIMIT 1
             """,
-            (*spellings, pr),
+            (*spellings, pr, canon_name),
         ).fetchone()
         if row:
-            pr_data = dict(row)
+            d = dict(row)
+            d.pop("repo_full_name", None)
+            pr_data = d
 
     return {
         "repo_full_name": canon_name,
@@ -833,10 +866,8 @@ def fetch_release_readiness_data(
 ) -> dict[str, Any]:
     """Retrieve raw milestone, issues, PRs, and links for release readiness evaluation."""
     alias_map = _get_alias_map()
-    raw_lower = (repo_full_name or "").strip().lower()
     canon_name = _canonical_name(repo_full_name, alias_map)
-    canon_lower = canon_name.lower()
-    spellings = list({raw_lower, canon_lower})
+    spellings = _all_repo_spellings(repo_full_name, alias_map)
     placeholders = ",".join("?" * len(spellings))
 
     repo_meta_row = conn.execute(
@@ -950,6 +981,8 @@ def fetch_release_readiness_data(
 
     # Promotion PR
     default_branch = repo_meta.get("default_branch") or "main" if repo_meta else "main"
+    prod_branches = list({"main", default_branch})
+    base_placeholders = ",".join("?" * len(prod_branches))
     promo_row = conn.execute(
         f"""
         SELECT *
@@ -957,12 +990,12 @@ def fetch_release_readiness_data(
         WHERE LOWER(repo_full_name) IN ({placeholders})
           AND item_type = 'pull_request'
           AND state = 'open'
-          AND base_ref = 'main'
+          AND base_ref IN ({base_placeholders})
           AND (head_ref = ? OR head_ref LIKE 'release/%')
         ORDER BY updated_at DESC
         LIMIT 1
         """,
-        (*spellings, default_branch),
+        (*spellings, *prod_branches, default_branch),
     ).fetchone()
     promotion_pr = dict(promo_row) if promo_row else None
 

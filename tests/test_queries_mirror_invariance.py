@@ -27,9 +27,10 @@ from rebalance.ingest.db.schema import ensure_github_schema, ensure_schema
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def org_alias(monkeypatch):
     aliases = {"hiqs-suite": "HiQS-Labs"}
+    monkeypatch.setattr(queries_mod, "_get_alias_map", lambda: aliases)
     monkeypatch.setattr(config_module, "get_github_org_aliases", lambda: aliases)
     return aliases
 
@@ -330,3 +331,89 @@ def test_query_function_mirror_invariance(db_pair, org_alias, fn_name):
     assert dump_clean == dump_mirror, (
         f"{fn_name} is NOT mirror-invariant!\nClean:\n{dump_clean}\nMirrored:\n{dump_mirror}"
     )
+
+
+def test_repo_scoped_queries_reach_alias_only_corpus(tmp_path):
+    """Calling repo-scoped queries with canonical name must find rows stored under legacy alias."""
+    db_path = tmp_path / "alias_only.db"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        # Seed under legacy alias only (HiQS-Suite/xyz-forge)
+        _seed_mirror_rows(conn)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        # Query with canonical target (HiQS-Labs/xyz-forge)
+        diag = queries_mod.fetch_repo_diagnostics(conn, "HiQS-Labs/xyz-forge", sha="abc1234", pr=10)
+        assert diag["counts"]["commits"] == 1
+        assert diag["counts"]["items"] == 2
+        assert len(diag["commit_matches"]) == 1
+        assert diag["pr_data"] is not None
+
+        readiness = queries_mod.fetch_release_readiness_data(conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0")
+        assert readiness["milestone"] is not None
+        assert len(readiness["issues"]) == 1
+        assert len(readiness["prs"]) == 1
+
+
+def test_naive_datetime_bounds_handling(db_pair):
+    """Day-window query functions must accept naive datetimes without raising TypeError."""
+    db_clean, _ = db_pair
+    # Naive datetimes (no tzinfo)
+    naive_start = datetime(2026, 9, 2, 0, 0, 0)
+    naive_end = datetime(2026, 9, 3, 0, 0, 0)
+
+    with sqlite3.connect(db_clean) as conn:
+        conn.row_factory = sqlite3.Row
+        commits = queries_mod.fetch_day_commits(conn, naive_start, naive_end, "noelsaw1")
+        assert len(commits) == 2
+
+        items = queries_mod.fetch_day_items(conn, naive_start, naive_end, "noelsaw1")
+        assert len(items) == 2
+
+        comments = queries_mod.fetch_day_comments(conn, naive_start, naive_end, "noelsaw1")
+        assert len(comments) == 1
+
+        watched = queries_mod.fetch_watched_activity(
+            conn, ["HiQS-Labs/xyz-forge"], start=naive_start, end=naive_end
+        )
+        assert len(watched) == 1
+
+
+def test_release_readiness_custom_default_branch(tmp_path):
+    """Release readiness must detect promotion PR when repo default branch is non-main."""
+    db_path = tmp_path / "custom_branch.db"
+    now_iso = "2026-09-02T18:00:00Z"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO github_repo_meta (repo_full_name, default_branch, pushed_at, updated_at, open_issues_count, has_issues, has_projects, fetched_at)
+            VALUES ('HiQS-Labs/xyz-forge', 'master', ?, ?, 1, 1, 1, ?)
+            """,
+            (now_iso, now_iso, now_iso),
+        )
+        conn.execute(
+            """
+            INSERT INTO github_milestones (repo_full_name, number, title, state, open_issues, closed_issues, due_on, created_at, updated_at, html_url)
+            VALUES ('HiQS-Labs/xyz-forge', 1, 'v1.0', 'open', 0, 1, '2026-09-30', ?, ?, 'https://github.com/HiQS-Labs/xyz-forge/milestone/1')
+            """,
+            (now_iso, now_iso),
+        )
+        conn.execute(
+            """
+            INSERT INTO github_items (repo_full_name, item_type, number, title, state, is_merged, author_login, head_ref, base_ref, created_at, updated_at, fetched_at, html_url)
+            VALUES ('HiQS-Labs/xyz-forge', 'pull_request', 20, 'feat: release v1.0', 'open', 0, 'noelsaw1', 'release/1.0', 'master', ?, ?, ?, 'https://github.com/HiQS-Labs/xyz-forge/pull/20')
+            """,
+            (now_iso, now_iso, now_iso),
+        )
+        conn.commit()
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        readiness = queries_mod.fetch_release_readiness_data(conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0")
+        assert readiness["promotion_pr"] is not None
+        assert readiness["promotion_pr"]["number"] == 20
+
