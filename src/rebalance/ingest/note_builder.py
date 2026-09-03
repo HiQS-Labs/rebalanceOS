@@ -46,54 +46,10 @@ def get_all_repo_activity_by_org(
         return {}
 
     from rebalance.ingest.config import get_github_ignored_repos
-    from rebalance.ingest.db import db_connection, ensure_github_schema
-
-    since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")
-
-    ignored = get_github_ignored_repos()
-    params: list[Any] = [since_date]
-    ignored_clause = ""
-    if ignored:
-        placeholders = ",".join("?" * len(ignored))
-        ignored_clause = f"AND LOWER(repo_full_name) NOT IN ({placeholders})"
-        params.extend(ignored)
+    from rebalance.ingest.db import db_connection, ensure_github_schema, fetch_org_activity
 
     with db_connection(database_path, ensure_github_schema) as conn:
-        rows = conn.execute(
-            f"""
-            SELECT repo_full_name,
-                   SUM(commits)        AS commits,
-                   SUM(prs_opened)     AS prs_opened,
-                   SUM(prs_merged)     AS prs_merged,
-                   SUM(issues_opened)  AS issues_opened,
-                   MAX(last_active_at) AS last_active_at
-            FROM github_activity
-            WHERE scan_date >= ?
-            {ignored_clause}
-            GROUP BY repo_full_name
-            """,
-            tuple(params),
-        ).fetchall()
-
-    by_org: dict[str, list[dict[str, Any]]] = {}
-    for row in rows:
-        repo = row["repo_full_name"]
-        org = repo.split("/")[0] if "/" in repo else repo
-        by_org.setdefault(org, []).append(
-            {
-                "repo_full_name": repo,
-                "commits": int(row["commits"] or 0),
-                "prs_opened": int(row["prs_opened"] or 0),
-                "prs_merged": int(row["prs_merged"] or 0),
-                "issues_opened": int(row["issues_opened"] or 0),
-                "last_active_at": row["last_active_at"],
-            }
-        )
-
-    for org_repos in by_org.values():
-        org_repos.sort(key=lambda r: r["last_active_at"] or "", reverse=True)
-
-    return by_org
+        return fetch_org_activity(conn, since_days=since_days, ignored_repos=get_github_ignored_repos())
 
 
 @dataclass

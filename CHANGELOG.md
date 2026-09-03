@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.84.0] - 2026-09-02
+
+### Added
+- Unified read layer with canonical repository identity (fe1 extension): queries over GitHub activity tables now route through a single database query layer that transparently collapses mirror organization aliases and case variants into unified repo entities. All presenting surfaces — balance aggregations, pulse rollups, next-action discovery, release readiness checks, and dashboard views — now produce identical, undoubled activity metrics regardless of how organization renames or aliases appear in raw data. (#150, #29)
+
 ## [0.83.0] - 2026-09-02
 
 ### Added
