@@ -1,26 +1,37 @@
 ---
 gh_issue: 144
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/144
-title: "GH-144 Phase 0 protocol — measured CI lane spike"
-status: "Protocol v1.1 — amended 2026-09-01 after independent review (Codex + agy), pre-run"
+title: "GH-144 — measured CI lane spike: protocol + C3 implementation"
+status: "Phase 0 done (campaign published, PR #145 merged); Phase 1 (implement C3) in progress"
 created: 2026-09-01
+updated: 2026-09-02
 owner: noel
 doc_type: protocol
+branch: fix/gh144-ci-seam-lane
 goal: >
   Measure the incumbent CI test job and the four candidates from issue #144 on
-  the same commit and executed-test inventory, and publish the campaign under
-  TESTS-RESULTS/2026-09-01+GH-144/ before any workflow change or speedup claim.
+  the same commit and executed-test inventory, publish the campaign under
+  TESTS-RESULTS/2026-09-01+GH-144/ before any workflow change or speedup claim
+  (Phase 0 — done), then implement the recommended candidate C3 (embeddings
+  seam lane split) in .github/workflows/ci.yml (Phase 1).
 effort: 2
 complexity: 2
-risk: 1
-phases: 1
+risk: 2
+phases: 2
 ratings_provisional: false
 ---
 
-# GH-144 Phase 0 — measured CI lane spike protocol
+# GH-144 — measured CI lane spike: protocol + C3 implementation
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Phase 0: protocol frozen + independently reviewed, campaign run and published (`TESTS-RESULTS/2026-09-01+GH-144/`), PR #145 merged to `development` (recommendation: C3 — embeddings seam lane). Phase 1 started: full clone `rebalanceOS-gh144`, branch `fix/gh144-ci-seam-lane`, added to Releases DB (`Seam Lane`, tracking #144). | Implement the C3 job split in `.github/workflows/ci.yml`, run the full suite locally to confirm the seam-file inventory still matches the campaign's D2 evidence (2146 root + 165 HiQS, exact-once, 0 flips), then QA via `/relay-xyz` with agy before opening a PR. |
 
 ## TOC
 
+0. [Phase 1 — Implement C3 (seam lane split)](#0-phase-1--implement-c3-seam-lane-split)
 1. [Question and decision rule](#1-question-and-decision-rule)
 2. [Constraints inherited from prior issues](#2-constraints-inherited-from-prior-issues)
 3. [Provenance and environments](#3-provenance-and-environments)
@@ -33,6 +44,59 @@ ratings_provisional: false
 10. [Pre-declared threats to validity](#10-pre-declared-threats-to-validity)
 11. [Checklist](#11-checklist)
 12. [Deviations and amendments](#12-deviations-and-amendments)
+
+## 0. Phase 1 — Implement C3 (seam lane split)
+
+**Recommendation being implemented** (from the Phase 0 campaign,
+`TESTS-RESULTS/2026-09-01+GH-144/SUMMARY.md`): split `.github/workflows/ci.yml`'s
+single `test` job into three: `root-noembed` (full suite minus the 2 seam files,
+no `embeddings` extra — no torch install), `seam` (the 2 embeddings-dependent
+files only, with the `embeddings` extra), and `hiqs` (unchanged — already
+near-free). This is cumulative with C1 (pip cache) and C2 (HiQS split), and
+measured to roughly halve the critical path (162→82s on 3.12, 159→74s on 3.13).
+
+**Seam files (exactly 4 nodes, per the campaign's D2 inventory):**
+- `tests/test_embedder.py::EmbedderTests` (2 nodes)
+- `tests/test_embedder_metal_unavailable.py` (2 nodes)
+
+**Fail-closed requirement (non-negotiable per the campaign's own framing):** a
+future embeddings-dependent test landing outside these two files must turn the
+`root-noembed` job **red**, not silently skip. The split must not rely on a
+marker/skip mechanism that could mask a new leak; running the full non-seam
+suite without the `embeddings` extra installed is what gives this property for
+free (the 4 known nodes fail with `ImportError` there — expected in the seam
+lane's exclusion set — and any *new* embeddings-dependent test elsewhere would
+fail the same way, not skip).
+
+### Phase 1 QA checklist
+- [x] `root-noembed` job installs no `embeddings` extra (no torch), runs
+      `tests/` minus the 2 seam files, green — verified locally in a clean venv
+      with no `embeddings` extra installed: 2178 collected, 2148 passed / 20
+      skipped / 10 xfailed, 0 failures (124s)
+- [x] `seam` job installs the `embeddings` extra, runs only the 2 seam files,
+      green — verified locally: 8 collected, 8 passed (13s)
+- [x] `hiqs` job unchanged, green — verified locally: 165 collected, 163
+      passed / 1 skipped / 1 xfailed, 0 failures (12s)
+- [x] Union of the three jobs' executed node counts is exact-once (no missing,
+      no duplicated) against this branch's full `tests/` collection: 2178
+      (root-noembed) + 8 (seam) = 2186, matching `pytest tests/ --collect-only`
+      with the `embeddings` extra installed (2186), exactly. Absolute counts
+      are higher than the campaign's pinned-commit numbers (2146 root / 165
+      HiQS at `8f733ce`) because this branch is cut from current `development`,
+      which has since gained tests via #147/#148/#150 — expected drift, not a
+      structural mismatch; HiQS's 165 matches the campaign exactly (no drift
+      there since GH-144).
+- [x] A test file requiring `sentence_transformers` added outside the seam list
+      fails `root-noembed` (not silently skipped) — spot-checked directly: ran
+      the two seam files themselves (which do import `sentence_transformers`)
+      in a venv with the `embeddings` extra NOT installed. Result: 4/8 nodes
+      FAIL with `ModuleNotFoundError: No module named 'sentence_transformers'`
+      (not skipped), the other 4 pass (they don't touch the import at
+      runtime) — exactly matching the campaign's own M7 probe ("without the
+      extra, exactly 4 nodes fail, all inside the 2 seam files"). Confirms the
+      fail-closed property: any file outside the seam list that imports
+      `sentence_transformers` would fail `root-noembed` the same way.
+- [ ] QA'd via `/relay-xyz` with agy before PR
 
 This protocol is **frozen before any measurement number is generated** (SOP §3.1).
 It was independently reviewed before any run (Codex + agy, 2026-09-01, transcripts
