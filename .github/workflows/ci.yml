@@ -72,9 +72,21 @@ jobs:
       - name: Type check
         run: mypy src/
 
-  test:
+  # GH-144 Phase 0 (TESTS-RESULTS/2026-09-01+GH-144/) measured this incumbent job's
+  # cost and found it decomposes into: install-with-torch ~55s + root suite ~100s +
+  # HiQS suite+install ~25s, serialized — but only 4 test nodes in 2 files actually
+  # need the `embeddings` extra (torch + sentence-transformers). The single `test`
+  # job below was split into three (root-noembed / seam / hiqs) per the campaign's
+  # recommended candidate C3, which cleared all 4 decision gates by the widest
+  # margin and roughly halves the critical path (162→82s on 3.12, 159→74s on 3.13,
+  # measured medians). See GH-144-CI-LANE-PROTOCOL.md §0 for the implementation
+  # contract, incl. the fail-closed requirement this split relies on: running the
+  # full non-seam suite WITHOUT the `embeddings` extra installed means a stray
+  # embeddings-dependent test landing outside the two seam files below fails this
+  # job (ImportError) rather than being silently skipped.
+  root-noembed:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
@@ -94,25 +106,9 @@ jobs:
           # the web-surface tests need it. pytest: the suite is pytest-run
           # locally and some modules are pytest-style (unittest discover
           # can't collect them, and one imports pytest at module scope).
-          # embeddings extra: tests/test_embedder*.py patch sentence_transformers,
-          # which requires it to be importable (GH-81). It pulls torch, which is
-          # why the job timeout above is 25 rather than 10 minutes.
-          #
-          # Install torch from PyTorch's CPU index FIRST. On Linux, plain
-          # `pip install torch` resolves to the CUDA build — several GB of
-          # nvidia-* wheels this runner has no GPU to use. Satisfying the
-          # requirement up front with the CPU wheel keeps the install small;
-          # the line below then finds torch already present.
-          pip install --index-url https://download.pytorch.org/whl/cpu torch
-          pip install -e ".[calendar,server,embeddings]" pytest
-          # HiQS is a standalone package with its own pyproject, and the step below runs its
-          # suite. That step was added without this line, so it had never once passed: every
-          # run since died collecting four test modules on `No module named 'numpy'`, which
-          # HiQS declares and nothing installed. Installing the package rather than
-          # hand-listing the missing import is deliberate — HiQS's own dependency note warns
-          # that hand-picking is how a declared requirement gets silently omitted, and this
-          # way a dependency added there tomorrow is installed here tomorrow.
-          pip install -e HiQS/
+          # Deliberately NO embeddings extra here (GH-144 C3) — the two
+          # embeddings-dependent test files run in the `seam` job below.
+          pip install -e ".[calendar,server]" pytest
 
       # tests/test_pulse_reconcile.py drives real `git pull --rebase` against a
       # throwaway clone. Without an identity that dies with code 128 on a fresh
@@ -129,21 +125,17 @@ jobs:
       # core suite on it meant an unsupported component could hold up supported work.
       # The code stays in the tree; this is a pause, not a removal. To resume, add
       # `utils/3-eyes/tests` back to this line.
+      #
+      # --ignore the 2 seam files (GH-144 C3) — they run in the `seam` job, which
+      # has the `embeddings` extra installed. Without that extra, collecting them
+      # here would fail on import, which is exactly the fail-closed property this
+      # split relies on for any THIRD file that starts needing it unexpectedly —
+      # but the two known, accounted-for seam files must not trip that same guard.
       - name: Run tests
-        run: python -m pytest tests/ -q
-
-      # HiQS runs as its OWN pytest process, not appended to the line above.
-      # It is a standalone package with its own pyproject, destined for
-      # extraction to HiQS-Labs/HiQS — running it in the incumbent's process is
-      # the very coupling its clean-room gate exists to prevent, and it is not
-      # hypothetical: sharing a process makes
-      # test_github_failure_continues_logs_error_and_keeps_watermark fail on
-      # state leaked from tests/ (reproduced on pristine main; tracked separately).
-      # This step is how HiQS will run after extraction. It shipped without the install
-      # its own package needed, so it was red from the day it was added — see the install
-      # step above.
-      - name: HiQS suite (isolated — standalone package)
-        run: python -m pytest HiQS/tests -q
+        run: |
+          python -m pytest tests/ -q \
+            --ignore=tests/test_embedder.py \
+            --ignore=tests/test_embedder_metal_unavailable.py
 
       # The 3-Eyes registry/dashboard sync check was removed here on 2026-08-17 for
       # the same reason as its test run above. Restoring it means re-adding a step
@@ -164,3 +156,72 @@ jobs:
             echo "::error::Raw duration calc found — use event_duration_minutes() from calendar_helpers.py"
             exit 1
           fi
+
+  # GH-144 C3 seam lane: the 4 test nodes across these 2 files are the ONLY reason
+  # the root suite ever needed torch. Isolating them keeps the `embeddings` extra
+  # (and its ~55s torch install) off the critical path for every other change.
+  seam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install torch from PyTorch's CPU index FIRST. On Linux, plain
+          # `pip install torch` resolves to the CUDA build — several GB of
+          # nvidia-* wheels this runner has no GPU to use. Satisfying the
+          # requirement up front with the CPU wheel keeps the install small;
+          # the line below then finds torch already present.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[embeddings]" pytest
+
+      - name: Run embeddings seam tests
+        run: python -m pytest tests/test_embedder.py tests/test_embedder_metal_unavailable.py -q
+
+  # HiQS runs as its OWN job (not appended to root-noembed's steps). It is a
+  # standalone package with its own pyproject, destined for extraction to
+  # HiQS-Labs/HiQS — running it in the incumbent's process is the very coupling
+  # its clean-room gate exists to prevent, and it is not hypothetical: sharing a
+  # process makes test_github_failure_continues_logs_error_and_keeps_watermark
+  # fail on state leaked from tests/ (reproduced on pristine main; tracked
+  # separately). This job is how HiQS will run after extraction. It shipped
+  # without the install its own package needed, so it was red from the day it
+  # was added — the install step below is required, not incidental.
+  hiqs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # HiQS is a standalone package with its own pyproject. Installing the
+          # package rather than hand-listing its imports is deliberate — HiQS's
+          # own dependency note warns that hand-picking is how a declared
+          # requirement gets silently omitted, and this way a dependency added
+          # there tomorrow is installed here tomorrow.
+          pip install -e HiQS/ pytest
+
+      - name: HiQS suite (isolated — standalone package)
+        run: python -m pytest HiQS/tests -q
