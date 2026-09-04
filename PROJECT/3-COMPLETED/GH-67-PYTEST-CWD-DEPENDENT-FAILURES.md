@@ -25,7 +25,7 @@ roadmap_exempt: true
 
 | What was just completed | What's next |
 |---|---|
-| Pinned the sandbox repo as the default `cwd` in `tests/test_uninstall_rebalance.py`'s `_run()` helper. Verified 0 failures from both the repo root and `/tmp`. **2026-09-04:** independently re-verified still fixed, and the declared `[tool.pytest.ini_options]` guard landed via #162. | None — the fix and its guard are both in. |
+| Pinned the sandbox repo as the default `cwd` in `tests/test_uninstall_rebalance.py`'s `_run()` helper. Verified 0 failures from both the repo root and `/tmp`. **2026-09-04:** independently re-verified still fixed, and the declared `[tool.pytest.ini_options]` guard landed via #162 (PR #165). | None — the fix and its guard are both in. |
 
 ## Why
 
@@ -83,7 +83,7 @@ Keychain-backed credential paths. Under CI's exact command the count is 6 failed
 all Keychain-bound. They are unrelated to invocation directory.
 
 **On the guard.** This issue's real argument was that the suite's result depended on an input
-nobody declared. That is now closed from the other direction: #162 added the
+nobody declared. That is now closed from the other direction: #162 (PR #165) added the
 `[tool.pytest.ini_options]` block, so `pyproject.toml` is a pytest inifile and `rootdir` resolves
 to the repo rather than being inferred per-invocation. Confirmed by running from `/tmp` and reading
 back `rootdir: <repo>`, `configfile: pyproject.toml`. `--strict-config` was added alongside, so a

@@ -2,9 +2,9 @@
 gh_issue: 162
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/162
 title: "GH-162 Test suite gaps: Hypothesis setup, pytest configuration, and property testing"
-status: "In progress (Phase 1)"
+status: "Merged 2026-09-04 as 8dd120b via PR #165. The md_parser regex change it originally carried was severed to #167 and landed separately as 7cee094 via PR #169."
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 owner: antigravity
 doc_type: plan
 goal: >

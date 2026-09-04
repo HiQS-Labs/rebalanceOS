@@ -4,7 +4,7 @@
 |---|---|
 | **Ran** | 2026-09-04 |
 | **Tracking issue** | [#67](https://github.com/HiQS-Labs/rebalanceOS/issues/67) — "15 tests fail when pytest is invoked from outside the repo root" |
-| **Working doc** | [PROJECT/2-WORKING/GH-67-PYTEST-CWD-DEPENDENT-FAILURES.md](../../PROJECT/2-WORKING/GH-67-PYTEST-CWD-DEPENDENT-FAILURES.md) |
+| **Working doc** | [PROJECT/3-COMPLETED/GH-67-PYTEST-CWD-DEPENDENT-FAILURES.md](../../PROJECT/3-COMPLETED/GH-67-PYTEST-CWD-DEPENDENT-FAILURES.md) |
 | **System under test** | the `tests/` suite, invoked from two different working directories |
 | **Commit** | `c897072fe6539c636ee4ee414b65974c9f3eebe2` (branch `hotfix/gh67-pytest-rootdir-config`, rebased on `development` @ `65634bf`) |
 | **Environment** | macOS, Apple Silicon; Python 3.14.7; pytest 9.1.1; venv built with `pip install -e ".[dev,server]"` |
