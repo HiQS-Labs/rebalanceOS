@@ -41,6 +41,7 @@ GH-106 discussion: another agent may be actively updating it).
 | `reingest` | command | Refresh the ask-self RAG index for this repo | Rebalance |
 | `git-pulse-daily-synthesis` | skill | Generate the daily vault synthesis (pulse activity, then multi-device Git Pulse activity) into today's Obsidian note | Rebalance |
 | `rebalance` | skill | Morning "what am I working on" brief fusing the ranked next-actions verdict with a device-wide recent-git-activity scan | Rebalance |
+| `activity-synthesis` | skill | 15-minute multi-source synthesis fusing prompt logs, Rebalance live signals, and git activity with rolling history | Rebalance |
 | `unlock-suite` | skill | Cross-repo issue triage — which open issues, closed first, most unblock the whole suite | Rebalance |
 
 ## Cross-repo surfaces referenced by this repo's docs (not owned here)
