@@ -2,9 +2,9 @@
 gh_issue: 161
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/161
 title: "GH-161 _read_config() returns non-dict for valid JSON of the wrong shape"
-status: "In progress (fix + regression tests landed, awaiting merge)"
+status: "Merged 2026-09-04 as 4b71033 via PR #164; shipped into 0.70.0 Green Board."
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 owner: noelsaw1
 doc_type: plan
 goal: >

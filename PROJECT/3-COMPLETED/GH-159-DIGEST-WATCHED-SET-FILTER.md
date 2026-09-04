@@ -2,7 +2,7 @@
 gh_issue: 159
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/159
 title: "GH-159 — the digest's watched-set filter guards one section; every headline collector filtered on date only"
-status: "Implemented 2026-09-03 on fix/gh159-digest-watched-set; live control recorded below"
+status: "Merged 2026-09-04 as ed2789d via PR #163; shipped into 0.70.0 Green Board."
 created: 2026-09-03
 owner: noel
 doc_type: fix

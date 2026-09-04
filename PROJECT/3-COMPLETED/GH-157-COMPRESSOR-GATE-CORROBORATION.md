@@ -2,7 +2,7 @@
 gh_issue: 157
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/157
 title: "GH-157 — the compressor gate refused a 1.9 GB job 179 times on a healthy machine"
-status: "Implemented 2026-09-03 on fix/gh157-compressor-gate; live control recorded below. Carries the #156 prerequisite."
+status: "Merged 2026-09-04 as d31e0e3 via PR #171; shipped into the Embeddings Under Pressure release. Carried the #156 prerequisite; #156 stays open for its remaining scope."
 created: 2026-09-03
 owner: noel
 doc_type: fix
