@@ -9,12 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 from hypothesis import given, settings, strategies as st
 
 from rebalance.ingest.md_parser import (
-    ParsedChunk,
     ParsedNote,
     _title_from_body,
     chunk_by_headings,
@@ -52,6 +50,7 @@ simple_words = st.text(
 # ---------------------------------------------------------------------------
 # 1. extract_frontmatter properties
 # ---------------------------------------------------------------------------
+
 
 @given(raw_text=st.text())
 def test_extract_frontmatter_crash_free(raw_text: str) -> None:
@@ -102,6 +101,7 @@ def test_extract_frontmatter_non_dict_payload_fallback(non_dict_data: Any, body_
 # 2. extract_tags properties
 # ---------------------------------------------------------------------------
 
+
 @given(text=st.text())
 def test_extract_tags_crash_free(text: str) -> None:
     """extract_tags must never raise on arbitrary text and return unique tags."""
@@ -135,6 +135,7 @@ def test_extract_tags_ignores_tags_in_code_blocks(tag_name: str, code_body: str)
 # ---------------------------------------------------------------------------
 # 3. extract_wikilinks properties
 # ---------------------------------------------------------------------------
+
 
 @given(text=st.text())
 def test_extract_wikilinks_crash_free(text: str) -> None:
@@ -173,6 +174,7 @@ def test_extract_wikilinks_embed(target: str) -> None:
 # ---------------------------------------------------------------------------
 # 4. chunk_by_headings invariants
 # ---------------------------------------------------------------------------
+
 
 @given(body=st.text())
 def test_chunk_by_headings_invariants(body: str) -> None:
@@ -214,10 +216,10 @@ def test_chunk_by_headings_structure(h1: str, h2: str, p1: str, p2: str) -> None
     assert chunks[1].heading_level == 2
 
 
-
 # ---------------------------------------------------------------------------
 # 5. _title_from_body & parse_note end-to-end
 # ---------------------------------------------------------------------------
+
 
 @given(
     title=simple_words,
