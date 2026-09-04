@@ -47,6 +47,7 @@ gcp = [
   "google-cloud-secret-manager>=2.0.0",
 ]
 dev = [
+  "hypothesis>=6.100.0",
   "mypy>=1.11",
   "pytest>=8.0.0",
   "ruff>=0.6",
@@ -64,6 +65,14 @@ where = ["src"]
 [tool.setuptools.package-data]
 # Ship SQL migration files inside the wheel so run_migrations() can find them.
 "rebalance.ingest.db" = ["migrations/*.sql"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+xfail_strict = true
+
 
 
 [tool.ruff]
