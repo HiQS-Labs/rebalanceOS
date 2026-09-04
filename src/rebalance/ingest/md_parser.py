@@ -48,8 +48,8 @@ class ParsedNote:
 # Regex patterns
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?\n)---\s*\n", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
+_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+)$", re.MULTILINE)
 _TAG_RE = re.compile(r"(?<!\w)#([a-zA-Z][a-zA-Z0-9_/-]*)")
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _EMBED_RE = re.compile(r"!\[\[([^\]]+)\]\]")
@@ -158,9 +158,22 @@ def chunk_by_headings(body_text: str) -> list[ParsedChunk]:
     return chunks
 
 
+# Blank lines only — not leading spaces. Up to three spaces still open an H1 in
+# CommonMark, but four make it an indented code block, and stripping indentation
+# here would promote a code block's `# comment` to the note's title.
+_LEADING_BLANK_LINES_RE = re.compile(r"\A(?:[ \t]*\r?\n)+")
+
+
 def _title_from_body(body: str, file_path: Path) -> str:
-    """Extract title from first H1, falling back to filename."""
-    match = re.match(r"^#\s+(.+)$", body, re.MULTILINE)
+    """Extract title from the opening H1, falling back to filename.
+
+    "Opening" means the first non-blank line, not merely position 0: frontmatter
+    is conventionally followed by a blank line, so anchoring at 0 would miss the
+    H1 that every such note has. It is deliberately *not* `re.search` — that
+    takes the first H1 anywhere in the document, which on the maintainer's vault
+    promoted mid-document section headings over the note's own name. See GH-167.
+    """
+    match = re.match(r"^#[ \t]+(.+)$", _LEADING_BLANK_LINES_RE.sub("", body), re.MULTILINE)
     if match:
         return match.group(1).strip()
     stem = file_path.stem.replace("_", " ").replace("-", " ").strip()
