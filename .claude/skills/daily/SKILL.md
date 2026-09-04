@@ -1,16 +1,16 @@
 ---
-name: activity-synthesis
+name: daily
 description: >
-  15-minute multi-source activity synthesis engine. Monitors the operator's multi-agent
+  15-minute multi-source daily work synthesizer. Monitors the operator's multi-agent
   prompt log (`0. Claude Prompts.md` / CLIO) and fuses it with Rebalance's live work signal
   (ranked next actions, calendar events, Sleuth reminders, GitHub activity) and device-wide
   git state (`collect.sh`). Appends 15-minute syntheses into deterministic daily logs at
   `temp/daily-log/YYYY-MM-DD.log`, evaluating trajectory and velocity over the rolling
-  2-hour window. Trigger on "synthesize activity", "what am I working on", "monitor prompts",
-  "activity synthesis".
+  2-hour window. Trigger on "/daily", "daily", "what am I working on", "synthesize activity",
+  "daily log", "monitor prompts".
 ---
 
-# Activity Synthesis — Prompts Log + Live Work Signal + Git Telemetry
+# Daily — Live Prompts Log + Work Signal + Git Telemetry
 
 Continuously answers: **"What is the operator actually working on right now across all agents, repos, and systems, and what is the trajectory/velocity of their work?"**
 

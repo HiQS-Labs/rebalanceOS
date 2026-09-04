@@ -13,7 +13,7 @@
 ## [0.83.1] - 2026-09-04
 
 ### Added
-- Multi-source activity synthesis skill (`activity-synthesis`): a 15-minute synthesis engine fusing the multi-agent prompt log (`0. Claude Prompts.md` / CLIO) with Rebalance's live work signal (ranked next actions, calendar events, Sleuth reminders) and device-wide git activity (`collect.sh`). Maintains a rolling 2-hour window in `temp/activity-rolling-window.md` with historical narrative overlay.
+- Multi-source daily work synthesis skill (`daily`): a 15-minute synthesis engine fusing the multi-agent prompt log (`0. Claude Prompts.md` / CLIO) with Rebalance's live work signal (ranked next actions, calendar events, Sleuth reminders) and device-wide git activity (`collect.sh`). Appends 15-minute syntheses into deterministic daily logs in `temp/daily-log/YYYY-MM-DD.log` with a rolling 2-hour trajectory and velocity model.
 
 ## [0.83.0] - 2026-09-02
 
