@@ -47,6 +47,10 @@ def isolated_guard(tmp_path, monkeypatch):
     # to exercise. Individual tests override these.
     monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 32 * GIB)
     monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 1 * GIB)
+    # Not paging. A compressor reading above the ceiling only trips when a second
+    # signal confirms real distress (#157), so the fixture has to state which
+    # machine it is describing rather than leave it to the host sysctl.
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 0)
     monkeypatch.delenv(job_guard.ENV_MAX_COMPRESSOR_GB, raising=False)
     return tmp_path
 
@@ -310,14 +314,90 @@ def test_compressor_pressure_refuses_to_start(isolated_guard, monkeypatch):
     settled rather than deferred: reclaimable pages can look plentiful while the
     kernel is already paying CPU to avoid swapping. Recorded data shows compressor
     at 25-35 GB during the crisis versus a 0.65-0.96 GB median when healthy.
+
+    The machine is paging, which is what distinguishes this from ambient pressure
+    (#157) — a compressor that is merely large has ABSORBED pressure; one that is
+    large while swap is in use has run out of room to absorb it.
     """
     monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 32 * GIB)
     monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 30 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 6 * GIB)
 
     ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
     with pytest.raises(job_guard.MemoryCeilingExceeded) as exc:
         ceiling.preflight()
     assert "compressor" in str(exc.value)
+    assert "swap in use" in str(exc.value), "the refusal must name what confirmed it"
+
+
+def test_compressor_pressure_alone_does_not_refuse_a_healthy_machine(isolated_guard, monkeypatch):
+    """GH-157: 179 refusals in 9 days for a 1.9 GB job on a machine that was fine.
+
+    Ambient compressor pressure from unrelated software sat at 17-23 GB against a
+    16 GB ceiling while ``memory_pressure`` reported 64% free and ``vm.swapusage``
+    0.00M used. The job peaked at 1.86 GB and moved the compressor by 0.23 GB, so
+    it neither caused the reading nor added to it — and the gate had no path back
+    to healthy, it just waited for other software to release memory.
+    """
+    monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 19 * GIB)  # over the 16 GB ceiling
+    monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 40 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 0)
+
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    ceiling.preflight()  # must not raise
+    assert ceiling._compressor_trip() is None, "the mid-run check must agree with preflight"
+
+
+def test_a_high_compressor_still_trips_when_availability_is_gone(isolated_guard, monkeypatch):
+    """The second corroborating signal: the availability floor, not just swap."""
+    monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 30 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 0)
+    monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 1 * GIB)
+
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.MemoryCeilingExceeded) as exc:
+        ceiling.preflight()
+    assert "below floor" in str(exc.value)
+
+
+def test_unreadable_corroboration_fails_closed(isolated_guard, monkeypatch):
+    """A blind probe must never be the thing that grants permission (#156)."""
+    monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 30 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: None)
+    monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 0)  # unreadable
+
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.MemoryCeilingExceeded) as exc:
+        ceiling.preflight()
+    assert "failing closed" in str(exc.value)
+
+
+def test_an_unreadable_ram_probe_refuses_instead_of_disabling_the_ceiling(isolated_guard, monkeypatch):
+    """GH-156: the guard used to fail OPEN when it could not read physical RAM.
+
+    With total == 0 every ceiling is None and the watchdog disables itself, so a run
+    that "passed" only because the sysctl was blocked was indistinguishable from a
+    genuinely well-behaved one. That also makes any measurement OF the guard
+    unreliable, which is why #157's acceptance depends on this.
+    """
+    monkeypatch.setattr(job_guard, "total_memory_bytes", lambda: 0)
+
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.MemoryCeilingExceeded) as exc:
+        ceiling.preflight()
+    assert "cannot determine physical RAM" in str(exc.value)
+
+
+def test_swap_usage_is_parsed_with_its_unit(monkeypatch):
+    """sysctl reports a unit alongside the number and it is not always M."""
+
+    class _Out:
+        returncode = 0
+        stdout = "total = 4096.00M  used = 2.50G  free = 1.00M  (encrypted)"
+
+    monkeypatch.setattr(job_guard.subprocess, "run", lambda *a, **k: _Out())
+    monkeypatch.setattr(job_guard.sys, "platform", "darwin")
+    assert job_guard.swap_used_bytes() == int(2.5 * GIB)
 
 
 def test_compressor_below_ceiling_does_not_block(isolated_guard, monkeypatch):
