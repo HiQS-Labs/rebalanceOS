@@ -1178,8 +1178,15 @@ def _contaminated(conn) -> None:
         conn.execute(
             "INSERT INTO github_items (repo_full_name, item_type, number, title, author_login, "
             "created_at, merged_at, closed_at, fetched_at) VALUES (?,'pull_request',?,?,?,?,?,?,'x')",
-            (repo, number, f"pr from {login}", login,
-             "2026-09-01T17:00:00Z", "2026-09-01T18:00:00Z", "2026-09-01T18:00:00Z"),
+            (
+                repo,
+                number,
+                f"pr from {login}",
+                login,
+                "2026-09-01T17:00:00Z",
+                "2026-09-01T18:00:00Z",
+                "2026-09-01T18:00:00Z",
+            ),
         )
 
 
