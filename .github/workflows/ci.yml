@@ -108,7 +108,7 @@ jobs:
           # can't collect them, and one imports pytest at module scope).
           # Deliberately NO embeddings extra here (GH-144 C3) — the two
           # embeddings-dependent test files run in the `seam` job below.
-          pip install -e ".[calendar,server]" pytest
+          pip install -e ".[calendar,server,dev]" pytest
 
       # tests/test_pulse_reconcile.py drives real `git pull --rebase` against a
       # throwaway clone. Without an identity that dies with code 128 on a fresh
