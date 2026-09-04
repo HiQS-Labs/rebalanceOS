@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 import yaml
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from rebalance.ingest.md_parser import (
     ParsedChunk,
@@ -23,6 +23,14 @@ from rebalance.ingest.md_parser import (
     extract_wikilinks,
     parse_note,
 )
+
+# Hypothesis's 200ms per-example deadline is a latency budget, not a correctness
+# check, and a cold CI runner blows it on work that is fine. Everything else stays
+# on Hypothesis's own defaults.
+# ponytail: one profile, registered here rather than in conftest so a venv without
+# the dev extra breaks only this file. Split into ci/dev profiles if a run gets slow.
+settings.register_profile("default", deadline=None)
+settings.load_profile("default")
 
 
 # ---------------------------------------------------------------------------

@@ -9,32 +9,6 @@ import pytest
 
 from rebalance.lib.metal_probe import metal_available
 
-# Register Hypothesis profiles for property-based testing across local and CI environments.
-try:
-    from hypothesis import HealthCheck, Phase, Verbosity, settings
-
-    settings.register_profile(
-        "ci",
-        max_examples=50,
-        deadline=None,
-        phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.shrink],
-        suppress_health_check=[HealthCheck.too_slow],
-    )
-    settings.register_profile(
-        "dev",
-        max_examples=100,
-        deadline=None,
-    )
-    settings.register_profile(
-        "debug",
-        max_examples=10,
-        verbosity=Verbosity.verbose,
-    )
-    settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "dev"))
-except ImportError:
-    pass
-
-
 # GH-225: stand in for MLX when it is not installed, so the MLX tests can run anywhere.
 #
 # mlx is Apple-Silicon-only and CI runs ubuntu-latest, so `import mlx` there raises

@@ -48,8 +48,8 @@ class ParsedNote:
 # Regex patterns
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+)$", re.MULTILINE)
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?\n)---\s*\n", re.DOTALL)
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 _TAG_RE = re.compile(r"(?<!\w)#([a-zA-Z][a-zA-Z0-9_/-]*)")
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _EMBED_RE = re.compile(r"!\[\[([^\]]+)\]\]")
@@ -160,12 +160,11 @@ def chunk_by_headings(body_text: str) -> list[ParsedChunk]:
 
 def _title_from_body(body: str, file_path: Path) -> str:
     """Extract title from first H1, falling back to filename."""
-    match = re.search(r"^#[ \t]+(.+)$", body, re.MULTILINE)
+    match = re.match(r"^#\s+(.+)$", body, re.MULTILINE)
     if match:
         return match.group(1).strip()
     stem = file_path.stem.replace("_", " ").replace("-", " ").strip()
     return " ".join(word.capitalize() for word in stem.split()) if stem else "Untitled"
-
 
 
 # ---------------------------------------------------------------------------
