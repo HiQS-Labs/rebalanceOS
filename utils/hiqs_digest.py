@@ -332,8 +332,45 @@ def _repo_canonicalizer() -> tuple[str, dict[str, str]]:
     return case, params
 
 
-def _day_commits_cte(canon_expr: str) -> str:
-    """DAY_COMMITS_CTE with *canon_expr* (from _repo_canonicalizer) as the repo key."""
+def resolve_watched_repos(db: Path) -> set[str]:
+    """The CURRENT watched set, canonicalized and lowercased.
+
+    Recomputed live — there is no persisted watchlist file — so it self-heals the moment
+    the operator adds or removes an ignore. Raises on failure; every caller in this module
+    fails CLOSED on the exception (#159), because a collector that cannot say what it is
+    allowed to report must say "unavailable", not report everything.
+    """
+    from rebalance.ingest.config import canonical_github_repo_name
+    from rebalance.ingest.index_ops import get_watched_repos
+
+    # get_watched_repos takes a Path, not a str; handed a str it returns every source
+    # list empty and the failure reads exactly like "nothing is being watched".
+    watched = {canonical_github_repo_name(r).lower() for r in get_watched_repos(Path(db))["watched"]}
+    if not watched:
+        raise ValueError("watched set resolved empty")
+    return watched
+
+
+def _watched_predicate(watched: set[str], canonical: str, prefix: str = "w") -> tuple[str, dict[str, str]]:
+    """``(sql, params)`` restricting *canonical* to *watched*.
+
+    The comparison is against the SAME canonical lowercased expression the queries group
+    by (#147), so an org mirror stored under the old owner spelling still matches a repo
+    watched under the new one — and a repo dropped from the watchlist stops appearing even
+    though its already-synced rows live in the artifact tables forever.
+    """
+    params = {f"{prefix}{i}": name for i, name in enumerate(sorted(watched))}
+    placeholders = ", ".join(f":{k}" for k in params)
+    return f"{canonical} IN ({placeholders})", params
+
+
+def _day_commits_cte(canon_expr: str, watched_sql: str) -> str:
+    """DAY_COMMITS_CTE with *canon_expr* (from _repo_canonicalizer) as the repo key.
+
+    *watched_sql* constrains the CTE to the watched set, which is what makes the
+    downstream commit_total, the commits detail list and the by_repo commits branch
+    inherit the filter from one place instead of three.
+    """
     canonical = canon_expr.format(col="repo_full_name")
     return f"""
     WITH day_commits AS (
@@ -352,6 +389,7 @@ def _day_commits_cte(canon_expr: str) -> str:
             FROM github_direct_commits
             WHERE datetime(committed_at) >= :start AND datetime(committed_at) < :end
         )
+        WHERE {watched_sql}
         GROUP BY {canonical}, sha
     )
 """
@@ -362,14 +400,26 @@ def _day_commits_cte(canon_expr: str) -> str:
 # so the synthesizer can say "unavailable" instead of implying a quiet day.
 
 
-def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
-    """Today's GitHub activity. No LLM, no parsing — the typed columns already carry it."""
+def collect_github(db: Path, bounds: tuple[str, str], watched: set[str]) -> dict[str, Any]:
+    """Today's GitHub activity. No LLM, no parsing — the typed columns already carry it.
+
+    *watched* is REQUIRED and has no default. The ignore list governs *collection*, not
+    *presentation*: a repo removed from the watchlist stops syncing, but every row it
+    already wrote stays in github_items/github_commits/github_direct_commits forever, and
+    before #159 these collectors filtered on the day window alone. That published a
+    third-party repo's traffic — six unrelated accounts' merged PRs, zero operator
+    commits — as the top shipped item of the day, into a shared channel. A parameter with
+    a permissive default would let that path come back the moment one caller omitted it,
+    so there is no way to call this collector without stating the watched set.
+    """
     start_utc, end_utc = bounds
     window = {"start": start_utc, "end": end_utc}
     canon_expr, alias_params = _repo_canonicalizer()
     canonical = canon_expr.format(col="repo_full_name")
-    cte = _day_commits_cte(canon_expr)
+    watched_sql, watched_params = _watched_predicate(watched, canonical)
+    cte = _day_commits_cte(canon_expr, watched_sql)
     window.update(alias_params)
+    window.update(watched_params)
     try:
         # db_connection_readonly already sets row_factory = sqlite3.Row (connection.py:101).
         with db_connection_readonly(db) as conn:
@@ -420,12 +470,14 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                         FROM github_items
                         WHERE item_type = 'pull_request'
                           AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
+                          AND {watched_sql}
                         UNION ALL
                         SELECT repo_full_name, author_login, 0, 0,
                                CASE WHEN item_type = 'pull_request' THEN 1 ELSE 0 END,
                                CASE WHEN item_type = 'issue' THEN 1 ELSE 0 END
                         FROM github_items
                         WHERE datetime(created_at) >= :start AND datetime(created_at) < :end
+                          AND {watched_sql}
                     )
                     GROUP BY {canonical}
                     ORDER BY commits DESC, prs_merged DESC
@@ -463,6 +515,7 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                 FROM github_items
                 WHERE item_type = 'pull_request'
                   AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
+                  AND {watched_sql}
                 """,
                 window,
             ).fetchone()[0]
@@ -476,6 +529,7 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                     FROM github_items
                     WHERE item_type = 'pull_request'
                       AND datetime(merged_at) >= :start AND datetime(merged_at) < :end
+                      AND {watched_sql}
                     GROUP BY {canonical}, number
                     ORDER BY datetime(merged_at) DESC
                     LIMIT :limit
@@ -492,6 +546,7 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                 SELECT COUNT(DISTINCT {canonical} || '#' || number)
                 FROM github_items
                 WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end AND merged_at IS NULL
+                  AND {watched_sql}
                 """,
                 window,
             ).fetchone()[0]
@@ -504,6 +559,7 @@ def collect_github(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
                     FROM github_items
                     WHERE datetime(closed_at) >= :start AND datetime(closed_at) < :end
                       AND merged_at IS NULL
+                      AND {watched_sql}
                     GROUP BY {canonical}, number
                     ORDER BY datetime(closed_at) DESC
                     LIMIT :limit
@@ -546,7 +602,7 @@ STALE_REPO_LAG_MINUTES = 180
 STALE_REPO_DETAIL_LIMIT = 8
 
 
-def collect_repo_freshness(db: Path, now: datetime) -> list[dict[str, Any]]:
+def collect_repo_freshness(db: Path, now: datetime, watched_lower: set[str]) -> list[dict[str, Any]]:
     """Watched repos whose data may under-report today (#147).
 
     Two signals, both canonicalized through the org-alias collapse:
@@ -564,13 +620,7 @@ def collect_repo_freshness(db: Path, now: datetime) -> list[dict[str, Any]]:
     monitoring legitimately has a frozen timestamp, and re-reporting it forever would
     train the channel to ignore the line.
     """
-    try:
-        from rebalance.ingest.config import canonical_github_repo_name
-        from rebalance.ingest.index_ops import get_watched_repos
-
-        watched_lower = {canonical_github_repo_name(r).lower() for r in get_watched_repos(Path(db))["watched"]}
-    except Exception as e:  # noqa: BLE001 — freshness must never kill the digest
-        return [{"error": _scrub(f"watched-set resolve failed: {e}")}]
+    from rebalance.ingest.config import canonical_github_repo_name
 
     entries: dict[str, dict[str, Any]] = {}
     try:
@@ -746,11 +796,23 @@ def collect_semantic(db: Path, bounds: tuple[str, str]) -> dict[str, Any]:
 def build_facts(db: Path, now: datetime) -> dict[str, Any]:
     today = now.strftime("%Y-%m-%d")
     bounds = _utc_day_bounds(now)
-    github = collect_github(db, bounds)
-    # Freshness is attached separately so a failure in either half cannot take out
-    # the other: the day's counts and the "which repos may be under-reported" verdict
-    # are independent facts (#147).
-    github.setdefault("stale_repos", collect_repo_freshness(db, now))
+    # ONE resolve per run, shared by the counts and the freshness verdict, so the two
+    # halves of the GitHub section cannot disagree about what is being watched.
+    # Fails the whole GitHub section CLOSED (#159): with no trustworthy watched set the
+    # honest output is "unavailable", not the entire artifact corpus. An unreadable guard
+    # that quietly stops constraining is #156's defect class, and this job publishes to a
+    # shared channel.
+    try:
+        watched_lower = resolve_watched_repos(db)
+    except Exception as e:  # noqa: BLE001 — report it, never publish unfiltered
+        github: dict[str, Any] = _fail("watched-set resolve failed; refusing to report unfiltered", e)
+        github["stale_repos"] = [{"error": _scrub(f"watched-set resolve failed: {e}")}]
+    else:
+        github = collect_github(db, bounds, watched_lower)
+        # Freshness is attached separately so a failure in either half cannot take out
+        # the other: the day's counts and the "which repos may be under-reported" verdict
+        # are independent facts (#147).
+        github.setdefault("stale_repos", collect_repo_freshness(db, now, watched_lower))
     return {
         "date": today,
         "generated_at": now.isoformat(timespec="seconds"),
