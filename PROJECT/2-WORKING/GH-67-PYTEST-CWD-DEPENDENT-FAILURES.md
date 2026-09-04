@@ -94,6 +94,10 @@ differs between two invocation directories. That means running the suite twice, 
 90-second job, and is a test-infrastructure decision worth taking on its own rather than folded in
 here. Parked, not dropped.
 
+**Retained evidence.** Raw transcripts, the rootdir proof, and a threats-to-validity section are
+published at [TESTS-RESULTS/2026-09-04+GH-67/](../../TESTS-RESULTS/2026-09-04+GH-67/), per `SOP.md` §1
+— a claim whose evidence is unpublished is an assertion.
+
 **Caveat on the evidence above.** Two invocation directories is a two-point comparison, not a
 proof. It falsifies the specific symptom this issue reported; it does not establish
 directory-independence in general. A third point outside `$HOME`, or a directory containing a
