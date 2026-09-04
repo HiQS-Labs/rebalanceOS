@@ -77,6 +77,25 @@ def db(tmp_path: Path) -> Path:
     return path
 
 
+def _all_repos(db: Path) -> set[str]:
+    """Every repo present in the fixture's artifact tables, canonical-lowered.
+
+    collect_github now REQUIRES a watched set (#159). These tests predate the filter and
+    are about other properties, so they hand it everything they inserted — the filter is
+    a no-op for them by construction. The tests that prove the filter actually CONSTRAINS
+    are the contamination ones below; do not read this helper as coverage of it.
+    """
+    from rebalance.ingest.config import canonical_github_repo_name
+
+    with sqlite3.connect(db) as conn:
+        rows = conn.execute(
+            "SELECT repo_full_name FROM github_commits "
+            "UNION SELECT repo_full_name FROM github_direct_commits "
+            "UNION SELECT repo_full_name FROM github_items"
+        ).fetchall()
+    return {canonical_github_repo_name(r[0]).lower() for r in rows} or {"none/inserted"}
+
+
 def _bounds(now: datetime) -> tuple[str, str]:
     return hiqs_digest._utc_day_bounds(now)
 
@@ -112,7 +131,7 @@ def _activity(conn, login: str, repo: str, scan_date: str, commits: int, pushes:
 
 def test_quiet_day_is_not_an_error(db: Path):
     now = datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert "error" not in facts
     assert facts["by_repo"] == []
@@ -134,7 +153,7 @@ def test_a_commit_in_both_tables_is_counted_once(db: Path):
     conn.commit()
     conn.close()
 
-    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)), _all_repos(db))
 
     assert facts["commit_total"] == 1, "one commit in both tables is still one commit"
     assert [r["commits"] for r in facts["by_repo"]] == [1]
@@ -150,7 +169,7 @@ def test_duplicate_rows_within_github_commits_are_collapsed(db: Path):
     conn.commit()
     conn.close()
 
-    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)), _all_repos(db))
 
     assert facts["commit_total"] == 1
 
@@ -164,7 +183,7 @@ def test_distinct_commits_are_not_collapsed(db: Path):
     conn.commit()
     conn.close()
 
-    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)))
+    facts = hiqs_digest.collect_github(db, _bounds(datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)), _all_repos(db))
 
     assert facts["commit_total"] == 3
     assert sorted(r["commits"] for r in facts["by_repo"]) == [1, 2]
@@ -176,7 +195,7 @@ def test_broken_db_reports_an_error_rather_than_a_quiet_day(tmp_path: Path):
     sqlite3.connect(broken).close()  # valid sqlite file, no tables
     now = datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)
 
-    facts = hiqs_digest.collect_github(broken, _bounds(now))
+    facts = hiqs_digest.collect_github(broken, _bounds(now), {"any/repo"})
 
     assert "error" in facts, "a failed collector must surface an error, not empty data"
     assert "by_repo" not in facts, "error case must not also present empty results"
@@ -189,7 +208,7 @@ def test_collector_errors_are_scrubbed_of_the_home_path(monkeypatch, tmp_path: P
     sqlite3.connect(broken).close()
     now = datetime(2026, 9, 1, 13, 5, tzinfo=PACIFIC)
 
-    error = hiqs_digest.collect_github(broken, _bounds(now))["error"]
+    error = hiqs_digest.collect_github(broken, _bounds(now), {"any/repo"})["error"]
 
     assert str(tmp_path) not in error, "home path must never ride into the prompt"
 
@@ -214,7 +233,7 @@ def test_by_repo_never_reads_the_rolling_window_rollup_table(db: Path):
         _activity(conn, "__watch__", "org/idle-today", "2026-09-01", commits=62)
         _commit(conn, "org/busy", "the only commit today", "2026-09-01T18:00:00Z")
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     by_repo = {r["repo_full_name"]: r for r in facts["by_repo"]}
     assert list(by_repo) == ["org/busy"], "a repo idle today must not be listed as active"
@@ -230,7 +249,7 @@ def test_by_repo_and_the_footer_total_cannot_disagree(db: Path):
         _commit(conn, "org/a", "two", "2026-09-01T19:00:00Z")
         _direct_commit(conn, "org/b", "three", "2026-09-01T20:00:00Z")
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert sum(r["commits"] for r in facts["by_repo"]) == facts["commit_total"] == 3
 
@@ -241,7 +260,7 @@ def test_push_only_repo_is_not_dropped_from_by_repo(db: Path):
     with sqlite3.connect(db) as conn:
         _direct_commit(conn, "org/pushonly", "straight to main", "2026-09-01T18:00:00Z")
 
-    by_repo = hiqs_digest.collect_github(db, _bounds(now))["by_repo"]
+    by_repo = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))["by_repo"]
 
     assert [r["repo_full_name"] for r in by_repo] == ["org/pushonly"]
     assert by_repo[0]["commits"] == 1
@@ -255,7 +274,7 @@ def test_by_repo_counts_contributors_across_logins_without_double_listing(db: Pa
         _commit(conn, "org/shared", "b", "2026-09-01T19:00:00Z", login="bob")
         _direct_commit(conn, "org/shared", "c", "2026-09-01T20:00:00Z", login="alice")
 
-    by_repo = hiqs_digest.collect_github(db, _bounds(now))["by_repo"]
+    by_repo = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))["by_repo"]
 
     assert len(by_repo) == 1, "one row per repo, not per login"
     assert by_repo[0]["commits"] == 3
@@ -274,7 +293,7 @@ def test_case_variants_of_one_repo_are_not_counted_as_two(db: Path):
         _commit(conn, "Acme-Org/Widget-Service", "a", "2026-09-01T18:00:00Z")
         _commit(conn, "acme-org/widget-service", "b", "2026-09-01T19:00:00Z")
 
-    by_repo = hiqs_digest.collect_github(db, _bounds(now))["by_repo"]
+    by_repo = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))["by_repo"]
 
     assert len(by_repo) == 1, "one repo, however its name was cased when stored"
     assert by_repo[0]["repo_full_name"] == "acme-org/widget-service"
@@ -289,7 +308,7 @@ def test_totals_are_counted_separately_from_the_capped_detail(db: Path):
         for i in range(over):
             _commit(conn, "org/r", f"fix {i}", "2026-09-01T18:00:00Z", sha=f"s{i}")
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert facts["commit_total"] == over, "the total is the real count"
     assert len(facts["commits"]) == hiqs_digest.COMMIT_DETAIL_LIMIT, "detail stays capped"
@@ -305,7 +324,7 @@ def test_evening_local_commits_are_not_pushed_to_tomorrow(db: Path):
         _commit(conn, "org/r", "evening work", "2026-09-02T01:00:00Z")  # 18:00 Sep 1 PDT
         _commit(conn, "org/r", "yesterday", "2026-09-01T06:00:00Z")  # 23:00 Aug 31 PDT
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     messages = [c["message"] for c in facts["commits"]]
     assert "evening work" in messages, "18:00 local Sep 1 belongs to Sep 1"
@@ -321,7 +340,7 @@ def test_direct_pushes_are_counted_alongside_pr_commits(db: Path):
         # Offset-bearing form, as this table actually stores it.
         _direct_commit(conn, "org/r", "pushed straight", "2026-09-01T11:00:00-07:00")
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert facts["commit_total"] == 2
     assert sorted(c["source"] for c in facts["commits"]) == ["pr", "push"]
@@ -333,7 +352,7 @@ def test_commit_message_is_trimmed_to_its_subject(db: Path):
     with sqlite3.connect(db) as conn:
         _commit(conn, "org/r", "fix: the thing\n\nlong body", "2026-09-01T18:00:00Z")
 
-    commits = hiqs_digest.collect_github(db, _bounds(now))["commits"]
+    commits = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))["commits"]
 
     assert commits[0]["message"] == "fix: the thing"
 
@@ -1020,7 +1039,7 @@ def test_org_mirror_rows_collapse_into_one_repo(db: Path, org_alias):
         _merged_pr(conn, "HiQS-Suite/xyz-forge", 10, "2026-09-02T19:00:00Z")
         _merged_pr(conn, "HiQS-Labs/XYZ-forge", 10, "2026-09-02T19:10:00Z")
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert [r["repo_full_name"] for r in facts["by_repo"]] == ["hiqs-labs/xyz-forge"]
     assert facts["by_repo"][0]["commits"] == 1, "same sha under both spellings is one commit"
@@ -1036,7 +1055,7 @@ def test_a_same_named_fork_is_not_collapsed_into_the_org(db: Path, org_alias):
         _commit(conn, "arnoldadero/xyz-forge", "fork work", "2026-09-02T18:00:00Z", sha="f1")
         _commit(conn, "HiQS-Labs/xyz-forge", "upstream work", "2026-09-02T18:30:00Z", sha="f2")
 
-    by_repo = hiqs_digest.collect_github(db, _bounds(now))["by_repo"]
+    by_repo = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))["by_repo"]
 
     assert sorted(r["repo_full_name"] for r in by_repo) == ["arnoldadero/xyz-forge", "hiqs-labs/xyz-forge"]
 
@@ -1051,7 +1070,7 @@ def test_closed_items_dedupe_on_canonical_identity_too(db: Path, org_alias):
                 (repo, "2026-09-02T18:00:00Z", "2026-09-02T17:00:00Z"),
             )
 
-    facts = hiqs_digest.collect_github(db, _bounds(now))
+    facts = hiqs_digest.collect_github(db, _bounds(now), _all_repos(db))
 
     assert facts["closed_not_merged_total"] == 1
     assert len(facts["closed_not_merged"]) == 1
@@ -1084,7 +1103,7 @@ def test_a_repo_the_sync_missed_is_named_stale(db: Path, org_alias):
         _repo_meta(conn, "HiQS-Labs/fresh", "2026-09-02T13:30:00Z")
         _repo_meta(conn, "hiqs-suite/stale", "2026-09-02T09:00:00Z")  # 5h behind
 
-    stale = hiqs_digest.collect_repo_freshness(db, now)
+    stale = hiqs_digest.collect_repo_freshness(db, now, hiqs_digest.resolve_watched_repos(db))
 
     named = [e for e in stale if "error" not in e]
     assert [e["repo"] for e in named] == ["HiQS-Labs/stale"], "canonical name, fresh repo absent"
@@ -1102,7 +1121,7 @@ def test_an_uncoverable_commit_corpus_is_named_with_its_reason(db: Path, org_ali
             "'no local clone found under configured local_repo_roots', '2026-09-02T13:00:00Z')",
         )
 
-    stale = hiqs_digest.collect_repo_freshness(db, now)
+    stale = hiqs_digest.collect_repo_freshness(db, now, hiqs_digest.resolve_watched_repos(db))
 
     assert [e["repo"] for e in stale] == ["HiQS-Labs/noclone"]
     assert "uncoverable" in stale[0]["reason"]
@@ -1115,7 +1134,7 @@ def test_a_repo_that_left_the_watched_set_is_not_reported_forever(db: Path):
     with sqlite3.connect(db) as conn:
         _repo_meta(conn, "old/gone", "2026-08-01T00:00:00Z")  # stale, but not watched
 
-    assert hiqs_digest.collect_repo_freshness(db, now) == []
+    assert hiqs_digest.collect_repo_freshness(db, now, {"still/watched"}) == []
 
 
 def test_the_stale_list_is_capped_with_an_overflow_marker(db: Path):
@@ -1126,7 +1145,7 @@ def test_the_stale_list_is_capped_with_an_overflow_marker(db: Path):
             _watched_via_push(conn, repo)
             _repo_meta(conn, repo, "2026-09-01T00:00:00Z")
 
-    stale = hiqs_digest.collect_repo_freshness(db, now)
+    stale = hiqs_digest.collect_repo_freshness(db, now, hiqs_digest.resolve_watched_repos(db))
 
     assert len(stale) == hiqs_digest.STALE_REPO_DETAIL_LIMIT + 1
     assert stale[-1]["repo"] == "+3 more"
@@ -1137,10 +1156,84 @@ def test_build_facts_attaches_freshness_to_the_github_half(monkeypatch, db: Path
     monkeypatch.setattr(hiqs_digest, "collect_semantic", lambda *a: {"hits": []})
     entry = {"repo": "x/y", "reason": "not synced since earlier"}
     monkeypatch.setattr(hiqs_digest, "collect_repo_freshness", lambda *a: [entry])
+    with sqlite3.connect(db) as conn:  # a watched set must resolve, or the half fails closed
+        _watched_via_push(conn, "x/y")
 
     facts = hiqs_digest.build_facts(db, datetime(2026, 9, 2, 13, 5, tzinfo=PACIFIC))
 
     assert facts["github"]["stale_repos"] == [entry]
+
+
+# --- Contamination (#159): an unwatched repo must not reach the channel ---------
+# These are the tests that prove the watched-set filter CONSTRAINS. The other
+# collect_github tests hand it everything they inserted, so the filter is inert there.
+
+
+def _contaminated(conn) -> None:
+    """One watched repo and one third-party repo, same day, identical row shapes."""
+    _commit(conn, "HiQS-Labs/mine", "my work", "2026-09-01T18:00:00Z", login="me")
+    _commit(conn, "DeusData/theirs", "their work", "2026-09-01T18:00:00Z", login="stranger")
+    _direct_commit(conn, "DeusData/theirs", "their push", "2026-09-01T18:30:00Z", login="stranger")
+    for repo, login, number in (("HiQS-Labs/mine", "me", 1), ("DeusData/theirs", "stranger", 2)):
+        conn.execute(
+            "INSERT INTO github_items (repo_full_name, item_type, number, title, author_login, "
+            "created_at, merged_at, closed_at, fetched_at) VALUES (?,'pull_request',?,?,?,?,?,?,'x')",
+            (repo, number, f"pr from {login}", login,
+             "2026-09-01T17:00:00Z", "2026-09-01T18:00:00Z", "2026-09-01T18:00:00Z"),
+        )
+
+
+def test_an_unwatched_repos_merged_prs_never_reach_the_digest(db: Path):
+    """The live 2026-09-03 defect: six strangers' merged PRs led the SHIPPED section."""
+    now = datetime(2026, 9, 1, 20, 0, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        _contaminated(conn)
+
+    facts = hiqs_digest.collect_github(db, _bounds(now), {"hiqs-labs/mine"})
+
+    assert [r["repo_full_name"] for r in facts["by_repo"]] == ["hiqs-labs/mine"]
+    assert facts["merged_total"] == 1, "the ignored repo's merged PR must not be counted"
+    assert [m["repo_full_name"] for m in facts["merged"]] == ["hiqs-labs/mine"]
+    assert facts["commit_total"] == 1, "commits and direct pushes both filtered"
+    assert all(c["repo_full_name"] == "hiqs-labs/mine" for c in facts["commits"])
+
+
+def test_the_same_corpus_reports_the_third_party_repo_when_it_is_watched(db: Path):
+    """The negative control: the filter is what removed it, not a broken fixture."""
+    now = datetime(2026, 9, 1, 20, 0, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        _contaminated(conn)
+
+    facts = hiqs_digest.collect_github(db, _bounds(now), {"hiqs-labs/mine", "deusdata/theirs"})
+
+    assert sorted(r["repo_full_name"] for r in facts["by_repo"]) == ["deusdata/theirs", "hiqs-labs/mine"]
+    assert facts["merged_total"] == 2
+    assert facts["commit_total"] == 3
+
+
+def test_a_watched_repos_rows_survive_under_a_mirror_spelling(db: Path, org_alias):
+    """Watched under the NEW org spelling, stored under the OLD one (#147)."""
+    now = datetime(2026, 9, 1, 20, 0, tzinfo=PACIFIC)
+    with sqlite3.connect(db) as conn:
+        _commit(conn, "HiQS-Suite/mine", "old spelling on disk", "2026-09-01T18:00:00Z")
+
+    facts = hiqs_digest.collect_github(db, _bounds(now), {"hiqs-labs/mine"})
+
+    assert facts["commit_total"] == 1, "an org mirror must not be filtered out as unwatched"
+
+
+def test_an_unresolvable_watched_set_fails_the_github_half_closed(monkeypatch, db: Path):
+    """No trustworthy watchlist means 'unavailable', never the whole artifact corpus."""
+    monkeypatch.setattr(hiqs_digest, "collect_health", lambda: {"problem_count": 0})
+    monkeypatch.setattr(hiqs_digest, "collect_semantic", lambda *a: {"hits": []})
+    monkeypatch.setattr(hiqs_digest, "collect_github", lambda *a: pytest.fail("must not run unfiltered"))
+    with sqlite3.connect(db) as conn:
+        _contaminated(conn)  # a corpus that WOULD have been published
+
+    facts = hiqs_digest.build_facts(db, datetime(2026, 9, 1, 20, 0, tzinfo=PACIFIC))
+
+    assert "error" in facts["github"], "an unresolvable watched set must surface an error"
+    assert "by_repo" not in facts["github"], "error case must not also present results"
 
 
 def test_render_footer_names_stale_repos():
