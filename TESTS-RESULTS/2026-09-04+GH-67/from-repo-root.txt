@@ -1,0 +1,546 @@
+# NOTE: absolute paths replaced with <REPO>/<HOME> per SOP.md (no machine-specific paths in tracked files).
+# raw transcript — pytest from the REPO ROOT
+# commit: c897072fe6539c636ee4ee414b65974c9f3eebe2
+# command: python -m pytest tests/ -q -p no:randomly
+# cwd: <repo root>
+
+........................................................................ [  3%]
+............xx.x.x..x.x..xxx............................................ [  6%]
+........................................................................ [  9%]
+.............................................................. [ 12%]
+........................................................................ [ 15%]
+................................F.F..................................... [ 18%]
+........................................................ [ 21%]
+.................................................................... [ 24%]
+.................................................F....... [ 27%]
+..........................................FF..FF........................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+......................................................F.F............... [ 46%]
+...................................................................... [ 49%]
+.................................................................... [ 52%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+.............................................................................................................. [ 64%]
+....................ssssssssssssssss.................................... [ 67%]
+......................F................................................. [ 70%]
+............x........................................................... [ 73%]
+.............................................................. [ 76%]
+..................................................................... [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+..................................................................................................... [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+...................................ssss.........................       [100%]
+=================================== FAILURES ===================================
+_____ OAuthCommonLoaderTests.test_insufficient_scope_raises_service_error ______
+
+self = <test_credential_dedup.OAuthCommonLoaderTests testMethod=test_insufficient_scope_raises_service_error>
+
+    def test_insufficient_scope_raises_service_error(self) -> None:
+        creds = type("C", (), {"expired": False, "refresh_token": "rt", "scopes": ["narrow"]})()
+        svc = self._svc(
+            get_token_json=lambda: '{"refresh_token": "rt"}',
+            has_scopes=lambda c, r: False,
+            scope_error=lambda c, r: RuntimeError("bad-scope"),
+        )
+>       with patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=creds):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_credential_dedup.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'google', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'google'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+_________ OAuthCommonLoaderTests.test_refresh_persists_to_both_stores __________
+
+self = <test_credential_dedup.OAuthCommonLoaderTests testMethod=test_refresh_persists_to_both_stores>
+
+    def test_refresh_persists_to_both_stores(self) -> None:
+        class Creds:
+            expired = True
+            refresh_token = "rt"
+            scopes = ["s"]
+            expiry = None
+    
+            def refresh(self, _request):
+                self.expired = False
+    
+            def to_json(self):
+                return '{"refresh_token": "rt"}'
+    
+        creds = Creds()
+        set_token = MagicMock(return_value=True)
+        # keyring returns a blob → reconstructed via _creds_from_json (seamed).
+        svc = self._svc(get_token_json=lambda: '{"refresh_token": "rt"}', set_token_json=set_token)
+    
+        with (
+            patch("rebalance.ingest.oauth_common._creds_from_json", return_value=creds),
+            patch("rebalance.ingest.secret_store.write_secret_file") as wsf,
+>           patch("google.auth.transport.requests.Request"),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            patch("rebalance.ingest.auth_log.log_token_refreshed"),
+        ):
+
+tests/test_credential_dedup.py:161: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'google', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'google'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+____ DeclaredRuntimeRootTests.test_declared_root_overrides_running_checkout ____
+
+self = <test_doctor_scheduled_stack.DeclaredRuntimeRootTests testMethod=test_declared_root_overrides_running_checkout>
+
+    def test_declared_root_overrides_running_checkout(self) -> None:
+        from unittest.mock import patch
+    
+        from rebalance import doctor
+    
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp) / "rebalance-runtime"
+            (runtime / "scripts").mkdir(parents=True)
+            root_file = Path(tmp) / "runtime-root"
+            root_file.write_text(str(runtime) + "\n", encoding="utf-8")
+    
+            agents = Path(tmp) / "agents"
+            agents.mkdir()
+            # Job in the declared runtime clone: OK even though it is not in
+            # the checkout running this test.
+            _write(agents, "pulse-server", str(runtime / "scripts" / "pulse_server.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+            self.assertEqual(checks[0].status, OK)
+            self.assertIn("declared runtime root", checks[0].detail)
+    
+            # Job in THIS checkout now counts as drift — the declaration wins.
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+>           self.assertEqual(checks[0].status, WARN)
+E           AssertionError: 'ok' != 'warning'
+E           - ok
+E           + warning
+
+tests/test_doctor_scheduled_stack.py:115: AssertionError
+_______________ EmbedderTests.test_embed_vault_chunks_end_to_end _______________
+
+self = <test_embedder.EmbedderTests testMethod=test_embed_vault_chunks_end_to_end>
+
+    def test_embed_vault_chunks_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            with db_connection(db_path, ensure_schema) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO vault_files (rel_path, title, content_hash, ingested_at, file_size_bytes, last_modified)
+                    VALUES ('note.md', 'Test Note', 'hash1', '2026-08-19T00:00:00Z', 100, '2026-08-19T00:00:00Z')
+                    """
+                )
+                file_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                conn.execute(
+                    """
+                    INSERT INTO chunks (file_id, chunk_index, heading, heading_level, body, char_count, content_hash)
+                    VALUES (?, 0, 'Heading', 1, 'Body content of the test note', 30, 'chash1')
+                    """,
+                    (file_id,),
+                )
+                conn.commit()
+    
+            mock_model = MagicMock()
+            mock_model.encode.return_value = [[0.1] * EMBEDDING_DIM]
+    
+>           with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+___________ EmbedderTests.test_load_and_embed_batch_with_mock_model ____________
+
+self = <test_embedder.EmbedderTests testMethod=test_load_and_embed_batch_with_mock_model>
+
+    def test_load_and_embed_batch_with_mock_model(self) -> None:
+        mock_model = MagicMock()
+        mock_model.encode.return_value = [[0.5] * EMBEDDING_DIM, [0.8] * EMBEDDING_DIM]
+    
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+_______________ test_real_model_loads_and_embeds_on_this_machine _______________
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+>           from sentence_transformers import SentenceTransformer
+E           ModuleNotFoundError: No module named 'sentence_transformers'
+
+src/rebalance/ingest/embedder.py:134: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.mark.skipif(
+        not _model_is_cached(DEFAULT_MODEL),
+        reason=f"{DEFAULT_MODEL} is not in the local HF cache; refusing to download ~130MB mid-suite",
+    )
+    def test_real_model_loads_and_embeds_on_this_machine():
+        """The un-mocked one: load the real model and produce a real vector.
+    
+        Every other test in this module mocks `SentenceTransformer`, so none of them
+        can tell a working install from a broken one. This is the test that would
+        catch a wrong model name, a sentence-transformers API change, a torch/Metal
+        load failure, or a dimension drift between `EMBEDDING_DIM` and what the model
+        actually emits.
+    
+        Asserting the dimension matters beyond "it ran": `EMBEDDING_DIM` is baked
+        into the vec0 table declarations in `db/schema.py`, so a model whose true
+        output width disagrees with that constant produces a database that rejects
+        every insert.
+        """
+        from rebalance.ingest.embedder import EMBEDDING_DIM, _embed_batch
+    
+>       model, tokenizer = _load_model(DEFAULT_MODEL)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+>           raise RuntimeError("sentence-transformers package is required for embeddings") from exc
+E           RuntimeError: sentence-transformers package is required for embeddings
+
+src/rebalance/ingest/embedder.py:136: RuntimeError
+_____________ test_load_model_succeeds_even_when_metal_unavailable _____________
+
+    def test_load_model_succeeds_even_when_metal_unavailable():
+        """Wiring only (mocked): `_load_model` must not require a Metal device.
+    
+        Proves the CPU fallback path is reachable. Does NOT prove the real library
+        loads — see `test_real_model_loads_and_embeds_on_this_machine` for that.
+        """
+        mock_st = MagicMock()
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_st):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+_____ GmailLoadCredentialsTests.test_keyring_blob_is_preferred_over_pickle _____
+
+self = <test_gmail_keyring.GmailLoadCredentialsTests testMethod=test_keyring_blob_is_preferred_over_pickle>
+
+    def test_keyring_blob_is_preferred_over_pickle(self) -> None:
+        from rebalance.ingest import gmail
+    
+        fake_creds = type(
+            "Creds",
+            (),
+            {
+                "expired": False,
+                "refresh_token": "rt_gmail",
+                "scopes": [gmail.GMAIL_READONLY_SCOPE],
+            },
+        )()
+    
+        with (
+            patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB),
+>           patch(
+                "google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=fake_creds
+            ) as from_info,
+        ):
+
+tests/test_gmail_keyring.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'google', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'google'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+_________ GmailLoadCredentialsTests.test_missing_required_scope_raises _________
+
+self = <test_gmail_keyring.GmailLoadCredentialsTests testMethod=test_missing_required_scope_raises>
+
+    def test_missing_required_scope_raises(self) -> None:
+        from rebalance.ingest import gmail
+    
+        narrow = type(
+            "Creds",
+            (),
+            {
+                "expired": False,
+                "refresh_token": "rt_gmail",
+                "scopes": ["https://www.googleapis.com/auth/userinfo.email"],
+            },
+        )()
+        with (
+            patch("rebalance.ingest.config.get_gmail_oauth_token_json", return_value=_BLOB),
+>           patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=narrow),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ):
+
+tests/test_gmail_keyring.py:111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'google', import_ = <function _gcd_import at 0x104b9fe20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'google'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+__________________ test_refresh_persists_json_to_both_stores ___________________
+
+tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-163/test_refresh_persists_json_to_0')
+
+    def test_refresh_persists_json_to_both_stores(tmp_path):
+        svc, kr = _make_svc(tmp_path)
+        kr["blob"] = json.dumps({"token": "old", "expired": True, "refresh_token": "rt"})
+    
+>       creds = oauth_common.load_credentials(svc)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_oauth_json_fallback.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+svc = OAuthService(name='calendar', token_path=PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of...unction _make_svc.<locals>.<lambda> at 0x132cdaae0>, scope_error=<function _make_svc.<locals>.<lambda> at 0x132cdab90>)
+required_scopes = None
+
+    def load_credentials(svc: OAuthService, required_scopes: list[str] | None = None) -> Any:
+        """Load OAuth2 credentials — keyring first, then the JSON secret-store fallback.
+    
+        keyring (interactive primary) ↔ the out-of-repo secret-store JSON file (launchd
+        reads this; the keychain is unreachable from the daily-sync's stripped
+        environment). A legacy pickle file is migrated to JSON on first read and
+        retired. On refresh, the rotated access token is written back to BOTH keyring
+        and the JSON fallback. Raises ``svc.missing_error`` if no token resolves and
+        ``svc.scope_error`` if the token lacks a required scope.
+        """
+        from rebalance.ingest import secret_store  # noqa: PLC0415
+        from rebalance.ingest.auth_log import (  # noqa: PLC0415
+            log_token_missing,
+            log_token_refresh_failed,
+            log_token_refreshed,
+        )
+    
+        store_key = secret_store_key(svc)
+        creds = None
+    
+        # 1) keyring (interactive primary)
+        blob = svc.get_token_json()
+        if blob:
+            try:
+                creds = _creds_from_json(blob)
+            except Exception:  # noqa: BLE001 — corrupt blob → try the file fallback
+                creds = None
+    
+        # 2) JSON secret-store fallback (launchd-reachable)
+        if creds is None:
+            stored = secret_store.read_secret_file(store_key)
+            if stored:
+                try:
+                    creds = _creds_from_json(stored)
+                except Exception:  # noqa: BLE001 — corrupt JSON fallback → try legacy pickle
+                    creds = None
+    
+        # 3) legacy pickle → JSON migration (read once, convert, retire)
+        if creds is None and svc.token_path.exists():
+            creds = _migrate_legacy_pickle(svc, store_key)
+    
+        if creds is None:
+            log_token_missing(str(svc.token_path), source=svc.name)
+            raise svc.missing_error(str(svc.token_path))
+    
+        # Refresh if expired — persist the rotated access token to keyring + JSON fallback.
+        if creds.expired and creds.refresh_token:
+>           from google.auth.transport.requests import Request  # noqa: PLC0415
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'google'
+
+src/rebalance/ingest/oauth_common.py:128: ModuleNotFoundError
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  <REPO>/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  <REPO>/.venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: no usable Metal device (probed out-of-process; MLX would abort this run rather than raise) — GH-250
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+FAILED tests/test_credential_dedup.py::OAuthCommonLoaderTests::test_insufficient_scope_raises_service_error
+FAILED tests/test_credential_dedup.py::OAuthCommonLoaderTests::test_refresh_persists_to_both_stores
+FAILED tests/test_doctor_scheduled_stack.py::DeclaredRuntimeRootTests::test_declared_root_overrides_running_checkout
+FAILED tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+FAILED tests/test_embedder.py::EmbedderTests::test_load_and_embed_batch_with_mock_model
+FAILED tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+FAILED tests/test_embedder_metal_unavailable.py::test_load_model_succeeds_even_when_metal_unavailable
+FAILED tests/test_gmail_keyring.py::GmailLoadCredentialsTests::test_keyring_blob_is_preferred_over_pickle
+FAILED tests/test_gmail_keyring.py::GmailLoadCredentialsTests::test_missing_required_scope_raises
+FAILED tests/test_oauth_json_fallback.py::test_refresh_persists_json_to_both_stores
+10 failed, 2187 passed, 20 skipped, 10 xfailed, 2 warnings, 143 subtests passed in 108.74s (0:01:48)

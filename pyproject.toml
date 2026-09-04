@@ -70,7 +70,10 @@ where = ["src"]
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra --strict-markers"
+# --strict-config makes an unknown key in THIS block an error rather than a
+# silently ignored line, so a typo here cannot quietly disable a setting above
+# it — the failure mode that leaves a suite believing it is stricter than it is.
+addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
 
 

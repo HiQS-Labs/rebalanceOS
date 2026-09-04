@@ -1,0 +1,15 @@
+# NOTE: absolute paths replaced with <REPO>/<HOME> per SOP.md (no machine-specific paths in tracked files).
+# rootdir resolution proof
+# commit: c897072fe6539c636ee4ee414b65974c9f3eebe2
+
+$ cd /tmp && python -m pytest <repo>/tests/test_doctor_json.py --collect-only
+rootdir: <REPO>
+configfile: pyproject.toml
+collected 11 items
+========================= 11 tests collected in 0.40s ==========================
+
+$ cd <repo> && python -m pytest tests/test_doctor_json.py --collect-only
+rootdir: <REPO>
+configfile: pyproject.toml
+collected 11 items
+========================= 11 tests collected in 0.25s ==========================
