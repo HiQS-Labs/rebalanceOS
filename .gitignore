@@ -141,3 +141,5 @@ DIAGRAM.md
 # committing them is what put 433MB of transcripts in this tree in the first place.
 relay-system/
 /.tick/
+.hypothesis/
+
