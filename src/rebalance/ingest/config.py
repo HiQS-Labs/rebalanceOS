@@ -276,9 +276,7 @@ def _read_config() -> dict[str, Any]:
         _warn_discarded_config(config_path, f"could not be read ({exc.strerror or exc})")
         return {}
     if not isinstance(data, dict):
-        _warn_discarded_config(
-            config_path, f"top level is {type(data).__name__}, not a JSON object"
-        )
+        _warn_discarded_config(config_path, f"top level is {type(data).__name__}, not a JSON object")
         return {}
     return data
 
