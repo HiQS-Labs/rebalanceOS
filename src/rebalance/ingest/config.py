@@ -17,6 +17,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Any
@@ -233,15 +234,51 @@ def _ensure_config_dir() -> None:
     _resolved_config_path().parent.mkdir(parents=True, exist_ok=True)
 
 
+# One warning per config path per process. _read_config() is called by ~40
+# getters, so warning unconditionally would print the same line dozens of times
+# in a single CLI run — which trains the operator to ignore it (GH-161).
+_WARNED_BAD_CONFIG: set[str] = set()
+
+
+def _warn_discarded_config(config_path: Path, reason: str) -> None:
+    """Say once, on stderr, that an existing config file was discarded."""
+    key = str(config_path)
+    if key in _WARNED_BAD_CONFIG:
+        return
+    _WARNED_BAD_CONFIG.add(key)
+    print(
+        f"warning: ignoring {config_path} — {reason}. "
+        "Falling back to defaults; every setting stored there is being skipped.",
+        file=sys.stderr,
+    )
+
+
 def _read_config() -> dict[str, Any]:
-    """Load config from disk; return {} if missing."""
+    """Load config from disk; return {} if missing, unreadable, or not an object.
+
+    The shape check is not decoration. Valid JSON whose top level is a list,
+    number, string, or null parses cleanly and then propagates a non-dict to
+    every getter that calls ``.get(...)`` on the result — roughly 40 of them —
+    raising ``AttributeError: 'list' object has no attribute 'get'`` from a
+    stack frame that names nothing about the actual problem (GH-161). The
+    sibling reader ``rebalance.paths._load_user_config`` has always guarded
+    this; this function is the one that did not.
+    """
     config_path = _resolved_config_path()
     if not config_path.exists():
         return {}
     try:
-        return json.loads(config_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, IOError):
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _warn_discarded_config(config_path, f"not valid JSON ({exc.msg} at line {exc.lineno})")
         return {}
+    except OSError as exc:  # IOError is an alias of OSError
+        _warn_discarded_config(config_path, f"could not be read ({exc.strerror or exc})")
+        return {}
+    if not isinstance(data, dict):
+        _warn_discarded_config(config_path, f"top level is {type(data).__name__}, not a JSON object")
+        return {}
+    return data
 
 
 def _write_config(config: dict[str, Any]) -> None:
