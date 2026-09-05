@@ -248,9 +248,7 @@ def diagnose_repo(
         if not watched:
             pr_block["likely_cause"] = "repo is not watched, so its PRs are never ingested"
         elif freshness == "never_synced":
-            pr_block["likely_cause"] = (
-                "repo is watched but has never been synced — run refresh_index(scope=['github'])"
-            )
+            pr_block["likely_cause"] = "repo is watched but has never been synced — run refresh_index(scope=['github'])"
         else:
             pr_block["likely_cause"] = (
                 f"PR #{pr_block.get('number')} was not found in local DB (either outside "

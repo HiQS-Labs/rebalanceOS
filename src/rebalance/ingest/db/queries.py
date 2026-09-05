@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Iterable
 
 from rebalance.ingest.agent_tags import classify as classify_source
 from rebalance.ingest.config import get_github_org_aliases
@@ -215,7 +215,7 @@ def _resolve_newest_items(
 
 
 def _recency_desc(
-    items: list[tuple[Any, dict[str, Any]]],
+    items: Iterable[tuple[Any, dict[str, Any]]],
 ) -> list[tuple[Any, dict[str, Any]]]:
     """Order resolved (key, record) pairs newest-first for presentation output."""
     return sorted(
@@ -244,7 +244,9 @@ def fetch_github_balance(
     snapshot rows latest-scan-wins (SOP §6), so projects listing either or both
     spellings of a repo get complete, undoubled stats.
     """
-    since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
+    since_date = (now_utc() - timedelta(days=since_days)).strftime(
+        "%Y-%m-%d"
+    )  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
     alias_map = _get_alias_map()
 
     canonical_stats: dict[str, dict[str, Any]] = {}
@@ -335,7 +337,9 @@ def fetch_org_activity(
     snapshot rows latest-scan-wins (SOP §6) before combining stats across
     distinct logins and days.
     """
-    since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
+    since_date = (now_utc() - timedelta(days=since_days)).strftime(
+        "%Y-%m-%d"
+    )  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
     alias_map = _get_alias_map()
     ignored_set = {_canonical_lower(r, alias_map) for r in (ignored_repos or []) if r}
 
@@ -636,9 +640,7 @@ def fetch_watched_activity(
 
     alias_map = _get_alias_map()
     canonical_targets = {
-        _canonical_lower(r, alias_map): _canonical_name(r, alias_map)
-        for r in external_repos
-        if r and r.strip()
+        _canonical_lower(r, alias_map): _canonical_name(r, alias_map) for r in external_repos if r and r.strip()
     }
     if not canonical_targets:
         return []
@@ -852,7 +854,11 @@ def fetch_repo_diagnostics(
     for table, key, distinct_expr in (
         ("github_items", "items", "DISTINCT item_type || ':' || number"),
         ("github_commits", "commits", "DISTINCT sha"),
-        ("github_comments", "comments", "DISTINCT COALESCE(github_comment_id, item_type || ':' || item_number || ':' || created_at)"),
+        (
+            "github_comments",
+            "comments",
+            "DISTINCT COALESCE(github_comment_id, item_type || ':' || item_number || ':' || created_at)",
+        ),
         ("github_documents", "documents", "DISTINCT source_type || ':' || source_number || ':' || doc_type"),
     ):
         row = conn.execute(
@@ -1012,9 +1018,7 @@ def fetch_release_readiness_data(
     deduped_issues.sort(key=lambda d: (d.get("state") or "", int(d["number"])))
     deduped_prs.sort(key=lambda d: int(d["number"]))
     if milestone:
-        deduped_issues = [
-            d for d in deduped_issues if (d.get("milestone_title") or "") == milestone["title"]
-        ]
+        deduped_issues = [d for d in deduped_issues if (d.get("milestone_title") or "") == milestone["title"]]
 
     seen_links: set[tuple[int, int]] = set()
     deduped_links: list[dict[str, Any]] = []
@@ -1064,9 +1068,7 @@ def fetch_release_readiness_data(
         head_ref = d.get("head_ref") or ""
         if head_ref != default_branch and not head_ref.startswith("release/"):
             continue
-        if promotion_pr is None or _ts_or_epoch(d.get("updated_at")) > _ts_or_epoch(
-            promotion_pr.get("updated_at")
-        ):
+        if promotion_pr is None or _ts_or_epoch(d.get("updated_at")) > _ts_or_epoch(promotion_pr.get("updated_at")):
             promotion_pr = d
 
     # Deployment issue — same resolved set; the title pattern matches
@@ -1196,9 +1198,7 @@ def fetch_repo_activity_counts(
         issues_opened = row["issues_opened"] or 0
         issue_comments = row["issue_comments"] or 0
         reviews = row["reviews"] or 0
-        cm["score"] += (
-            commits + prs_opened + prs_merged + issues_opened + issue_comments + reviews
-        )
+        cm["score"] += commits + prs_opened + prs_merged + issues_opened + issue_comments + reviews
         cm["commits"] += commits
         cm["prs"] += prs_opened + prs_merged
         cm["issues"] += issues_opened

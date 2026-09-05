@@ -479,9 +479,7 @@ def fetch_org_activity(days: int = 14, limit: int = 100) -> dict[str, list[dict[
 
     try:
         with db_connection(DB_PATH) as conn:
-            return _db_fetch_org_activity(
-                conn, since_days=days, ignored_repos=get_github_ignored_repos(), limit=limit
-            )
+            return _db_fetch_org_activity(conn, since_days=days, ignored_repos=get_github_ignored_repos(), limit=limit)
     except Exception:  # noqa: BLE001
         return {}
 

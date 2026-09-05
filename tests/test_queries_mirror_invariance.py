@@ -244,11 +244,7 @@ def db_pair(tmp_path: Path):
     return db_clean, db_mirror
 
 
-PUBLIC_QUERY_FUNCTIONS = [
-    name
-    for name in queries_mod.__all__
-    if callable(getattr(queries_mod, name))
-]
+PUBLIC_QUERY_FUNCTIONS = [name for name in queries_mod.__all__ if callable(getattr(queries_mod, name))]
 
 
 @pytest.mark.parametrize("fn_name", PUBLIC_QUERY_FUNCTIONS)
@@ -378,9 +374,7 @@ def test_naive_datetime_bounds_handling(db_pair):
         comments = queries_mod.fetch_day_comments(conn, naive_start, naive_end, "noelsaw1")
         assert len(comments) == 1
 
-        watched = queries_mod.fetch_watched_activity(
-            conn, ["HiQS-Labs/xyz-forge"], start=naive_start, end=naive_end
-        )
+        watched = queries_mod.fetch_watched_activity(conn, ["HiQS-Labs/xyz-forge"], start=naive_start, end=naive_end)
         assert len(watched) == 1
 
 
@@ -451,15 +445,31 @@ def _insert_activity(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            login, repo, scan_date, commits, pushes, prs_opened, prs_merged,
-            issues_opened, issue_comments, reviews, last_active_at, scanned_at,
+            login,
+            repo,
+            scan_date,
+            commits,
+            pushes,
+            prs_opened,
+            prs_merged,
+            issues_opened,
+            issue_comments,
+            reviews,
+            last_active_at,
+            scanned_at,
         ),
     )
 
 
 NEWER_TOTALS = dict(
-    commits=48, pushes=11, prs_opened=13, prs_merged=4,
-    issues_opened=21, issue_comments=5, reviews=6, last_active_at="2026-09-02T23:30:00Z",
+    commits=48,
+    pushes=11,
+    prs_opened=13,
+    prs_merged=4,
+    issues_opened=21,
+    issue_comments=5,
+    reviews=6,
+    last_active_at="2026-09-02T23:30:00Z",
 )
 
 
@@ -480,13 +490,26 @@ def test_duplicate_day_snapshot_latest_scan_wins(tmp_path, org_alias, newer_spel
         ensure_schema(conn)
         ensure_github_schema(conn)
         _insert_activity(
-            conn, "noelsaw1", older_repo, "2026-09-02", "2026-09-02T17:00:00Z",
-            commits=38, pushes=9, prs_opened=13, prs_merged=2,
-            issues_opened=21, issue_comments=3, reviews=3,
+            conn,
+            "noelsaw1",
+            older_repo,
+            "2026-09-02",
+            "2026-09-02T17:00:00Z",
+            commits=38,
+            pushes=9,
+            prs_opened=13,
+            prs_merged=2,
+            issues_opened=21,
+            issue_comments=3,
+            reviews=3,
             last_active_at="2026-09-02T16:45:00Z",
         )
         _insert_activity(
-            conn, "noelsaw1", newer_repo, "2026-09-02", "2026-09-02T23:45:00Z",
+            conn,
+            "noelsaw1",
+            newer_repo,
+            "2026-09-02",
+            "2026-09-02T23:45:00Z",
             **NEWER_TOTALS,
         )
 
@@ -559,8 +582,18 @@ def _insert_comment(
                                      updated_at, fetched_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (repo, item_type, item_number, comment_type, github_comment_id, author,
-         "A review remark", created_at, created_at, created_at),
+        (
+            repo,
+            item_type,
+            item_number,
+            comment_type,
+            github_comment_id,
+            author,
+            "A review remark",
+            created_at,
+            created_at,
+            created_at,
+        ),
     )
 
 
@@ -614,8 +647,18 @@ def _insert_item(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            repo, item_type, number, "item", state, "noelsaw1", head_ref, base_ref,
-            milestone_title, "2026-08-01T00:00:00Z", updated_at, fetched_at,
+            repo,
+            item_type,
+            number,
+            "item",
+            state,
+            "noelsaw1",
+            head_ref,
+            base_ref,
+            milestone_title,
+            "2026-08-01T00:00:00Z",
+            updated_at,
+            fetched_at,
             f"https://github.com/{repo}/{item_type}/{number}",
         ),
     )
@@ -649,9 +692,16 @@ def _seed_state_pair(
         copies.reverse()
     for repo, state, ts in copies:
         _insert_item(
-            conn, repo, item_type, number, state,
-            updated_at=ts, fetched_at=ts,
-            head_ref=head_ref, base_ref=base_ref, milestone_title=milestone_title,
+            conn,
+            repo,
+            item_type,
+            number,
+            state,
+            updated_at=ts,
+            fetched_at=ts,
+            head_ref=head_ref,
+            base_ref=base_ref,
+            milestone_title=milestone_title,
         )
 
 
@@ -669,15 +719,17 @@ def test_open_items_follow_newest_state(tmp_path, org_alias, order, scenario):
         ensure_schema(conn)
         ensure_github_schema(conn)
         _seed_state_pair(
-            conn, item_type="issue", number=5,
-            old_state=old_state, new_state=new_state, order=order,
+            conn,
+            item_type="issue",
+            number=5,
+            old_state=old_state,
+            new_state=new_state,
+            order=order,
         )
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        items = queries_mod.fetch_open_items_for_projects(
-            conn, {"XYZ Forge": ["HiQS-Labs/xyz-forge"]}
-        )
+        items = queries_mod.fetch_open_items_for_projects(conn, {"XYZ Forge": ["HiQS-Labs/xyz-forge"]})
         assert (len(items["XYZ Forge"]) == 1) is expect_open
 
 
@@ -695,8 +747,12 @@ def test_open_prs_follow_newest_state(tmp_path, org_alias, order, scenario):
         ensure_schema(conn)
         ensure_github_schema(conn)
         _seed_state_pair(
-            conn, item_type="pull_request", number=10,
-            old_state=old_state, new_state=new_state, order=order,
+            conn,
+            item_type="pull_request",
+            number=10,
+            old_state=old_state,
+            new_state=new_state,
+            order=order,
         )
 
     with sqlite3.connect(db_path) as conn:
@@ -734,21 +790,28 @@ def test_release_readiness_uses_resolved_newest_records(tmp_path, org_alias, ord
             (now_iso, now_iso),
         )
         _seed_state_pair(
-            conn, item_type="issue", number=5,
-            old_state=old_state, new_state=new_state, order=order,
+            conn,
+            item_type="issue",
+            number=5,
+            old_state=old_state,
+            new_state=new_state,
+            order=order,
             milestone_title="v1.0",
         )
         _seed_state_pair(
-            conn, item_type="pull_request", number=10,
-            old_state=old_state, new_state=new_state, order=order,
-            head_ref="release/1.0", base_ref="main",
+            conn,
+            item_type="pull_request",
+            number=10,
+            old_state=old_state,
+            new_state=new_state,
+            order=order,
+            head_ref="release/1.0",
+            base_ref="main",
         )
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        data = queries_mod.fetch_release_readiness_data(
-            conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0"
-        )
+        data = queries_mod.fetch_release_readiness_data(conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0")
         assert len(data["issues"]) == 1
         assert data["issues"][0]["state"] == new_state
         assert len(data["prs"]) == 1
@@ -758,4 +821,3 @@ def test_release_readiness_uses_resolved_newest_records(tmp_path, org_alias, ord
             assert data["promotion_pr"]["number"] == 10
         else:
             assert data["promotion_pr"] is None
-

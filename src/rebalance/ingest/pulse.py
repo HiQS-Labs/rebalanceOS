@@ -29,7 +29,6 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from rebalance.repair import RepairFSM, RepairResult, RepairStatus
-from rebalance.ingest.agent_tags import classify as classify_source
 from rebalance.ingest._http import GitHubClient, GitHubHTTPError
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.ingest.calendar_helpers import calendar_dt_utc, normalize_aware_utc
@@ -210,15 +209,9 @@ def _query_day_activity(
                 }
             )
 
-    activity.gh_commits = fetch_day_commits(
-        conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS
-    )
-    activity.gh_items = fetch_day_items(
-        conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS
-    )
-    activity.gh_comments = fetch_day_comments(
-        conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS
-    )
+    activity.gh_commits = fetch_day_commits(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
+    activity.gh_items = fetch_day_items(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
+    activity.gh_comments = fetch_day_comments(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
 
     if slack_user_id and _table_exists(conn, "sleuth_reminders"):
         rows = conn.execute(

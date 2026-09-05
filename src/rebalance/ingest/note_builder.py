@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from rebalance.lib.time_ops import now_iso, now_utc
+from rebalance.lib.time_ops import now_iso
 from rebalance.ingest.calendar_config import (
     OPERATOR_CALENDAR_ID,
     CalendarConfig,

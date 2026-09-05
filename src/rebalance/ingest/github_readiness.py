@@ -147,9 +147,7 @@ def infer_github_release_readiness(
     from rebalance.ingest.db import fetch_release_readiness_data
 
     with db_connection(database_path, ensure_github_schema) as conn:
-        data = fetch_release_readiness_data(
-            conn, repo_full_name, milestone_title=milestone_title
-        )
+        data = fetch_release_readiness_data(conn, repo_full_name, milestone_title=milestone_title)
 
     repo_meta = data["repo_meta"]
     if not repo_meta:
@@ -249,9 +247,7 @@ def infer_github_release_readiness(
                 blockers.append(
                     f"Deployment issue expects release branch `{expected_release_branch}`, but that branch is missing."
                 )
-        evidence.append(
-            f"Found deployment issue #{deployment_issue['number']} for milestone `{milestone['title']}`."
-        )
+        evidence.append(f"Found deployment issue #{deployment_issue['number']} for milestone `{milestone['title']}`.")
 
     if release_branches:
         evidence.append(f"Known release branches: {', '.join(release_branches[:5])}.")
@@ -297,9 +293,7 @@ def infer_github_release_readiness(
         status = "release_candidate"
         summary = f"{repo_full_name} milestone `{milestone['title']}` looks release-candidate ready: milestone work is resolved, but there is no open promotion PR to `main` yet."
     elif blockers:
-        status = (
-            "release_blocked" if deployment_issue or (due_in_days is not None and due_in_days <= 7) else "blocked"
-        )
+        status = "release_blocked" if deployment_issue or (due_in_days is not None and due_in_days <= 7) else "blocked"
         summary = (
             f"{repo_full_name} milestone `{milestone['title']}` is blocked by explicit review/check/branch issues."
         )
@@ -308,7 +302,9 @@ def infer_github_release_readiness(
         summary = f"{repo_full_name} milestone `{milestone['title']}` is in merge queue: remaining open issues all have approved PRs."
     elif counts["awaiting_review"] > 0:
         status = "review_queue"
-        summary = f"{repo_full_name} milestone `{milestone['title']}` is in review queue: green PRs are waiting on approval."
+        summary = (
+            f"{repo_full_name} milestone `{milestone['title']}` is in review queue: green PRs are waiting on approval."
+        )
     else:
         status = "active_development"
         summary = f"{repo_full_name} milestone `{milestone['title']}` is still in active development."
