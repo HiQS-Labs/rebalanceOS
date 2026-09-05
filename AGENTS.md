@@ -167,6 +167,7 @@ operator name from what it does, never from how it ships.
 - High-rate API bursts (respect GitHub 5000/hr PAT limits; sleep/retry).
 - Hardcoding credentials or secrets in code or config files.
 - Destructive operations without explicit confirmation or dry-run support.
+- Counting one real-world entity twice because it has an alias, rename, mirror, fork, or casing variant. Canonicalise before aggregating, de-duplicate the store, and never let the de-dup test assert on zeros — see [`SOP.md` §6](SOP.md).
 
 ## Security & Credentials
 

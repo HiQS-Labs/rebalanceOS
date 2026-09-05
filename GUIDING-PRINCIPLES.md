@@ -17,6 +17,8 @@ Every output is a signal. A signal is high-quality only when it is all four:
 
 Fail a pillar, and the feature, source, or output isn't done.
 
+**Counted once.** One real-world entity contributes to a metric exactly once. An alias, rename, mirror, fork, or casing variant that gets counted twice is a defect against *Attested* and *Relevant*, not a rounding error — see [`SOP.md` §6](SOP.md).
+
 ## How it's built
 
 1. **Local-first, private by default.** Private work never leaves the machine; a cloud LLM sees only what the operator sends. Non-negotiable — it is what makes rebalance usable for client work. Any feature that erodes it loses.
