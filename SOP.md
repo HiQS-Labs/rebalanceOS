@@ -175,16 +175,23 @@ the guard was inert.
 
 ### The rule, concretely
 
-1. **Decide the reconciliation semantics from the schema, not from preference.** If the table
+The three controls are **detect, reconcile, repair**. All three are required and none substitutes
+for another: detection is the only proactive step, reconciliation is what stops a wrong number
+being published, and repair is what protects every consumer that does not use the canonical read
+path. They are a set, not a sequence — repair the store before or after fixing reads, but do both.
+
+1. **Read the schema to decide the semantics — then do not expect it to enforce them.** If a table
    carries a snapshot — `UNIQUE(...) ON CONFLICT REPLACE` is the tell — then **one row wins**
-   (latest `scanned_at`), and summing across aliases is always wrong. If rows are genuinely
-   disjoint increments, summing is right. Read the schema before deciding; it usually settles
-   it without an opinion.
-2. **Canonicalise on read.** Every aggregate over an entity that can have aliases must map to
-   a canonical identity before grouping, not after.
-3. **De-duplicate the store too.** A read-time fix leaves wrong rows in the database for any
-   consumer that does not use the canonical path. Rewrite the stale rows to the canonical
-   identity and drop superseded snapshots.
+   (latest `scanned_at`), and summing across aliases is wrong. If rows are genuinely disjoint
+   increments, summing is right. The schema tells you which, and that is all it does: a uniqueness
+   key built on a **mutable** identifier does not prevent duplicates, it *creates* them. In
+   `github_activity` the key includes `repo_full_name`, so an org rename produced a new key, both
+   spellings coexisted, and the constraint never fired. That is the whole origin of this defect.
+2. **Reconcile at read.** Every aggregate over an entity that can have aliases maps to a canonical
+   identity *before* grouping, never after, and never sums across aliases of one entity.
+3. **Repair the store too.** Reconciling reads leaves wrong rows in the database for any consumer
+   that does not use the canonical path — MCP tools, dashboards, exports. Re-key the stale rows to
+   the canonical identity and drop superseded snapshots.
 4. **Order matters when de-duplicating.** On a table declared `ON CONFLICT REPLACE`, renaming
    a row onto an existing key **silently destroys the row already there**. Delete the
    superseded rows *first*, then rename. Back up before either.

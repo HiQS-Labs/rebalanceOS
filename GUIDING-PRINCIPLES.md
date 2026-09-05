@@ -12,7 +12,7 @@ Every output is a signal. HiQS is High Quality Signals, and a signal is high-qua
 
 **ATTESTED** — Every signal carries its receipts: source, author, time, link. Never a bare verdict.
 
-**RANKED** — Volume is not value. Signals are ordered by what your team actually owes.
+**RANKED** — Volume is not value. Signals are ordered by what your team actually owes — which means selecting what belongs before ordering it. Ranked noise is still noise.
 
 **FRESH** — Yesterday's truth is today's mistake. Stale signals decay automatically.
 
@@ -20,22 +20,21 @@ Every output is a signal. HiQS is High Quality Signals, and a signal is high-qua
 
 Fail a pillar, and the feature, source, or output isn't done.
 
-### Counted once — the fifth thing each pillar assumes
+### Counted once — what the pillars assume
 
-**One real-world entity contributes to a metric exactly once.** An alias, rename, mirror, fork, or casing variant counted twice is a defect, not a rounding error. It is not a fifth pillar because it is not a separate property — it is the precondition every other pillar quietly depends on:
+**One real-world entity contributes to a metric exactly once.** An alias, rename, mirror, fork, or casing variant counted twice is a defect, not a rounding error. It is not a fifth pillar because it is not a separate property — it is the precondition two of the four rest on:
 
-- A doubled count is **not ATTESTED**. Its receipts say 48 commits; the number says 86. Nothing reconciles them, and the receipt is the thing that was supposed to make the number checkable.
-- A doubled count is **not RANKED**. Ranking is ordering, and an entity counted twice sorts above one counted once regardless of what anybody owes. One inflated row reorders the whole list.
-- A doubled count corrupts **FRESH**. When the same day is scanned twice under two spellings, summing adds a stale partial snapshot to the current one. The stale copy does not decay — it accumulates.
-- A doubled count breaks **STRUCTURED**. Two spellings of one entity are two shapes for one thing, and an agent fed both cannot tell they are the same.
+- A doubled count is **not ATTESTED**. Its receipts say 48 commits; the number says 86, and nothing reconciles them.
+- A doubled count is **not RANKED**. An entity counted twice outranks one counted once regardless of what anybody owes, so one inflated row reorders the whole list.
+- It **can** corrupt **FRESH** as well, where an alias leaves a superseded snapshot standing beside its replacement, so an older observation is presented as current.
 
-**Detected, blocked, not counted** — in that order, and all three are required:
+**Detected, reconciled, repaired** — all three are required, and none substitutes for another:
 
-1. **Detected.** Aliased duplicates are found by a check that runs, not by someone noticing a number looks high. `tests/test_alias_dedup_invariant.py` pins the invariant on synthetic fixtures, and it is deliberately capable of failing — its own meta-check asserts the duplicate fixture is non-zero, because the first guard written for this defect used zeros and could never go red.
-2. **Blocked.** Reads canonicalise before grouping. Aggregates never sum across aliases of one entity; on a snapshot table the latest row wins. The rule comes from the schema, not from preference: `UNIQUE(...) ON CONFLICT REPLACE` means one row wins, and that settles it without an opinion.
-3. **Not counted.** The store is de-duplicated too, not only the read path. A read-time fix leaves wrong rows behind for every consumer that does not use the canonical path — and a number already published from doubled data is wrong and will be cited. Correct it, or say plainly that it was not recomputed.
+1. **Detected.** Alias-equivalent duplicates are found by a check that can fail, not by someone noticing a number looks high.
+2. **Reconciled at read.** Aggregates map aliases to a canonical identity *before* grouping, and never sum across them.
+3. **Repaired in the store.** Superseded rows are removed or re-keyed, so consumers outside the canonical read path cannot count them either.
 
-This is written from a live failure, not from theory. A GitHub org rename put one repository in `github_activity` under two spellings on the same day; every read path summed them, and a day with 48 commits and 13 pull requests was reported as 86 and 26 in `top_active_repos`, the `github_balance` MCP tool, Focus 5, the dashboard, and the morning brief. No error was raised. The full policy, including the hazard that renaming a row onto an existing key on such a table silently destroys the row already there, is [`SOP.md` §6](SOP.md).
+Nothing here is enforced by the schema. `github_activity`'s uniqueness is keyed on `repo_full_name`, which is **mutable** — a rename changes the key, both spellings coexist, and the constraint never fires. That is precisely why the duplicates arose. The rule, the enforcement order, the reconciliation semantics, and the hazards of repairing a store in place are all in [`SOP.md` §6](SOP.md); this section says only why the principle exists.
 
 ## How it's built
 
