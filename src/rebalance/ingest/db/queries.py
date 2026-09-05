@@ -13,22 +13,31 @@ SQL in CLI scripts or ingest modules:
 - Release readiness facts
 - Recent presentation queries (dashboard TUI / web: recent GitHub, vault, calendar, email, Figma)
 
-Every query routes repo identity through ``canonical_github_repo_name(...).lower()``
-so mirrored org rows (e.g. ``HiQS-Suite/*`` vs ``HiQS-Labs/*``) and casing variants
+Every query routes repo identity through an in-memory alias map so mirror-org rows
+(the same repository recorded under a renamed or aliased org) and casing variants
 collapse into a single canonical identity.
+
+Reconciliation semantics (SOP §6 — one entity counted twice is a defect):
+- ``github_activity`` is a snapshot table (``UNIQUE(login, repo_full_name, scan_date)
+  ON CONFLICT REPLACE``): an org rename re-keys the row mid-day, leaving one day
+  recorded twice. The copy with the latest ``scanned_at`` wins per
+  (login, canonical repo, scan_date); callers never sum across spellings.
+- ``github_items`` copies resolve to the newest record per canonical item
+  *before* any state or milestone filter, so a stale "open" copy can never
+  outvote a newer "closed" one.
+- Comments are identified by their native GitHub comment id, so distinct
+  comments sharing a timestamp both survive while mirror copies count once.
 """
 
 from __future__ import annotations
 
-import functools
-import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from rebalance.ingest.agent_tags import classify as classify_source
-from rebalance.ingest.config import canonical_github_repo_name, get_github_org_aliases
-from rebalance.lib.time_ops import now_utc
+from rebalance.ingest.config import get_github_org_aliases
+from rebalance.lib.time_ops import now_utc, parse_utc_iso
 
 
 # Default cloud agent bots recognized as automated commit authors
@@ -120,14 +129,103 @@ def _in_window(iso_str: str | None, start: datetime, end: datetime) -> bool:
     """Check if an ISO timestamp falls in [start, end)."""
     if not iso_str:
         return False
-    from rebalance.lib.time_ops import parse_utc_iso
-
     parsed = parse_utc_iso(iso_str)
     if parsed is None:
         return False
     start_utc = _ensure_utc(start)
     end_utc = _ensure_utc(end)
     return start_utc <= parsed < end_utc
+
+
+def _ts_or_epoch(value: str | None) -> datetime:
+    """Parse an ISO timestamp for recency ranking; unparseable values sort oldest."""
+    parsed = parse_utc_iso(value) if value else None
+    return parsed if parsed is not None else datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _latest_activity_snapshots(
+    conn: sqlite3.Connection,
+    since_date: str,
+    alias_map: dict[str, str],
+) -> list[sqlite3.Row]:
+    """Return in-window github_activity rows with superseded snapshots collapsed.
+
+    github_activity is a snapshot table — UNIQUE(login, repo_full_name, scan_date)
+    ON CONFLICT REPLACE — so each row overwrites the prior observation of that
+    login/repo/day, and an org rename re-keys the row mid-day, leaving the same
+    day recorded under two spellings. Per SOP §6 the snapshot with the latest
+    scanned_at wins per (login, canonical repo, scan_date); ties prefer the
+    canonical spelling, then the later insert. Callers aggregate the survivors
+    and never sum across spellings of the same day.
+    """
+    rows = conn.execute(
+        """
+        SELECT id, login, repo_full_name, scan_date, commits, pushes, prs_opened,
+               prs_merged, issues_opened, issue_comments, reviews, last_active_at,
+               scanned_at
+        FROM github_activity
+        WHERE scan_date >= ?
+        ORDER BY id
+        """,
+        (since_date,),
+    ).fetchall()
+
+    latest: dict[tuple[str, str, str], tuple[tuple, sqlite3.Row]] = {}
+    for row in rows:
+        canon_lower = _canonical_lower(row["repo_full_name"], alias_map)
+        key = ((row["login"] or "").lower(), canon_lower, row["scan_date"] or "")
+        rank = (
+            _ts_or_epoch(row["scanned_at"]),
+            1 if (row["repo_full_name"] or "").lower() == canon_lower else 0,
+            row["id"],
+        )
+        incumbent = latest.get(key)
+        if incumbent is None or rank > incumbent[0]:
+            latest[key] = (rank, row)
+    return [row for _rank, row in latest.values()]
+
+
+def _resolve_newest_items(
+    rows: list[sqlite3.Row],
+    alias_map: dict[str, str],
+) -> dict[tuple[str, str, int], dict[str, Any]]:
+    """Collapse mirrored github_items copies to the newest record per canonical item.
+
+    github_items is keyed UNIQUE(repo_full_name, item_type, number) ON CONFLICT
+    REPLACE, so an org rename re-keys the row and leaves two records of one item
+    that can disagree on state or milestone. The newest record wins: latest
+    updated_at (falling back to created_at), then latest fetched_at, then the
+    canonical spelling, then the later insert. Callers must filter by state or
+    milestone only after this resolution, never before.
+    """
+    resolved: dict[tuple[str, str, int], tuple[tuple, dict[str, Any]]] = {}
+    for index, row in enumerate(rows):
+        canon_lower = _canonical_lower(row["repo_full_name"], alias_map)
+        key = (canon_lower, row["item_type"] or "", int(row["number"] or 0))
+        rank = (
+            _ts_or_epoch(row["updated_at"] or row["created_at"]),
+            _ts_or_epoch(row["fetched_at"]),
+            1 if (row["repo_full_name"] or "").lower() == canon_lower else 0,
+            index,
+        )
+        incumbent = resolved.get(key)
+        if incumbent is None or rank > incumbent[0]:
+            resolved[key] = (rank, dict(row))
+    return {key: record for key, (_rank, record) in resolved.items()}
+
+
+def _recency_desc(
+    items: list[tuple[Any, dict[str, Any]]],
+) -> list[tuple[Any, dict[str, Any]]]:
+    """Order resolved (key, record) pairs newest-first for presentation output."""
+    return sorted(
+        items,
+        key=lambda kv: (
+            _ts_or_epoch(kv[1].get("updated_at") or kv[1].get("created_at")),
+            kv[0][2],
+        ),
+        reverse=True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -142,32 +240,15 @@ def fetch_github_balance(
 ) -> list[dict[str, Any]]:
     """Return GitHub activity balance per project using canonical repo identity.
 
-    Collapses mirror org rows (e.g. HiQS-Suite vs HiQS-Labs) into one canonical
-    entity so projects listing either or both spellings get complete, undoubled stats.
+    Collapses mirror-org spellings into one canonical entity and reconciles
+    snapshot rows latest-scan-wins (SOP §6), so projects listing either or both
+    spellings of a repo get complete, undoubled stats.
     """
     since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
     alias_map = _get_alias_map()
 
-    rows = conn.execute(
-        """
-        SELECT repo_full_name,
-               SUM(commits)        AS commits,
-               SUM(pushes)         AS pushes,
-               SUM(prs_opened)     AS prs_opened,
-               SUM(prs_merged)     AS prs_merged,
-               SUM(issues_opened)  AS issues_opened,
-               SUM(issue_comments) AS issue_comments,
-               SUM(reviews)        AS reviews,
-               MAX(last_active_at) AS last_active_at
-        FROM github_activity
-        WHERE scan_date >= ?
-        GROUP BY repo_full_name
-        """,
-        (since_date,),
-    ).fetchall()
-
     canonical_stats: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for row in _latest_activity_snapshots(conn, since_date, alias_map):
         canon_key = _canonical_lower(row["repo_full_name"], alias_map)
         if canon_key not in canonical_stats:
             canonical_stats[canon_key] = {
@@ -250,38 +331,16 @@ def fetch_org_activity(
 ) -> dict[str, list[dict[str, Any]]]:
     """Return all github_activity rows grouped by canonical GitHub org.
 
-    Collapses mirror org spellings into canonical targets and combines
-    activity stats for identical repos.
+    Collapses mirror org spellings into canonical targets and reconciles
+    snapshot rows latest-scan-wins (SOP §6) before combining stats across
+    distinct logins and days.
     """
     since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")  # READ-LAYER-OK: P1 read layer destination for since_cutoff (GH-150)
     alias_map = _get_alias_map()
-    ignored_set = {r.lower() for r in (ignored_repos or [])}
-
-    params: list[Any] = [since_date]
-    ignored_clause = ""
-    if ignored_set:
-        placeholders = ",".join("?" * len(ignored_set))
-        ignored_clause = f"AND LOWER(repo_full_name) NOT IN ({placeholders})"
-        params.extend(sorted(ignored_set))
-
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name,
-               SUM(commits)        AS commits,
-               SUM(prs_opened)     AS prs_opened,
-               SUM(prs_merged)     AS prs_merged,
-               SUM(issues_opened)  AS issues_opened,
-               MAX(last_active_at) AS last_active_at
-        FROM github_activity
-        WHERE scan_date >= ?
-        {ignored_clause}
-        GROUP BY repo_full_name
-        """,
-        tuple(params),
-    ).fetchall()
+    ignored_set = {_canonical_lower(r, alias_map) for r in (ignored_repos or []) if r}
 
     canon_repo_map: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for row in _latest_activity_snapshots(conn, since_date, alias_map):
         canon_name = _canonical_name(row["repo_full_name"], alias_map)
         canon_lower = canon_name.lower()
         if canon_lower in ignored_set:
@@ -504,7 +563,12 @@ def fetch_day_comments(
     github_login: str,
     cloud_authors: tuple[str, ...] = CLOUD_AGENT_AUTHORS,
 ) -> list[dict[str, Any]]:
-    """Return author-scoped github_comments in [start, end)."""
+    """Return author-scoped github_comments in [start, end).
+
+    Dedup identity is the native GitHub comment id (with comment type), so two
+    distinct comments by one author that share a timestamp both survive while a
+    mirror-spelling copy of the same comment counts once.
+    """
     alias_map = _get_alias_map()
     sql_floor = _utc_iso_floor(start)
     comment_filter = _author_filter_sql("author_login", cloud_authors)
@@ -512,7 +576,7 @@ def fetch_day_comments(
     rows = conn.execute(
         f"""
         SELECT repo_full_name, item_type, item_number, comment_type,
-               body, created_at, html_url, author_login
+               github_comment_id, body, created_at, html_url, author_login
         FROM github_comments
         WHERE created_at >= ?
           AND {comment_filter}
@@ -526,8 +590,13 @@ def fetch_day_comments(
     for r in rows:
         if _in_window(r["created_at"], start, end):
             canon_lower = _canonical_lower(r["repo_full_name"], alias_map)
-            item_num = int(r["item_number"] or 0)
-            c_key = (canon_lower, r["item_type"] or "", item_num, r["created_at"] or "", r["author_login"] or "")
+            c_key = (
+                canon_lower,
+                r["comment_type"] or "",
+                int(r["github_comment_id"] or 0),
+                r["created_at"] or "",
+                r["author_login"] or "",
+            )
             if c_key in seen_comments:
                 continue
             seen_comments.add(c_key)
@@ -654,10 +723,13 @@ def fetch_watched_activity(
             }
         )
 
-    # Comments
+    # Comments — identity is the native GitHub comment id (with comment type),
+    # so distinct comments sharing a timestamp both count while mirror copies
+    # of one comment count once.
     rows = conn.execute(
         """
-        SELECT repo_full_name, item_type, item_number, created_at, author_login FROM github_comments
+        SELECT repo_full_name, item_type, item_number, comment_type,
+               github_comment_id, created_at, author_login FROM github_comments
         WHERE created_at >= ?
         """,
         (sql_floor,),
@@ -665,7 +737,12 @@ def fetch_watched_activity(
     for r in rows:
         canon_lower = _canonical_lower(r["repo_full_name"], alias_map)
         if canon_lower in activity and _in_window(r["created_at"], start, end):
-            c_key = (r["item_type"] or "", int(r["item_number"] or 0), r["created_at"] or "", r["author_login"] or "")
+            c_key = (
+                r["comment_type"] or "",
+                int(r["github_comment_id"] or 0),
+                r["created_at"] or "",
+                r["author_login"] or "",
+            )
             if c_key not in activity[canon_lower]["_seen_comments"]:
                 activity[canon_lower]["_seen_comments"].add(c_key)
                 activity[canon_lower]["comments"] += 1
@@ -698,7 +775,12 @@ def fetch_open_items_for_projects(
     conn: sqlite3.Connection,
     project_repos: dict[str, list[str]],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Read open GitHub items per project using canonical repo identity."""
+    """Read open GitHub items per project using canonical repo identity.
+
+    Mirrored copies of one item resolve to the newest record first; only then is
+    the open state checked, so a stale mirror copy saying "open" can never keep
+    a closed item on the list (SOP §6).
+    """
     alias_map = _get_alias_map()
     out: dict[str, list[dict[str, Any]]] = {project: [] for project in project_repos}
     repo_to_projects: dict[str, set[str]] = {}
@@ -713,31 +795,27 @@ def fetch_open_items_for_projects(
 
     rows = conn.execute(
         """
-        SELECT repo_full_name, item_type, number, title, html_url,
-               created_at, updated_at
+        SELECT repo_full_name, item_type, number, title, state, html_url,
+               created_at, updated_at, fetched_at
         FROM github_items
-        WHERE LOWER(COALESCE(state, '')) = 'open'
-        ORDER BY COALESCE(updated_at, created_at) DESC, number DESC
         """
     ).fetchall()
 
-    seen_items: set[tuple[str, str, int]] = set()
-    for row in rows:
-        canon_lower = _canonical_lower(row["repo_full_name"], alias_map)
-        item_key = (canon_lower, row["item_type"], row["number"])
-        if item_key in seen_items:
+    resolved = _recency_desc(_resolve_newest_items(rows, alias_map).items())
+    for key, record in resolved:
+        if (record.get("state") or "").lower() != "open":
             continue
-        seen_items.add(item_key)
+        canon_lower, _item_type, _number = key
         for project in repo_to_projects.get(canon_lower, set()):
             out[project].append(
                 {
-                    "repo": _canonical_name(row["repo_full_name"], alias_map),
-                    "item_type": row["item_type"],
-                    "number": row["number"],
-                    "title": row["title"] or "",
-                    "html_url": row["html_url"] or "",
-                    "created_at": row["created_at"],
-                    "updated_at": row["updated_at"],
+                    "repo": _canonical_name(record["repo_full_name"], alias_map),
+                    "item_type": record["item_type"],
+                    "number": record["number"],
+                    "title": record["title"] or "",
+                    "html_url": record["html_url"] or "",
+                    "created_at": record["created_at"],
+                    "updated_at": record["updated_at"],
                 }
             )
 
@@ -864,9 +942,12 @@ def fetch_release_readiness_data(
     *,
     milestone_title: str = "",
 ) -> dict[str, Any]:
-    """Retrieve raw milestone, issues, PRs, and links for release readiness evaluation."""
+    """Retrieve raw milestone, issues, PRs, and links for release readiness evaluation.
+
+    All item facts derive from one resolved set (newest record per canonical
+    item wins, SOP §6) before any state or milestone filter is applied.
+    """
     alias_map = _get_alias_map()
-    canon_name = _canonical_name(repo_full_name, alias_map)
     spellings = _all_repo_spellings(repo_full_name, alias_map)
     placeholders = ",".join("?" * len(spellings))
 
@@ -905,42 +986,35 @@ def fetch_release_readiness_data(
         if m_rows:
             milestone = dict(m_rows[0])
 
-    seen_issues: set[int] = set()
-    deduped_issues: list[dict[str, Any]] = []
-    if milestone:
-        i_rows = conn.execute(
-            f"""
-            SELECT * FROM github_items
-            WHERE LOWER(repo_full_name) IN ({placeholders})
-              AND item_type = 'issue' AND milestone_title = ?
-            ORDER BY state ASC, number ASC
-            """,
-            (*spellings, milestone["title"]),
-        ).fetchall()
-        for r in i_rows:
-            d = dict(r)
-            d["repo_full_name"] = _canonical_name(d["repo_full_name"], alias_map)
-            num = int(d["number"])
-            if num not in seen_issues:
-                seen_issues.add(num)
-                deduped_issues.append(d)
-
-    seen_prs: set[int] = set()
-    deduped_prs: list[dict[str, Any]] = []
-    pr_rows = conn.execute(
+    # One resolution pass over every copy of this repo's items: the newest
+    # record per (canonical repo, item_type, number) wins (SOP §6). Every
+    # item-derived fact below — milestone issues, PR list, promotion PR,
+    # deployment issue — reads this resolved set, so a stale mirror copy can
+    # never outvote the newest state.
+    item_rows = conn.execute(
         f"""
         SELECT * FROM github_items
-        WHERE LOWER(repo_full_name) IN ({placeholders}) AND item_type = 'pull_request'
+        WHERE LOWER(repo_full_name) IN ({placeholders})
         """,
         spellings,
     ).fetchall()
-    for r in pr_rows:
-        d = dict(r)
+    resolved_items = _resolve_newest_items(item_rows, alias_map)
+
+    deduped_issues: list[dict[str, Any]] = []
+    deduped_prs: list[dict[str, Any]] = []
+    for (_canon_lower, item_type, _number), record in resolved_items.items():
+        d = dict(record)
         d["repo_full_name"] = _canonical_name(d["repo_full_name"], alias_map)
-        num = int(d["number"])
-        if num not in seen_prs:
-            seen_prs.add(num)
+        if item_type == "issue":
+            deduped_issues.append(d)
+        elif item_type == "pull_request":
             deduped_prs.append(d)
+    deduped_issues.sort(key=lambda d: (d.get("state") or "", int(d["number"])))
+    deduped_prs.sort(key=lambda d: int(d["number"]))
+    if milestone:
+        deduped_issues = [
+            d for d in deduped_issues if (d.get("milestone_title") or "") == milestone["title"]
+        ]
 
     seen_links: set[tuple[int, int]] = set()
     deduped_links: list[dict[str, Any]] = []
@@ -979,44 +1053,42 @@ def fetch_release_readiness_data(
             seen_branches.add(b_name)
             branches.append(dict(r))
 
-    # Promotion PR
+    # Promotion PR — derived from the resolved set: a stale open copy under an
+    # old spelling must not outrank a newer closed record.
     default_branch = repo_meta.get("default_branch") or "main" if repo_meta else "main"
     prod_branches = list({"main", default_branch})
-    base_placeholders = ",".join("?" * len(prod_branches))
-    promo_row = conn.execute(
-        f"""
-        SELECT *
-        FROM github_items
-        WHERE LOWER(repo_full_name) IN ({placeholders})
-          AND item_type = 'pull_request'
-          AND state = 'open'
-          AND base_ref IN ({base_placeholders})
-          AND (head_ref = ? OR head_ref LIKE 'release/%')
-        ORDER BY updated_at DESC
-        LIMIT 1
-        """,
-        (*spellings, *prod_branches, default_branch),
-    ).fetchone()
-    promotion_pr = dict(promo_row) if promo_row else None
+    promotion_pr: dict[str, Any] | None = None
+    for d in deduped_prs:
+        if d.get("state") != "open" or d.get("base_ref") not in prod_branches:
+            continue
+        head_ref = d.get("head_ref") or ""
+        if head_ref != default_branch and not head_ref.startswith("release/"):
+            continue
+        if promotion_pr is None or _ts_or_epoch(d.get("updated_at")) > _ts_or_epoch(
+            promotion_pr.get("updated_at")
+        ):
+            promotion_pr = d
 
-    # Deployment issue
-    deployment_issue = None
+    # Deployment issue — same resolved set; the title pattern matches
+    # "...deployment: <milestone>..." case-insensitively.
+    deployment_issue: dict[str, Any] | None = None
     if milestone:
-        dep_row = conn.execute(
-            f"""
-            SELECT *
-            FROM github_items
-            WHERE LOWER(repo_full_name) IN ({placeholders})
-              AND item_type = 'issue'
-              AND state = 'open'
-              AND LOWER(title) LIKE ?
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (*spellings, f"%deployment:%{milestone['title'].lower()}%"),
-        ).fetchone()
-        if dep_row:
-            deployment_issue = dict(dep_row)
+        mstone_lower = milestone["title"].lower()
+        for (_canon_lower, item_type, _number), record in resolved_items.items():
+            if item_type != "issue":
+                continue
+            title = (record.get("title") or "").lower()
+            pos = title.find("deployment:")
+            if pos == -1 or record.get("state") != "open":
+                continue
+            if title.find(mstone_lower, pos) == -1:
+                continue
+            if deployment_issue is None or _ts_or_epoch(record.get("updated_at")) > _ts_or_epoch(
+                deployment_issue.get("updated_at")
+            ):
+                d = dict(record)
+                d["repo_full_name"] = _canonical_name(d["repo_full_name"], alias_map)
+                deployment_issue = d
 
     # Recent release
     rel_row = conn.execute(
@@ -1096,31 +1168,17 @@ def fetch_repo_activity_counts(
     days: int = 7,
     limit: int = 12,
 ) -> list[dict[str, Any]]:
-    """Top active repos ranked by activity score in the last N days."""
+    """Top active repos ranked by activity score in the last N days.
+
+    Snapshot rows reconcile latest-scan-wins per (login, canonical repo, day)
+    before scoring, so a renamed org's two spellings of one day count once.
+    """
     since_date = (now_utc() - timedelta(days=days)).strftime("%Y-%m-%d")
     alias_map = _get_alias_map()
 
-    rows = conn.execute(
-        """
-        SELECT repo_full_name,
-               SUM(commits) + SUM(prs_opened) + SUM(prs_merged) +
-               SUM(issues_opened) + SUM(issue_comments) + SUM(reviews) AS score,
-               SUM(commits) AS commits,
-               SUM(prs_opened) + SUM(prs_merged) AS prs,
-               SUM(issues_opened) AS issues,
-               MAX(last_active_at) AS last_active_at
-        FROM github_activity
-        WHERE scan_date >= ?
-        GROUP BY repo_full_name
-        HAVING score > 0
-        ORDER BY score DESC
-        """,
-        (since_date,),
-    ).fetchall()
-
     canon_map: dict[str, dict[str, Any]] = {}
-    for r in rows:
-        c_name = _canonical_name(r["repo_full_name"], alias_map)
+    for row in _latest_activity_snapshots(conn, since_date, alias_map):
+        c_name = _canonical_name(row["repo_full_name"], alias_map)
         c_lower = c_name.lower()
         if c_lower not in canon_map:
             canon_map[c_lower] = {
@@ -1132,15 +1190,27 @@ def fetch_repo_activity_counts(
                 "last_active_at": None,
             }
         cm = canon_map[c_lower]
-        cm["score"] += r["score"] or 0
-        cm["commits"] += r["commits"] or 0
-        cm["prs"] += r["prs"] or 0
-        cm["issues"] += r["issues"] or 0
-        la = r["last_active_at"]
+        commits = row["commits"] or 0
+        prs_opened = row["prs_opened"] or 0
+        prs_merged = row["prs_merged"] or 0
+        issues_opened = row["issues_opened"] or 0
+        issue_comments = row["issue_comments"] or 0
+        reviews = row["reviews"] or 0
+        cm["score"] += (
+            commits + prs_opened + prs_merged + issues_opened + issue_comments + reviews
+        )
+        cm["commits"] += commits
+        cm["prs"] += prs_opened + prs_merged
+        cm["issues"] += issues_opened
+        la = row["last_active_at"]
         if la and (cm["last_active_at"] is None or la > cm["last_active_at"]):
             cm["last_active_at"] = la
 
-    ranked = sorted(canon_map.values(), key=lambda x: x["score"], reverse=True)
+    ranked = sorted(
+        (cm for cm in canon_map.values() if cm["score"] > 0),
+        key=lambda x: x["score"],
+        reverse=True,
+    )
     return ranked[:limit]
 
 
@@ -1148,38 +1218,38 @@ def fetch_open_prs(
     conn: sqlite3.Connection,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
-    """Open PRs with review decision and check status."""
+    """Open PRs with review decision and check status.
+
+    Mirrored copies of one PR resolve to the newest record before the open-state
+    check, so a stale "open" copy can never list a PR that has since closed.
+    """
     alias_map = _get_alias_map()
     rows = conn.execute(
         """
-        SELECT repo_full_name, number, title, author_login, is_draft,
-               review_decision, check_status, comments_count, created_at, updated_at
+        SELECT repo_full_name, item_type, number, title, author_login, state, is_draft,
+               review_decision, check_status, comments_count, created_at, updated_at,
+               fetched_at
         FROM github_items
-        WHERE item_type = 'pull_request' AND state = 'open'
-        ORDER BY COALESCE(updated_at, created_at) DESC
+        WHERE item_type = 'pull_request'
         """
     ).fetchall()
 
     out: list[dict[str, Any]] = []
-    seen: set[tuple[str, int]] = set()
-    for r in rows:
-        canon_lower = _canonical_lower(r["repo_full_name"], alias_map)
-        key = (canon_lower, r["number"])
-        if key in seen:
+    for _key, record in _recency_desc(_resolve_newest_items(rows, alias_map).items()):
+        if (record.get("state") or "") != "open":
             continue
-        seen.add(key)
         out.append(
             {
-                "repo_full_name": _canonical_name(r["repo_full_name"], alias_map),
-                "number": r["number"],
-                "title": r["title"] or "",
-                "author_login": r["author_login"] or "",
-                "is_draft": bool(r["is_draft"]),
-                "review_decision": r["review_decision"] or "",
-                "check_status": r["check_status"] or "",
-                "comments_count": r["comments_count"] or 0,
-                "created_at": r["created_at"],
-                "updated_at": r["updated_at"],
+                "repo_full_name": _canonical_name(record["repo_full_name"], alias_map),
+                "number": record["number"],
+                "title": record["title"] or "",
+                "author_login": record["author_login"] or "",
+                "is_draft": bool(record["is_draft"]),
+                "review_decision": record["review_decision"] or "",
+                "check_status": record["check_status"] or "",
+                "comments_count": record["comments_count"] or 0,
+                "created_at": record["created_at"],
+                "updated_at": record["updated_at"],
             }
         )
         if len(out) >= limit:

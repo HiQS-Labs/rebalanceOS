@@ -10,12 +10,10 @@ public function in db/queries.py MUST return identical, deduplicated results.
 
 from __future__ import annotations
 
-import inspect
 import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -201,13 +199,18 @@ def _seed_mirror_rows(conn: sqlite3.Connection) -> None:
         """
     )
 
-    # Duplicate activity under old spelling
+    # Superseded stale snapshot under the old spelling: an earlier scan of the
+    # SAME day with smaller totals (the rename happened mid-day; the canonical
+    # spelling was scanned later and more completely). Values are deliberately
+    # non-zero and deliberately different — a zero-filled duplicate can never
+    # witness double-counting, and identical values can never witness the wrong
+    # row being picked (SOP §6, clause 5).
     conn.execute(
         """
         INSERT INTO github_activity (login, repo_full_name, scan_date, commits, pushes, prs_opened, prs_merged, issues_opened, issue_comments, reviews, last_active_at, scanned_at)
-        VALUES ('noelsaw1', 'HiQS-Suite/xyz-forge', ?, 0, 0, 0, 0, 0, 0, 0, ?, ?)
+        VALUES ('noelsaw1', 'HiQS-Suite/xyz-forge', ?, 3, 1, 1, 0, 1, 1, 0, ?, ?)
         """,
-        (now_date, now_iso, now_iso),
+        (now_date, "2026-09-02T16:30:00Z", "2026-09-02T17:00:00Z"),
     )
 
     # Document under old spelling
@@ -416,4 +419,343 @@ def test_release_readiness_custom_default_branch(tmp_path):
         readiness = queries_mod.fetch_release_readiness_data(conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0")
         assert readiness["promotion_pr"] is not None
         assert readiness["promotion_pr"]["number"] == 20
+
+
+# ---------------------------------------------------------------------------
+# Snapshot reconciliation: latest scanned_at wins per (login, canonical repo,
+# scan_date); never sum across spellings (SOP §6).
+# ---------------------------------------------------------------------------
+
+
+def _insert_activity(
+    conn: sqlite3.Connection,
+    login: str,
+    repo: str,
+    scan_date: str,
+    scanned_at: str,
+    *,
+    commits: int = 0,
+    pushes: int = 0,
+    prs_opened: int = 0,
+    prs_merged: int = 0,
+    issues_opened: int = 0,
+    issue_comments: int = 0,
+    reviews: int = 0,
+    last_active_at: str | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO github_activity (login, repo_full_name, scan_date, commits, pushes,
+                                     prs_opened, prs_merged, issues_opened, issue_comments,
+                                     reviews, last_active_at, scanned_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            login, repo, scan_date, commits, pushes, prs_opened, prs_merged,
+            issues_opened, issue_comments, reviews, last_active_at, scanned_at,
+        ),
+    )
+
+
+NEWER_TOTALS = dict(
+    commits=48, pushes=11, prs_opened=13, prs_merged=4,
+    issues_opened=21, issue_comments=5, reviews=6, last_active_at="2026-09-02T23:30:00Z",
+)
+
+
+@pytest.mark.parametrize("newer_spelling", ["canonical", "mirror"])
+def test_duplicate_day_snapshot_latest_scan_wins(tmp_path, org_alias, newer_spelling):
+    """One day recorded under two spellings must count exactly once.
+
+    The snapshot with the latest scanned_at wins, regardless of which spelling
+    carries it and regardless of insertion order (SOP §6).
+    """
+    canonical = "HiQS-Labs/xyz-forge"
+    mirror = "HiQS-Suite/xyz-forge"
+    newer_repo = canonical if newer_spelling == "canonical" else mirror
+    older_repo = mirror if newer_spelling == "canonical" else canonical
+
+    db_path = tmp_path / "dup_day.db"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        _insert_activity(
+            conn, "noelsaw1", older_repo, "2026-09-02", "2026-09-02T17:00:00Z",
+            commits=38, pushes=9, prs_opened=13, prs_merged=2,
+            issues_opened=21, issue_comments=3, reviews=3,
+            last_active_at="2026-09-02T16:45:00Z",
+        )
+        _insert_activity(
+            conn, "noelsaw1", newer_repo, "2026-09-02", "2026-09-02T23:45:00Z",
+            **NEWER_TOTALS,
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        balance = queries_mod.fetch_github_balance(conn, {"P": [canonical]}, since_days=14)
+        assert balance[0]["total_commits"] == 48
+        assert balance[0]["prs_opened"] == 13
+        assert balance[0]["prs_merged"] == 4
+        assert balance[0]["issues_opened"] == 21
+        assert balance[0]["last_active_at"] == "2026-09-02T23:30:00Z"
+
+        counts = queries_mod.fetch_repo_activity_counts(conn, days=14, limit=10)
+        assert len(counts) == 1
+        assert counts[0]["commits"] == 48
+        assert counts[0]["prs"] == 17
+        assert counts[0]["issues"] == 21
+        assert counts[0]["score"] == 48 + 13 + 4 + 21 + 5 + 6
+
+        org = queries_mod.fetch_org_activity(conn, since_days=14)
+        assert len(org["HiQS-Labs"]) == 1
+        assert org["HiQS-Labs"][0]["commits"] == 48
+        assert org["HiQS-Labs"][0]["prs_opened"] == 13
+
+
+def test_activity_distinct_days_and_logins_still_sum(tmp_path, org_alias):
+    """Latest-scan-wins applies within one (login, repo, day); distinct days and
+    distinct logins must still add together."""
+    db_path = tmp_path / "distinct_days.db"
+    canonical = "HiQS-Labs/xyz-forge"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        _insert_activity(conn, "noelsaw1", canonical, "2026-09-01", "2026-09-01T20:00:00Z", commits=5)
+        _insert_activity(conn, "noelsaw1", canonical, "2026-09-02", "2026-09-02T20:00:00Z", commits=7)
+        _insert_activity(conn, "teammate1", canonical, "2026-09-02", "2026-09-02T21:00:00Z", commits=4)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        balance = queries_mod.fetch_github_balance(conn, {"P": [canonical]}, since_days=14)
+        assert balance[0]["total_commits"] == 16
+
+        counts = queries_mod.fetch_repo_activity_counts(conn, days=14, limit=10)
+        assert counts[0]["commits"] == 16
+
+        org = queries_mod.fetch_org_activity(conn, since_days=14)
+        assert org["HiQS-Labs"][0]["commits"] == 16
+
+
+# ---------------------------------------------------------------------------
+# Comment identity: native GitHub comment id, not (author, timestamp).
+# ---------------------------------------------------------------------------
+
+
+def _insert_comment(
+    conn: sqlite3.Connection,
+    repo: str,
+    github_comment_id: int,
+    created_at: str,
+    *,
+    item_type: str = "pull_request",
+    item_number: int = 10,
+    comment_type: str = "issue_comment",
+    author: str = "noelsaw1",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO github_comments (repo_full_name, item_type, item_number, comment_type,
+                                     github_comment_id, author_login, body, created_at,
+                                     updated_at, fetched_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (repo, item_type, item_number, comment_type, github_comment_id, author,
+         "A review remark", created_at, created_at, created_at),
+    )
+
+
+def test_comments_same_timestamp_distinct_ids_both_survive(tmp_path, org_alias):
+    """Two distinct comments by one author sharing a timestamp must both count;
+    a mirror-spelling copy of one of them must not add a third."""
+    db_path = tmp_path / "comment_ids.db"
+    canonical = "HiQS-Labs/xyz-forge"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        _insert_comment(conn, canonical, 201, "2026-09-02T18:00:00Z")
+        _insert_comment(conn, canonical, 202, "2026-09-02T18:00:00Z")
+        _insert_comment(conn, "HiQS-Suite/xyz-forge", 201, "2026-09-02T18:00:00Z")
+
+    start = datetime(2026, 9, 2, 0, 0, 0, tzinfo=PACIFIC)
+    end = datetime(2026, 9, 3, 0, 0, 0, tzinfo=PACIFIC)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        comments = queries_mod.fetch_day_comments(conn, start, end, "noelsaw1")
+        assert len(comments) == 2
+
+        watched = queries_mod.fetch_watched_activity(conn, [canonical], start=start, end=end)
+        assert watched[0]["comments"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Item resolution: newest record per canonical item wins BEFORE any state or
+# milestone filter (SOP §6).
+# ---------------------------------------------------------------------------
+
+
+def _insert_item(
+    conn: sqlite3.Connection,
+    repo: str,
+    item_type: str,
+    number: int,
+    state: str,
+    *,
+    updated_at: str,
+    fetched_at: str,
+    head_ref: str | None = None,
+    base_ref: str | None = None,
+    milestone_title: str | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO github_items (repo_full_name, item_type, number, title, state,
+                                  author_login, head_ref, base_ref, milestone_title,
+                                  created_at, updated_at, fetched_at, html_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            repo, item_type, number, "item", state, "noelsaw1", head_ref, base_ref,
+            milestone_title, "2026-08-01T00:00:00Z", updated_at, fetched_at,
+            f"https://github.com/{repo}/{item_type}/{number}",
+        ),
+    )
+
+
+def _seed_state_pair(
+    conn: sqlite3.Connection,
+    *,
+    item_type: str,
+    number: int,
+    old_state: str,
+    new_state: str,
+    order: str,
+    milestone_title: str | None = None,
+    head_ref: str | None = None,
+    base_ref: str | None = None,
+) -> None:
+    """Insert one canonical and one mirror copy of an item whose states disagree.
+
+    The canonical copy is always the NEWER record (updated/fetched at 14:00), the
+    mirror copy the stale one (12:00). ``order`` only flips insertion order, which
+    must not influence which record wins.
+    """
+    canonical = "HiQS-Labs/xyz-forge"
+    mirror = "HiQS-Suite/xyz-forge"
+    copies = [
+        (mirror, old_state, "2026-09-02T12:00:00Z"),
+        (canonical, new_state, "2026-09-02T14:00:00Z"),
+    ]
+    if order == "new_first":
+        copies.reverse()
+    for repo, state, ts in copies:
+        _insert_item(
+            conn, repo, item_type, number, state,
+            updated_at=ts, fetched_at=ts,
+            head_ref=head_ref, base_ref=base_ref, milestone_title=milestone_title,
+        )
+
+
+@pytest.mark.parametrize("order", ["old_first", "new_first"])
+@pytest.mark.parametrize("scenario", ["old_open_new_closed", "old_closed_new_reopened"])
+def test_open_items_follow_newest_state(tmp_path, org_alias, order, scenario):
+    """A stale open copy must not list a closed item, and a stale closed copy
+    must not hide one that has since reopened — in either insertion order."""
+    old_state = "open" if scenario == "old_open_new_closed" else "closed"
+    new_state = "closed" if scenario == "old_open_new_closed" else "open"
+    expect_open = new_state == "open"
+
+    db_path = tmp_path / f"open_items_{scenario}_{order}.db"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        _seed_state_pair(
+            conn, item_type="issue", number=5,
+            old_state=old_state, new_state=new_state, order=order,
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        items = queries_mod.fetch_open_items_for_projects(
+            conn, {"XYZ Forge": ["HiQS-Labs/xyz-forge"]}
+        )
+        assert (len(items["XYZ Forge"]) == 1) is expect_open
+
+
+@pytest.mark.parametrize("order", ["old_first", "new_first"])
+@pytest.mark.parametrize("scenario", ["old_open_new_closed", "old_closed_new_reopened"])
+def test_open_prs_follow_newest_state(tmp_path, org_alias, order, scenario):
+    """fetch_open_prs resolves mirrored copies to the newest record before
+    checking state, in either insertion order."""
+    old_state = "open" if scenario == "old_open_new_closed" else "closed"
+    new_state = "closed" if scenario == "old_open_new_closed" else "open"
+    expect_open = new_state == "open"
+
+    db_path = tmp_path / f"open_prs_{scenario}_{order}.db"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        _seed_state_pair(
+            conn, item_type="pull_request", number=10,
+            old_state=old_state, new_state=new_state, order=order,
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        prs = queries_mod.fetch_open_prs(conn, limit=10)
+        assert (len(prs) == 1) is expect_open
+
+
+@pytest.mark.parametrize("order", ["old_first", "new_first"])
+@pytest.mark.parametrize("scenario", ["old_open_new_closed", "old_closed_new_reopened"])
+def test_release_readiness_uses_resolved_newest_records(tmp_path, org_alias, order, scenario):
+    """Release readiness must read the same resolved set: a stale open mirror
+    copy can neither revive a closed PR as the promotion PR, nor keep a closed
+    milestone issue open; the reverse must not hide reopened work."""
+    old_state = "open" if scenario == "old_open_new_closed" else "closed"
+    new_state = "closed" if scenario == "old_open_new_closed" else "open"
+
+    db_path = tmp_path / f"readiness_{scenario}_{order}.db"
+    now_iso = "2026-09-02T18:00:00Z"
+    with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO github_repo_meta (repo_full_name, default_branch, pushed_at, updated_at, open_issues_count, has_issues, has_projects, fetched_at)
+            VALUES ('HiQS-Labs/xyz-forge', 'main', ?, ?, 1, 1, 1, ?)
+            """,
+            (now_iso, now_iso, now_iso),
+        )
+        conn.execute(
+            """
+            INSERT INTO github_milestones (repo_full_name, number, title, state, open_issues, closed_issues, due_on, created_at, updated_at, html_url)
+            VALUES ('HiQS-Labs/xyz-forge', 1, 'v1.0', 'open', 1, 0, '2026-09-30', ?, ?, 'https://github.com/HiQS-Labs/xyz-forge/milestone/1')
+            """,
+            (now_iso, now_iso),
+        )
+        _seed_state_pair(
+            conn, item_type="issue", number=5,
+            old_state=old_state, new_state=new_state, order=order,
+            milestone_title="v1.0",
+        )
+        _seed_state_pair(
+            conn, item_type="pull_request", number=10,
+            old_state=old_state, new_state=new_state, order=order,
+            head_ref="release/1.0", base_ref="main",
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        data = queries_mod.fetch_release_readiness_data(
+            conn, "HiQS-Labs/xyz-forge", milestone_title="v1.0"
+        )
+        assert len(data["issues"]) == 1
+        assert data["issues"][0]["state"] == new_state
+        assert len(data["prs"]) == 1
+        assert data["prs"][0]["state"] == new_state
+        if new_state == "open":
+            assert data["promotion_pr"] is not None
+            assert data["promotion_pr"]["number"] == 10
+        else:
+            assert data["promotion_pr"] is None
 
