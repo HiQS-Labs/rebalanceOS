@@ -1,6 +1,6 @@
 ---
 title: "GH-182 project_registry contested claims — naming rule + unmarked writer"
-status: "Queued (issue filed, decision deliberately deferred)"
+status: "Decided 2026-09-04 — rule settled, enforcement sequenced, not yet implemented"
 created: 2026-09-04
 issue: "https://github.com/HiQS-Labs/rebalanceOS/issues/182"
 trigger: "PR #181 shipped project-level duplicate detection; the 7 survivors need a naming rule before any repair can be automated"
@@ -78,19 +78,87 @@ contested set from 11 to 7.
   the single repository the twin claims — `R7` claims three repositories and only one is contested.
   Collapsing these the same way loses a project.
 
+## Decision (2026-09-04)
+
+**The naming dilemma is false, and that is what settles it.**
+
+`preflight.discover_candidates()` names a candidate after its repository because at discovery time
+there *is* no project yet — the `owner/repo` string is a **placeholder standing in for a name nobody
+has supplied**, not a competing naming convention. `confirm_and_write()` then appends it straight
+into `active_projects` with no check, so the placeholder becomes permanent and, when a human-named
+project later claims the same repository, contested.
+
+**Human-readable names win, always** — not because curation outranks inference (neither row is
+curated) but because the slug was never a name.
+
+### The rule
+
+> A project whose `name` is equal to one of the repositories in its own `repos` list is a discovery
+> placeholder, not a project.
+
+A pure function of the row: no per-case judgement, no provenance lookup, no operator input. That is
+what makes it deterministic. It resolves all seven contested cases the same way, with no tie.
+
+It also classifies the **seven further placeholders that have no human-named twin** — 14 slug-named
+entries sit in `active_projects` today. Those seven are not duplicates and must not be deleted; they
+are the only record of their repository. They get *renamed* when a real name exists and keep working
+until then. That asymmetry is the intuitive half of the rule.
+
+### Where the source of truth actually is
+
+```
+Projects/00-project-registry.md   (hand-editable YAML in the vault — SOURCE OF TRUTH)
+        -> Registry model -> _registry_to_projection() -> projects.yaml -> sync_db()
+        -> project_registry table                        (a PROJECTION, not the store)
+```
+
+All seven contested rows live in the registry markdown under `active_projects`, each with
+`custom_fields: {}`. **Repair is an edit to one file followed by `rebalance ingest sync --mode pull`**
+— not SQL surgery on the live database, and so free of the delete-before-rename hazard SOP.md §6
+clause 4 exists to prevent.
+
+### Enforcement — three points, each where it belongs, no new subsystem
+
+1. **`confirm_and_write()`** — refuse to append an entry claiming a repository an existing entry
+   already claims, compared through `canonical_github_repo_name()`. This is the write that created
+   all seven; roughly ten lines, and it is the *blocked* control.
+2. **The projection boundary** (`_registry_to_projection` / `sync_db`) — refuse to project two
+   entries claiming one canonical repository. The registry is hand-edited YAML, so this is the only
+   layer that can catch a human edit; it must fail loudly at sync rather than write through.
+3. **`doctor`** — the existing `projects` check reports anything that slips past both. Detection in
+   the test suite landed in PR #181.
+
+### Why not a `project_repos` table with a `UNIQUE` index
+
+The textbook answer, and the wrong trade here. The source of truth is hand-edited YAML in the vault,
+not SQLite. A database constraint cannot prevent a bad edit to that file — only fail *after* it, at
+exactly the boundary where control 2 already sits. The join table buys a migration and a second
+representation of the same fact, for enforcement still needed at the YAML boundary regardless.
+Control 2 gives the same determinism for less code (GUIDING-PRINCIPLES #6), and SOP.md §6 clause 1 is
+explicit that identity should not rest on a constraint over a mutable key.
+
+### Correction to this doc's earlier framing
+
+Earlier revisions said `provenance` is "set on the model and lost on the write". Imprecise: the
+round-trip works in **both** directions and has since the initial public release
+(`registry.py:141` writes it into `custom_fields`; `registry.py:218` reads it back). The registry
+markdown contains **zero** provenance fields — it is dropped at *accept* time in
+`confirm_and_write()`, not at projection time. Same missing stamp, smaller and better-located fix,
+and it belongs in the same ten lines as control 1.
+
 ## What resolving it requires, in order
 
-1. **Decide the naming rule** — human-readable name or `owner/repo` slug. Today both are produced and
-   neither is authoritative. This is the operator's call and the only genuinely blocked step.
-2. **Persist `provenance` on `discover_candidates()` rows** into `custom_fields_json`. Small, and it
-   is the precondition for any safe automated repair.
-3. **Merge, don't delete, the two multi-repo cases** (`R1`, `R7`). The narrow row's activity history
-   has to land on the surviving project.
-4. **Add the blocked control** — a guard in `project_inference.py` refusing to create a project for a
-   repository an existing project already claims, compared canonically. Excluded from PR #181 on
-   purpose; #181 shipped *detect* only.
+| # | Change | Depends on |
+|---|---|---|
+| 1 | `confirm_and_write()`: claim guard + carry `provenance` onto accepted entries | — |
+| 2 | Projection boundary: refuse two entries claiming one canonical repository | — |
+| 3 | Repair the 7 contested entries in the registry markdown, then `sync --mode pull` | 1, 2 |
+| 4 | Rename the 7 orphan placeholders as real names become available | 3 |
 
-Steps 2 and 4 do not depend on step 1 and can land independently.
+1 and 2 are independent of each other and of the repair. Before deleting a contested slug entry,
+decide whether its `priority_tier` carries onto the survivor — the twins hold `null` today and the
+tier feeds `next_actions.py` low-cadence gating. Concrete identifiers are in the maintainer's local
+GH-182 sidecar doc.
 
 ## What this deliberately does NOT propose
 
