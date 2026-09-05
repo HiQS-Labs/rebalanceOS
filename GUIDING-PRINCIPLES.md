@@ -8,16 +8,34 @@ rebalance ingests scattered work artifacts — Obsidian vault, GitHub, calendar,
 
 ## The signal bar
 
-Every output is a signal. A signal is high-quality only when it is all four:
+Every output is a signal. HiQS is High Quality Signals, and a signal is high-quality only when it is all four:
 
-- **Attested** — carries its receipts: source, evidence, confidence. Never a bare verdict.
-- **Relevant** — ranked, not dumped. Volume is not value.
-- **Fresh** — current, not stale. Refreshes are incremental or safely bounded so nothing rots silently.
-- **Structured** — one shape, clean for people to read and for agents to feed on.
+**ATTESTED** — Every signal carries its receipts: source, author, time, link. Never a bare verdict.
+
+**RANKED** — Volume is not value. Signals are ordered by what your team actually owes.
+
+**FRESH** — Yesterday's truth is today's mistake. Stale signals decay automatically.
+
+**STRUCTURED** — Clean to read, ready to feed your agents. No screenshot parsing.
 
 Fail a pillar, and the feature, source, or output isn't done.
 
-**Counted once.** One real-world entity contributes to a metric exactly once. An alias, rename, mirror, fork, or casing variant that gets counted twice is a defect against *Attested* and *Relevant*, not a rounding error — see [`SOP.md` §6](SOP.md).
+### Counted once — the fifth thing each pillar assumes
+
+**One real-world entity contributes to a metric exactly once.** An alias, rename, mirror, fork, or casing variant counted twice is a defect, not a rounding error. It is not a fifth pillar because it is not a separate property — it is the precondition every other pillar quietly depends on:
+
+- A doubled count is **not ATTESTED**. Its receipts say 48 commits; the number says 86. Nothing reconciles them, and the receipt is the thing that was supposed to make the number checkable.
+- A doubled count is **not RANKED**. Ranking is ordering, and an entity counted twice sorts above one counted once regardless of what anybody owes. One inflated row reorders the whole list.
+- A doubled count corrupts **FRESH**. When the same day is scanned twice under two spellings, summing adds a stale partial snapshot to the current one. The stale copy does not decay — it accumulates.
+- A doubled count breaks **STRUCTURED**. Two spellings of one entity are two shapes for one thing, and an agent fed both cannot tell they are the same.
+
+**Detected, blocked, not counted** — in that order, and all three are required:
+
+1. **Detected.** Aliased duplicates are found by a check that runs, not by someone noticing a number looks high. `tests/test_alias_dedup_invariant.py` pins the invariant on synthetic fixtures, and it is deliberately capable of failing — its own meta-check asserts the duplicate fixture is non-zero, because the first guard written for this defect used zeros and could never go red.
+2. **Blocked.** Reads canonicalise before grouping. Aggregates never sum across aliases of one entity; on a snapshot table the latest row wins. The rule comes from the schema, not from preference: `UNIQUE(...) ON CONFLICT REPLACE` means one row wins, and that settles it without an opinion.
+3. **Not counted.** The store is de-duplicated too, not only the read path. A read-time fix leaves wrong rows behind for every consumer that does not use the canonical path — and a number already published from doubled data is wrong and will be cited. Correct it, or say plainly that it was not recomputed.
+
+This is written from a live failure, not from theory. A GitHub org rename put one repository in `github_activity` under two spellings on the same day; every read path summed them, and a day with 48 commits and 13 pull requests was reported as 86 and 26 in `top_active_repos`, the `github_balance` MCP tool, Focus 5, the dashboard, and the morning brief. No error was raised. The full policy, including the hazard that renaming a row onto an existing key on such a table silently destroys the row already there, is [`SOP.md` §6](SOP.md).
 
 ## How it's built
 
@@ -34,7 +52,7 @@ Fail a pillar, and the feature, source, or output isn't done.
 
 ## Applying this
 
-Adding a feature or weighing a tradeoff, ask: *higher-quality signal — Attested, Relevant, Fresh, Structured — still local, and "done" verifiable?* If any answer is no, reconsider.
+Adding a feature or weighing a tradeoff, ask: *higher-quality signal — Attested, Ranked, Fresh, Structured, and counted once — still local, and "done" verifiable?* If any answer is no, reconsider.
 
 ---
 
@@ -51,7 +69,8 @@ When reviewing any repo doc (roadmap entries, plans, architecture notes, audits,
 5. **Drift reduced, not created?** No duplicated docs, no execution detail added to ROADMAP.md, no reinventing a path ARCHITECTURE.md already documents.
 6. **Next action singular?** One explicit next step, not buried in prose; status cells non-empty.
 7. **Operator control explicit?** No silent retry, auto-repair, or masked failure; destructive ops surface before executing.
-8. **Four pillars pass?** Each output is Attested, Relevant, Fresh, Structured. Fail one → not done.
+8. **Four pillars pass?** Each output is Attested, Ranked, Fresh, Structured. Fail one → not done.
+9. **Counted once?** No entity reaches a metric twice through an alias, rename, mirror, fork, or casing variant. A doubled count fails Attested and Ranked at the same time — see [`SOP.md` §6](SOP.md).
 
 **Tie-breakers**
 
