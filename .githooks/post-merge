@@ -1,0 +1,8 @@
+#!/bin/bash
+# Reminder, never a gate. After a merge lands in THIS checkout, say how far the
+# deployed runtime — the folder launchd actually runs — now trails development.
+# A merge is not a deploy (SOP.md § 7, AGENTS.md § "Deploy runtime folder").
+#
+# Install once per clone:  git config core.hooksPath .githooks
+"$(git rev-parse --show-toplevel)/scripts/stack.sh" drift || true
+exit 0

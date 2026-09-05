@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.84.0] - 2026-09-04
+
+### Added
+- Unified read layer with canonical repository identity (fe1 extension): queries over GitHub activity tables now route through a single database query layer that transparently collapses mirror organization aliases and case variants into unified repo entities. All presenting surfaces — balance aggregations, pulse rollups, next-action discovery, release readiness checks, and dashboard views — now produce identical, undoubled activity metrics regardless of how organization renames or aliases appear in raw data. (#150, #29)
+
+### Fixed
+- Activity totals no longer double-count one day's work when a repository was recorded under two organization spellings: daily snapshot rows now resolve to the latest scan per person, repository, and day before any total is computed, instead of being summed. Open/closed status resolves to the newest record per item before open-item, open-PR, and release-readiness views filter on it, so finished work can no longer reappear as open because an older copy said so. Comments are identified by their native comment ID, so distinct comments posted at the same timestamp are no longer collapsed into one. The duplicate-row test fixture carries real non-zero values so the guard can actually fail (a zero-filled duplicate asserts nothing). (#150)
+
 ## [0.83.1] - 2026-09-04
 
 ### Added

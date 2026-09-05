@@ -1090,9 +1090,14 @@ def _project_activity_rows_for_day(
 ) -> list[str]:
     """Return concrete GitHub-backed activity rows for one project's day."""
     rows: list[str] = []
+    from rebalance.ingest.config import canonical_github_repo_name
+
+    canon_repos = {canonical_github_repo_name(r).lower() for r in repos}
 
     def in_project(repo: str | None) -> bool:
-        return (repo or "").lower() in repos
+        if not repo:
+            return False
+        return canonical_github_repo_name(repo).lower() in canon_repos
 
     for commit in snapshot.today.gh_commits:
         if not in_project(commit.get("repo")):
@@ -1138,45 +1143,10 @@ def _open_items_for_projects(
     project_repos: dict[str, list[str]],
 ) -> dict[str, list[dict[str, Any]]]:
     """Read open GitHub items per project from the existing collector tables."""
-    out: dict[str, list[dict[str, Any]]] = {project: [] for project in project_repos}
-    repo_to_projects: dict[str, set[str]] = {}
-    for project, repos in project_repos.items():
-        for repo in repos:
-            repo_to_projects.setdefault(repo.lower(), set()).add(project)
-
-    if not repo_to_projects:
-        return out
-
-    placeholders = ",".join("?" for _ in repo_to_projects)
-    from rebalance.ingest.db import ensure_github_schema
+    from rebalance.ingest.db import db_connection, ensure_github_schema, fetch_open_items_for_projects
 
     with db_connection(database_path, ensure_github_schema) as conn:
-        rows = conn.execute(
-            f"""
-            SELECT repo_full_name, item_type, number, title, html_url,
-                   created_at, updated_at
-            FROM github_items
-            WHERE LOWER(repo_full_name) IN ({placeholders})
-              AND LOWER(COALESCE(state, '')) = 'open'
-            ORDER BY COALESCE(updated_at, created_at) DESC, number DESC
-            """,
-            tuple(repo_to_projects),
-        ).fetchall()
-
-    for row in rows:
-        repo = (row["repo_full_name"] or "").lower()
-        for project in repo_to_projects.get(repo, set()):
-            out[project].append(
-                {
-                    "repo": row["repo_full_name"],
-                    "item_type": row["item_type"],
-                    "number": row["number"],
-                    "title": row["title"] or "",
-                    "html_url": row["html_url"] or "",
-                    "updated_at": row["updated_at"] or row["created_at"] or "",
-                }
-            )
-    return out
+        return fetch_open_items_for_projects(conn, project_repos)
 
 
 def compute_deep_work_signals(

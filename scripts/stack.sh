@@ -10,6 +10,7 @@
 #   bash scripts/stack.sh down          # unload every managed job (plists kept)
 #   bash scripts/stack.sh restart       # down, then up
 #   bash scripts/stack.sh status        # per-job PID / last exit / state
+#   bash scripts/stack.sh drift         # how far the runtime trails origin/development (exit 1 if behind)
 #   bash scripts/stack.sh doctor        # rebalance doctor (exits with its code)
 #   bash scripts/stack.sh verify        # preflight only — changes nothing
 #   bash scripts/stack.sh purge         # unload AND delete managed plists
@@ -379,6 +380,40 @@ stack_down() {
 # ------------------------------------------------------------------------------
 # status
 # ------------------------------------------------------------------------------
+# Runtime drift: how far the deployed checkout ($REBALANCE_DIR) trails
+# origin/development. The fleet runs from THAT folder, not from wherever a PR
+# was merged; a merge is not a deploy until someone pulls it there (AGENTS.md
+# § "Deploy runtime folder", SOP.md § 7). Returns 1 when behind so a git hook
+# or a health job can act on it. Never blocks: an unreadable or offline
+# runtime reports "unknown" and returns 0, because a drift check that fails
+# closed would turn every flaky network into a red `status`.
+runtime_drift() {
+    local behind head_desc
+    # Git hooks export GIT_DIR/GIT_WORK_TREE. With those set, `git -C <runtime>`
+    # ignores -C for repository discovery and quietly measures the DEV checkout
+    # instead — the first probe of the post-merge hook reported "up to date" while
+    # the runtime was 51 commits behind. Clear them so the runtime is always what
+    # gets measured, whoever calls this.
+    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+    if ! git -C "$REBALANCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "RUNTIME: $REBALANCE_DIR is not a git checkout — drift unknown"
+        return 0
+    fi
+    if ! git -C "$REBALANCE_DIR" fetch --quiet origin development 2>/dev/null; then
+        echo "RUNTIME: fetch failed — drift unknown (offline, or no origin/development)"
+        return 0
+    fi
+    behind=$(git -C "$REBALANCE_DIR" rev-list --count HEAD..origin/development)
+    head_desc=$(git -C "$REBALANCE_DIR" log -1 --format='%h from %cs' HEAD)
+    if [ "$behind" -eq 0 ]; then
+        echo "RUNTIME: up to date with origin/development ($head_desc)"
+        return 0
+    fi
+    echo "RUNTIME: $behind commit(s) BEHIND origin/development — fleet is running $head_desc"
+    echo "         deploy: git -C \"$REBALANCE_DIR\" pull --ff-only origin development"
+    return 1
+}
+
 stack_status() {
     refresh_launchctl_cache
     echo "================================================================================"
@@ -444,6 +479,8 @@ stack_status() {
             printf "  · %-40s %s\n" "$suffix" "$state"
         done
     fi
+    echo
+    runtime_drift || true   # informational here; `stack.sh drift` carries the exit code
     echo "================================================================================"
 }
 
@@ -478,6 +515,7 @@ case "$cmd" in
         stack_up "$FORCE"
         ;;
     status|ps)      stack_status ;;
+    drift)          runtime_drift ;;
     doctor)
         if [ ! -x "$REBALANCE_CLI" ]; then
             log_error "rebalance CLI not found at $REBALANCE_CLI"
@@ -488,7 +526,7 @@ case "$cmd" in
         ;;
     verify|test)    validate_environment ;;
     *)
-        echo "Usage: $0 {up [--force]|down|restart|status|doctor|verify|purge}"
+        echo "Usage: $0 {up [--force]|down|restart|status|drift|doctor|verify|purge}"
         exit 2
         ;;
 esac

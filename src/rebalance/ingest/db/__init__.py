@@ -24,6 +24,20 @@ from rebalance.ingest.db.github import (
     top_active_repos,
 )
 from rebalance.ingest.db.migrate import current_schema_version, run_migrations
+from rebalance.ingest.db.queries import (
+    fetch_day_comments,
+    fetch_day_commits,
+    fetch_day_items,
+    fetch_github_balance,
+    fetch_open_items_for_projects,
+    fetch_open_prs,
+    fetch_org_activity,
+    fetch_recent_github,
+    fetch_release_readiness_data,
+    fetch_repo_activity_counts,
+    fetch_repo_diagnostics,
+    fetch_watched_activity,
+)
 from rebalance.ingest.db.schema import (
     BASELINE_SCHEMA_VERSION,
     ensure_baseline_schema,
@@ -51,4 +65,16 @@ __all__ = [
     "run_migrations",
     "current_schema_version",
     "BASELINE_SCHEMA_VERSION",
+    "fetch_github_balance",
+    "fetch_org_activity",
+    "fetch_day_commits",
+    "fetch_day_items",
+    "fetch_day_comments",
+    "fetch_watched_activity",
+    "fetch_open_items_for_projects",
+    "fetch_repo_diagnostics",
+    "fetch_release_readiness_data",
+    "fetch_recent_github",
+    "fetch_repo_activity_counts",
+    "fetch_open_prs",
 ]

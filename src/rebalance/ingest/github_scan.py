@@ -758,71 +758,10 @@ def get_github_balance(
     if not database_path.exists():
         return []
 
-    from rebalance.ingest.db import db_connection, ensure_github_schema
-
-    since_date = (now_utc() - timedelta(days=since_days)).strftime("%Y-%m-%d")
+    from rebalance.ingest.db import db_connection, ensure_github_schema, fetch_github_balance
 
     with db_connection(database_path, ensure_github_schema) as conn:
-        rows = conn.execute(
-            """
-            SELECT repo_full_name,
-                   SUM(commits)       AS commits,
-                   SUM(pushes)        AS pushes,
-                   SUM(prs_opened)    AS prs_opened,
-                   SUM(prs_merged)    AS prs_merged,
-                   SUM(issues_opened) AS issues_opened,
-                   SUM(issue_comments) AS issue_comments,
-                   SUM(reviews)       AS reviews,
-                   MAX(last_active_at) AS last_active_at
-            FROM github_activity
-            WHERE scan_date >= ?
-            GROUP BY repo_full_name
-            """,
-            (since_date,),
-        ).fetchall()
-
-    # Build lookup: repo_full_name → aggregated activity row
-    repo_stats: dict[str, dict[str, Any]] = {row["repo_full_name"]: dict(row) for row in rows}
-
-    results: list[dict[str, Any]] = []
-    for project_name, repos in project_repos.items():
-        total_commits = 0
-        total_prs_opened = 0
-        total_prs_merged = 0
-        total_issues = 0
-        repos_touched: list[str] = []
-        last_active: str | None = None
-
-        for repo in repos:
-            stats = repo_stats.get(repo)
-            if not stats:
-                continue
-            repos_touched.append(repo)
-            total_commits += stats.get("commits") or 0
-            total_prs_opened += stats.get("prs_opened") or 0
-            total_prs_merged += stats.get("prs_merged") or 0
-            total_issues += stats.get("issues_opened") or 0
-            la = stats.get("last_active_at")
-            if la and (last_active is None or la > last_active):
-                last_active = la
-
-        results.append(
-            {
-                "project_name": project_name,
-                "repos_linked": repos,
-                "repos_touched": repos_touched,
-                "total_commits": total_commits,
-                "prs_opened": total_prs_opened,
-                "prs_merged": total_prs_merged,
-                "issues_opened": total_issues,
-                "last_active_at": last_active,
-                "is_idle": len(repos_touched) == 0,
-            }
-        )
-
-    # Sort: active projects first, then by last_active_at descending
-    results.sort(key=lambda x: (x["is_idle"], -(len(x["repos_touched"]))), reverse=False)
-    return results
+        return fetch_github_balance(conn, project_repos, since_days=since_days)
 
 
 # ---------------------------------------------------------------------------
