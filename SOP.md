@@ -218,3 +218,41 @@ a check against live data.
 **Related:** [`TESTS-RESULTS/README.md`](TESTS-RESULTS/README.md) (structure and
 conventions) · [`AGENTS.md`](AGENTS.md) (working agreements) ·
 [`ROUTER.md`](ROUTER.md) (prior-art checks before building)
+
+## 7. A merge is not a deploy
+
+> **Scheduled jobs run from the runtime folder, not from the branch you merged. Until
+> someone pulls, the fix does not exist.**
+
+The fleet (`launchd`) is pinned to one checkout — the path in
+`~/.config/rebalance/runtime-root`, shown as `Target root` by `scripts/stack.sh status`
+— and that checkout is updated deliberately, by hand, with
+
+```
+git -C "$(cat ~/.config/rebalance/runtime-root)" pull --ff-only origin development
+```
+
+This exists because it has already failed here. On 2026-09-04 eight PRs merged to
+`development` in one day, including the digest filter (#163) and the compressor-gate
+fix (#171). The runtime had last been pulled on 2026-09-02. Both 13:05 and 17:05
+digests went to Slack still leading with the repo #163 removes, and
+`obsidian-vault-embeddings` kept failing on the gate #171 relaxes — 51 commits of
+merged, CI-green, verifiably working code, none of it running. Nothing reported the
+gap; it was found by reading the digest by hand.
+
+**The rule, concretely**
+
+- After merging to `development`, run `bash scripts/stack.sh drift`. It prints how many
+  commits the runtime trails and the exact pull command. Exit 1 means behind.
+- `stack.sh status` prints the same line at the bottom, so the check rides along with
+  the tool ROUTER.md already names as ground truth.
+- The `.githooks/post-merge` hook prints it after every `git pull` in your dev
+  checkout. Enable once per clone: `git config core.hooksPath .githooks`. It is a
+  reminder, never a gate — it cannot fail a merge.
+- A deploy is done when `stack.sh drift` says `up to date`, not when the PR says
+  `Merged`. Say which in the PR or issue if it matters — "merged" and "deployed" are
+  different claims (§ 5).
+
+**Enforcement.** `tests/test_runtime_drift.py` pins the check with two throwaway
+repositories and no dependency on any operator's machine — including that it still
+measures the runtime when run from inside a git hook, where `GIT_DIR` points elsewhere.
