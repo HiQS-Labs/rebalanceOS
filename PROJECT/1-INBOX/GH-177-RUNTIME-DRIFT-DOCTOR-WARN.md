@@ -2,9 +2,9 @@
 gh_issue: 177
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/177
 title: "GH-177 doctor warns daily when the runtime trails origin/development"
-status: "Proposed (1-INBOX — not yet active). Rated 2026-09-04; ratings await operator confirmation."
+status: "Proposed (1-INBOX — not yet active). Rated 2026-09-04, re-rated 2026-09-05 after advisory review; ratings_provisional stays true deliberately — see Ratings."
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 owner: noel
 doc_type: hygiene
 goal: >
@@ -12,8 +12,8 @@ goal: >
   that trails development is reported without anyone typing a command. Reuse the existing
   check; do not grow a second drift algorithm.
 effort: 2
-complexity: 2
-risk: 1
+complexity: 3
+risk: 2
 phases: 1
 ratings_provisional: true
 roadmap_exempt: true
@@ -37,15 +37,40 @@ the daily job saying it.
 
 ## Ratings, with reasons
 
+Re-rated 2026-09-05. An advisory review disputed all three axes; two were raised and the
+eligibility flag deliberately left set. **Codex was unavailable** (its configured model needs a
+newer CLI), so this was one advisor's read plus first-hand evidence from the session that built
+`stack.sh drift` — not a cross-verified consult.
+
 | Field | Value | Why |
 |---|---|---|
-| `effort` | 2 | ~20 lines: a `_check_runtime_drift()` in the shape of `_check_token()` ([doctor.py:203](../../src/rebalance/doctor.py#L203)) that shells to `stack.sh drift` and maps exit 1 → WARN; one test; one `TESTS-RESULTS/` record for the two acceptance runs. |
-| `complexity` | 2 | One integration seam, Python → bash, and one constraint worth getting right: resolve the runtime through `~/.config/rebalance/runtime-root` as `install_common.sh` does, never a `parents[N]` walk (AGENTS.md #152). The `GIT_DIR` trap is already handled inside `stack.sh`. Not a 1 because the seam crosses languages and the threshold needs a stated rule. |
-| `risk` | 1 | Additive, WARN-only, read-only (a `git fetch`). Reversible by deleting one function. "Easy" on the reversibility scale. |
-| `phases` | 1 | — |
+| `effort` | 2 | ~20 lines: a `_check_runtime_drift()` in the shape of `_check_token()` ([doctor.py:203](../../src/rebalance/doctor.py#L203)) that shells to `stack.sh drift` and maps exit 1 → WARN; one test; one `TESTS-RESULTS/` record for the two acceptance runs. Unchanged. |
+| `complexity` | 3 | **Raised from 2.** Four concerns, not one: a Python→bash seam; resolving the runtime through `~/.config/rebalance/runtime-root` (never a `parents[N]` walk, AGENTS.md #152); a *compound* threshold needing both a commit count and a commit date; and a test that monkeypatches the subprocess. The original 2 assumed the threshold was free because `stack.sh` already computes drift. It is not — the date half is a second query nothing provides yet. |
+| `risk` | 2 | **Raised from 1.** Still the Easy end of the reversibility scale — additive, WARN-only, deleted in one function. But a subtle bug here does not merely fail: it emits a false green in a daily automated report, masking the exact drift the check exists to catch. Within the 1–2 bucket, that is a 2. Still `<= 2`, so eligibility is unaffected. |
+| `phases` | 1 | Unchanged. |
 
-`ease = effort + complexity = 4`. Eligible for auto-selection once the operator clears
-`ratings_provisional`.
+`ease = effort + complexity = 5` (was 4).
+
+### Why `ratings_provisional` stays `true`
+
+The blocker is concrete, not caution. Step 2 needs the runtime's `HEAD` **commit date**, and
+`stack.sh drift` does not emit one — so whoever implements this writes a *new* git call against
+the runtime. That is precisely where the `GIT_DIR` trap lives: git hooks export
+`GIT_DIR`/`GIT_WORK_TREE`, and with them set `git -C <runtime>` silently measures the calling
+checkout instead. It has already happened once here — the first `.githooks/post-merge` probe
+printed "up to date" while the runtime was 51 commits behind. `runtime_drift()` clears those three
+variables; a fresh git call in `doctor.py` would not, unless the implementer knows to.
+
+An agent auto-selecting this on `ease = 5` would not know to. So the flag stays set, and the
+condition to clear it is written down rather than left to judgement:
+
+> **Clear `ratings_provisional` once `stack.sh drift` also emits the runtime `HEAD` commit date**,
+> so the doctor check consumes one already-guarded command and makes no git call of its own. At
+> that point the compound threshold is a string parse, `complexity` drops back to 2, and the item
+> is safe to auto-pick.
+
+That is a small change to a file that already has the guard and the test. It is the cheapest way
+to make this item genuinely autonomous rather than nominally so.
 
 ## Plan
 
