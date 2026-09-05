@@ -59,3 +59,24 @@ To elevate `/daily` into a proactive executive co-pilot while maintaining rigor:
 - **Pytest**: Passed clean (0 errors/failures).
 - **Relay Review**: Approved by Codex in Round 2 (`relay-system/2026-09-04/gh179-daily-coaching-qa.md`).
 - **Pull Request**: Opened [#180](https://github.com/HiQS-Labs/rebalanceOS/pull/180).
+
+## Lessons Learned (For Future Agents)
+
+Distilled at reconcile time from the plan above, PR #180, and the two-round relay record
+(`relay-system/2026-09-04/gh179-daily-coaching-qa.md`); the implementing session did not write
+this section, and the reconciler refuses to retire a doc without it.
+
+- **A coaching nudge without a cited trigger is an opinion.** Every nudge names the rule that
+  fired and the numbers behind it (`[Trigger: 3 repos touched in 45m: …]`). That is what makes
+  "you seem fragmented" falsifiable instead of vibes — the same bar as `GUIDING-PRINCIPLES.md`
+  "ATTESTED".
+- **Time-gated sections need exactly-once semantics, not clock checks.** The morning
+  retrospective and Monday horizon key off "first synthesis cycle written to today's log", not
+  "is it before 09:00". A clock check re-fires on every cycle in the window; a first-write check
+  fires once even if the machine slept through the morning.
+- **Degrade, don't fail, on optional sources.** Apple Reminders is a macOS Core Data read that
+  can be denied by TCC or absent entirely. It warns and continues; a missing optional input must
+  never take down the synthesis it feeds.
+- **Five copies of `SKILL.md` is a maintenance cost, not a feature.** The skill is synced into
+  `~/.claude`, `~/.codex`, two `~/.gemini` trees and `~/.agents`. Any future edit has to fan out
+  to all five or the agents silently disagree. Worth a sync check before that bites.
