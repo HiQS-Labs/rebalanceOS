@@ -18,6 +18,11 @@
 ### Fixed
 - Activity totals no longer double-count one day's work when a repository was recorded under two organization spellings: daily snapshot rows now resolve to the latest scan per person, repository, and day before any total is computed, instead of being summed. Open/closed status resolves to the newest record per item before open-item, open-PR, and release-readiness views filter on it, so finished work can no longer reappear as open because an older copy said so. Comments are identified by their native comment ID, so distinct comments posted at the same timestamp are no longer collapsed into one. The duplicate-row test fixture carries real non-zero values so the guard can actually fail (a zero-filled duplicate asserts nothing). (#150)
 
+## [0.83.1] - 2026-09-04
+
+### Added
+- Multi-source daily work synthesis skill (`daily`): a 15-minute synthesis engine fusing the multi-agent prompt log (`0. Claude Prompts.md` / CLIO) with Rebalance's live work signal (ranked next actions, calendar events, Sleuth reminders) and device-wide git activity (`collect.sh`). Appends 15-minute syntheses into deterministic daily logs in `temp/daily-log/YYYY-MM-DD.log` with a rolling 2-hour trajectory and velocity model.
+
 ## [0.83.0] - 2026-09-02
 
 ### Added

@@ -127,7 +127,32 @@ MIN_AVAILABLE_FLOOR = 4 * GIB
 #: uncritical — any value in the empty middle classifies the same way — so 25% of
 #: RAM (16 GB on this machine) is chosen to sit as far from both modes as
 #: possible. Robustness here is a property of the data, not a lucky constant.
+#:
+#: GH-157 AMENDMENT (2026-09-03) — the constant is UNCHANGED; what changed is that
+#: crossing it is now a SUSPICION, not a verdict. The "almost nothing between" the
+#: two modes is exactly what stopped holding: this machine spent 9 days sitting at
+#: 17-23 GB of ambient compressor — squarely inside the supposedly-empty middle —
+#: and refused ``obsidian-vault-embeddings`` **179 times**, 36 times in a single day
+#: on four separate days, i.e. every scheduled run. A full run measured on
+#: 2026-09-03 peaked at 1.86 GB and moved the compressor by 0.23 GB (17.71 -> 17.94,
+#: 59 samples, exit 0): the job neither causes the pressure nor meaningfully adds to
+#: it, and with ambient pressure from other software the gate had no path back to
+#: healthy. See :meth:`MemoryCeiling._compressor_trip` for the corroboration rule
+#: that replaces the bare threshold. Raising this number was explicitly rejected —
+#: it would weaken the check for every guarded job, including the Qwen-class ones
+#: (14.32 GiB, stopped only by MPS's own watermark) the 0.25 figure was correctly
+#: derived for. One global fraction cannot serve jobs three orders of magnitude
+#: apart in footprint; the fix is a better predicate, not a looser one.
 DEFAULT_MAX_COMPRESSOR_FRACTION = 0.25
+
+#: Swap actually in use, above which a high compressor reading is CONFIRMED as real
+#: distress. This is the signal the compressor alone stopped providing: a compressor
+#: that is merely large has absorbed pressure, while a machine that is *swapping* has
+#: run out of room to absorb it. A healthy Mac routinely carries a few hundred MB of
+#: residual swap from earlier peaks, so the bar is 1 GiB rather than "nonzero".
+#: Measured on 2026-09-03 during a refusal: compressor 19.25 GB, ``vm.swapusage``
+#: 0.00M used, 64% of memory free, no paging — the refusal had no distress behind it.
+SWAP_DISTRESS_BYTES = 1 * GIB
 
 #: Override for the compressor pressure ceiling, in GB.
 ENV_MAX_COMPRESSOR_GB = "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB"
@@ -357,6 +382,33 @@ def compressor_bytes() -> int:
             if digits.isdigit():
                 return int(digits) * page_size
     return 0
+
+
+def swap_used_bytes() -> int | None:
+    """Bytes of swap currently in use, or ``None`` when undeterminable (GH-157).
+
+    ``None`` and ``0`` mean different things here and must not be collapsed: ``0`` is
+    positive evidence that the machine is NOT paging, while ``None`` is no evidence at
+    all. The compressor corroboration rule treats them differently — an unreadable
+    probe falls back to the old refuse-on-threshold behaviour rather than quietly
+    granting permission, because a guard that stops constraining when a probe fails is
+    #156's defect class.
+    """
+    if sys.platform != "darwin":
+        return None
+    try:
+        out = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    # "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)" — the unit travels with
+    # the number and is not always M, so parse both rather than assuming megabytes.
+    match = re.search(r"used\s*=\s*([\d.]+)([KMGT])", out.stdout)
+    if not match:
+        return None
+    scale = {"K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}[match.group(2)]
+    return int(float(match.group(1)) * scale)
 
 
 def tree_footprint_bytes(pid: int) -> tuple[int, bool, int]:
@@ -673,6 +725,64 @@ class MemoryCeiling:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def _compressor_trip(self) -> str | None:
+        """The compressor verdict, corroborated. ``None`` means do not trip (GH-157).
+
+        Crossing the compressor ceiling used to be sufficient on its own, on the
+        recorded premise that the distribution was bimodal with an empty middle
+        (see :data:`DEFAULT_MAX_COMPRESSOR_FRACTION`). That premise stopped holding:
+        the machine now idles at 17-23 GB of ambient compressor from unrelated
+        software, and the bare threshold refused a 1.9 GB job 179 times in 9 days
+        while the machine was demonstrably healthy — 64% free, zero swap, no paging.
+
+        Machine-wide compressor pressure answers *"is this machine in distress?"*.
+        It does not answer *"will running this job put it there?"*, and for a job
+        whose measured effect on the compressor is 0.23 GB those are different
+        questions. So a reading above the ceiling now has to be CONFIRMED by a
+        signal that only genuine distress produces:
+
+          * swap actually in use above :data:`SWAP_DISTRESS_BYTES` — the machine has
+            run out of room to absorb pressure and is paging; or
+          * available memory below the floor — the availability gate would refuse
+            this run anyway.
+
+        A large compressor with neither is a machine that absorbed pressure
+        successfully, which is the compressor doing its job, not evidence against
+        starting a small one.
+
+        Fails CLOSED on a blind probe: if neither corroborating signal can be read,
+        the old refuse-on-threshold behaviour stands. An unreadable probe must never
+        be the thing that grants permission (#156).
+        """
+        if not self.max_compressor:
+            return None
+        compressor = compressor_bytes()
+        if not compressor or compressor <= self.max_compressor:
+            return None
+
+        swap = swap_used_bytes()
+        available = available_memory_bytes()
+        if swap is not None and swap > SWAP_DISTRESS_BYTES:
+            corroboration = f"swap in use {_fmt_gb(swap)}"
+        elif available and self.min_available and available < self.min_available:
+            corroboration = f"available {_fmt_gb(available)} below floor {_fmt_gb(self.min_available)}"
+        elif swap is None and not available:
+            corroboration = "corroborating signals unreadable; failing closed"
+        else:
+            self.log(
+                f"memory compressor holds {_fmt_gb(compressor)} (ceiling {_fmt_gb(self.max_compressor)}) "
+                f"but the machine is not in distress: swap "
+                f"{_fmt_gb(swap) if swap is not None else 'unknown'}, available {_fmt_gb(available)}. "
+                f"Proceeding — ambient compressor pressure this job does not cause is not a reason "
+                f"to refuse it (#157)."
+            )
+            return None
+
+        return (
+            f"memory compressor holds {_fmt_gb(compressor)}, ceiling is "
+            f"{_fmt_gb(self.max_compressor)}, confirmed by {corroboration}"
+        )
+
     def preflight(self) -> None:
         """Refuse to even start when the machine is already starved.
 
@@ -680,15 +790,22 @@ class MemoryCeiling:
         and it is the check that turns a stacked run into a clean error instead
         of a kernel panic.
         """
+        # The guard must never silently stop guarding. Without physical RAM every
+        # ceiling below is None and the watchdog disables itself, so a run that only
+        # "passed" because the sysctl was blocked would be indistinguishable from a
+        # genuinely well-behaved one — and #157's measurements would be unreliable
+        # for exactly that reason. Refuse instead: EX_TEMPFAIL is deferred, so a
+        # supervisor retries rather than counting it as a job failure (#156).
+        if not self.total:
+            raise MemoryCeilingExceeded(
+                "refusing to start: cannot determine physical RAM, so no memory ceiling "
+                "can be enforced (an unguarded run must not masquerade as a guarded one)"
+            )
+
         # Compressor pressure first: it stays honest when "available" does not.
-        if self.max_compressor:
-            compressor = compressor_bytes()
-            if compressor and compressor > self.max_compressor:
-                raise MemoryCeilingExceeded(
-                    f"refusing to start: memory compressor holds "
-                    f"{_fmt_gb(compressor)}, ceiling is {_fmt_gb(self.max_compressor)} "
-                    f"(the machine is already under real pressure)"
-                )
+        reason = self._compressor_trip()
+        if reason:
+            raise MemoryCeilingExceeded(f"refusing to start: {reason}")
 
         if not self.min_available:
             return
@@ -726,14 +843,12 @@ class MemoryCeiling:
                 f"process tree holds {_fmt_gb(footprint)} {metric}, ceiling is {_fmt_gb(self.max_footprint)}{unr_msg}"
             )
 
-        if self.max_compressor:
-            compressor = compressor_bytes()
-            if compressor and compressor > self.max_compressor:
-                return (
-                    f"memory compressor holds {_fmt_gb(compressor)}, ceiling is "
-                    f"{_fmt_gb(self.max_compressor)} (this job {metric}: "
-                    f"{_fmt_gb(footprint)}{unr_msg})"
-                )
+        # Same corroboration rule as preflight (#157). A long run that started on a
+        # healthy machine must not be killed at minute forty because unrelated
+        # software filled the compressor; only real distress ends it.
+        reason = self._compressor_trip()
+        if reason:
+            return f"{reason} (this job {metric}: {_fmt_gb(footprint)}{unr_msg})"
 
         available = available_memory_bytes()
         if self.min_available and available and available < self.min_available:
