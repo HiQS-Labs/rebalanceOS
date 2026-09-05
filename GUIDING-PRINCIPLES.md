@@ -8,14 +8,33 @@ rebalance ingests scattered work artifacts — Obsidian vault, GitHub, calendar,
 
 ## The signal bar
 
-Every output is a signal. A signal is high-quality only when it is all four:
+Every output is a signal. HiQS is High Quality Signals, and a signal is high-quality only when it is all four:
 
-- **Attested** — carries its receipts: source, evidence, confidence. Never a bare verdict.
-- **Relevant** — ranked, not dumped. Volume is not value.
-- **Fresh** — current, not stale. Refreshes are incremental or safely bounded so nothing rots silently.
-- **Structured** — one shape, clean for people to read and for agents to feed on.
+**ATTESTED** — Every signal carries its receipts: source, author, time, link. Never a bare verdict.
+
+**RANKED** — Volume is not value. Signals are ordered by what your team actually owes — which means selecting what belongs before ordering it. Ranked noise is still noise.
+
+**FRESH** — Yesterday's truth is today's mistake. Stale signals decay automatically.
+
+**STRUCTURED** — Clean to read, ready to feed your agents. No screenshot parsing.
 
 Fail a pillar, and the feature, source, or output isn't done.
+
+### Counted once — what the pillars assume
+
+**One real-world entity contributes to a metric exactly once.** An alias, rename, mirror, fork, or casing variant counted twice is a defect, not a rounding error. It is not a fifth pillar because it is not a separate property — it is the precondition two of the four rest on:
+
+- A doubled count is **not ATTESTED**. Its receipts say 48 commits; the number says 86, and nothing reconciles them.
+- A doubled count is **not RANKED**. An entity counted twice outranks one counted once regardless of what anybody owes, so one inflated row reorders the whole list.
+- It **can** corrupt **FRESH** as well, where an alias leaves a superseded snapshot standing beside its replacement, so an older observation is presented as current.
+
+**Detected, reconciled, repaired** — all three are required, and none substitutes for another:
+
+1. **Detected.** Alias-equivalent duplicates are found by a check that can fail, not by someone noticing a number looks high.
+2. **Reconciled at read.** Aggregates map aliases to a canonical identity *before* grouping, and never sum across them.
+3. **Repaired in the store.** Superseded rows are removed or re-keyed, so consumers outside the canonical read path cannot count them either.
+
+Nothing here is enforced by the schema. `github_activity`'s uniqueness is keyed on `repo_full_name`, which is **mutable** — a rename changes the key, both spellings coexist, and the constraint never fires. That is precisely why the duplicates arose. The rule, the enforcement order, the reconciliation semantics, and the hazards of repairing a store in place are all in [`SOP.md` §6](SOP.md); this section says only why the principle exists.
 
 ## How it's built
 
@@ -32,7 +51,7 @@ Fail a pillar, and the feature, source, or output isn't done.
 
 ## Applying this
 
-Adding a feature or weighing a tradeoff, ask: *higher-quality signal — Attested, Relevant, Fresh, Structured — still local, and "done" verifiable?* If any answer is no, reconsider.
+Adding a feature or weighing a tradeoff, ask: *higher-quality signal — Attested, Ranked, Fresh, Structured, and counted once — still local, and "done" verifiable?* If any answer is no, reconsider.
 
 ---
 
@@ -49,7 +68,8 @@ When reviewing any repo doc (roadmap entries, plans, architecture notes, audits,
 5. **Drift reduced, not created?** No duplicated docs, no execution detail added to ROADMAP.md, no reinventing a path ARCHITECTURE.md already documents.
 6. **Next action singular?** One explicit next step, not buried in prose; status cells non-empty.
 7. **Operator control explicit?** No silent retry, auto-repair, or masked failure; destructive ops surface before executing.
-8. **Four pillars pass?** Each output is Attested, Relevant, Fresh, Structured. Fail one → not done.
+8. **Four pillars pass?** Each output is Attested, Ranked, Fresh, Structured. Fail one → not done.
+9. **Counted once?** No entity reaches a metric twice through an alias, rename, mirror, fork, or casing variant. A doubled count fails Attested and Ranked at the same time — see [`SOP.md` §6](SOP.md).
 
 **Tie-breakers**
 

@@ -152,6 +152,67 @@ conventions and the current model's exact identity.
 Verify from ground truth: the code constant, the recorded run metadata, and the
 downloaded artifact should agree. Where they disagree, say which one governs.
 
+## 6. The same thing collected twice is a defect, not a rounding error
+
+> **One real-world entity must contribute to a metric exactly once. If an alias, a rename,
+> a mirror, a fork, or a casing variant causes it to be counted twice, that is a defect —
+> catch it, fix the read path, and remove the duplicate rows from the store.**
+
+This is the source of truth for the rule. `AGENTS.md` and `GUIDING-PRINCIPLES.md` point here.
+
+### Why it has its own section
+
+A GitHub org rename put the same repository in `github_activity` under two spellings on the
+same `scan_date`. Every read path that aggregated those rows **summed** them, so one day's
+48 commits and 13 PRs were reported as 86 and 26. Nothing failed, no error was raised, and
+the number was simply wrong in every ranking built on it — `top_active_repos`, the
+`github_balance` MCP tool, Focus 5, the dashboard, the morning brief.
+
+The test written to catch exactly this inserted the duplicate row with **every metric set to
+zero**, so summing it changed nothing and the test passed. It could never have failed. That
+is the part worth remembering: the duplicate was known about, a guard was written for it, and
+the guard was inert.
+
+### The rule, concretely
+
+The three controls are **detect, reconcile, repair**. All three are required and none substitutes
+for another: detection is the only proactive step, reconciliation is what stops a wrong number
+being published, and repair is what protects every consumer that does not use the canonical read
+path. They are a set, not a sequence — repair the store before or after fixing reads, but do both.
+
+1. **Read the schema to decide the semantics — then do not expect it to enforce them.** If a table
+   carries a snapshot — `UNIQUE(...) ON CONFLICT REPLACE` is the tell — then **one row wins**
+   (latest `scanned_at`), and summing across aliases is wrong. If rows are genuinely disjoint
+   increments, summing is right. The schema tells you which, and that is all it does: a uniqueness
+   key built on a **mutable** identifier does not prevent duplicates, it *creates* them. In
+   `github_activity` the key includes `repo_full_name`, so an org rename produced a new key, both
+   spellings coexisted, and the constraint never fired. That is the whole origin of this defect.
+2. **Reconcile at read.** Every aggregate over an entity that can have aliases maps to a canonical
+   identity *before* grouping, never after, and never sums across aliases of one entity.
+3. **Repair the store too.** Reconciling reads leaves wrong rows in the database for any consumer
+   that does not use the canonical path — MCP tools, dashboards, exports. Re-key the stale rows to
+   the canonical identity and drop superseded snapshots.
+4. **Order matters when de-duplicating.** On a table declared `ON CONFLICT REPLACE`, renaming
+   a row onto an existing key **silently destroys the row already there**. Delete the
+   superseded rows *first*, then rename. Back up before either.
+5. **Never let a de-dup test assert on zeros.** The duplicate fixture must carry the same
+   non-zero values as the row it duplicates, and the test must be witnessed failing before the
+   fix. A de-dup test that has never gone red is not evidence.
+6. **Purge the metric, not just the source.** A number already published from doubled data is
+   wrong and gets cited. Correct it, or say plainly that it was not recomputed.
+
+### What this applies to
+
+Any identity with more than one spelling: renamed GitHub orgs and repos, mirrors, forks,
+casing variants, email aliases, Slack user IDs versus display names, project aliases in
+`project_priority_rules`, and vault note paths that moved. It is not a GitHub-specific rule.
+
+### Enforcement
+
+`tests/test_alias_dedup_invariant.py` pins the invariant with synthetic fixtures and no
+dependency on any operator's configuration or org names. It is a deterministic suite test, not
+a check against live data.
+
 ---
 
 **Related:** [`TESTS-RESULTS/README.md`](TESTS-RESULTS/README.md) (structure and
