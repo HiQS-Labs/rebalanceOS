@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.84.1] - 2026-09-04
+
+### Added
+- A repository now belongs to at most one project, enforced on every write path into the project registry (#182). Discovery names a candidate after its repository — at that point no project name exists yet — and nothing checked whether a real project already claimed it, so seven repositories ended up claimed by two projects each and every project-level read counted them twice. Onboarding and activity inference now refuse the second claim and report it instead of writing it; the registry projection refuses to project two entries claiming one repository. Claims compare through the canonical repository key, so a claim survives an organisation rename rather than being re-opened by one. Complements the detection shipped in #181.
+
+### Fixed
+- Onboarding carries a candidate's `provenance` through to the registry (#182). The candidate dict was rebuilt field by field and `provenance` was omitted, so every onboarded row landed unstamped — and an unstamped row cannot afterwards be told apart from one the operator entered by hand, which is what made the duplicate claims unsafe to repair automatically.
+
 ## [0.84.0] - 2026-09-04
 
 ### Added
