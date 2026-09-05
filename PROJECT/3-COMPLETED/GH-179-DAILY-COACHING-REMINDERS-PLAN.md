@@ -2,9 +2,9 @@
 gh_issue: 179
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/179
 title: "GH-179 Daily Skill: Adaptive Coaching, Morning Retrospectives, Weekly Outlook, and Apple Reminders Integration"
-status: "In PR (#180)"
+status: Complete
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 owner: noel
 doc_type: feature
 goal: >
