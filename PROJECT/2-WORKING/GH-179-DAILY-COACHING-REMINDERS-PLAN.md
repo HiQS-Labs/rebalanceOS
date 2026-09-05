@@ -2,7 +2,7 @@
 gh_issue: 179
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/179
 title: "GH-179 Daily Skill: Adaptive Coaching, Morning Retrospectives, Weekly Outlook, and Apple Reminders Integration"
-status: "Working"
+status: "In PR (#180)"
 created: 2026-09-04
 updated: 2026-09-04
 owner: noel
@@ -23,7 +23,7 @@ roadmap_exempt: true
 
 | What was just completed | What's next |
 |---|---|
-| Refined `.agents/skills/daily/SKILL.md` addressing Codex review (deterministic thresholds, exactly-once time-gated horizons, Apple Reminders graceful degradation, fixed schema). | Run second Codex QA review turn via `/relay-xyz` to obtain approval, sync global skill paths, and open PR. |
+| Implemented enhanced specification, completed 2-round `/relay-xyz` QA review with Codex (Approved), verified pytest suite, synchronized global skill locations, and opened PR [#180](https://github.com/HiQS-Labs/rebalanceOS/pull/180). | Merge PR [#180](https://github.com/HiQS-Labs/rebalanceOS/pull/180) into `development`. |
 
 ## Context & Motivation
 
@@ -47,10 +47,15 @@ To elevate `/daily` into a proactive executive co-pilot while maintaining rigor:
 1. **`.agents/skills/daily/SKILL.md`**:
    - Core specification update across Steps 1–6.
 2. **Global Skill Parity**:
-   - Synchronize `SKILL.md` into `~/.claude/skills/daily/`, `~/.codex/skills/daily/`, `~/.gemini/config/skills/daily/`, `~/.gemini/antigravity/skills/daily/`, `~/.agents/skills/daily/`.
+   - Synchronized `SKILL.md` into:
+     - `~/.claude/skills/daily/`
+     - `~/.codex/skills/daily/`
+     - `~/.gemini/config/skills/daily/`
+     - `~/.gemini/antigravity/skills/daily/`
+     - `~/.agents/skills/daily/`
 
-## Verification Plan
+## Verification & QA Evidence
 
-- Run `pytest` on `rebalanceOS` test suite.
-- Re-run `/relay-xyz` with Codex to confirm approval.
-- Open PR on `origin/development`.
+- **Pytest**: Passed clean (0 errors/failures).
+- **Relay Review**: Approved by Codex in Round 2 (`relay-system/2026-09-04/gh179-daily-coaching-qa.md`).
+- **Pull Request**: Opened [#180](https://github.com/HiQS-Labs/rebalanceOS/pull/180).
