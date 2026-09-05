@@ -58,7 +58,7 @@ provenance:
 
 | | claimant A | claimant B |
 |---|---|---|
-| writer | `project_inference.py` (`rebalance ingest infer-project-registry`) | `preflight.py: discover_candidates()` ([L246-L262](src/rebalance/ingest/preflight.py#L246-L262)) |
+| writer | `project_inference.py` (`rebalance ingest infer-project-registry`) | `preflight.py: discover_candidates()` ([L246-L262](../../src/rebalance/ingest/preflight.py#L246-L262)) |
 | name shape | human-readable label from activity clustering | `repo_full_name` verbatim, **including the owner segment** |
 | provenance in DB | `custom_fields_json.inference.generated_by = "activity_inference_v1"` | **`{}` — `provenance="remote-activity"` is set on the model and lost on the write** |
 | other fingerprints | `tags: ["inferred", "source:github", …]` | `tier=3`, band tags `["A"]`/`["A","B"]`, summary `Recent activity: … Active bands: …` |
