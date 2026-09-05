@@ -29,12 +29,17 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from rebalance.repair import RepairFSM, RepairResult, RepairStatus
-from rebalance.ingest.agent_tags import classify as classify_source
+from rebalance.ingest._http import GitHubClient, GitHubHTTPError
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.ingest.calendar_helpers import calendar_dt_utc, normalize_aware_utc
-from rebalance.ingest._http import GitHubClient, GitHubHTTPError
 from rebalance.ingest.config import get_github_token, get_pulse_config
-from rebalance.ingest.db import db_connection
+from rebalance.ingest.db import (
+    db_connection,
+    fetch_day_comments,
+    fetch_day_commits,
+    fetch_day_items,
+    fetch_watched_activity,
+)
 from rebalance.ingest.slack_users import compact_sleuth_reminder
 from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
@@ -204,164 +209,9 @@ def _query_day_activity(
                 }
             )
 
-    commit_filter = _author_filter_sql("c.author_login")
-    rows = conn.execute(
-        f"""
-        SELECT c.repo_full_name, c.sha, c.message, c.committed_at, c.html_url,
-               c.author_login, gi.head_ref
-        FROM github_commits c
-        LEFT JOIN github_items gi
-          ON gi.repo_full_name = c.repo_full_name
-         AND gi.item_type = c.item_type
-         AND gi.number = c.item_number
-        WHERE c.committed_at >= ?
-          AND {commit_filter}
-        ORDER BY c.committed_at DESC
-        """,
-        (sql_floor, github_login, *CLOUD_AGENT_AUTHORS),
-    ).fetchall()
-    for r in rows:
-        if _in_window(r["committed_at"], start, end):
-            first_line = (r["message"] or "").splitlines()[0] if r["message"] else ""
-            tag = classify_source(
-                branch=r["head_ref"],
-                author_login=r["author_login"],
-                commit_message=r["message"],
-            )
-            activity.gh_commits.append(
-                {
-                    "repo": r["repo_full_name"],
-                    "sha": r["sha"][:7] if r["sha"] else "",
-                    "subject": first_line[:160],
-                    "committed_at": r["committed_at"],
-                    "html_url": r["html_url"] or "",
-                    "author_login": r["author_login"] or "",
-                    "source_tag": tag,
-                    "source_kind": "pull_request",
-                }
-            )
-
-    # Direct branch commits are a distinct raw source. The anti-join means a
-    # later-discovered PR commit replaces the visible signal without deleting
-    # the direct-push receipt/provenance.
-    direct_filter = _author_filter_sql("d.author_login")
-    rows = conn.execute(
-        f"""
-        SELECT d.repo_full_name, d.sha, d.message, d.committed_at, d.html_url,
-               d.author_login, d.ref,
-               (SELECT GROUP_CONCAT(path, char(10))
-                  FROM github_direct_commit_files f
-                 WHERE f.repo_full_name = d.repo_full_name AND f.sha = d.sha) AS paths
-        FROM github_direct_commits d
-        WHERE d.committed_at >= ?
-          AND {direct_filter}
-          AND NOT EXISTS (
-              SELECT 1 FROM github_commits p
-              WHERE p.repo_full_name = d.repo_full_name AND p.sha = d.sha
-          )
-        ORDER BY d.committed_at DESC
-        """,
-        (sql_floor, github_login, *CLOUD_AGENT_AUTHORS),
-    ).fetchall()
-    for r in rows:
-        if _in_window(r["committed_at"], start, end):
-            message = r["message"] or ""
-            activity.gh_commits.append(
-                {
-                    "repo": r["repo_full_name"],
-                    "sha": r["sha"][:7] if r["sha"] else "",
-                    "subject": message.splitlines()[0][:160] if message else "direct commit",
-                    "committed_at": r["committed_at"],
-                    "html_url": r["html_url"] or "",
-                    "author_login": r["author_login"] or "",
-                    "paths": (r["paths"] or "").splitlines(),
-                    "source_tag": classify_source(
-                        branch=r["ref"],
-                        author_login=r["author_login"],
-                        commit_message=message,
-                    ),
-                    "source_kind": "direct_push",
-                }
-            )
-
-    item_filter = _author_filter_sql("author_login")
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name, item_type, number, title, state, html_url,
-               created_at, updated_at, author_login, head_ref, body
-        FROM github_items
-        WHERE (created_at >= ? OR updated_at >= ?)
-          AND (
-                {item_filter}
-                OR head_ref LIKE 'claude/%'
-                OR head_ref LIKE 'codex/%'
-                OR head_ref LIKE 'lovable-%'
-                OR head_ref LIKE 'lovable/%'
-          )
-        ORDER BY COALESCE(updated_at, created_at) DESC
-        """,
-        (sql_floor, sql_floor, github_login, *CLOUD_AGENT_AUTHORS),
-    ).fetchall()
-    for r in rows:
-        created_in = _in_window(r["created_at"], start, end)
-        updated_in = _in_window(r["updated_at"], start, end)
-        if not (created_in or updated_in):
-            continue
-        tag = classify_source(
-            branch=r["head_ref"],
-            author_login=r["author_login"],
-            commit_message=r["body"] or "",
-        )
-        activity.gh_items.append(
-            {
-                "repo": r["repo_full_name"],
-                "item_type": r["item_type"],
-                "number": r["number"],
-                "title": r["title"] or "",
-                "state": r["state"] or "",
-                "html_url": r["html_url"] or "",
-                "created_at": r["created_at"],
-                "updated_at": r["updated_at"],
-                "author_login": r["author_login"] or "",
-                "head_ref": r["head_ref"] or "",
-                "is_new": created_in,
-                "source_tag": tag,
-            }
-        )
-
-    comment_filter = _author_filter_sql("author_login")
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name, item_type, item_number, comment_type, body,
-               html_url, created_at, author_login
-        FROM github_comments
-        WHERE created_at >= ?
-          AND {comment_filter}
-        ORDER BY created_at DESC
-        """,
-        (sql_floor, github_login, *CLOUD_AGENT_AUTHORS),
-    ).fetchall()
-    for r in rows:
-        if _in_window(r["created_at"], start, end):
-            body = (r["body"] or "").strip().replace("\r", "")
-            preview = body.split("\n", 1)[0][:160]
-            tag = classify_source(
-                author_login=r["author_login"],
-                commit_message=body,
-            )
-            activity.gh_comments.append(
-                {
-                    "repo": r["repo_full_name"],
-                    "item_type": r["item_type"],
-                    "item_number": r["item_number"],
-                    "comment_type": r["comment_type"] or "",
-                    "preview": preview,
-                    "html_url": r["html_url"] or "",
-                    "created_at": r["created_at"],
-                    "author_login": r["author_login"] or "",
-                    "source_tag": tag,
-                }
-            )
+    activity.gh_commits = fetch_day_commits(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
+    activity.gh_items = fetch_day_items(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
+    activity.gh_comments = fetch_day_comments(conn, start, end, github_login, cloud_authors=CLOUD_AGENT_AUTHORS)
 
     if slack_user_id and _table_exists(conn, "sleuth_reminders"):
         rows = conn.execute(
@@ -594,73 +444,8 @@ def _query_watched_activity(
     start: datetime,
     end: datetime,
 ) -> list[dict[str, Any]]:
-    """Whole-repo (all-author) activity for watched external repos in [start, end).
-
-    Mirrors the personal day-activity queries but WITHOUT the author filter and
-    scoped to the external repos — so the pulse surfaces everyone's commits/PRs on
-    the repos the operator monitors. Repos with no activity in the window are omitted.
-    """
-    if not external_repos:
-        return []
-    repos_lower = [r.lower() for r in external_repos]
-    placeholders = ",".join("?" * len(repos_lower))
-    sql_floor = _utc_iso_floor(start - timedelta(hours=2))
-
-    activity: dict[str, dict[str, Any]] = {
-        r: {"repo": r, "commits": 0, "items": [], "comments": 0} for r in repos_lower
-    }
-
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name, committed_at FROM github_commits
-        WHERE LOWER(repo_full_name) IN ({placeholders}) AND committed_at >= ?
-        """,
-        (*repos_lower, sql_floor),
-    ).fetchall()
-    for r in rows:
-        if _in_window(r["committed_at"], start, end):
-            activity[r["repo_full_name"].lower()]["commits"] += 1
-
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name, item_type, number, title, state, html_url,
-               created_at, updated_at
-        FROM github_items
-        WHERE LOWER(repo_full_name) IN ({placeholders})
-          AND (created_at >= ? OR updated_at >= ?)
-        ORDER BY COALESCE(updated_at, created_at) DESC
-        """,
-        (*repos_lower, sql_floor, sql_floor),
-    ).fetchall()
-    for r in rows:
-        created_in = _in_window(r["created_at"], start, end)
-        if not (created_in or _in_window(r["updated_at"], start, end)):
-            continue
-        activity[r["repo_full_name"].lower()]["items"].append(
-            {
-                "item_type": r["item_type"],
-                "number": r["number"],
-                "title": r["title"] or "",
-                "state": r["state"] or "",
-                "html_url": r["html_url"] or "",
-                "is_new": created_in,
-            }
-        )
-
-    rows = conn.execute(
-        f"""
-        SELECT repo_full_name, created_at FROM github_comments
-        WHERE LOWER(repo_full_name) IN ({placeholders}) AND created_at >= ?
-        """,
-        (*repos_lower, sql_floor),
-    ).fetchall()
-    for r in rows:
-        if _in_window(r["created_at"], start, end):
-            activity[r["repo_full_name"].lower()]["comments"] += 1
-
-    out = [a for a in activity.values() if a["commits"] or a["items"] or a["comments"]]
-    out.sort(key=lambda a: (len(a["items"]), a["commits"], a["comments"]), reverse=True)
-    return out
+    """Whole-repo (all-author) activity for watched external repos in [start, end)."""
+    return fetch_watched_activity(conn, external_repos, start=start, end=end)
 
 
 def collect_pulse_snapshot(

@@ -10,13 +10,21 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.84.0] - 2026-09-04
+## [0.84.1] - 2026-09-04
 
 ### Added
 - A repository now belongs to at most one project, enforced on every write path into the project registry (#182). Discovery names a candidate after its repository — at that point no project name exists yet — and nothing checked whether a real project already claimed it, so seven repositories ended up claimed by two projects each and every project-level read counted them twice. Onboarding and activity inference now refuse the second claim and report it instead of writing it; the registry projection refuses to project two entries claiming one repository. Claims compare through the canonical repository key, so a claim survives an organisation rename rather than being re-opened by one. Complements the detection shipped in #181.
 
 ### Fixed
 - Onboarding carries a candidate's `provenance` through to the registry (#182). The candidate dict was rebuilt field by field and `provenance` was omitted, so every onboarded row landed unstamped — and an unstamped row cannot afterwards be told apart from one the operator entered by hand, which is what made the duplicate claims unsafe to repair automatically.
+
+## [0.84.0] - 2026-09-04
+
+### Added
+- Unified read layer with canonical repository identity (fe1 extension): queries over GitHub activity tables now route through a single database query layer that transparently collapses mirror organization aliases and case variants into unified repo entities. All presenting surfaces — balance aggregations, pulse rollups, next-action discovery, release readiness checks, and dashboard views — now produce identical, undoubled activity metrics regardless of how organization renames or aliases appear in raw data. (#150, #29)
+
+### Fixed
+- Activity totals no longer double-count one day's work when a repository was recorded under two organization spellings: daily snapshot rows now resolve to the latest scan per person, repository, and day before any total is computed, instead of being summed. Open/closed status resolves to the newest record per item before open-item, open-PR, and release-readiness views filter on it, so finished work can no longer reappear as open because an older copy said so. Comments are identified by their native comment ID, so distinct comments posted at the same timestamp are no longer collapsed into one. The duplicate-row test fixture carries real non-zero values so the guard can actually fail (a zero-filled duplicate asserts nothing). (#150)
 
 ## [0.83.1] - 2026-09-04
 
