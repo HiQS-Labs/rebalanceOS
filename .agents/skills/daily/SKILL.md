@@ -47,9 +47,10 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
   - Filter to incomplete items (`is_completed == False`).
   - Graceful degradation: If running on non-macOS or if TCC/permissions are unavailable, log a warning and proceed without failing the cycle.
 
-### Step 3 — Scan Device-Wide Git Activity (Code Signal)
-- Execute `bash .claude/skills/rebalance/collect.sh` (or inspect recent commits from `github_commits` / `github_activity`).
-- Identify repos with `ACTIVE` or `WARM` worktrees, recent commit timestamps, unmerged branches, and dirty working trees.
+### Step 3 — Scan Device-Wide Git Activity & Unclosed Loops (Code Signal)
+- Execute `python3 .agents/skills/daily/scripts/scan_unclosed_loops.py` (or `bash .claude/skills/rebalance/collect.sh`).
+- Automatically updates and synchronizes `temp/close-the-loop.md` with active in-flight worktrees, un-PRed branches, and open pull requests.
+- Identifies repos with `ACTIVE` or `WARM` worktrees, recent commit timestamps, unmerged branches, and dirty working trees.
 
 ### Step 4 — Evaluate 2-Hour Trajectory, Velocity & Cadenced Horizons
 
@@ -69,7 +70,7 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
      - *Action*: Evaluate upcoming 5-day calendar (`calendar_events` Monday–Friday) and top-ranked next actions to outline key weekly milestones, meeting load distribution, and deep work runways.
 
 3. **Adaptive Coaching & Focus Guidance (Falsifiable Predicates)**:
-   Evaluate the rolling window against these four trigger rules. Every emitted coaching nudge **must explicitly cite the trigger** (e.g., `[Trigger: ...]`) to remain falsifiable:
+   Evaluate the rolling window against these trigger rules. Every emitted coaching nudge **must explicitly cite the trigger** (e.g., `[Trigger: ...]`) to remain falsifiable:
    - **Flow State & Momentum Reinforcement**:
      - *Trigger*: $\ge 2$ consecutive 15m cycles with prompts/commits concentrated on a single repository without context-switching.
      - *Nudge*: Reinforce flow state; advise protecting the deep-work block until the current unit of work/PR is landed.
@@ -86,6 +87,10 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
      - *Trigger*: $\ge 2$ consecutive cycles reporting test failure, error traces, or unmerged blocked state on the same task.
      - *Nudge*: Recommend dropping down to Rung 1 (`/debug-mantra`) to re-verify ground truth or invoking a quick `/consult` before further churn.
      - *Citation*: `[Trigger: Stalled task <task_id> for N cycles]`
+   - **Unclosed Loops & Stalled Work Alert**:
+     - *Trigger*: $\ge 1$ un-PRed branch, dangling worktree commit, or unmerged PR sitting without movement for $\ge 4$ consecutive cycles ($\ge 60\text{m}$).
+     - *Nudge*: Prompt operator to close the loop (cut the PR, squash-merge, or run `/merge-cleanup`) to prevent branch drift and abandoned work.
+     - *Citation*: `[Trigger: Unclosed loop <repo:branch_or_pr> stalled for N cycles]`
 
 ---
 
@@ -107,6 +112,7 @@ Format the synthesis matching this exact Markdown template:
   - <Bullet 2: swarm state across tools/agents (Claude, Agy, Codex, ZCode)>
 - **Velocity**: <Nominal / High / Very High — with brief quantitative basis (e.g. commits/PRs/phases completed)>
 - **Operational Horizon**: <Reconciled next 1–2 hours: upcoming calendar commitments + ranked Sleuth & Apple Reminders priorities>
+- **Unclosed Loops**: <N un-PRed branches, M open PRs, K unpushed commits> `[Details: temp/close-the-loop.md]`
 - **Coaching Nudge**: <1-2 sentences of actionable guidance> `[Trigger: <telemetry_metric>]`
 ```
 
@@ -115,3 +121,4 @@ Format the synthesis matching this exact Markdown template:
 ### Step 6 — Append to Daily Log
 
 Append the formatted synthesis entry into `temp/daily-log/YYYY-MM-DD.log` (create file with `# Daily Activity Log — YYYY-MM-DD` header if starting a new day).
+
