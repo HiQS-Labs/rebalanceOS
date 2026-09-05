@@ -23,7 +23,7 @@ from rebalance.ingest.db import (
     ensure_project_schema,
 )
 from rebalance.ingest.project_classifier import normalize_match_text
-from rebalance.ingest.registry import sync_db
+from rebalance.ingest.registry import canonical_repo_key, sync_db
 
 _GENERIC_ALIAS_TOKENS = {
     "app",
@@ -701,18 +701,56 @@ def _delete_stale_inferred_rows(database_path: Path, project_names: set[str]) ->
 def _partition_writable_rows(
     database_path: Path, projects: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Split inferred rows into writable vs. curated-name collisions.
+    """Split inferred rows into writable vs. rows inference must not write.
 
-    A name already present in project_registry WITHOUT the inference marker is
-    operator-curated state — inference must not touch it (the registry upsert
-    is keyed by name, so writing would clobber the curated row wholesale).
+    Two things make a row unwritable, and they are the same contract seen from
+    two angles — inference owns its own rows and nothing else:
+
+    - **A curated name.** A name already in project_registry WITHOUT the
+      inference marker is operator-curated state (the upsert is keyed by name,
+      so writing would clobber the curated row wholesale).
+    - **A repository another project already claims.** One repository belongs to
+      at most one project; writing a second claim makes every project-level read
+      count that repository twice. This is GH-182, and inference reaches
+      project_registry through ``sync_db`` directly rather than through the
+      registry projection, so the projection's guard never sees these rows.
+
+    Claims are compared through :func:`canonical_repo_key`, and a project never
+    conflicts with itself. Ownership is collected as a *set* per repository
+    rather than first-writer-wins, so the outcome does not depend on the order
+    SQLite happens to return rows in — the existing duplicates would otherwise
+    make this decision flap between runs.
     """
     with db_connection(database_path, ensure_project_schema) as conn:
-        rows = conn.execute("SELECT name, custom_fields_json FROM project_registry").fetchall()
+        rows = conn.execute("SELECT name, custom_fields_json, repos_json FROM project_registry").fetchall()
+
     curated_names = {row["name"] for row in rows if not _is_inference_owned(row["custom_fields_json"])}
-    writable = [p for p in projects if p["name"] not in curated_names]
-    skipped = sorted(p["name"] for p in projects if p["name"] in curated_names)
-    return writable, skipped
+
+    claimants: dict[str, set[str]] = {}
+    for row in rows:
+        try:
+            repos = json.loads(row["repos_json"] or "[]")
+        except (json.JSONDecodeError, ValueError):
+            repos = []
+        for repo in repos:
+            if key := canonical_repo_key(str(repo)):
+                claimants.setdefault(key, set()).add(row["name"])
+
+    def _claimed_elsewhere(project: dict[str, Any]) -> bool:
+        for repo in project.get("repos") or []:
+            key = canonical_repo_key(str(repo))
+            if key and claimants.get(key, set()) - {project["name"]}:
+                return True
+        return False
+
+    writable: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for project in projects:
+        if project["name"] in curated_names or _claimed_elsewhere(project):
+            skipped.append(project["name"])
+        else:
+            writable.append(project)
+    return writable, sorted(skipped)
 
 
 def infer_project_registry(

@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from rebalance.ingest.config import canonical_github_repo_name
+
 
 class Project(BaseModel):
     name: str
@@ -44,6 +46,29 @@ class Registry(BaseModel):
     # Legacy fallback for projects without detectable activity
     potential_projects: list[Project] = Field(default_factory=list)
     archived_projects: list[Project] = Field(default_factory=list)
+
+
+class DuplicateRepoClaimError(ValueError):
+    """Two registry entries claim the same repository.
+
+    Raised at the projection boundary. The registry markdown is hand-edited YAML,
+    so the projection is the only layer that sees an operator's edit before it
+    reaches SQLite. A duplicate claim projects as two ``project_registry`` rows and
+    every project-level read then counts one repository twice — GH-182, and the
+    same counted-once rule as SOP.md section 6.
+    """
+
+
+def canonical_repo_key(repo: str) -> str:
+    """The comparison key for a repository claim: canonical owner, casefolded.
+
+    Org renames are folded through :func:`canonical_github_repo_name` so a claim
+    survives a rename. A claim must not rest on a mutable spelling — that is what
+    let one repository enter the store under two names in the first place
+    (SOP.md section 6, clause 1). Returns "" for anything unusable, which callers
+    skip rather than treat as a claim.
+    """
+    return canonical_github_repo_name(repo or "").strip().casefold()
 
 
 YAML_BLOCK_PATTERN = re.compile(r"```ya?ml\s*(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -127,8 +152,32 @@ Sections:
 
 
 def _registry_to_projection(registry: Registry) -> dict[str, Any]:
+    """Flatten the registry's active projects into the ``projects.yaml`` shape.
+
+    Refuses to project two entries that claim one repository. This guard sits here
+    rather than on a database constraint on purpose: the registry markdown is
+    hand-edited YAML and is the source of truth, so a constraint in SQLite could
+    only fail *after* the fact, at this same boundary. Failing loudly here keeps
+    the duplicate out of the store instead of detecting it once it is in.
+    """
     projects = []
+    claimed_by: dict[str, str] = {}
     for project in registry.active_projects:
+        for repo in project.repos:
+            key = canonical_repo_key(repo)
+            if not key:
+                continue
+            owner = claimed_by.get(key)
+            if owner is not None and owner != project.name:
+                raise DuplicateRepoClaimError(
+                    f"{repo!r} is claimed by two active projects: {owner!r} and "
+                    f"{project.name!r}. One repository belongs to at most one project — "
+                    f"projecting both would count its activity twice on every "
+                    f"project-level surface. Remove the claim from whichever entry is a "
+                    f"discovery placeholder (its name is one of its own repos) and "
+                    f"re-run the sync."
+                )
+            claimed_by[key] = project.name
         # Persist the typed ``external`` flag inside custom_fields_json so it
         # round-trips through the project_registry table without a schema column
         # (get_projects already decodes custom_fields, and read paths that open

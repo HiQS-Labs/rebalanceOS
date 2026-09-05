@@ -174,6 +174,11 @@ def onboard_cmd(
             "repos": d.get("repos", []),
             "priority_tier": d.get("priority_tier") or 3,
             "tags": d.get("tags", []),
+            # Rebuilt field by field, so anything omitted here is dropped. Leaving
+            # provenance out is what left every onboarded row unstamped, and an
+            # unstamped row cannot later be told apart from an operator-entered
+            # one — which is what blocked repairing GH-182 automatically.
+            "provenance": d.get("provenance", ""),
         }
         for d in (_as_dict(c) for c in chosen)
     ]
@@ -189,6 +194,8 @@ def onboard_cmd(
         database_path=db,
     )
     typer.echo(f"Registered {result.project_count} project(s) -> {result.registry_path}")
+    for name, repo, owner in result.skipped_claims:
+        typer.echo(f"  skipped {name!r}: {repo} is already claimed by {owner!r}")
 
     # 6. Initial refresh.
     if skip_refresh:

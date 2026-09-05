@@ -11,6 +11,7 @@ from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.registry import (
     Project,
     Registry,
+    canonical_repo_key,
     load_registry,
     read_registry,
     save_registry,
@@ -48,6 +49,11 @@ class ConfirmResult:
     registry_path: str
     project_count: int
     sync_ok: bool
+    # Entries refused because a registry entry already claims one of their
+    # repositories: (candidate name, repository, name of the existing claimant).
+    # Reported rather than dropped silently — the operator decides what to do
+    # with a rejected candidate (GUIDING-PRINCIPLES 7).
+    skipped_claims: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -311,6 +317,29 @@ def discover_candidates(
 # ---------------------------------------------------------------------------
 
 
+def _claimed_repos(registry: Registry) -> dict[str, str]:
+    """Canonical repository key -> the name of the entry already claiming it.
+
+    Archived entries hold no claim: retiring a project must not stop a new one
+    from taking over its repositories. Within the remaining segments the first
+    claimant wins, so an existing duplicate (there are seven today) reports one
+    stable owner instead of flapping between them.
+    """
+    claimed_by: dict[str, str] = {}
+    for segment in (
+        registry.active_projects,
+        registry.most_likely_active_projects,
+        registry.semi_active_projects,
+        registry.dormant_projects,
+        registry.potential_projects,
+    ):
+        for project in segment:
+            for repo in project.repos:
+                if key := canonical_repo_key(repo):
+                    claimed_by.setdefault(key, project.name)
+    return claimed_by
+
+
 def confirm_and_write(
     projects: list[dict[str, Any]],
     vault_path: Path,
@@ -324,9 +353,29 @@ def confirm_and_write(
     Creates standard vault directories (Projects/, Daily Notes/) if missing.
     """
     registry = load_registry(registry_path)
+    claimed_by = _claimed_repos(registry)
+    skipped_claims: list[tuple[str, str, str]] = []
+    written = 0
 
     for proj_dict in projects:
         project = Project.model_validate(proj_dict)
+
+        # A repository belongs to at most one project. This append is the write
+        # that put seven repositories into the registry twice (GH-182): discovery
+        # names a candidate after its repository because no project name exists
+        # yet, and nothing here checked whether a real project already claimed it.
+        collision = next(
+            (
+                (repo, claimed_by[key])
+                for repo in project.repos
+                if (key := canonical_repo_key(repo)) and key in claimed_by and claimed_by[key] != project.name
+            ),
+            None,
+        )
+        if collision is not None:
+            skipped_claims.append((project.name, collision[0], collision[1]))
+            continue
+
         # Respect explicit status field: active → active_projects (scored/tracked).
         # Otherwise fall back to activity-based segmentation.
         explicit_status = (proj_dict.get("status") or "").strip().lower()
@@ -335,6 +384,10 @@ def confirm_and_write(
         else:
             segment = _segment_project(proj_dict)
             getattr(registry, segment).append(project)
+        for repo in project.repos:
+            if key := canonical_repo_key(repo):
+                claimed_by.setdefault(key, project.name)
+        written += 1
 
     save_registry(registry_path=registry_path, registry=registry)
 
@@ -356,8 +409,9 @@ def confirm_and_write(
 
     return ConfirmResult(
         registry_path=str(registry_path),
-        project_count=len(projects),
+        project_count=written,
         sync_ok=sync_ok,
+        skipped_claims=skipped_claims,
     )
 
 
