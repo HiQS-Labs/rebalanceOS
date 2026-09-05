@@ -10,7 +10,8 @@ What it pins, in the order the defect actually unfolded:
 1. ``canonical_github_repo_name`` collapses an aliased owner and leaves everything else alone.
 2. A stored-duplicate detector finds one entity written under two spellings for the same day.
 3. The reconciliation rule for a snapshot table is *latest wins*, never *sum*.
-4. The duplicate fixture is non-zero — the meta-check, because the original guard for this
+4. Two PROJECTS claiming one repository are detected — the same defect one layer up.
+5. The duplicate fixture is non-zero — the meta-check, because the original guard for this
    defect inserted the duplicate with every metric set to ``0`` and could never fail.
 
 Background: a GitHub org rename put one repository in ``github_activity`` under two spellings
@@ -18,12 +19,17 @@ on the same ``scan_date``. Read paths summed them, so a day with 48 commits and 
 reported 86 and 26 in every ranking built on that table. No error was raised.
 """
 
+import json
 import sqlite3
 
 import pytest
 
 from rebalance.ingest import config as config_mod
-from rebalance.ingest.db.schema import ensure_github_schema, ensure_schema
+from rebalance.ingest.db.schema import (
+    ensure_github_schema,
+    ensure_project_schema,
+    ensure_schema,
+)
 
 # Synthetic identities. `oldorg` is the retired spelling; `NewOrg` is canonical.
 OLD_ORG = "oldorg"
@@ -132,3 +138,79 @@ def test_the_duplicate_fixture_is_not_inert():
     assert EARLY["commits"] > 0 and LATE["commits"] > 0
     assert EARLY["commits"] != LATE["commits"]
     assert EARLY["scanned_at"] < LATE["scanned_at"]
+
+
+# ---------------------------------------------------------------------------
+# The same defect, one layer up: two PROJECTS claiming one repository.
+#
+# `project_registry`'s primary key is the project NAME, so nothing stops two rows
+# claiming the same repo. Two writers create rows — activity inference and
+# commit-threshold auto-promotion — and neither canonicalises the repo before
+# deciding whether a project for it already exists. The live consequence: an org
+# rename auto-promoted a second project for a repo that already had one, because
+# the generated project name is derived from the repo's full name including the
+# owner. Counting a repo under two projects splits or doubles its signal exactly
+# the way counting it under two orgs did.
+# ---------------------------------------------------------------------------
+
+PROJECT_CANONICAL = "Widget Service"
+PROJECT_TWIN = "Neworg Widget Service"
+
+
+@pytest.fixture
+def registry_db(tmp_path):
+    """Two projects claiming one repo, one of them under the retired org spelling."""
+    path = tmp_path / "registry.db"
+    with sqlite3.connect(path) as conn:
+        ensure_schema(conn)
+        ensure_github_schema(conn)
+        ensure_project_schema(conn)
+        for name, repo in (
+            (PROJECT_CANONICAL, f"{NEW_ORG}/{REPO}"),
+            (PROJECT_TWIN, f"{OLD_ORG}/{REPO}"),
+            ("Unrelated Project", f"someone-else/{REPO}"),
+        ):
+            conn.execute(
+                "INSERT INTO project_registry (name, status, repos_json) VALUES (?, 'active', ?)",
+                (name, json.dumps([repo])),
+            )
+        conn.commit()
+    return path
+
+
+def _projects_by_canonical_repo(conn, canonicalise):
+    """Map canonical repo -> the project names claiming it."""
+    claims: dict[str, list[str]] = {}
+    conn.row_factory = sqlite3.Row
+    for row in conn.execute("SELECT name, repos_json FROM project_registry"):
+        for repo in json.loads(row["repos_json"] or "[]"):
+            claims.setdefault(canonicalise(repo).lower(), []).append(row["name"])
+    return claims
+
+
+def test_two_projects_claiming_one_repo_are_detected(registry_db, aliases):
+    """A repo must be claimed by at most one project, compared canonically."""
+    with sqlite3.connect(registry_db) as conn:
+        claims = _projects_by_canonical_repo(conn, config_mod.canonical_github_repo_name)
+    contested = {repo: names for repo, names in claims.items() if len(names) > 1}
+    assert list(contested) == [f"{NEW_ORG}/{REPO}".lower()]
+    assert sorted(contested[f"{NEW_ORG}/{REPO}".lower()]) == sorted([PROJECT_CANONICAL, PROJECT_TWIN])
+
+
+def test_a_fork_under_another_owner_is_not_a_contested_claim(registry_db, aliases):
+    """Only aliased owners collapse. A same-named repo elsewhere stays its own project."""
+    with sqlite3.connect(registry_db) as conn:
+        claims = _projects_by_canonical_repo(conn, config_mod.canonical_github_repo_name)
+    assert claims[f"someone-else/{REPO}".lower()] == ["Unrelated Project"]
+
+
+def test_the_detector_needs_canonicalisation_to_see_it(registry_db):
+    """Without the alias map the duplicate is invisible — which is why it survived.
+
+    No `aliases` fixture here, so `canonical_github_repo_name` is a no-op and the two
+    spellings look like two different repos. This is the negative control for the
+    detector above: it pins that canonicalisation is what does the work, not grouping.
+    """
+    with sqlite3.connect(registry_db) as conn:
+        claims = _projects_by_canonical_repo(conn, lambda r: r)
+    assert not [repo for repo, names in claims.items() if len(names) > 1]

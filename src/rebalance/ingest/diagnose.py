@@ -164,43 +164,63 @@ def diagnose_repo(
         else:
             monitoring_reason = "not in watched set"
 
-    # Stage 3 — sync freshness --------------------------------------------
-    counts = {"items": 0, "commits": 0, "comments": 0, "documents": 0}
+    # Stage 3 — sync freshness, Stage 4 — sha lookup, Stage 5 — pr lookup
+    counts: dict[str, Any] = {"items": 0, "commits": 0, "comments": 0, "documents": 0}
     last_synced: str | None = None
     default_branch: str | None = None
-    repo_meta_fetched_at: str | None = None
+    commit_block: dict[str, Any] | None = None
+    pr_block: dict[str, Any] | None = None
+
+    pr_num: int | None = None
+    if pr is not None:
+        try:
+            pr_num = int(pr)
+        except (TypeError, ValueError):
+            pr_block = {"error": f"pr must be an integer, got {pr!r}"}
+
     try:
+        from rebalance.ingest.db import fetch_repo_diagnostics
+
         with db_connection(database_path) as conn:
-            row = conn.execute(
-                "SELECT default_branch, fetched_at FROM github_repo_meta WHERE LOWER(repo_full_name) = ?",
-                (repo_norm,),
-            ).fetchone()
-            if row:
-                default_branch = row["default_branch"]
-                repo_meta_fetched_at = row["fetched_at"]
+            diag = fetch_repo_diagnostics(conn, repo_norm, sha=sha, pr=pr_num)
+            counts = diag["counts"]
+            last_synced = diag["last_synced"]
+            default_branch = diag["default_branch"]
 
-            for table, key in (
-                ("github_items", "items"),
-                ("github_commits", "commits"),
-                ("github_comments", "comments"),
-                ("github_documents", "documents"),
-            ):
-                row = conn.execute(
-                    f"SELECT COUNT(*) AS c, MAX(fetched_at) AS m FROM {table} WHERE LOWER(repo_full_name) = ?",
-                    (repo_norm,),
-                ).fetchone()
-                if row:
-                    counts[key] = int(row["c"] or 0)
-                    candidate = row["m"]
-                    if candidate and (not last_synced or candidate > last_synced):
-                        last_synced = candidate
+            if sha:
+                sha_clean = sha.strip().lower()
+                matches = diag.get("commit_matches") or []
+                commit_block = {
+                    "sha_query": sha_clean,
+                    "found_in_db": len(matches) > 0,
+                }
+                if matches:
+                    commit_block["matches"] = matches
+                    if len(matches) > 1:
+                        commit_block["ambiguous"] = True
+
+            if pr_num is not None and pr_block is None:
+                pr_data = diag.get("pr_data")
+                pr_block = {"number": pr_num, "found_in_db": pr_data is not None}
+                if pr_data:
+                    pr_block["state"] = pr_data["state"]
+                    pr_block["merged"] = bool(pr_data["is_merged"])
+                    pr_block["title"] = pr_data["title"]
+                    pr_block["author"] = pr_data["author_login"]
+                    pr_block["created_at"] = pr_data["created_at"]
+                    pr_block["updated_at"] = pr_data["updated_at"]
+                    pr_block["merged_at"] = pr_data["merged_at"]
+                    pr_block["comments_count"] = pr_data["comments_count"]
+                    pr_block["commits_count"] = pr_data["commits_count"]
+                    pr_block["fetched_at"] = pr_data["fetched_at"]
+                    pr_block["html_url"] = pr_data["html_url"]
     except Exception as exc:
-        # Don't blow up — surface as a diagnostic.
         last_synced = None
-        counts["__db_error__"] = str(exc)  # type: ignore[assignment]
-
-    if not last_synced and repo_meta_fetched_at:
-        last_synced = repo_meta_fetched_at
+        counts["__db_error__"] = str(exc)
+        if sha and commit_block is not None:
+            commit_block["db_error"] = str(exc)
+        if pr_num is not None and pr_block is not None:
+            pr_block["db_error"] = str(exc)
 
     staleness_days = _days_since(last_synced)
     if last_synced is None:
@@ -210,103 +230,30 @@ def diagnose_repo(
     else:
         freshness = "fresh"
 
-    # Stage 4 — sha lookup -------------------------------------------------
-    commit_block: dict[str, Any] | None = None
-    if sha:
-        sha_clean = sha.strip().lower()
-        commit_block = {"sha_query": sha_clean, "found_in_db": False}
-        try:
-            with db_connection(database_path) as conn:
-                rows = conn.execute(
-                    "SELECT sha, item_type, item_number, author_login, "
-                    "       committed_at, message, html_url "
-                    "FROM github_commits "
-                    "WHERE LOWER(repo_full_name) = ? AND LOWER(sha) LIKE ? "
-                    "LIMIT 5",
-                    (repo_norm, f"{sha_clean}%"),
-                ).fetchall()
-                if rows:
-                    commit_block["found_in_db"] = True
-                    commit_block["matches"] = [
-                        {
-                            "sha": r["sha"],
-                            "associated": f"{r['item_type']}#{r['item_number']}",
-                            "author": r["author_login"],
-                            "committed_at": r["committed_at"],
-                            "message_first_line": (r["message"] or "").splitlines()[0][:200] if r["message"] else "",
-                            "html_url": r["html_url"],
-                        }
-                        for r in rows
-                    ]
-                    if len(rows) > 1:
-                        commit_block["ambiguous"] = True
-        except Exception as exc:
-            commit_block["db_error"] = str(exc)
-
-        if not commit_block["found_in_db"]:
-            if not watched:
-                commit_block["likely_cause"] = "repo is not watched, so its commits are never ingested"
-            elif freshness == "never_synced":
-                commit_block["likely_cause"] = (
-                    "repo is watched but has never been synced — run refresh_index(scope=['github'])"
-                )
-            else:
-                commit_block["likely_cause"] = (
-                    "current pipeline only ingests commits referenced by PRs in the "
-                    f"{DEFAULT_SYNC_WINDOW_DAYS}-day lookback. A bare commit on a "
-                    "branch with no PR (or one outside the window) will not appear."
-                )
-
-    # Stage 5 — pr lookup --------------------------------------------------
-    pr_block: dict[str, Any] | None = None
-    if pr is not None:
-        try:
-            pr_num = int(pr)
-        except (TypeError, ValueError):
-            pr_block = {"error": f"pr must be an integer, got {pr!r}"}
+    if commit_block and not commit_block.get("found_in_db"):
+        if not watched:
+            commit_block["likely_cause"] = "repo is not watched, so its commits are never ingested"
+        elif freshness == "never_synced":
+            commit_block["likely_cause"] = (
+                "repo is watched but has never been synced — run refresh_index(scope=['github'])"
+            )
         else:
-            pr_block = {"number": pr_num, "found_in_db": False}
-            try:
-                with db_connection(database_path) as conn:
-                    row = conn.execute(
-                        "SELECT title, state, is_merged, author_login, created_at, "
-                        "       updated_at, merged_at, comments_count, "
-                        "       commits_count, fetched_at, html_url "
-                        "FROM github_items "
-                        "WHERE LOWER(repo_full_name) = ? "
-                        "  AND item_type = 'pull_request' AND number = ?",
-                        (repo_norm, pr_num),
-                    ).fetchone()
-                    if row:
-                        pr_block["found_in_db"] = True
-                        pr_block["state"] = row["state"]
-                        pr_block["merged"] = bool(row["is_merged"])
-                        pr_block["title"] = row["title"]
-                        pr_block["author"] = row["author_login"]
-                        pr_block["created_at"] = row["created_at"]
-                        pr_block["updated_at"] = row["updated_at"]
-                        pr_block["merged_at"] = row["merged_at"]
-                        pr_block["comments_count"] = row["comments_count"]
-                        pr_block["commits_count"] = row["commits_count"]
-                        pr_block["fetched_at"] = row["fetched_at"]
-                        pr_block["html_url"] = row["html_url"]
-            except Exception as exc:
-                pr_block["db_error"] = str(exc)
+            commit_block["likely_cause"] = (
+                "current pipeline only ingests commits referenced by PRs in the "
+                f"{DEFAULT_SYNC_WINDOW_DAYS}-day lookback. A bare commit on a "
+                "branch with no PR (or one outside the window) will not appear."
+            )
 
-            if not pr_block.get("found_in_db"):
-                if not watched:
-                    pr_block["likely_cause"] = "repo is not watched, so its PRs are never ingested"
-                elif freshness == "never_synced":
-                    pr_block["likely_cause"] = (
-                        "repo is watched but has never been synced — run refresh_index(scope=['github'])"
-                    )
-                else:
-                    pr_block["likely_cause"] = (
-                        f"PR may have last been updated more than "
-                        f"{DEFAULT_SYNC_WINDOW_DAYS} days ago and fallen outside the "
-                        "sync window, or the repo wasn't watched at the time of the "
-                        "last refresh"
-                    )
+    if pr_block and not pr_block.get("found_in_db") and "error" not in pr_block:
+        if not watched:
+            pr_block["likely_cause"] = "repo is not watched, so its PRs are never ingested"
+        elif freshness == "never_synced":
+            pr_block["likely_cause"] = "repo is watched but has never been synced — run refresh_index(scope=['github'])"
+        else:
+            pr_block["likely_cause"] = (
+                f"PR #{pr_block.get('number')} was not found in local DB (either outside "
+                f"the {DEFAULT_SYNC_WINDOW_DAYS}-day lookback or never fetched)"
+            )
 
     # Stage 6 — live PAT visibility --------------------------------------
     pat_block: dict[str, Any] = {"checked": False}

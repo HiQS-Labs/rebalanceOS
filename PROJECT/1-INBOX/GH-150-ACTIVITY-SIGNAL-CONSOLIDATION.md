@@ -5,9 +5,19 @@ created: 2026-09-02
 issue: "https://github.com/HiQS-Labs/rebalanceOS/issues/150"
 parent_plan: "PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/SCOPE.md (phase fe1)"
 trigger: "#147 — the org-mirror defect had to be hand-patched into three surfaces; this audit asked where else it lives"
-effort: 3
-complexity: 3
-risk: 2
+effort: 2
+complexity: 2
+risk: 1
+ratings_reviewed: 2026-09-04
+ratings_note: >
+  Re-rated down on 2026-09-04, after the store was repaired and the reconciliation
+  rule was settled. effort 3->2: PR #155 is already written and its suites are
+  green; what remains is a scoped read-path change plus one test fixture.
+  complexity 3->2: the semantics were the intricate part and they are now decided
+  and documented (SOP.md section 6 - a snapshot table reconciles by latest
+  scanned_at, never by summing across aliases), so the open question is gone.
+  risk 2->1: reversible, no data migration left (51,476 stale rows were already
+  re-keyed or removed), and the invariant is pinned by a test witnessed failing.
 ---
 
 # GH-150 — Activity-signal audit: one pipeline, many read paths
