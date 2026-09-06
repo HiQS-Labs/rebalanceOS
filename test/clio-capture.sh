@@ -90,11 +90,11 @@ skips_short_prompt() {
 }
 
 boundary_is_inclusive() {
-  exactly100=$(printf 'x%.0s' $(seq 1 100))
-  n=$(run_hook "boundary" "$(json_input "$exactly100")")
-  [ "$n" = "1" ] || fail "expected exactly-100-char prompt to be captured, got $n line(s)"
-  n=$(run_hook "boundary99" "$(json_input "$(printf 'x%.0s' $(seq 1 99))")")
-  [ "$n" = "0" ] || fail "expected 99-char prompt to be skipped, got $n line(s)"
+  exactly20=$(printf 'x%.0s' $(seq 1 20))
+  n=$(run_hook "boundary" "$(json_input "$exactly20")")
+  [ "$n" = "1" ] || fail "expected exactly-20-char prompt to be captured, got $n line(s)"
+  n=$(run_hook "boundary19" "$(json_input "$(printf 'x%.0s' $(seq 1 19))")")
+  [ "$n" = "0" ] || fail "expected 19-char prompt to be skipped, got $n line(s)"
 }
 
 skips_task_notification() {

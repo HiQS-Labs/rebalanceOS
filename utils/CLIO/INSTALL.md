@@ -61,7 +61,7 @@ LOG="$HOME/.claude/prompt-log.jsonl"
 LOCK="$HOME/.claude/prompt-log.lock"
 mkdir -p "$HOME/.claude" 2>/dev/null || true
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-minchars="${CLIO_MIN_PROMPT_CHARS:-100}"
+minchars="${CLIO_MIN_PROMPT_CHARS:-20}"
 
 AGENT=""; RECORD=0
 while [ "$#" -gt 0 ]; do
@@ -467,7 +467,7 @@ rm -f ~/.claude/hooks/clio-capture.sh ~/.claude/hooks/clio-hook-probe.sh \
 - **Timestamps:** the raw JSONL and every `clio:id` stay **UTC** — the ID is `session_id:timestamp`, so localizing it would change all IDs, break dedup, and re-emit the note as duplicates. Only the *displayed* line is localized (`2026-07-19 14:27:50 PDT`). Conversion uses `python3` (`datetime.astimezone()`), **not** jq. Without `python3` the display falls back to UTC.
 - **Capture filtering (permanent):** the writer skips two classes of prompt outright, for every agent:
   - *Automated turns* — anything containing `<task-notification>` or the `[SYSTEM NOTIFICATION - NOT USER INPUT]` preamble (background-task and monitor events). Matched on the raw prompt before tag stripping.
-  - *Short prompts* — under `CLIO_MIN_PROMPT_CHARS` (default **100**) after injected blocks are stripped, so `yes` / `push it` are dropped while substantive session-opening prompts are kept. Set `CLIO_MIN_PROMPT_CHARS=0` to capture everything again.
+  - *Short prompts* — under `CLIO_MIN_PROMPT_CHARS` (default **20**) after injected blocks are stripped, so `yes` / `push it` are dropped while substantive session-opening prompts are kept. Set `CLIO_MIN_PROMPT_CHARS=0` to capture everything again.
 
   This is a **drop, not a hide** — unlike `PROMPT_LOG_EXCLUDE` below, a skipped prompt is unrecoverable. Prefer the render-side filter if you might want the text back later. Covered by `test/clio-capture.sh`.
 - **Same-second collisions:** two substantive prompts in the same session within one second share an ID; the second is suppressed and traced to the error log (content-free) rather than written as a duplicate.
