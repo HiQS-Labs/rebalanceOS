@@ -1,6 +1,6 @@
 # Marathon Phase gh127
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH127-TURN builder=codex reviewer=agy round-cap=5 -->
 
@@ -117,3 +117,15 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Updated both README Getting Started install commands to use `embeddings`, `calendar`, `server`, and
+  `dev`; the platform fallback now drops only `embeddings`. `dev` supplies pytest and `server` supplies
+  FastAPI, which collection imports.
+- Replaced the stale test-install addendum with the collection command and current Python 3.12 baseline:
+  `2146 tests collected` with 0 errors (from the published GH-144 campaign).
+- Added the isolated `readme-install` macOS 14 CI job, which runs the README commands verbatim on a
+  fresh checkout before collecting `tests/`. It does not alter the existing split test lanes.
+- Verification: the sandbox blocks PyPI DNS, so a fresh local install could not complete; reviewer should
+  validate the clean-check job in CI. Local YAML/content checks follow before handoff.
