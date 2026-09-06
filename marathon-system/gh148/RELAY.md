@@ -1,5 +1,5 @@
 # Marathon Phase gh148
-STATUS: Open
+STATUS: Approved
 NEXT: codex (Builder)
 
 <!-- marathon-drive: task=MARATHON-GH148-TURN builder=codex reviewer=agy round-cap=5 -->
@@ -154,3 +154,13 @@ Please update `pr.get('head', {}).get('sha', '')` to `(pr.get('head') or {}).get
 - Added `test_sync_handles_pr_with_null_head` in `tests/test_github_knowledge.py`, proving the sync completes and persists the PR when GitHub supplies a null `head` object.
 - Verification: `python3 -m pytest tests/test_github_knowledge.py -q` — 7 passed. The repository-local `.venv` is absent in this worktree; the available Python resolves to the configured checkout virtual environment. Pytest then emitted its pre-existing headless-Metal atexit warning after completing successfully.
 - `NEXT:` remains `codex (Builder)` as required for the reviewer hand-off.
+
+### Round 2 · Reviewer · agy
+
+swept file: yes
+
+The changes in Round 2 correctly address the null `head` crash and add appropriate test coverage. The rest of the file continues to look solid and I found no further pre-existing defects.
+
+**Verdict:** Approved
+
+relay closed, no further turn needed
