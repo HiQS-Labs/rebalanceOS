@@ -1,6 +1,6 @@
 # Marathon Phase gh160
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH160-TURN builder=codex reviewer=agy round-cap=5 -->
 
@@ -87,6 +87,13 @@ From #160 §3, targets 3 and 4, verbatim:
 - [ ] Every red control witnessed red before its fix.
 - [ ] Existing time_ops and registry tests unchanged and green.
 - [ ] No behaviour change for a VALID tz or registry.
+
+### Round 1 · Builder · codex
+
+- Captured red controls for malformed timezone overrides and malformed/schema-invalid registry YAML in `.relay-scratch/` before the fix.
+- Hardened `local_tz()` against `ZoneInfoNotFoundError`, `ValueError`, and `OSError` (including `IsADirectoryError`), logging each invalid configured name once before falling back to UTC.
+- Added `RegistryLoadError`, preserving the registry path and chaining the original YAML or Pydantic validation failure so callers receive one diagnosable error type.
+- Added Hypothesis properties for arbitrary `REBALANCE_TZ` and fenced YAML input, plus direct assertions for the two known malformed timezone paths and both named registry failure surfaces.
 
 
 ---

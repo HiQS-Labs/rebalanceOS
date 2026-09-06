@@ -6,11 +6,16 @@ and operator-facing display formatting.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from datetime import date, datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+logger = logging.getLogger(__name__)
+_warned_invalid_timezone_names: set[str] = set()
 
 
 def parse_iso(raw: Any, force_utc: bool = True) -> datetime | None:
@@ -165,8 +170,14 @@ def local_tz() -> ZoneInfo:
     if name:
         try:
             return ZoneInfo(name)
-        except ZoneInfoNotFoundError:
-            pass
+        except (ZoneInfoNotFoundError, ValueError, OSError) as exc:
+            if name not in _warned_invalid_timezone_names:
+                _warned_invalid_timezone_names.add(name)
+                logger.warning(
+                    "Invalid timezone name %r (%s); falling back to UTC",
+                    name,
+                    exc,
+                )
 
     return ZoneInfo("UTC")
 
