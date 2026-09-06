@@ -378,7 +378,9 @@ above and check that `python3 --version` really was 3.12+.
 > **To run the test suite**, the Getting Started install already includes the `dev` and
 > `server` extras. From the repo root, run `.venv/bin/pytest tests/`. To verify collection,
 > run `.venv/bin/pytest --collect-only -q tests/`: the current expected result is
-> `2146 tests collected` with 0 errors. A `ModuleNotFoundError: fastapi` means the
+> `2302 tests collected` with 0 errors (measured at the commit that wrote this line; the
+> number drifts as tests land — the clean-checkout CI job is the authoritative check, the
+> thing that must never appear is `errors during collection`). A `ModuleNotFoundError: fastapi` means the
 > `server` extra was skipped (GH-127).
 > Run it from the repo root; `pytest` invoked from inside `src/rebalance/` puts that
 > directory on `sys.path`, where the local `mcp/` package shadows the installed MCP SDK.
