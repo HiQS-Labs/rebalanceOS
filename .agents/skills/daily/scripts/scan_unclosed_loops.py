@@ -106,8 +106,8 @@ def inspect_git_repo(repo_path: Path) -> dict[str, Any]:
     _, wt_out = run_cmd(["git", "worktree", "list"], cwd=repo_path)
     worktrees = []
     for line in wt_out.splitlines()[1:]:
-        if l.strip():
-            worktrees.append(l.strip())
+        if line.strip():
+            worktrees.append(line.strip())
 
     # Age of HEAD commit
     _, log_epoch = run_cmd(["git", "log", "-1", "--format=%ct"], cwd=repo_path)
