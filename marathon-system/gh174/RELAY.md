@@ -1,6 +1,6 @@
 # Marathon Phase gh174
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH174-TURN builder=codex reviewer=agy round-cap=5 -->
 
@@ -76,6 +76,17 @@ Whatever lands should state, in the PR, which of the three options above it impl
 ### QA checklist — Phase 1
 - [ ] Witnessed red: temporarily point the subprocess at a copy of the repo with `[tool.pytest.ini_options]` removed and confirm the assertion fails.
 - [ ] Test is hermetic — no dependency on the operator's machine paths.
+
+### Round 1 · Builder · codex
+
+Created `tests/test_pytest_rootdir_pinned.py`. Its two parameterized subprocess probes collect the
+absolute repository test directory from an outside working directory, including one that contains a
+failing stray `conftest.py`; both require the collection header to report this repository as `rootdir`
+and `pyproject.toml` as `configfile`. The test derives the repository path from its own location and
+uses the current Python interpreter, so it has no operator-specific path or launcher dependency.
+`-v` accompanies the required `-q` because quiet mode alone suppresses the session header that this
+assertion must inspect. Verification: `python3 -m pytest tests/test_pytest_rootdir_pinned.py -q` —
+2 passed in 5.45s (5.72s measured wall-clock, including pytest startup).
 
 
 ---
