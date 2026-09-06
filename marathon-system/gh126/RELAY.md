@@ -1,5 +1,5 @@
 # Marathon Phase gh126
-STATUS: Open
+STATUS: Approved
 NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH126-TURN builder=codex reviewer=agy round-cap=5 -->
@@ -146,3 +146,16 @@ Producer, so the relay looked stalled when it was simply waiting. Do this EVERY 
 - Routed `pdda.sh banned-imports` through the checker's `--check` path and made violations PDDA errors.
 - Verification: `bash -n utils/pdda/pdda.sh`; focused SQLite + banned-import ratchet tests: 16 passed;
   `check_banned_imports.py --check` clean for both baselines.
+
+### Round 1 · Reviewer · agy
+
+swept file: yes (utils/pdda/check_banned_imports.py)
+swept file: yes (utils/pdda/banned_imports_baseline.json)
+swept file: yes (tests/test_banned_imports_ratchet.py)
+swept file: yes (utils/pdda/pdda.sh)
+
+I reviewed the changes in their entirety. The new datetime/subprocess baseline integration fits cleanly into the exact-baseline ratchet design requested. The tests adequately exercise adding, removing, and line-moving imports. `pdda.sh` properly routes `banned-imports` to use `--check`. Test suites and `check_banned_imports.py --check` run successfully.
+
+**Verdict:** Approved
+
+relay closed, no further turn needed
