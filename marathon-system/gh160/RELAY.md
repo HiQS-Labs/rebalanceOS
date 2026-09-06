@@ -1,5 +1,5 @@
 # Marathon Phase gh160
-STATUS: Open
+STATUS: Approved
 NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH160-TURN builder=codex reviewer=agy round-cap=5 -->
@@ -74,7 +74,7 @@ From #160 §3, targets 3 and 4, verbatim:
 }
 ```
 
-*Contract auto-drafted by the 2026-09-05 marathon prep from the issue text — artifacts/lanes not yet operator-verified.*
+*Contract auto-drafted by the 2026-09-05 marathon prep from the issue text — artifacts/lanes not yet operator-verified.*  [Unverified — no citation]
 
 ## Phase 1
 
@@ -134,3 +134,19 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
    approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
    Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Reviewer · agy
+
+swept file: yes
+I have reviewed the entire files (`src/rebalance/lib/time_ops.py`, `src/rebalance/ingest/registry.py`, `tests/test_time_ops_property.py`, `tests/test_registry_property.py`) beyond just the diffs, as requested. 
+
+The implementations correctly address the Phase Brief requirements:
+1. `local_tz()` properly catches `ZoneInfoNotFoundError`, `ValueError`, and `OSError` (which includes `IsADirectoryError`), logs the invalid timezone only once, and falls back to UTC safely.
+2. The registry loading safely wraps `yaml.safe_load` and Pydantic's `ValidationError`, elevating them to the requested `RegistryLoadError` with the context of the file path and reason.
+3. Both features are backed by solid Hypothesis property tests (`test_time_ops_property.py` and `test_registry_property.py`) that verify these error containment invariants.
+4. I ran probes to verify the behavior of `os.environ` rejecting null bytes, which justifies the string filtering in the Hypothesis tests.
+5. I did not find any latent defects or pre-existing bugs in the swept code. The existing functions and logic in both files look robust.
+
+**Verdict:** Approved
+
+relay closed, no further turn needed
