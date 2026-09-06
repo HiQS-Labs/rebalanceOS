@@ -878,10 +878,12 @@ def _project_repos(database_path: Path) -> list[str]:
 def _activity_repos(database_path: Path, *, since_days: int = 14) -> list[str]:
     """Repos with recent activity according to ``github_activity``.
 
-    These are repos the user has *actually worked in* on GitHub in the last
+    These are repos the user has *authored in* on GitHub in the last
     *since_days*, regardless of whether they appear in the project registry.
-    Passive events such as starring/watching a repo may create GitHub Events
-    API entries, but they must not auto-monitor a repo.
+    Authorship means commits, pushes, or pull requests. Participation —
+    opening issues, commenting, reviewing — does not auto-monitor a repo, and
+    neither does starring/watching it (GH-158, SOP.md § 8). A repo you only
+    file issues on stays out until you push to it or list it in ``repos:``.
     """
     from rebalance.ingest.github_watch import WATCHED_LOGIN
 
@@ -894,10 +896,7 @@ def _activity_repos(database_path: Path, *, since_days: int = 14) -> list[str]:
                 FROM github_activity
                 WHERE scan_date >= date('now', ?)
                   AND login != ?
-                  AND (
-                    commits + pushes + prs_opened + prs_merged
-                    + issues_opened + issue_comments + reviews
-                  ) > 0
+                  AND (commits + pushes + prs_opened + prs_merged) > 0
                 ORDER BY repo_full_name
                 """,
                 (f"-{int(since_days)} days", WATCHED_LOGIN),
