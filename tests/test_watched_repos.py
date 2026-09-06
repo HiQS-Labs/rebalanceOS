@@ -21,6 +21,26 @@ class WatchedReposTests(unittest.TestCase):
     def tearDown(self) -> None:
         config_module.CONFIG_PATH = self._orig_config_path
 
+    def test_participation_only_does_not_auto_watch_repo(self) -> None:
+        """GH-158: issues, comments and reviews are participation, not authorship."""
+        db_path = Path(self._tmp.name) / "rebalance.db"
+        row = """
+            INSERT INTO github_activity
+                (login, repo_full_name, scan_date, commits, pushes, prs_opened, prs_merged,
+                 issues_opened, issue_comments, reviews, last_active_at, scanned_at)
+            VALUES (?, ?, date('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        with db_connection(db_path) as conn:
+            ensure_github_schema(conn)
+            ensure_project_schema(conn)
+            ts = ("2026-09-05T12:00:00Z", "2026-09-05T12:05:00Z")
+            conn.execute(row, ("tester", "stranger/commented", 0, 0, 0, 0, 1, 5, 2, *ts))
+            conn.execute(row, ("tester", "mine/pr-only", 0, 0, 1, 0, 0, 0, 0, *ts))
+            conn.commit()
+        watched = get_watched_repos(db_path)["watched"]
+        self.assertNotIn("stranger/commented", watched)
+        self.assertIn("mine/pr-only", watched)
+
     def test_zero_work_activity_does_not_auto_watch_repo(self) -> None:
         db_path = Path(self._tmp.name) / "rebalance.db"
         with db_connection(db_path) as conn:

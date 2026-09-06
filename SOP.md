@@ -256,3 +256,59 @@ gap; it was found by reading the digest by hand.
 **Enforcement.** `tests/test_runtime_drift.py` pins the check with two throwaway
 repositories and no dependency on any operator's machine — including that it still
 measures the runtime when run from inside a git hook, where `GIT_DIR` points elsewhere.
+
+## 8. Which GitHub repos get monitored
+
+> **Authorship monitors a repo. Participation does not. There is no watchlist file.**
+
+Settled on 2026-09-06 under GH-158. The monitored set is recomputed from scratch on
+every refresh by `get_watched_repos()` in `src/rebalance/ingest/index_ops.py`:
+
+```
+watched = (project ∪ external ∪ activity ∪ pushed) − ignored
+```
+
+**A repo is monitored when any ONE of these holds:**
+
+1. **You listed it.** It is in `repos:` on an active project in the project registry.
+   This is the only manual list, and it never ages out.
+2. **You flagged it external.** A project marked `external: true` is monitored for
+   *everyone's* activity, not just yours. Never ages out.
+3. **You authored in it recently** — a commit, a push, or a pull request opened or
+   merged. One event is enough. "Recently" means the repo appeared in a GitHub scan
+   run in the last 14 days; each scan aggregates a 30-day event window, so a repo can
+   stay eligible up to roughly 44 days after your last contribution. Expiry is by scan
+   date, not contribution date.
+4. **Someone pushed to it in the last 14 days** and you can see it, per GitHub's own
+   pushed-repos list. This path is *not* authorship-checked: a collaborator's push to a
+   private org repo you have access to monitors it too. It exists because the events
+   feed drops collaborator pushes and caps at 300 events. If that catches a repo you do
+   not want, ignore it (below); tightening this path is a separate decision.
+
+**These do NOT monitor a repo:** starring or watching it, forking it (your first push
+to the fork does), opening an issue, commenting on an issue, or reviewing a pull
+request. Those are participation, and monitoring a stranger's repo because you left a
+comment ingests its entire history and reports other people's work as yours
+(`PARKED/2026-09-03-digest-repo-contamination.md`). Editing a project board is not in
+GitHub's events feed at all and is not a signal.
+
+**A repo stops being monitored when:**
+
+- it is explicitly ignored — `rebalance config add-github-ignored-repo <owner/repo>`.
+  Ignore always wins, over every rule above; or
+- it ages out — if activity or a push was its only reason to be monitored, it leaves
+  the set silently once no scan in the last 14 days has carried it (see rule 3 for why
+  that is later than 14 days after your last commit). There is no other drop mechanism,
+  and none is planned. Note this does not drop a repo that has been promoted to a
+  project or listed in `repos:` — those stay until you remove or ignore them.
+
+**A repo becomes a project on its own** once 3 or more commits to it (all-time in
+collected data, threshold configurable) are attributed to you or to a configured
+cloud-agent author (`CLOUD_AGENT_AUTHORS` in `pulse.py`). The promoted row is
+machine-owned and never overwrites a curated project of the same name, and from then
+on the repo is monitored through the registry, so it no longer ages out. See
+"Auto-promotion" in `AGENTS.md`.
+
+**Enforcement.** `tests/test_watched_repos.py::test_participation_only_does_not_auto_watch_repo`
+pins that a repo with only issues, comments and reviews stays out while a repo with a
+single pull request comes in.
