@@ -37,9 +37,7 @@ def test_registry_loader_never_leaks_yaml_errors(yaml_block: str) -> None:
         ("active_projects: definitely-not-a-list", ValidationError),
     ],
 )
-def test_registry_loader_wraps_parse_and_schema_failures(
-    yaml_block: str, expected_cause: type[Exception]
-) -> None:
+def test_registry_loader_wraps_parse_and_schema_failures(yaml_block: str, expected_cause: type[Exception]) -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "registry.md"
         path.write_text(_registry_markdown(yaml_block), encoding="utf-8")

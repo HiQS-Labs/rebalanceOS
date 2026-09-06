@@ -15,7 +15,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,11 +91,13 @@ def inspect_git_repo(repo_path: Path) -> dict[str, Any]:
     branch = branch or "detached"
 
     _, s_out = run_cmd(["git", "status", "-s"], cwd=repo_path)
-    dirty_lines = [l for l in s_out.splitlines() if l.strip()]
+    dirty_lines = [line for line in s_out.splitlines() if line.strip()]
 
     ahead, behind = 0, 0
     if branch != "detached":
-        code, ab_out = run_cmd(["git", "rev-list", "--left-right", "--count", f"origin/{branch}...{branch}"], cwd=repo_path)
+        code, ab_out = run_cmd(
+            ["git", "rev-list", "--left-right", "--count", f"origin/{branch}...{branch}"], cwd=repo_path
+        )
         if code == 0 and len(ab_out.split()) == 2:
             parts = ab_out.split()
             behind, ahead = int(parts[0]), int(parts[1])
@@ -103,7 +105,7 @@ def inspect_git_repo(repo_path: Path) -> dict[str, Any]:
     # Worktrees
     _, wt_out = run_cmd(["git", "worktree", "list"], cwd=repo_path)
     worktrees = []
-    for l in wt_out.splitlines()[1:]:
+    for line in wt_out.splitlines()[1:]:
         if l.strip():
             worktrees.append(l.strip())
 
@@ -128,12 +130,19 @@ def fetch_open_prs() -> list[dict[str, Any]]:
     """Fetch open PRs across primary watched repos using gh CLI."""
     prs = []
     for repo in PRIMARY_WATCHED_REPOS:
-        code, out = run_cmd([
-            "gh", "pr", "list",
-            "--repo", repo,
-            "--state", "open",
-            "--json", "number,title,headRefName,updatedAt,url,author",
-        ])
+        code, out = run_cmd(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--state",
+                "open",
+                "--json",
+                "number,title,headRefName,updatedAt,url,author",
+            ]
+        )
         if code == 0 and out:
             try:
                 data = json.loads(out)
@@ -145,7 +154,9 @@ def fetch_open_prs() -> list[dict[str, Any]]:
     return prs
 
 
-def update_close_the_loop_ledger(ledger_path: Path, local_issues: list[dict[str, Any]], open_prs: list[dict[str, Any]]) -> None:
+def update_close_the_loop_ledger(
+    ledger_path: Path, local_issues: list[dict[str, Any]], open_prs: list[dict[str, Any]]
+) -> None:
     """Update temp/close-the-loop.md with latest in-flight loops while preserving manual triage."""
     now_str = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
@@ -167,30 +178,36 @@ def update_close_the_loop_ledger(ledger_path: Path, local_issues: list[dict[str,
     for item in local_issues:
         content.append(f"| **`{item['repo']}`** | `{item['branch_or_wt']}` | {item['status']} | {item['action']} |")
 
-    content.extend([
-        "",
-        "---",
-        "",
-        "## ⏳ Tier 2: Open & Pending Pull Requests (Primary Watched Repos)",
-        "",
-    ])
+    content.extend(
+        [
+            "",
+            "---",
+            "",
+            "## ⏳ Tier 2: Open & Pending Pull Requests (Primary Watched Repos)",
+            "",
+        ]
+    )
 
     if open_prs:
         for pr in open_prs:
-            content.append(f"- [ ] [{pr['repo']}#{pr['number']}]({pr['url']}) — `{pr['headRefName']}`: {pr['title']} (Updated: {pr['updatedAt'][:10]})")
+            content.append(
+                f"- [ ] [{pr['repo']}#{pr['number']}]({pr['url']}) — `{pr['headRefName']}`: {pr['title']} (Updated: {pr['updatedAt'][:10]})"
+            )
     else:
         content.append("_No open pull requests currently pending on primary watched repositories._")
 
-    content.extend([
-        "",
-        "---",
-        "",
-        "## 🧹 Maintenance Discipline (How to Keep This Clear)",
-        "1. **Never leave a branch un-PRed**: As soon as a worktree commit lands (`/relay-xyz` QA pass), open the PR immediately.",
-        "2. **Post-Merge Cleanup**: When a PR merges, run `/merge-cleanup` to remove stale worktrees and isolated clone folders.",
-        "3. **Daily Sweep**: During `/daily` cycles, surface items that have been open for $\\ge 4$ cycles ($>60\\text{m}$).",
-        "",
-    ])
+    content.extend(
+        [
+            "",
+            "---",
+            "",
+            "## 🧹 Maintenance Discipline (How to Keep This Clear)",
+            "1. **Never leave a branch un-PRed**: As soon as a worktree commit lands (`/relay-xyz` QA pass), open the PR immediately.",
+            "2. **Post-Merge Cleanup**: When a PR merges, run `/merge-cleanup` to remove stale worktrees and isolated clone folders.",
+            "3. **Daily Sweep**: During `/daily` cycles, surface items that have been open for $\\ge 4$ cycles ($>60\\text{m}$).",
+            "",
+        ]
+    )
 
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text("\n".join(content), encoding="utf-8")
@@ -231,19 +248,23 @@ def main() -> int:
     # Prepare structured local issues list
     local_issues = []
     for item in unpred_branches:
-        local_issues.append({
-            "repo": item["repo"],
-            "branch_or_wt": item["branch"],
-            "status": "Linked worktree active; verify if PR is open",
-            "action": "Push & cut PR or run /merge-cleanup if merged"
-        })
+        local_issues.append(
+            {
+                "repo": item["repo"],
+                "branch_or_wt": item["branch"],
+                "status": "Linked worktree active; verify if PR is open",
+                "action": "Push & cut PR or run /merge-cleanup if merged",
+            }
+        )
     for item in unpushed_branches:
-        local_issues.append({
-            "repo": item["repo"],
-            "branch_or_wt": item["branch"],
-            "status": f"{item['ahead']} unpushed commit(s) ahead of origin",
-            "action": "Push commits to remote origin"
-        })
+        local_issues.append(
+            {
+                "repo": item["repo"],
+                "branch_or_wt": item["branch"],
+                "status": f"{item['ahead']} unpushed commit(s) ahead of origin",
+                "action": "Push commits to remote origin",
+            }
+        )
 
     # Ledger update
     ledger_file = Path("/Users/noelsaw/Documents/GH Repos/rebalanceOS/temp/close-the-loop.md")
