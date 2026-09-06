@@ -233,7 +233,7 @@ fi
 install -m 0755 utils/CLIO/prompt-log-to-md.sh ~/.claude/hooks/prompt-log-to-md.sh
 
 echo "✅ Installed. Smoke test (uses the Claude shim; expects agent=claude-code):"
-echo '{"prompt":"a substantive session-opening prompt that runs well past the one hundred character capture threshold on its own","session_id":"install-check"}' | ~/.claude/hooks/log-prompt.sh
+echo '{"prompt":"a substantive session-opening prompt that runs well past the twenty character capture threshold on its own","session_id":"install-check"}' | ~/.claude/hooks/log-prompt.sh
 tail -1 ~/.claude/prompt-log.jsonl
 ```
 

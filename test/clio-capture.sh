@@ -25,7 +25,7 @@ chmod +x "$WRITER" "$HOOK"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-long_prompt="This is a substantive session-opening prompt that comfortably exceeds the one hundred character minimum threshold."
+long_prompt="This is a substantive session-opening prompt that comfortably exceeds the twenty character minimum threshold."
 
 # Feed stdin to a script under a fresh $HOME; echo the resulting line count.
 # Usage: run_case <script> <case> <input-json> [env assignments...]
