@@ -471,18 +471,39 @@ def sync_github_repo(
         direction="desc",
     )
 
+    # The list endpoints carry each item's authoritative ``updated_at``. Read
+    # the local values in one bounded query before entering the expensive
+    # per-item fan-out: an equal, non-empty timestamp means the stored item and
+    # all of its children are already current. This read-only connection closes
+    # before any network request below, preserving GH-171's lock boundary.
+    with db_connection(database_path, ensure_github_schema) as conn:
+        stored_item_updated_ats = {
+            (str(row["item_type"]), int(row["number"])): row["updated_at"]
+            for row in conn.execute(
+                """
+                SELECT item_type, number, updated_at
+                FROM github_items
+                WHERE repo_full_name = ?
+                """,
+                (repo_full_name,),
+            )
+        }
+
     # --- Fetch phase (GH-171) ---
-    # Pull every per-issue and per-PR payload (comments, reviews, review
+    # Pull each changed issue's and PR's payload (comments, reviews, review
     # comments, commits, check-runs) from the GitHub API here, before any
     # write transaction opens. Previously all of this fetching happened
     # *inside* the `with db_connection(...)` block below, so the write
     # transaction spanned the full network walk — worst case ~49 minutes per
     # GH-146 — holding the single SQLite writer for the entire run and giving
-    # every other writer a bare "database is locked". What is fetched and how
-    # is unchanged; only the transaction boundary moves.
+    # every other writer a bare "database is locked". The transaction boundary
+    # remains unchanged; equal list timestamps skip the fan-out above it.
     issue_payloads: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
     for issue in issues:
         item_number = int(issue["number"])
+        listed_updated_at = issue.get("updated_at")
+        if listed_updated_at and stored_item_updated_ats.get(("issue", item_number)) == listed_updated_at:
+            continue
         issue_comments = client.paginate(f"{repo_base}/issues/{item_number}/comments", fetch_json=api_get_json)
         issue_payloads.append((issue, issue_comments))
 
@@ -498,6 +519,9 @@ def sync_github_repo(
     ] = []
     for pull_summary in pull_summaries:
         item_number = int(pull_summary["number"])
+        listed_updated_at = pull_summary.get("updated_at")
+        if listed_updated_at and stored_item_updated_ats.get(("pull_request", item_number)) == listed_updated_at:
+            continue
         pr = api_get(f"{repo_base}/pulls/{item_number}")
         if not isinstance(pr, dict):
             continue

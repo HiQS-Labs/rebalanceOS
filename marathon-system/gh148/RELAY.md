@@ -1,6 +1,6 @@
 # Marathon Phase gh148
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH148-TURN builder=codex reviewer=agy round-cap=5 -->
 
@@ -87,6 +87,12 @@ Verbatim from #148, restricted to what slice 1 can deliver:
 - [ ] The red control was witnessed red before the fix landed.
 - [ ] No change to what is stored for items that DID change.
 - [ ] Full `tests/test_github_knowledge.py` + `tests/test_github_scan.py` green.
+
+### Round 1 · Builder · codex
+
+- Touched `src/rebalance/ingest/github_knowledge.py` and `tests/test_github_knowledge.py` only (plus this relay). The sync now batch-reads stored item timestamps before the child-endpoint fan-out, then skips an issue or PR only when its listed, non-empty `updated_at` equals the stored value. Missing timestamps and first-seen/changed items still fetch normally.
+- Added an API-recording regression control: a second identical sync must issue zero issue/PR child fan-out calls. It was witnessed red against the prior implementation (7 child-endpoint calls), then passed after the change.
+- Verification: `tests/test_github_knowledge.py` — 6 passed. The sandbox emitted its unrelated headless-Metal atexit warning after pytest completed.
 
 
 ---
