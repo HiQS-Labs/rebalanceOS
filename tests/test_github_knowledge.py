@@ -385,6 +385,29 @@ class GitHubKnowledgeTests(unittest.TestCase):
         self.assertEqual(result.issues_synced, 1)
         self.assertEqual(result.prs_synced, 1)
 
+    def test_sync_handles_pr_with_null_head(self) -> None:
+        """A null PR head must not abort the rest of the sync."""
+
+        def _null_head_api(url: str) -> object:
+            if "/commits//check-runs?" in url:
+                return {"check_runs": []}
+            payload = _fake_github_api(url)
+            if url.endswith("/pulls/202"):
+                return {**payload, "head": None}
+            return payload
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = sync_github_repo(
+                database_path=Path(tmpdir) / "rebalance.db",
+                repo_full_name="AcmeOrg/sample-child-theme-oct-2024",
+                token="ghp_test",
+                since_days=30,
+                api_get_json=_null_head_api,
+            )
+
+        self.assertEqual(result.prs_synced, 1)
+        self.assertEqual(result.checks_synced, 0)
+
     def test_sync_does_not_hold_write_lock_across_network_fetch(self) -> None:
         """GH-171 regression: sync_github_repo must not hold the SQLite write
         transaction open while blocked on a "network" call. A second writer

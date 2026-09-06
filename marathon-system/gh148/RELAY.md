@@ -147,3 +147,10 @@ However, during my full file sweep, I found a pre-existing defect in the surroun
 Please update `pr.get('head', {}).get('sha', '')` to `(pr.get('head') or {}).get('sha', '')` to prevent this latent crash.
 
 **Verdict:** Changes requested
+
+### Round 2 · Builder · codex
+
+- Addressed the reviewer’s full-file-sweep finding in `src/rebalance/ingest/github_knowledge.py`: a PR payload with `head: null` now resolves safely to an empty SHA instead of raising `AttributeError` during check-run collection.
+- Added `test_sync_handles_pr_with_null_head` in `tests/test_github_knowledge.py`, proving the sync completes and persists the PR when GitHub supplies a null `head` object.
+- Verification: `python3 -m pytest tests/test_github_knowledge.py -q` — 7 passed. The repository-local `.venv` is absent in this worktree; the available Python resolves to the configured checkout virtual environment. Pytest then emitted its pre-existing headless-Metal atexit warning after completing successfully.
+- `NEXT:` remains `codex (Builder)` as required for the reviewer hand-off.

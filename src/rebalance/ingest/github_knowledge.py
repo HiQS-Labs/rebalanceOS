@@ -531,7 +531,7 @@ def sync_github_repo(
         pr_review_comments = client.paginate(f"{repo_base}/pulls/{item_number}/comments", fetch_json=api_get_json)
         pr_commits = client.paginate(f"{repo_base}/pulls/{item_number}/commits", fetch_json=api_get_json)
         check_runs_resp = api_get(
-            client.build_url(f"{repo_base}/commits/{pr.get('head', {}).get('sha', '')}/check-runs", per_page=100)
+            client.build_url(f"{repo_base}/commits/{(pr.get('head') or {}).get('sha', '')}/check-runs", per_page=100)
         )
         pr_check_runs = check_runs_resp.get("check_runs", []) if isinstance(check_runs_resp, dict) else []
         pr_payloads.append((pr, pr_issue_comments, pr_reviews, pr_review_comments, pr_commits, pr_check_runs))
