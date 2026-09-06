@@ -53,7 +53,7 @@ Verbatim from #148, restricted to what slice 1 can deliver:
   "target": { "repo": ".", "ref": "development" },
   "gate": ".venv/bin/python -m pytest tests/test_github_knowledge.py tests/test_github_scan.py -q",
   "fix_probes": [
-    { "type": "grep_absent", "path": "src/rebalance/ingest/github_knowledge.py", "pattern": "stored_updated_at" }
+    { "type": "grep_absent", "path": "src/rebalance/ingest/github_knowledge.py", "pattern": "stored_item_updated_ats" }
   ],
   "artifacts": [
     "src/rebalance/ingest/github_knowledge.py",
@@ -67,7 +67,7 @@ Verbatim from #148, restricted to what slice 1 can deliver:
 }
 ```
 
-*Contract auto-drafted by the 2026-09-05 marathon prep from the issue text — artifacts/lanes not yet operator-verified.*
+*Contract auto-drafted by the 2026-09-05 marathon prep from the issue text — artifacts/lanes not yet operator-verified. Post-run: the original fix_probe grepped for the identifier `stored_updated_at`; the builder named it `stored_item_updated_ats`, so the driver escalated `acceptance-probes-unmet` on a fix that had landed and been approved. Probe corrected to the identifier the reviewer approved.*
 
 ## Phase 1 — implement + red control
 

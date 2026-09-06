@@ -480,11 +480,7 @@ def sync_github_repo(
         stored_item_updated_ats = {
             (str(row["item_type"]), int(row["number"])): row["updated_at"]
             for row in conn.execute(
-                """
-                SELECT item_type, number, updated_at
-                FROM github_items
-                WHERE repo_full_name = ?
-                """,
+                "SELECT item_type, number, updated_at FROM github_items WHERE repo_full_name = ?",  # READ-LAYER-OK: GH-148 slice 1 — bounded per-repo checkpoint read inside the collector, not a report surface; fold into db/queries.py under GH-150
                 (repo_full_name,),
             )
         }
