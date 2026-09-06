@@ -1,6 +1,6 @@
 # Marathon Phase gh126
 STATUS: Open
-NEXT: codex (Builder)
+NEXT: agy (Reviewer)
 
 <!-- marathon-drive: task=MARATHON-GH126-TURN builder=codex reviewer=agy round-cap=5 -->
 
@@ -132,5 +132,17 @@ You are the REVIEWER for this phase. Read the latest builder block above AND rev
    is wanted; verifying in-tree is what costs you the turn.
 5. HAND OFF EXPLICITLY (GH-268): end your turn by naming who acts next — "handing off to codex —
    codex, take your turn" when requesting changes, or "relay closed, no further turn needed" when
-   approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
-   Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+approving. The beta report singled this out: the Reviewer turn did not tell the user to go back to the
+Producer, so the relay looked stalled when it was simply waiting. Do this EVERY round.
+
+### Round 1 · Builder · codex
+
+- Extended the existing single checker with a datetime/subprocess exact baseline keyed by relative path,
+  import family, and occurrence count; `--check` now validates both it and the SQLite ratchet, while
+  `--update-baseline` refreshes both explicitly.
+- Added the 33-site, 29-file import baseline and focused fixture/current-tree/mutation/pragma/fail-closed
+  coverage. A non-empty same-line `CANONICAL-PATH-OK` pragma exempts a reviewed import; a blank reason
+  remains debt.
+- Routed `pdda.sh banned-imports` through the checker's `--check` path and made violations PDDA errors.
+- Verification: `bash -n utils/pdda/pdda.sh`; focused SQLite + banned-import ratchet tests: 16 passed;
+  `check_banned_imports.py --check` clean for both baselines.

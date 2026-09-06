@@ -1,0 +1,90 @@
+{
+  "src/rebalance/ingest/apple_reminders.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/apple_reminders_write.py": {
+    "subprocess": 1
+  },
+  "src/rebalance/ingest/calendar.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/calendar_helpers.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/calendar_snap.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/claude_cloud.py": {
+    "datetime": 1,
+    "subprocess": 1
+  },
+  "src/rebalance/ingest/code_collector.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/config.py": {
+    "subprocess": 2
+  },
+  "src/rebalance/ingest/daily_report.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/db/queries.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/github_commit_backfill.py": {
+    "subprocess": 1
+  },
+  "src/rebalance/ingest/github_coverage.py": {
+    "subprocess": 1
+  },
+  "src/rebalance/ingest/github_knowledge.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/github_scan.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/gmail.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/index_ops.py": {
+    "datetime": 2
+  },
+  "src/rebalance/ingest/next_actions.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/note_builder.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/note_ingester.py": {
+    "datetime": 2
+  },
+  "src/rebalance/ingest/preflight.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/profile_sync.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/project_inference.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/pulse.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/pulse_health.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/querier.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/sleuth_reminders.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/sync_snapshot.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/token_meta.py": {
+    "datetime": 1
+  },
+  "src/rebalance/ingest/weekly_report.py": {
+    "datetime": 1
+  }
+}

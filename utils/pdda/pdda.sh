@@ -1014,27 +1014,35 @@ check_banned_imports() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-banned-imports" rc=0
   local script_path="$PDDA_REPO_ROOT/utils/pdda/check_banned_imports.py"
-  
+
   if [ ! -f "$script_path" ]; then
     return 0
   fi
 
-  local output
-  output=$("$PDDA_REPO_ROOT/.venv/bin/python" "$script_path" 2>/dev/null)
-  
-  if [ -n "$output" ]; then
+  # ``--check`` owns both exact ratchets (SQLite and datetime/subprocess), so the
+  # standalone PDDA command and CI exercise exactly the same comparison path.
+  local output check_rc=0
+  output=$("$PDDA_REPO_ROOT/.venv/bin/python" "$script_path" --check 2>&1) || check_rc=$?
+
+  if [ "$check_rc" -ne 0 ]; then
     while IFS= read -r line; do
+      [ -n "$line" ] || continue
       local file="${line%%:*}"
       local rest="${line#*:}"
       local lineno="${rest%%:*}"
       local msg="${rest#*: }"
-      pdda_record_finding warn "$CHECK_NAME" "$file" "$lineno" "$msg" "replace-import"
+      if [ "$file" = "$line" ] || [ "$lineno" = "$rest" ]; then
+        file="$script_path"
+        lineno=1
+        msg="$line"
+      fi
+      pdda_record_finding error "$CHECK_NAME" "$file" "$lineno" "$msg" "update-banned-import-baseline"
       rc=1
     done <<< "$output"
   fi
 
-  pdda_emit_summary "$CHECK_NAME" 0
-  return "$(pdda_gated_exit 0)"
+  pdda_emit_summary "$CHECK_NAME" "$rc"
+  return "$(pdda_gated_exit "$rc")"
 }
 
 check_governance() {
