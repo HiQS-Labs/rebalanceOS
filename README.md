@@ -25,7 +25,7 @@ the fully supported platform ([why](#platform-support)).
 git clone https://github.com/HiQS-Suite/rebalanceOS.git
 cd rebalanceOS
 python3 -m venv .venv
-.venv/bin/pip install -e ".[embeddings,calendar]"
+.venv/bin/pip install -e ".[embeddings,calendar,server,dev]"
 .venv/bin/rebalance version   # checkpoint — no vault, tokens, or network needed
 ```
 
@@ -356,7 +356,7 @@ below in place of `python3`. On macOS: `brew install python@3.13`.
 git clone https://github.com/HiQS-Suite/rebalanceOS.git
 cd rebalanceOS
 python3 -m venv .venv
-.venv/bin/pip install -e ".[embeddings,calendar]"
+.venv/bin/pip install -e ".[embeddings,calendar,server,dev]"
 ```
 
 **Checkpoint — confirm the install before going further.** This needs no vault, no
@@ -373,14 +373,15 @@ an import error, fix that here rather than in Step 2: re-run the `pip install` l
 above and check that `python3 --version` really was 3.12+.
 
 > On Linux / Windows / Intel Mac, drop the `embeddings` extra:
-> `pip install -e ".[calendar]"` (semantic search will be unavailable; everything else works).
+> `pip install -e ".[calendar,server,dev]"` (semantic search will be unavailable; everything else works).
 
-> **To run the test suite**, add the `dev` and `server` extras — neither is included above:
-> `.venv/bin/pip install -e ".[dev,server]"`, then `.venv/bin/pytest tests/` from the repo root.
-> `--collect-only` should report 0 errors (the count itself drifts as tests are added —
-> don't pin it); a `ModuleNotFoundError: fastapi`
-> means the `server` extra was skipped (GH-127 — it is easy to miss since nothing above it
-> installs `fastapi`).
+> **To run the test suite**, the Getting Started install already includes the `dev` and
+> `server` extras. From the repo root, run `.venv/bin/pytest tests/`. To verify collection,
+> run `.venv/bin/pytest --collect-only -q tests/`: the current expected result is
+> `2302 tests collected` with 0 errors (measured at the commit that wrote this line; the
+> number drifts as tests land — the clean-checkout CI job is the authoritative check, the
+> thing that must never appear is `errors during collection`). A `ModuleNotFoundError: fastapi` means the
+> `server` extra was skipped (GH-127).
 > Run it from the repo root; `pytest` invoked from inside `src/rebalance/` puts that
 > directory on `sys.path`, where the local `mcp/` package shadows the installed MCP SDK.
 

@@ -144,7 +144,7 @@ def _fake_github_api(url: str) -> object:
             "deletions": 5,
             "changed_files": 3,
             "created_at": "2026-04-17T09:00:00Z",
-            "updated_at": "2026-04-17T13:00:00Z",
+            "updated_at": _RECENT_ISO,
             "closed_at": None,
             "user": {"login": "bob"},
             "assignees": [{"login": "bob"}],
@@ -344,6 +344,69 @@ class GitHubKnowledgeTests(unittest.TestCase):
                     "SELECT COUNT(*) FROM semantic_documents WHERE source_type = 'github'"
                 ).fetchone()[0]
                 self.assertGreaterEqual(semantic_doc_count, 6)
+
+    def test_sync_skips_fanout_for_unchanged_items(self) -> None:
+        """A second sync must not refetch children when list timestamps match storage."""
+        api_calls: list[str] = []
+
+        def _recording_api(url: str) -> object:
+            api_calls.append(url)
+            return _fake_github_api(url)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            sync_github_repo(
+                database_path=db_path,
+                repo_full_name="AcmeOrg/sample-child-theme-oct-2024",
+                token="ghp_test",
+                since_days=30,
+                api_get_json=_recording_api,
+            )
+            api_calls.clear()
+
+            result = sync_github_repo(
+                database_path=db_path,
+                repo_full_name="AcmeOrg/sample-child-theme-oct-2024",
+                token="ghp_test",
+                since_days=30,
+                api_get_json=_recording_api,
+            )
+
+        fanout_calls = [
+            url
+            for url in api_calls
+            if "/issues/101/comments?" in url
+            or "/issues/202/comments?" in url
+            or url.endswith("/pulls/202")
+            or "/pulls/202/" in url
+            or "/commits/deadbeef/check-runs?" in url
+        ]
+        self.assertEqual(fanout_calls, [])
+        self.assertEqual(result.issues_synced, 1)
+        self.assertEqual(result.prs_synced, 1)
+
+    def test_sync_handles_pr_with_null_head(self) -> None:
+        """A null PR head must not abort the rest of the sync."""
+
+        def _null_head_api(url: str) -> object:
+            if "/commits//check-runs?" in url:
+                return {"check_runs": []}
+            payload = _fake_github_api(url)
+            if url.endswith("/pulls/202"):
+                return {**payload, "head": None}
+            return payload
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = sync_github_repo(
+                database_path=Path(tmpdir) / "rebalance.db",
+                repo_full_name="AcmeOrg/sample-child-theme-oct-2024",
+                token="ghp_test",
+                since_days=30,
+                api_get_json=_null_head_api,
+            )
+
+        self.assertEqual(result.prs_synced, 1)
+        self.assertEqual(result.checks_synced, 0)
 
     def test_sync_does_not_hold_write_lock_across_network_fetch(self) -> None:
         """GH-171 regression: sync_github_repo must not hold the SQLite write

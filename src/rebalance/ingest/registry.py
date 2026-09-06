@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from rebalance.ingest.config import canonical_github_repo_name
 
@@ -57,6 +57,15 @@ class DuplicateRepoClaimError(ValueError):
     every project-level read then counts one repository twice — GH-182, and the
     same counted-once rule as SOP.md section 6.
     """
+
+
+class RegistryLoadError(ValueError):
+    """A project registry could not be parsed or did not match its schema."""
+
+    def __init__(self, registry_path: Path, reason: yaml.YAMLError | ValidationError) -> None:
+        self.registry_path = registry_path
+        self.reason = reason
+        super().__init__(f"Could not load project registry {registry_path}: {reason}")
 
 
 def canonical_repo_key(repo: str) -> str:
@@ -114,8 +123,11 @@ def read_registry(registry_path: Path) -> Registry:
     if not registry_path.exists():
         return Registry()
     raw = registry_path.read_text(encoding="utf-8")
-    parsed = _extract_yaml_block(raw)
-    return Registry.model_validate(parsed)
+    try:
+        parsed = _extract_yaml_block(raw)
+        return Registry.model_validate(parsed)
+    except (yaml.YAMLError, ValidationError) as exc:
+        raise RegistryLoadError(registry_path, exc) from exc
 
 
 def load_registry(registry_path: Path) -> Registry:

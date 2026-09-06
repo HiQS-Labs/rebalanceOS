@@ -72,6 +72,27 @@ jobs:
       - name: Type check
         run: mypy src/
 
+  # GH-127: the README's credential-free Getting Started path includes all
+  # dependencies needed to collect the root suite. Keep this separate from the
+  # split test lanes below: this job protects the documented install contract,
+  # rather than changing their targeted dependency/cost trade-offs.
+  readme-install:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Follow README Getting Started
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -e ".[embeddings,calendar,server,dev]"
+          .venv/bin/rebalance version
+      - name: Verify documented test collection
+        run: .venv/bin/pytest --collect-only -q tests/
+
   # GH-144 Phase 0 (TESTS-RESULTS/2026-09-01+GH-144/) measured this incumbent job's
   # cost and found it decomposes into: install-with-torch ~55s + root suite ~100s +
   # HiQS suite+install ~25s, serialized — but only 4 test nodes in 2 files actually
