@@ -47,10 +47,14 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
   - Filter to incomplete items (`is_completed == False`).
   - Graceful degradation: If running on non-macOS or if TCC/permissions are unavailable, log a warning and proceed without failing the cycle.
 
-### Step 3 — Scan Device-Wide Git Activity & Unclosed Loops (Code Signal)
+### Step 3 — Scan Device-Wide Git Activity, Unclosed Loops & Machine CPU Health (Code Signal)
 - Execute `python3 .agents/skills/daily/scripts/scan_unclosed_loops.py` (or `bash .claude/skills/rebalance/collect.sh`).
 - Automatically updates and synchronizes `temp/close-the-loop.md` with active in-flight worktrees, un-PRed branches, and open pull requests.
 - Identifies repos with `ACTIVE` or `WARM` worktrees, recent commit timestamps, unmerged branches, and dirty working trees.
+- **Machine CPU Health (Runaway Scanner)**:
+  - Execute `python3 .agents/skills/daily/scripts/scan_runaway_cpu.py` (sibling scanner, GH-194).
+  - Flags processes pinning a core across cycles: `%CPU > 50`, duty cycle (CPU time ÷ elapsed) `> 0.5`, elapsed `> 2h`, and (same `(pid, lstart)` persisted from the previous cycle with growing CPU time **or** elapsed `> 24h`); known long-lived services (`mcp_server`, `pulse_server`, IDE helpers, system daemons) are exempt.
+  - Maintains the rolling comparison state at `temp/daily-log/cpu-watch.json`. Strictly report-only — it never signals or kills a process; the flagged line carries the ready `kill` command for the operator to run (or decline).
 
 ### Step 4 — Evaluate 2-Hour Trajectory, Velocity & Cadenced Horizons
 
@@ -91,6 +95,10 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
      - *Trigger*: $\ge 1$ un-PRed branch, dangling worktree commit, or unmerged PR sitting without movement for $\ge 4$ consecutive cycles ($\ge 60\text{m}$).
      - *Nudge*: Prompt operator to close the loop (cut the PR, squash-merge, or run `/merge-cleanup`) to prevent branch drift and abandoned work.
      - *Citation*: `[Trigger: Unclosed loop <repo:branch_or_pr> stalled for N cycles]`
+   - **Runaway Compute Alert**:
+     - *Trigger*: The CPU-health scanner flags the same PID as a runaway candidate for $\ge 2$ consecutive cycles, or any candidate with elapsed $\ge 24\text{h}$ on its first flag.
+     - *Nudge*: Name the process, its duty cycle and persistence span, and surface the ready `kill <pid>` command so the operator can stop it; never signal or kill the process yourself.
+     - *Citation*: `[Trigger: PID <n> runaway for N cycles, duty <d>%]`
 
 ---
 
@@ -113,6 +121,7 @@ Format the synthesis matching this exact Markdown template:
 - **Velocity**: <Nominal / High / Very High — with brief quantitative basis (e.g. commits/PRs/phases completed)>
 - **Operational Horizon**: <Reconciled next 1–2 hours: upcoming calendar commitments + ranked Sleuth & Apple Reminders priorities>
 - **Unclosed Loops**: <N un-PRed branches, M open PRs, K unpushed commits> `[Details: temp/close-the-loop.md]`
+- **Machine CPU Health**: <0 runaway candidates, or N candidates with PID / command / duty / cycles and the ready kill command> `[Details: temp/daily-log/cpu-watch.json]`
 - **Coaching Nudge**: <1-2 sentences of actionable guidance> `[Trigger: <telemetry_metric>]`
 ```
 
