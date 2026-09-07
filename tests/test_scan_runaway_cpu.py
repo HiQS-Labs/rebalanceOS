@@ -15,14 +15,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / ".agents"
-    / "skills"
-    / "daily"
-    / "scripts"
-    / "scan_runaway_cpu.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / ".agents" / "skills" / "daily" / "scripts" / "scan_runaway_cpu.py"
 spec = importlib.util.spec_from_file_location("scan_runaway_cpu", SCRIPT)
 scan_runaway_cpu = importlib.util.module_from_spec(spec)
 sys.modules["scan_runaway_cpu"] = scan_runaway_cpu
@@ -247,9 +240,7 @@ def test_json_payload_round_trip_shape(tmp_path, capsys, monkeypatch):
         "snapshot_processes",
         lambda: [make_proc()],
     )
-    monkeypatch.setattr(
-        scan_runaway_cpu, "DEFAULT_STATE_PATH", tmp_path / "cpu-watch.json", raising=False
-    )
+    monkeypatch.setattr(scan_runaway_cpu, "DEFAULT_STATE_PATH", tmp_path / "cpu-watch.json", raising=False)
     sys.argv = ["scan_runaway_cpu.py", "--json", "--state-path", str(tmp_path / "cpu-watch.json")]
     assert scan_runaway_cpu.main() == 0
     payload = json.loads(capsys.readouterr().out)
