@@ -331,37 +331,25 @@ def sync_registry(mode: str, registry_path: Path, projects_yaml_path: Path, data
 # ---------------------------------------------------------------------------
 
 
-def get_projects(
-    database_path: Path,
+def _fetch_projects_from_conn(
+    conn: Any,
     status: str | None = None,
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch projects from the project_registry table.
+    query = (
+        "SELECT name, status, summary, value_level, priority_tier, "
+        "risk_level, repos_json, tags_json, custom_fields_json "
+        "FROM project_registry"
+    )
+    params: list[Any] = []
+    if status:
+        query += " WHERE status = ?"
+        params.append(status)
+    query += " ORDER BY name ASC"
+    if limit is not None:
+        query += f" LIMIT {int(limit)}"
 
-    Returns a list of dicts with ``repos`` (list), ``tags`` (list), and
-    ``custom_fields`` (dict) already decoded from their ``*_json`` columns.
-
-    This is the **canonical** way to read projects from SQLite.  All callers
-    (MCP server, querier, project classifier, etc.) should use this instead
-    of writing their own SQL + JSON-parsing logic.
-    """
-    if not database_path.exists():
-        return []
-
-    from rebalance.ingest.db import db_connection, ensure_project_schema
-
-    with db_connection(database_path, ensure_project_schema) as conn:
-        query = (
-            "SELECT name, status, summary, value_level, priority_tier, "
-            "risk_level, repos_json, tags_json, custom_fields_json "
-            "FROM project_registry"
-        )
-        params: tuple[Any, ...] = ()
-        if status:
-            query += " WHERE status = ?"
-            params = (status,)
-        query += " ORDER BY name ASC"
-
-        rows = conn.execute(query, params).fetchall()
+    rows = conn.execute(query, tuple(params)).fetchall()
 
     result: list[dict[str, Any]] = []
     for row in rows:
@@ -382,6 +370,34 @@ def get_projects(
         d["provenance"] = (d["custom_fields"] or {}).get("provenance", "")
         result.append(d)
     return result
+
+
+def get_projects(
+    database_path: Path | None = None,
+    status: str | None = None,
+    *,
+    conn: Any = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch projects from the project_registry table.
+
+    Returns a list of dicts with ``repos`` (list), ``tags`` (list), and
+    ``custom_fields`` (dict) already decoded from their ``*_json`` columns.
+
+    This is the **canonical** way to read projects from SQLite.  All callers
+    (MCP server, querier, project classifier, etc.) should use this instead
+    of writing their own SQL + JSON-parsing logic.
+    """
+    if conn is not None:
+        return _fetch_projects_from_conn(conn, status, limit=limit)
+
+    if database_path is None or not database_path.exists():
+        return []
+
+    from rebalance.ingest.db import db_connection, ensure_project_schema
+
+    with db_connection(database_path, ensure_project_schema) as c:
+        return _fetch_projects_from_conn(c, status, limit=limit)
 
 
 def effective_client(custom_fields: dict[str, Any] | None) -> str | None:

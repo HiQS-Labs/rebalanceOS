@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.86.0] - 2026-09-08
+
+### Added
+- Shutdown triage and next-session continuity skill: an end-of-day triage workflow that scans local repositories across a three-calendar-day window and records reviewed triage decisions, proposed merge order, and a single concrete next-session nudge per project. Distinguishes merged phase PRs from incomplete project arcs, and preserves deliberate deferral reasons across sessions (#196).
+- Two-pass repository liveness verification: detects active edits, ref updates, and open driver locks between timed snapshots to exclude active repositories from end-of-day triage actions (#196).
+- Read-only database enrichment seam: enriches triage reports with recent commits and items when a local database is present, with strict bounds and automatic fallback to standalone mode (#196).
+
 ## [0.85.0] - 2026-09-06
 
 ### Added
