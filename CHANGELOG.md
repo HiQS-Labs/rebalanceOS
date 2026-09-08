@@ -10,12 +10,17 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.85.0] - 2026-09-08
+## [0.86.0] - 2026-09-08
 
 ### Added
 - Shutdown triage and next-session continuity skill: an end-of-day triage workflow that scans local repositories across a three-calendar-day window and records reviewed triage decisions, proposed merge order, and a single concrete next-session nudge per project. Distinguishes merged phase PRs from incomplete project arcs, and preserves deliberate deferral reasons across sessions (#196).
 - Two-pass repository liveness verification: detects active edits, ref updates, and open driver locks between timed snapshots to exclude active repositories from end-of-day triage actions (#196).
 - Read-only database enrichment seam: enriches triage reports with recent commits and items when a local database is present, with strict bounds and automatic fallback to standalone mode (#196).
+
+## [0.85.0] - 2026-09-06
+
+### Added
+- Machine CPU-health monitoring in the daily work-synthesis skill (#194): a deterministic, report-only scanner flags processes that have pinned a core far longer than legitimate work allows — high CPU, a near-1.0 duty cycle (CPU time over elapsed time), and hours of elapsed runtime, sustained across successive synthesis cycles or exceeding a day outright. Born from a real incident: a runaway test process burned ~67 CPU-hours over nearly three days and was found only by a chance look at the process table. Known long-lived services (servers, agent runtimes, system daemons) are exempt; the flagged line names the process, its duty cycle and persistence, and carries the ready stop command for the operator — the scanner itself never signals a process. The daily synthesis gains a matching falsifiable coaching trigger and a Machine CPU Health line.
 
 ## [0.84.1] - 2026-09-04
 
