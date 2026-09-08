@@ -51,7 +51,7 @@ out=$(HOME="$home" CODEX_HOME="$TMP/start-now/codex" "$TAILER")
 home=$(setup_home "$TMP/partial-first")
 rollout=$(new_session_file "$TMP/partial-first/codex")
 cp "$FIXTURE" "$rollout"
-printf '%s' '{"payload":{"type":"user_message","message":"This is the fifth mock user prompt, present but unterminated at first sighting, long enough to clear the threshold."},"timestamp":"2026-08-27T19:25:00.000Z","type":"event_msg"}' >> "$rollout"
+printf '%s' '{"payload":{"type":"user_message","message":"This is the fifth mock user prompt, present but unterminated at first sighting, long enough to clear the threshold."},"timestamp":"2099-08-27T19:25:00.000Z","type":"event_msg"}' >> "$rollout"
 HOME="$home" CODEX_HOME="$TMP/partial-first/codex" "$TAILER" >/dev/null
 [ "$(log_count "$home/.claude/prompt-log.jsonl")" = "0" ] \
   || fail "partial first sighting: a partial record was captured pre-completion"
@@ -138,5 +138,134 @@ out=$(HOME="$home" CODEX_HOME="$TMP/backfill/codex" "$TAILER")
 [ "$out" = "clio-codex-tail: delivered=1 deferred_files=0" ] \
   || fail "append lock freed: the deferred chunk was not delivered"
 [ "$(log_count "$log")" = "5" ] || fail "append lock freed: expected 5 JSONL rows"
+
+# -- 9. GH-199: discovery boundary, provenance and migration -----------------
+python3 - "$TAILER" "$INSTALL_DOC" <<'PYTEST'
+import json, os, subprocess, sys, tempfile
+from pathlib import Path
+
+tailer, install_doc = map(Path, sys.argv[1:])
+marker = "cat > ~/.claude/hooks/clio-capture.sh << 'EOF'\n"
+writer_text = install_doc.read_text().split(marker, 1)[1].split('\nEOF', 1)[0] + '\n'
+SINCE = '2026-09-08T20:00:00.500000+00:00'
+OLD = '2026-09-08T20:00:00.499999Z'
+NEW = '2026-09-08T20:00:00.500001Z'
+
+def meta(sid='root', source='vscode', **extra):
+    return {'type':'session_meta', 'payload':{'id':sid, 'cwd':'/fixture/'+sid, 'source':source, **extra}}
+
+def prompt(label, ts=NEW):
+    return {'type':'event_msg', 'timestamp':ts, 'payload':{'type':'user_message', 'message':label+' '+('x'*120)}}
+
+def encoded(rows):
+    return ''.join(json.dumps(row)+'\n' for row in rows).encode()
+
+with tempfile.TemporaryDirectory(prefix='clio-discovery-') as tmp:
+    root = Path(tmp)
+    def setup(name, sessions=True):
+        home = root/name/'home'; hooks = home/'.claude/hooks'; hooks.mkdir(parents=True)
+        writer = hooks/'clio-capture.sh'; writer.write_text(writer_text); writer.chmod(0o755)
+        tree = root/name/'codex/sessions'
+        if sessions: tree.mkdir(parents=True)
+        env = {**os.environ, 'HOME':str(home), 'CODEX_HOME':str(tree.parent)}
+        env.pop('CLIO_TAIL_BACKFILL', None)
+        return home, tree, env
+
+    def run(case, **extra):
+        p = subprocess.run([str(tailer)], env={**case[2], **extra}, capture_output=True, text=True, timeout=30)
+        assert p.returncode == 0, p.stderr
+        log = case[0]/'.claude/prompt-log.jsonl'
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def pin(case):
+        state = case[0]/'.claude/prompt-log-codex-tail.state'
+        state.write_text('# capture_since\t'+SINCE+'\n')
+        return state
+
+    def labels(rows):
+        return [r['prompt'].split()[0] for r in rows]
+
+    # A complete prompt exists before the first discovery of its new file.
+    c = setup('first'); assert run(c) == []; pin(c)
+    f = c[1]/'rollout-new.jsonl'; f.write_bytes(encoded([meta(), prompt('first')]))
+    before = f.read_bytes()
+    assert labels(run(c)) == ['first'], 'completed first prompt lost before discovery'
+    assert labels(run(c)) == ['first'], 'restart duplicated first prompt'
+    assert f.read_bytes() == before, 'source was modified'
+
+    # Initial history remains excluded; polling can initialize without a tree.
+    c = setup('absent', sessions=False); assert run(c) == []
+    assert (c[0]/'.claude/prompt-log-codex-tail.state').read_text().startswith('# capture_since\t')
+    pin(c); c[1].mkdir(parents=True)
+    f = c[1]/'rollout-late.jsonl'; f.write_bytes(encoded([meta(),prompt('history',OLD),prompt('late')]))
+    assert labels(run(c)) == ['late']
+    original = f.read_bytes(); replacement = f.with_suffix('.new'); replacement.write_bytes(original); replacement.replace(f)
+    assert labels(run(c)) == ['late'], 'rotation imported skipped history'
+    f.write_bytes(b''); assert labels(run(c)) == ['late']
+    f.write_bytes(original); assert labels(run(c)) == ['late'], 'truncation imported skipped history'
+
+    # Full-precision, inclusive comparison and validation, with distinct IDs.
+    c = setup('times'); pin(c)
+    for sid,ts in [('before',OLD),('equal',SINCE),('after',NEW),('offset','2026-09-08T13:00:00.500000-07:00'),('invalid','2026-99-99T20:00:00Z'),('naive','2026-09-08T20:00:01'),('missing','')]:
+        (c[1]/('rollout-'+sid+'.jsonl')).write_bytes(encoded([meta(sid),prompt(sid,ts)]))
+    assert sorted(labels(run(c))) == ['after','equal','offset']
+
+    # Completing an old partial does not bypass eligibility; a new one survives.
+    c = setup('partials'); pin(c)
+    for sid,ts in [('old',OLD),('new',NEW)]:
+        (c[1]/('rollout-'+sid+'.jsonl')).write_bytes(encoded([meta(sid),prompt(sid,ts)]).rstrip(b'\n'))
+    assert run(c) == []
+    for f in c[1].glob('*.jsonl'):
+        with f.open('ab') as h: h.write(b'\n')
+    assert labels(run(c)) == ['new'], 'partial completion bypassed cutoff or was lost'
+
+    # Empty first sighting must retain the cutoff when its first data arrives.
+    c = setup('empty'); pin(c); f = c[1]/'rollout-empty.jsonl'; f.touch(); assert run(c) == []
+    f.write_bytes(encoded([meta(),prompt('history',OLD),prompt('eligible')]))
+    assert labels(run(c)) == ['eligible']
+
+    # The FIRST metadata controls child identity even after parent context appears.
+    c = setup('provenance'); pin(c)
+    f = c[1]/'rollout-child.jsonl'
+    child = meta('child', {'subagent':{'thread_spawn':{'parent_thread_id':'parent'}}})
+    f.write_bytes(encoded([child,prompt('inherited'),meta('parent'),prompt('copied')]))
+    for sid, m in [('string',meta('string','subagent')),('parent',meta('parent-id',parent_thread_id='parent'))]:
+        (c[1]/('rollout-'+sid+'.jsonl')).write_bytes(encoded([m,meta('copied-'+sid),prompt('copied-'+sid)]))
+    r = c[1]/'rollout-root.jsonl'; r.write_bytes(encoded([meta('genuine'),prompt('root')]))
+    assert labels(run(c)) == ['root'], 'child context leaked or all roots rejected'
+    with f.open('ab') as h: h.write(encoded([prompt('child-later','2026-09-08T20:01:00Z')]))
+    with r.open('ab') as h: h.write(encoded([meta('resumed','cli'),prompt('resume','2026-09-08T20:01:00Z')]))
+    rows = run(c)
+    assert labels(rows) == ['root','resume'] and [v['session_id'] for v in rows] == ['genuine','resumed']
+    assert [v['repo'] for v in rows] == ['genuine','resumed']
+    assert labels(run(c,CLIO_TAIL_BACKFILL='1')) == ['root','resume']
+
+    # New root parsing defers until complete first metadata, never cached guesses.
+    c = setup('metadata'); pin(c); f = c[1]/'rollout-meta.jsonl'; data=encoded([meta()]); f.write_bytes(data[:20]); assert run(c)==[]
+    with f.open('ab') as h: h.write(data[20:]+encoded([prompt('complete')]))
+    assert labels(run(c)) == ['complete']
+
+    # A legacy pending chunk retries unchanged; reset never imports skipped A.
+    c = setup('legacy'); f=c[1]/'rollout-legacy.jsonl'
+    prefix=encoded([meta(),prompt('A','2026-09-08T18:00:00Z')]); whole=prefix+encoded([prompt('B','2026-09-08T19:00:00Z')]); f.write_bytes(whole)
+    state=c[0]/'.claude/prompt-log-codex-tail.state'
+    state.write_text(f'{f}\t{f.stat().st_ino}\t{len(prefix)}\troot\t/fixture/root\n')
+    real_writer=c[0]/'.claude/hooks/clio-capture.sh'; saved=real_writer.read_text(); real_writer.write_text('#!/bin/bash\nexit 3\n')
+    assert run(c)==[]; assert '\t'+str(len(prefix))+'\t' in state.read_text()
+    real_writer.write_text(saved)
+    assert labels(run(c))==['B'], 'legacy pending row was discarded'
+    replacement=f.with_suffix('.new'); replacement.write_bytes(whole); replacement.replace(f)
+    assert labels(run(c))==['B'], 'legacy reset imported skipped A'
+    f.write_bytes(b''); assert labels(run(c))==['B']; f.write_bytes(whole)
+    assert labels(run(c))==['B'], 'legacy truncation imported skipped A'
+
+    # Explicit backfill still imports root history; it never imports child copies.
+    c=setup('backfill-child'); pin(c)
+    (c[1]/'rollout-root.jsonl').write_bytes(encoded([meta(),prompt('old-root',OLD)]))
+    (c[1]/'rollout-child.jsonl').write_bytes(encoded([child,meta('parent'),prompt('old-child',OLD)]))
+    assert labels(run(c,CLIO_TAIL_BACKFILL='1'))==['old-root']
+
+print('PASS: GH-199 first discovery, history/rotation, precision, partials, child/root resume, legacy retry, backfill')
+PYTEST
 
 echo "PASS: codex tailer"

@@ -16,12 +16,16 @@
 #             writer accepted the chunk. Re-delivery after a crash is safe:
 #             the writer suppresses already-seen IDs.
 #   context = session id + cwd are checkpointed WITH the cursor, so each tick
-#             reads only new bytes; a state row without context triggers one
+#             extracts only new bytes after checking first-file provenance; a state row without context triggers one
 #             recovery pass from byte 0. In-chunk session_meta entries (resume
 #             forks) update the context in file order.
 #   rescan  = inode change or size regression resets the offset to 0.
-#   first sighting = start at the last terminating newline (no history import)
-#             unless CLIO_TAIL_BACKFILL=1, which imports from byte 0 once.
+#   first sighting = read from byte 0, eligible since the persisted capture-start
+#             instant. CLIO_TAIL_BACKFILL=1 admits history for unseen ROOT files.
+#   provenance = first session_meta identifies child files; inherited child prompts
+#             are never user submissions, even after later parent metadata.
+#   migration = legacy pending bytes remain eligible on their original inode; a
+#             reset adopts capture-start eligibility instead of importing old history.
 #   overlap = a tailer lock serializes invocations; a busy lock is a silent
 #             no-op (the next tick catches up).
 #   lock-busy on the shared append lock (writer exit 3) aborts WITHOUT
@@ -39,7 +43,6 @@ diag() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) clio-codex-tail: $*" >> "$ERRLOG";
 
 [ -x "$WRITER" ] || { echo "clio-codex-tail: shared writer not installed at $WRITER" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is required" >&2; exit 1; }
-[ -d "$CODEX_SESSIONS" ] || exit 0
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
@@ -49,31 +52,24 @@ date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
 
 file_id() { stat -f '%i' "$1" 2>/dev/null || stat -c '%i' "$1" 2>/dev/null || echo "?"; }
 file_size() { stat -f '%z' "$1" 2>/dev/null || stat -c '%s' "$1" 2>/dev/null || echo 0; }
-file_last_newline() { # byte offset just after the last terminating newline (0 if none)
-  python3 - "$1" <<'PYEOF'
-import sys
-with open(sys.argv[1], "rb") as fh:
-    print(fh.read().rfind(b"\n") + 1)
-PYEOF
-}
-
-# State: path<TAB>inode<TAB>offset<TAB>session_id<TAB>cwd (tab-sanitized).
-state_lookup() { # $1 = path -> echoes "inode<TAB>offset<TAB>sid<TAB>cwd"; nonzero when unseen
+# State: capture-start header plus path/inode/offset/session/cwd/eligibility TSV.
+# Eligibility: ISO cutoff, 0 (explicit backfill), or legacy (original-inode pending).
+state_lookup() { # $1 = path -> echoes "inode<TAB>offset<TAB>sid<TAB>cwd<TAB>eligibility"; nonzero when unseen
   [ -f "$STATE" ] || return 1
-  hit=$(awk -F'\t' -v p="$1" '$1 == p { printf "%s\t%s\t%s\t%s\n", $2, $3, $4, $5; exit }' "$STATE")
+  hit=$(awk -F'\t' -v p="$1" '$1 == p { printf "%s\t%s\t%s\t%s\t%s\n", $2, $3, $4, $5, $6; exit }' "$STATE")
   [ -n "$hit" ] && { printf '%s\n' "$hit"; return 0; }
   return 1
 }
 
-state_update() { # $1 = path, $2 = inode, $3 = offset, $4 = session_id, $5 = cwd
+state_update() { # $1 = path, $2 = inode, $3 = offset, $4 = session_id, $5 = cwd, $6 = eligibility
   tmp="$STATE.tmp.$$"
   if [ -f "$STATE" ]; then
     awk -F'\t' -v p="$1" '$1 != p' "$STATE" > "$tmp"
   else
     : > "$tmp"
   fi
-  printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" \
-    "$(printf '%s' "$4" | tr '\t' ' ')" "$(printf '%s' "$5" | tr '\t' ' ')" >> "$tmp"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" \
+    "$(printf '%s' "$4" | tr '\t' ' ')" "$(printf '%s' "$5" | tr '\t' ' ')" "$6" >> "$tmp"
   mv "$tmp" "$STATE"
 }
 
@@ -85,32 +81,49 @@ state_update() { # $1 = path, $2 = inode, $3 = offset, $4 = session_id, $5 = cwd
 # straight to the offset; otherwise one pass from byte 0 recovers the nearest
 # preceding session_meta before the offset.
 extract_rows() {
-  python3 - "$1" "$2" "${3:-}" "${4:-}" <<'PYEOF'
+  python3 - "$1" "$2" "${3:-}" "${4:-}" "$5" <<'PYEOF'
 import json, sys
 from datetime import datetime, timezone
 
-def norm_ts(ts):
-    """Normalize any ISO-8601 instant to UTC second precision (clio:id contract)."""
-    if not ts:
-        return ""
-    if ts.endswith("Z") and len(ts) >= 20:
-        return ts[:19] + "Z"
+def parse_ts(ts):
+    """Validate before cutoff comparison; output IDs still use UTC seconds."""
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    except Exception:
-        return ""
+        return dt.astimezone(timezone.utc) if dt.tzinfo is not None else None
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 path, offset = sys.argv[1], int(sys.argv[2])
 ctx_sid, ctx_cwd = sys.argv[3], sys.argv[4]
+since = None if sys.argv[5] in ("0", "legacy") else parse_ts(sys.argv[5])
+if since is None and sys.argv[5] not in ("0", "legacy"):
+    raise ValueError("invalid capture-start state")
 with open(path, "rb") as fh:
+    # Immutable file provenance is independent of the cached/nearest context.
+    first_meta = None
+    for raw in fh:
+        if not raw.endswith(b"\n"):
+            break
+        try:
+            item = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(item, dict) and item.get("type") == "session_meta":
+            candidate = item.get("payload")
+            if isinstance(candidate, dict) and candidate.get("id"):
+                first_meta = candidate
+            break
+    source = (first_meta or {}).get("source")
+    child = bool(first_meta and (first_meta.get("parent_thread_id") or source == "subagent"
+                 or isinstance(source, dict) and "subagent" in source))
     if offset > 0 and ctx_sid:
         fh.seek(offset)
         data, scan_start = fh.read(), offset
     else:
+        fh.seek(0)
         data, scan_start = fh.read(), 0
 
-cut = data.rfind(b"\n")
+cut = data.rfind(b"\n") if first_meta else -1
 malformed = 0
 session_id, cwd = ctx_sid, ctx_cwd
 if cut != -1 and cut >= (offset - scan_start):
@@ -128,21 +141,30 @@ if cut != -1 and cut >= (offset - scan_start):
         except Exception:
             malformed += 1
             continue
-        payload = obj.get("payload") or {}
+        if not isinstance(obj, dict) or not isinstance(obj.get("payload"), dict):
+            malformed += 1
+            continue
+        payload = obj["payload"]
         if obj.get("type") == "session_meta":
             session_id = str(payload.get("id") or session_id)
             cwd = str(payload.get("cwd") or cwd)
             continue
-        if line_start < offset:
+        if child or line_start < offset:
             continue
         if obj.get("type") != "event_msg" or payload.get("type") != "user_message":
             continue
         text = payload.get("message")
         if not isinstance(text, str) or not text.strip() or not session_id:
             continue
+        instant = parse_ts(obj.get("timestamp"))
+        if instant is None:
+            malformed += 1
+            continue
+        if since is not None and instant < since:
+            continue
         repo = cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else ""
         print(json.dumps({
-            "timestamp": norm_ts(str(obj.get("timestamp") or "")),
+            "timestamp": instant.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "repo": repo,
             "branch": "",
             "machine": "",
@@ -158,6 +180,18 @@ print(f"MALFORMED {malformed}", file=sys.stderr)
 PYEOF
 }
 
+# Initialize under the existing tailer lock, even before a sessions tree exists.
+# The header survives atomic per-file updates and is ignored by legacy readers.
+CAPTURE_SINCE=$(awk -F'\t' '$1 == "# capture_since" {print $2; exit}' "$STATE" 2>/dev/null || true)
+if [ -z "$CAPTURE_SINCE" ]; then
+  CAPTURE_SINCE=$(python3 -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())')
+  tmp="$STATE.tmp.$$"
+  printf '# capture_since\t%s\n' "$CAPTURE_SINCE" > "$tmp"
+  if [ -f "$STATE" ]; then cat "$STATE" >> "$tmp"; fi
+  mv "$tmp" "$STATE"
+fi
+[ -d "$CODEX_SESSIONS" ] || exit 0
+
 delivered=0
 skipped=0
 
@@ -172,29 +206,28 @@ while IFS= read -r -d '' file; do
     cached_offset=$(printf '%s' "$cached" | awk -F'\t' '{print $2}')
     cached_sid=$(printf '%s' "$cached" | awk -F'\t' '{print $3}')
     cached_cwd=$(printf '%s' "$cached" | awk -F'\t' '{print $4}')
+    cached_since=$(printf '%s' "$cached" | awk -F'\t' '{print $5}')
+    cached_since=${cached_since:-legacy}
     case "$cached_offset" in ''|*[!0-9]*) cached_offset=0 ;; esac
     if [ "$cached_inode" != "$inode" ] || [ "$size" -lt "$cached_offset" ]; then
-      offset=0          # rotated or truncated -> full rescan (IDs suppress dups)
+      offset=0          # reset loses original-inode legacy eligibility
+      [ "$cached_since" != legacy ] || cached_since="$CAPTURE_SINCE"
       cached_sid=""; cached_cwd=""
     else
       offset=$cached_offset
     fi
-  elif [ "$BACKFILL" = "1" ]; then
+  else
     offset=0
     cached_sid=""; cached_cwd=""
-  else
-    # Start now: land the cursor after the last TERMINATING newline so a
-    # record completed after first sighting is still delivered.
-    offset=$(file_last_newline "$file")
-    state_update "$file" "$inode" "$offset" "" ""
-    continue
+    cached_since="$CAPTURE_SINCE"
+    [ "$BACKFILL" != 1 ] || cached_since=0
   fi
 
-  [ "$offset" -ge "$size" ] && { state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd"; continue; }
+  [ "$offset" -ge "$size" ] && { state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"; continue; }
 
   rows_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-rows.XXXXXX")
   err_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-err.XXXXXX")
-  if ! python_ok=$(extract_rows "$file" "$offset" "$cached_sid" "$cached_cwd" > "$rows_file" 2> "$err_file" && echo yes); then
+  if ! python_ok=$(extract_rows "$file" "$offset" "$cached_sid" "$cached_cwd" "$cached_since" > "$rows_file" 2> "$err_file" && echo yes); then
     diag "rollout parse failed: $file"
     rm -f "$rows_file" "$err_file"
     continue
@@ -245,7 +278,7 @@ while IFS= read -r -d '' file; do
   rm -f "$rows_file"
 
   if [ "$chunk_ok" = 1 ]; then
-    state_update "$file" "$inode" "$((offset + consumed))" "$ctx_sid" "$ctx_cwd"
+    state_update "$file" "$inode" "$((offset + consumed))" "$ctx_sid" "$ctx_cwd" "$cached_since"
   else
     skipped=$((skipped + 1))
   fi

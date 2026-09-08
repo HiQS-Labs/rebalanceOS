@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Plan revised after Codex round 2
+status: Implemented — verification in progress
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
@@ -19,7 +19,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Producer ownership confirmed; existing tailer and failure traced. | Promote the grounded repair plan, then Codex plan QA. |
+| Codex approved the plan; first-prompt fix and synthetic regressions implemented. | Complete verification and final Codex QA, then publish canonical PR and downstream commit. |
 
 Canonical issue: https://github.com/HiQS-Labs/rebalanceOS/issues/199.
 RebalanceOS owns CLIO; XYZ-CLIO receives the matching downstream commit after the
@@ -155,3 +155,7 @@ to every chunk, including pending partials; newline completion grants eligibilit
 only when its source timestamp qualifies. Old pending records remain eligible only
 under the explicitly bounded original-inode legacy policy. The second driver returned
 8 due to a malformed reviewer verdict block; it is not treated as approval.
+
+Round 3 approved the plan with no open findings. The reviewer omitted a protocol
+label; the unchanged approval and a separately labeled producer receipt are retained
+in the relay thread. The validator and relay driver then returned zero.
