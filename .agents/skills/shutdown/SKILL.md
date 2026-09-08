@@ -35,14 +35,22 @@ which concrete actions should kick off tomorrow morning.
 ## Conversational Execution Workflow
 
 ### Step 1 — Run Two-Pass Scanner
-Execute the canonical scanner in shutdown mode:
+Execute the canonical scanner in shutdown mode independently of current working directory:
 ```bash
-python3 .agents/skills/daily/scripts/scan_unclosed_loops.py --mode shutdown
+# Locate scanner via repository root or standard paths:
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+SCANNER_SCRIPT="$REPO_ROOT/.agents/skills/daily/scripts/scan_unclosed_loops.py"
+if [ ! -f "$SCANNER_SCRIPT" ]; then
+  SCANNER_SCRIPT="$REPO_ROOT/.claude/skills/daily/scripts/scan_unclosed_loops.py"
+fi
+
+python3 "$SCANNER_SCRIPT" --mode shutdown [--config <path/to/rbos.config>] [--output-dir <path/to/output>]
 ```
 - Discovers git repositories across configured roots (`temp/rbos.config` or standard dev folders).
 - Performs Snapshot A, waits $\ge 30\text{s}$, performs Snapshot B.
 - Gathers staged/unstaged/untracked files, local branch tips, unpushed commits, and open PRs.
 - Emits structured JSON to stdout.
+- Supports `--config <path>` to specify operator configuration and `--output-dir <path>` to customize persistent handoff destination (defaults to `temp/daily-log/shutdown`).
 
 ### Step 2 — Synthesize Context & Read Continuity History
 1. **Read Previous Handoff**: Inspect `temp/daily-log/shutdown/latest.md` (if present)

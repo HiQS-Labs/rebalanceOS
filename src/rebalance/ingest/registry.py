@@ -331,19 +331,25 @@ def sync_registry(mode: str, registry_path: Path, projects_yaml_path: Path, data
 # ---------------------------------------------------------------------------
 
 
-def _fetch_projects_from_conn(conn: Any, status: str | None = None) -> list[dict[str, Any]]:
+def _fetch_projects_from_conn(
+    conn: Any,
+    status: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
     query = (
         "SELECT name, status, summary, value_level, priority_tier, "
         "risk_level, repos_json, tags_json, custom_fields_json "
         "FROM project_registry"
     )
-    params: tuple[Any, ...] = ()
+    params: list[Any] = []
     if status:
         query += " WHERE status = ?"
-        params = (status,)
+        params.append(status)
     query += " ORDER BY name ASC"
+    if limit is not None:
+        query += f" LIMIT {int(limit)}"
 
-    rows = conn.execute(query, params).fetchall()
+    rows = conn.execute(query, tuple(params)).fetchall()
 
     result: list[dict[str, Any]] = []
     for row in rows:
@@ -371,6 +377,7 @@ def get_projects(
     status: str | None = None,
     *,
     conn: Any = None,
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch projects from the project_registry table.
 
@@ -382,7 +389,7 @@ def get_projects(
     of writing their own SQL + JSON-parsing logic.
     """
     if conn is not None:
-        return _fetch_projects_from_conn(conn, status)
+        return _fetch_projects_from_conn(conn, status, limit=limit)
 
     if database_path is None or not database_path.exists():
         return []
@@ -390,7 +397,7 @@ def get_projects(
     from rebalance.ingest.db import db_connection, ensure_project_schema
 
     with db_connection(database_path, ensure_project_schema) as c:
-        return _fetch_projects_from_conn(c, status)
+        return _fetch_projects_from_conn(c, status, limit=limit)
 
 
 def effective_client(custom_fields: dict[str, Any] | None) -> str | None:

@@ -10,14 +10,15 @@ import json
 import logging
 import os
 import tempfile
-from datetime import datetime, timezone  # CANONICAL-PATH-OK: type hints and timezone handling
+import time
+from datetime import datetime  # CANONICAL-PATH-OK: type annotation for UTC datetime boundaries
 from pathlib import Path
 from typing import Any
 
 from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.ingest.db.queries import fetch_day_commits, fetch_day_items
 from rebalance.ingest.registry import get_projects
-from rebalance.lib.time_ops import format_local, now_utc, parse_iso
+from rebalance.lib.time_ops import now_utc, parse_iso
 
 logger = logging.getLogger(__name__)
 
@@ -59,28 +60,41 @@ def enrich_shutdown_with_db(
             # Set busy timeout on connection to prevent hanging
             conn.execute(f"PRAGMA busy_timeout = {int(timeout_seconds * 1000)}")
 
-            commits = fetch_day_commits(conn, start=start_utc, end=end_utc, github_login=github_login)
-            items = fetch_day_items(conn, start=start_utc, end=end_utc, github_login=github_login)
-            projects = get_projects(conn=conn, status="active")
+            start_monotonic = time.monotonic()
+
+            def _progress_handler() -> int:
+                if time.monotonic() - start_monotonic > timeout_seconds:
+                    return 1  # Abort query execution
+                return 0
+
+            conn.set_progress_handler(_progress_handler, 1000)
+            try:
+                commits = fetch_day_commits(conn, start=start_utc, end=end_utc, github_login=github_login)
+                items = fetch_day_items(conn, start=start_utc, end=end_utc, github_login=github_login)
+                projects = get_projects(conn=conn, status="active", limit=max_records)
+            finally:
+                conn.set_progress_handler(None, 0)
 
             # Check freshness of newest commit or item
             latest_epoch: float = 0.0
             for c in commits:
                 c_at = c.get("committed_at")
                 if isinstance(c_at, str):
-                    try:
-                        latest_epoch = max(latest_epoch, datetime.fromisoformat(c_at.replace("Z", "+00:00")).timestamp())
-                    except Exception:
-                        pass
+                    parsed_dt = parse_iso(c_at)
+                    if parsed_dt:
+                        latest_epoch = max(latest_epoch, parsed_dt.timestamp())
 
-            now_epoch = datetime.now(timezone.utc).timestamp()
+            now_epoch = now_utc().timestamp()
             is_stale = (now_epoch - latest_epoch > 86400) if latest_epoch > 0 else False
+
+            is_truncated = len(commits) > max_records or len(items) > max_records or len(projects) >= max_records
 
             # Bounded output
             return {
                 "status": "ok",
                 "database_path": str(p),
                 "is_stale": is_stale,
+                "is_truncated": is_truncated,
                 "commits": commits[:max_records],
                 "items": items[:max_records],
                 "projects": projects[:max_records],
@@ -111,9 +125,12 @@ def write_shutdown_handoff(
     and a relative symlink is updated at:
       <output_home>/latest.md -> <date_str>/<run_id>.md
     """
+    # 1. Serialize JSON first so any serialization errors abort before file creation
+    json_str = json.dumps(json_evidence, indent=2)
+
     home_dir = Path(output_home).expanduser().resolve()
     if not date_str:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = now_utc().strftime("%Y-%m-%d")
 
     target_dir = home_dir / date_str
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -121,36 +138,51 @@ def write_shutdown_handoff(
     md_target = target_dir / f"{run_id}.md"
     json_target = target_dir / f"{run_id}.json"
 
-    # Atomic write for markdown file
-    with tempfile.NamedTemporaryFile("w", dir=target_dir, delete=False, suffix=".tmp") as tf_md:
-        tf_md.write(markdown_content)
-        tf_md.flush()
-        os.fsync(tf_md.fileno())
-        temp_md_path = Path(tf_md.name)
+    temp_md_path: Path | None = None
+    temp_json_path: Path | None = None
+    temp_link_path: Path | None = None
 
-    os.replace(temp_md_path, md_target)
+    try:
+        # 2. Write markdown temp file
+        with tempfile.NamedTemporaryFile("w", dir=target_dir, delete=False, suffix=".mdtmp", encoding="utf-8") as tf_md:
+            tf_md.write(markdown_content)
+            tf_md.flush()
+            os.fsync(tf_md.fileno())
+            temp_md_path = Path(tf_md.name)
 
-    # Atomic write for JSON sidecar
-    with tempfile.NamedTemporaryFile("w", dir=target_dir, delete=False, suffix=".tmp") as tf_json:
-        tf_json.write(json.dumps(json_evidence, indent=2))
-        tf_json.flush()
-        os.fsync(tf_json.fileno())
-        temp_json_path = Path(tf_json.name)
+        # 3. Write JSON temp file
+        with tempfile.NamedTemporaryFile("w", dir=target_dir, delete=False, suffix=".jsontmp", encoding="utf-8") as tf_json:
+            tf_json.write(json_str)
+            tf_json.flush()
+            os.fsync(tf_json.fileno())
+            temp_json_path = Path(tf_json.name)
 
-    os.replace(temp_json_path, json_target)
+        # 4. Atomically move both files into place
+        os.replace(temp_md_path, md_target)
+        temp_md_path = None
+        os.replace(temp_json_path, json_target)
+        temp_json_path = None
 
-    # Atomic symlink update for latest.md
-    latest_link = home_dir / "latest.md"
-    rel_target = Path(date_str) / f"{run_id}.md"
+        # 5. Atomically update latest.md symlink
+        latest_link = home_dir / "latest.md"
+        rel_target = Path(date_str) / f"{run_id}.md"
 
-    with tempfile.NamedTemporaryFile("w", dir=home_dir, delete=False, suffix=".linktmp") as tf_link:
-        temp_link_path = Path(tf_link.name)
+        with tempfile.NamedTemporaryFile("w", dir=home_dir, delete=False, suffix=".linktmp") as tf_link:
+            temp_link_path = Path(tf_link.name)
 
-    temp_link_path.unlink(missing_ok=True)
-    os.symlink(rel_target, temp_link_path)
-    os.replace(temp_link_path, latest_link)
+        temp_link_path.unlink(missing_ok=True)
+        os.symlink(rel_target, temp_link_path)
+        os.replace(temp_link_path, latest_link)
+        temp_link_path = None
 
-    return md_target, json_target, latest_link
+        return md_target, json_target, latest_link
+    finally:
+        if temp_md_path and temp_md_path.exists():
+            temp_md_path.unlink(missing_ok=True)
+        if temp_json_path and temp_json_path.exists():
+            temp_json_path.unlink(missing_ok=True)
+        if temp_link_path and temp_link_path.exists():
+            temp_link_path.unlink(missing_ok=True)
 
 
 def format_shutdown_brief(
@@ -160,7 +192,7 @@ def format_shutdown_brief(
     run_timestamp: str | None = None,
 ) -> str:
     """Format the end-of-day shutdown brief according to the canonical template."""
-    now_str = run_timestamp or datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    now_str = run_timestamp or now_utc().astimezone().strftime("%Y-%m-%d %H:%M %Z")  # READ-LAYER-OK: display timestamp
 
     lines = [
         f"# 🌙 End-of-Day Shutdown Brief — {now_str}",
@@ -214,9 +246,14 @@ def format_shutdown_brief(
 
     all_open_prs = []
     for proj in projects:
+        # Exclude active projects from action candidate PRs
+        if proj.get("is_active"):
+            continue
         for pr in proj.get("open_prs", []):
-            all_open_prs.append(pr)
+            if pr.get("state", "OPEN").upper() == "OPEN":
+                all_open_prs.append(pr)
 
+    pr_query_errors = scanner_data.get("pr_query_errors", [])
     if all_open_prs:
         for idx, pr in enumerate(all_open_prs, 1):
             pr_repo = pr.get("repo", "")
@@ -224,6 +261,8 @@ def format_shutdown_brief(
             pr_title = pr.get("title", "")
             pr_url = pr.get("url", "")
             lines.append(f"{idx}. [{pr_repo}#{pr_num}]({pr_url}) — {pr_title} (Open)")
+    elif pr_query_errors:
+        lines.append("_Pull request status unknown for some repositories due to query errors._")
     else:
         lines.append("_No pending pull requests across scanned repositories._")
 
@@ -264,9 +303,11 @@ def format_shutdown_brief(
     )
 
     nudges_emitted = 0
-    # Top nudge 1: Un-PRed branches
+    # Top nudge 1: Un-PRed branches (only from stable, non-excluded projects)
     unpred_list = []
     for proj in projects:
+        if proj.get("is_active"):
+            continue
         for b in proj.get("branches", []):
             if b.get("pr_status") == "unpred":
                 unpred_list.append((proj["canonical_remote"], b["branch"]))
@@ -278,7 +319,7 @@ def format_shutdown_brief(
             f"{nudges_emitted}. **Review Un-PRed Branch**: Inspect `{r_name}:{b_name}` and cut PR or merge via `/merge-cleanup`."
         )
 
-    # Top nudge 2: Open PRs
+    # Top nudge 2: Open PRs (only from stable, non-excluded projects)
     if all_open_prs and nudges_emitted < 3:
         nudges_emitted += 1
         first_pr = all_open_prs[0]

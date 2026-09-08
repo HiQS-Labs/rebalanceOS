@@ -8,9 +8,6 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 from rebalance.ingest.shutdown_handoff import (
     enrich_shutdown_with_db,
@@ -307,4 +304,50 @@ def test_a12_useful_restart(tmp_path: Path):
     assert "🌙 End-of-Day Shutdown Brief" in restart_content
     assert "Tomorrow Morning Nudges" in restart_content
     assert "HiQS-Labs/rebalanceOS#196" in restart_content
+
+
+# --------------------------------------------------------------------------
+# Reproduction verification tests from code review
+# --------------------------------------------------------------------------
+
+def test_repro_active_repo_nudges():
+    """Verifies active repository branches/PRs are excluded from morning nudges."""
+    active = {
+        "canonical_remote": "example/project",
+        "is_active": True,
+        "open_prs": [
+            {
+                "repo": "example/project",
+                "number": 1,
+                "title": "active PR",
+                "url": "https://github.com/example/project/pull/1",
+            }
+        ],
+        "branches": [{"branch": "feature", "pr_status": "unpred"}],
+    }
+    brief = format_shutdown_brief(
+        {
+            "projects": [active],
+            "excluded_repos": [{"name": "project", "activity_reasons": ["active edits"]}],
+        }
+    )
+    assert "cut PR or merge" not in brief, "Active repository branch must not be suggested for PR creation"
+    assert "Review Top PR" not in brief, "Active repository PR must not be suggested as top PR review"
+    assert "Ongoing Activity Exclusions" in brief
+
+
+def test_repro_same_run_id_interrupted_write(tmp_path: Path):
+    """Verifies atomic write: non-serializable sidecar data aborts before overwriting existing files."""
+    out = tmp_path / "handoffs"
+    _, js, latest = write_shutdown_handoff(out, "201500", "first brief", {"run": 1}, "2026-09-08")
+    assert latest.read_text(encoding="utf-8") == "first brief"
+
+    # Attempt to overwrite with non-serializable object
+    try:
+        write_shutdown_handoff(out, "201500", "second brief", {"not_serializable": object()}, "2026-09-08")
+    except TypeError:
+        pass
+
+    assert latest.read_text(encoding="utf-8") == "first brief", "Failed write must not modify existing markdown"
+    assert json.loads(js.read_text(encoding="utf-8")) == {"run": 1}, "Failed write must not corrupt existing JSON"
 

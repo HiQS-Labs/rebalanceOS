@@ -62,7 +62,7 @@ def run_cmd(cmd: list[str], cwd: Path | None = None, timeout: int = 10) -> tuple
             text=True,
             timeout=timeout,
         )
-        return res.returncode, res.stdout.strip()
+        return res.returncode, res.stdout.rstrip("\r\n")
     except Exception as e:
         return 1, str(e)
 
@@ -227,7 +227,7 @@ def inspect_git_repo(
 
     # Full status porcelain v1
     code_s, s_out = run_cmd(["git", "status", "--porcelain=v1", "-uall"], cwd=repo_path)
-    status_lines = [l for l in s_out.splitlines() if l.strip()] if code_s == 0 else []
+    status_lines = [line for line in s_out.splitlines() if line.strip()] if code_s == 0 else []
 
     staged_files = []
     unstaged_files = []
@@ -239,6 +239,8 @@ def inspect_git_repo(
             continue
         code_xy = line[:2]
         filepath = line[3:].strip()
+        if " -> " in filepath:
+            filepath = filepath.split(" -> ")[1].strip()
         if code_xy[0] in "MADRC":
             staged_files.append(filepath)
         if code_xy[1] in "MD":
@@ -268,7 +270,7 @@ def inspect_git_repo(
         for ref_line in refs_out.splitlines():
             parts = ref_line.split("|")
             if len(parts) >= 4:
-                b_name, b_upstream, b_sha, b_date = parts[0], parts[1], parts[2], parts[3]
+                b_name, b_upstream, b_sha = parts[0], parts[1], parts[2]
                 ahead, behind = 0, 0
                 upstream_status = "present" if b_upstream else "missing"
 
@@ -352,8 +354,8 @@ def inspect_git_repo(
             cwd=repo_path,
         )
         if code_log == 0 and log_out:
-            for l in log_out.splitlines():
-                lp = l.split("|")
+            for log_line in log_out.splitlines():
+                lp = log_line.split("|")
                 if len(lp) >= 4:
                     recent_commits.append(
                         {
@@ -373,8 +375,8 @@ def inspect_git_repo(
             cwd=repo_path,
         )
         if code_rf == 0 and rf_out:
-            for l in rf_out.splitlines():
-                lp = l.split("|")
+            for rf_line in rf_out.splitlines():
+                lp = rf_line.split("|")
                 if len(lp) >= 3:
                     recent_reflog.append({"ref": lp[0], "action": lp[1], "epoch": int(lp[2]) if lp[2].isdigit() else 0})
 
@@ -385,12 +387,14 @@ def inspect_git_repo(
     # Active lock files
     git_dir = Path(common_dir)
     known_locks = ["index.lock", "HEAD.lock", "relay-driver.lock", "releases-app.lock"]
-    active_locks = [l for l in known_locks if (git_dir / l).exists()]
+    active_locks = [lock_name for lock_name in known_locks if (git_dir / lock_name).exists()]
 
     # Undated unresolved classification
     is_undated_unresolved = False
     if (dirty_count > 0 or len(unpushed_branches) > 0) and not recent_commits and age_days > 3.0:
         is_undated_unresolved = True
+
+    git_error = (code_s != 0 or code_refs != 0)
 
     return {
         "path": str(repo_path),
@@ -413,26 +417,51 @@ def inspect_git_repo(
         "age_days": round(age_days, 1),
         "active_locks": active_locks,
         "is_undated_unresolved": is_undated_unresolved,
+        "git_error": git_error,
     }
 
 
-def get_repo_fingerprint(repo_path: Path, max_file_bytes: int = 10 * 1024 * 1024) -> dict[str, Any]:
+def get_repo_fingerprint(
+    repo_path: Path,
+    max_file_bytes: int = 10 * 1024 * 1024,
+    max_repo_bytes: int = 100 * 1024 * 1024,
+) -> dict[str, Any]:
     """Compute a quick bounded fingerprint of a repository to detect active concurrent edits."""
-    _, head_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_path)
-    _, status_raw = run_cmd(["git", "status", "--porcelain=v1", "-uall"], cwd=repo_path)
-    _, refs_raw = run_cmd(["git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"], cwd=repo_path)
+    code_head, head_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_path)
+    code_status, status_raw = run_cmd(["git", "status", "--porcelain=v1", "-uall"], cwd=repo_path)
+    code_refs, refs_raw = run_cmd(["git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"], cwd=repo_path)
     _, stash_raw = run_cmd(["git", "rev-parse", "-q", "--verify", "refs/stash"], cwd=repo_path)
 
-    dirty_files_meta: list[tuple[str, int, int]] = []
-    for line in status_raw.splitlines():
-        if len(line) >= 3:
-            fpath = repo_path / line[3:].strip()
-            try:
-                if fpath.is_file():
-                    st = fpath.stat()
-                    dirty_files_meta.append((line[3:].strip(), st.st_size, int(st.st_mtime)))
-            except OSError:
-                pass
+    git_error = (code_status != 0 or code_refs != 0 or code_head != 0)
+    uncertain = git_error
+
+    dirty_files_meta: list[tuple[str, int, int, str]] = []
+    total_bytes_hashed = 0
+
+    if code_status == 0:
+        for line in status_raw.splitlines():
+            if len(line) >= 3:
+                filepath = line[3:].strip()
+                if " -> " in filepath:
+                    filepath = filepath.split(" -> ")[1].strip()
+                fpath = repo_path / filepath
+                try:
+                    if fpath.is_file():
+                        st = fpath.stat()
+                        content_hash = ""
+                        remaining = max(0, max_repo_bytes - total_bytes_hashed)
+                        read_len = min(st.st_size, max_file_bytes, remaining)
+                        if read_len > 0:
+                            try:
+                                with open(fpath, "rb") as f:
+                                    chunk = f.read(read_len)
+                                content_hash = hashlib.sha256(chunk).hexdigest()
+                                total_bytes_hashed += len(chunk)
+                            except OSError:
+                                uncertain = True
+                        dirty_files_meta.append((filepath, st.st_size, int(st.st_mtime), content_hash))
+                except OSError:
+                    uncertain = True
 
     # Check lock files
     git_dir = repo_path / ".git"
@@ -445,9 +474,9 @@ def get_repo_fingerprint(repo_path: Path, max_file_bytes: int = 10 * 1024 * 1024
             pass
 
     locks = []
-    for l in ["index.lock", "HEAD.lock", "relay-driver.lock", "releases-app.lock"]:
-        if (git_dir / l).exists():
-            locks.append(l)
+    for lock_name in ["index.lock", "HEAD.lock", "relay-driver.lock", "releases-app.lock"]:
+        if (git_dir / lock_name).exists():
+            locks.append(lock_name)
 
     hasher = hashlib.sha256()
     hasher.update(head_sha.encode())
@@ -455,19 +484,21 @@ def get_repo_fingerprint(repo_path: Path, max_file_bytes: int = 10 * 1024 * 1024
     hasher.update(refs_raw.encode())
     hasher.update(stash_raw.encode())
     for item in sorted(dirty_files_meta):
-        hasher.update(f"{item[0]}:{item[1]}:{item[2]}".encode())
-    for l in sorted(locks):
-        hasher.update(l.encode())
+        hasher.update(f"{item[0]}:{item[1]}:{item[2]}:{item[3]}".encode())
+    for lock_name in sorted(locks):
+        hasher.update(lock_name.encode())
 
     return {
         "path": str(repo_path),
         "head_sha": head_sha,
-        "status_count": len(status_raw.splitlines()),
+        "status_count": len([line for line in status_raw.splitlines() if line.strip()]),
         "refs_raw": refs_raw,
         "stash_raw": stash_raw,
         "dirty_files_meta": dirty_files_meta,
         "locks": locks,
         "hash": hasher.hexdigest(),
+        "git_error": git_error,
+        "uncertain": uncertain,
     }
 
 
@@ -491,11 +522,11 @@ def fetch_prs_for_remotes(
                 "--repo",
                 remote,
                 "--state",
-                "open",
+                "all",
                 "--limit",
                 str(max_prs_per_remote),
                 "--json",
-                "number,title,headRefName,baseRefName,updatedAt,url,author,isDraft",
+                "number,title,headRefName,baseRefName,updatedAt,url,author,isDraft,state,mergedAt",
             ],
             timeout=timeout,
         )
@@ -553,6 +584,9 @@ def run_two_pass_scan(
         f_b = fingerprints_B[p]
         reasons = []
 
+        if f_a.get("git_error") or f_b.get("git_error") or f_a.get("uncertain") or f_b.get("uncertain"):
+            reasons.append("Failed Git command or unreadable repository state during scan pass")
+
         if f_a["hash"] != f_b["hash"]:
             if f_a["head_sha"] != f_b["head_sha"]:
                 reasons.append(f"HEAD changed: {f_a['head_sha'][:7]} -> {f_b['head_sha'][:7]}")
@@ -561,13 +595,17 @@ def run_two_pass_scan(
             if f_a["status_count"] != f_b["status_count"]:
                 reasons.append(f"Dirty status line count changed ({f_a['status_count']} -> {f_b['status_count']})")
             if f_a["dirty_files_meta"] != f_b["dirty_files_meta"]:
-                reasons.append("Dirty/untracked file mtime or size changed (content edit)")
+                reasons.append("Dirty/untracked file content, mtime, or size changed (content edit)")
             if not reasons:
                 reasons.append("Fingerprint hash divergence between snapshots")
 
         locks = f_b.get("locks", [])
         if locks:
             reasons.append(f"Active lock files detected: {', '.join(locks)}")
+
+        insp_b = inspections_B.get(p)
+        if insp_b and insp_b.get("git_error"):
+            reasons.append("Failed Git command during repository inspection")
 
         if reasons:
             active_paths.add(p)
@@ -683,11 +721,14 @@ def main() -> int:
     parser.add_argument("--update-ledger", action="store_true", default=False, help="Update temp/close-the-loop.md")
     parser.add_argument("--no-ledger-write", action="store_true", help="Force no-ledger-write invariant")
     parser.add_argument("--config", type=str, help="Explicit path to configuration file (e.g. temp/rbos.config)")
+    parser.add_argument("--output-dir", "--output-home", dest="output_dir", type=str, help="Override output directory for shutdown handoff artifacts")
     parser.add_argument("--days", type=int, default=3, help="Calendar day window (default 3: today + 2 previous local days)")
     parser.add_argument("--delay", type=float, default=None, help="Delay between snapshots in seconds (default 30 for shutdown, 0 for daily)")
     args = parser.parse_args()
 
     cfg = load_shutdown_config(args.config)
+    if args.output_dir:
+        cfg["output_home"] = args.output_dir
     window = compute_calendar_window(days=args.days, tz_name=cfg["timezone"])
 
     if args.mode == "shutdown":
@@ -703,12 +744,15 @@ def main() -> int:
         all_inspections = two_pass["stable_repos"] + two_pass["excluded_repos"]
         discovered_remotes = [insp["canonical_remote"] for insp in all_inspections if insp.get("canonical_remote")]
         prs_by_remote, pr_errors = fetch_prs_for_remotes(discovered_remotes)
+        pr_error_remotes = {e.get("remote") for e in pr_errors if e.get("remote")}
 
         # Build grouped project representation
         projects_map: dict[str, dict[str, Any]] = {}
         for insp in all_inspections:
             r_name = insp.get("canonical_remote") or insp["name"]
             if r_name not in projects_map:
+                all_prs = prs_by_remote.get(r_name, [])
+                open_prs = [p for p in all_prs if p.get("state", "OPEN").upper() == "OPEN"]
                 projects_map[r_name] = {
                     "canonical_remote": r_name,
                     "physical_clones": [],
@@ -717,7 +761,8 @@ def main() -> int:
                     "branches": [],
                     "dirty_files_count": 0,
                     "recent_commits": [],
-                    "open_prs": prs_by_remote.get(r_name, []),
+                    "open_prs": open_prs,
+                    "all_prs": all_prs,
                     "is_undated_unresolved": False,
                 }
             proj = projects_map[r_name]
@@ -726,17 +771,38 @@ def main() -> int:
                 proj["is_active"] = True
                 proj["activity_reasons"].extend(insp.get("activity_reasons", []))
             proj["dirty_files_count"] += insp["dirty_count"]
-            proj["recent_commits"].extend(insp.get("recent_commits", []))
+
+            # Deduplicate recent commits by SHA
+            existing_shas = {c["sha"] for c in proj["recent_commits"]}
+            for c in insp.get("recent_commits", []):
+                if c["sha"] not in existing_shas:
+                    proj["recent_commits"].append(c)
+                    existing_shas.add(c["sha"])
+
             if insp.get("is_undated_unresolved"):
                 proj["is_undated_unresolved"] = True
 
             for b in insp.get("branches", []):
-                matched_pr = next((p for p in proj["open_prs"] if p.get("headRefName") == b["branch"]), None)
+                existing_branch_names = {eb["branch"] for eb in proj["branches"]}
+                if b["branch"] in existing_branch_names:
+                    continue
+
+                matched_pr = next((p for p in proj.get("all_prs", []) if p.get("headRefName") == b["branch"]), None)
                 b_augmented = dict(b)
                 if matched_pr:
-                    b_augmented["pr_status"] = "open"
+                    pr_state = matched_pr.get("state", "OPEN").upper()
+                    if pr_state == "MERGED":
+                        b_augmented["pr_status"] = "merged"
+                    elif pr_state == "CLOSED":
+                        b_augmented["pr_status"] = "closed"
+                    else:
+                        b_augmented["pr_status"] = "open"
                     b_augmented["pr_number"] = matched_pr["number"]
                     b_augmented["pr_url"] = matched_pr["url"]
+                    if matched_pr.get("mergedAt"):
+                        b_augmented["merged_at"] = matched_pr["mergedAt"]
+                elif r_name in pr_error_remotes:
+                    b_augmented["pr_status"] = "unknown"
                 elif b["branch"] in ("main", "master", "development"):
                     b_augmented["pr_status"] = "integration_branch"
                 else:
@@ -747,6 +813,7 @@ def main() -> int:
             "mode": "shutdown",
             "generated_at": datetime.now().astimezone().isoformat(),
             "config_path": cfg["config_path"],
+            "output_home": cfg["output_home"],
             "window": window,
             "summary": {
                 "discovered_clones": len(all_inspections),
@@ -775,7 +842,9 @@ def main() -> int:
     open_prs = []
     prs_by_remote, _ = fetch_prs_for_remotes(PRIMARY_WATCHED_REPOS)
     for r_prs in prs_by_remote.values():
-        open_prs.extend(r_prs)
+        for p in r_prs:
+            if p.get("state", "OPEN").upper() == "OPEN":
+                open_prs.append(p)
 
     unpred_branches: list[dict[str, str]] = []
     unpushed_branches: list[dict[str, str]] = []
@@ -783,11 +852,11 @@ def main() -> int:
     active_worktrees: list[dict[str, str]] = []
 
     for r in repo_stats:
-        if r["worktrees"]:
-            for wt in r["worktrees"]:
-                active_worktrees.append({"repo": r["name"], "wt": wt.get("path", "")})
-                if wt.get("branch"):
-                    unpred_branches.append({"repo": r["name"], "branch": wt["branch"], "wt_desc": str(wt)})
+        linked_worktrees = r["worktrees"][1:] if len(r["worktrees"]) > 1 else []
+        for wt in linked_worktrees:
+            active_worktrees.append({"repo": r["name"], "wt": wt.get("path", "")})
+            if wt.get("branch"):
+                unpred_branches.append({"repo": r["name"], "branch": wt["branch"], "wt_desc": str(wt)})
 
         for up in r["unpushed_branches"]:
             unpushed_branches.append(up)

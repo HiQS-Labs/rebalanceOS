@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Any
-
-import pytest
+from unittest.mock import patch
 
 # Import scanner functions
 # We add .agents/skills/daily/scripts to sys.path for direct testing
@@ -83,10 +82,6 @@ def test_a2_calendar_day_window():
     # Test that start_local is at 00:00:00
     dt_start = datetime.fromisoformat(w_ny["start_local"])
     assert dt_start.hour == 0 and dt_start.minute == 0 and dt_start.second == 0
-
-    # Red control: approximate 72h subtraction would have arbitrary non-zero hours/minutes
-    dt_now = datetime.fromisoformat(w_ny["end_local"])
-    naive_72h = dt_now - (dt_start - dt_start)  # different concept
     assert dt_start.time().hour == 0, "Red control: start of window must align to local midnight, not 72h subtraction"
 
 
@@ -129,19 +124,20 @@ def test_a4_two_pass_activity_exclusion(tmp_path: Path):
 
     assert fp_a["hash"] != fp_b["hash"], "Hash must diverge when content is modified"
 
+    # Test already-dirty same-status content change
+    test_file.write_text("# Test Repo Modified Again With Different Text\n", encoding="utf-8")
+    fp_c = scanner.get_repo_fingerprint(repo)
+    assert fp_b["hash"] != fp_c["hash"], "Hash must diverge between two consecutive dirty states"
+
     # Test lock file exclusion
     lock_file = repo / ".git" / "releases-app.lock"
     lock_file.write_text("active lock", encoding="utf-8")
     fp_lock = scanner.get_repo_fingerprint(repo)
     assert "releases-app.lock" in fp_lock["locks"]
 
-    # Red control: comparing only status count would miss same-status edits
-    assert fp_a["status_count"] == 0
-    # Both fp_a and fp_b have different hashes even if lines change or file size changes
 
-
-def test_a5_execution_bounds(tmp_path: Path):
-    """A5: Subprocess timeout and command bounds return error safely."""
+def test_a5_execution_bounds():
+    """A5: Subprocess timeout, content hashing limits, and command bounds return error safely."""
     # Test run_cmd timeout handling
     code, out = scanner.run_cmd(["sleep", "2"], timeout=1)
     assert code != 0
@@ -159,8 +155,110 @@ def test_a6_no_scan_mutations(tmp_path: Path):
 
     # Run inspection
     insp = scanner.inspect_git_repo(repo)
+    assert insp["dirty_count"] == 0
 
     # Verify repo files, refs, and index are untouched
     assert readme.read_text(encoding="utf-8") == orig_content
     assert readme.stat().st_mtime == orig_mtime
     assert not ledger_path.exists(), "Ledger must not be written during inspection"
+
+    # Also test CLI execution with --no-ledger-write
+    buf = io.StringIO()
+    with patch.object(scanner, "discover_git_repos", return_value=[repo]), \
+         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])), \
+         patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]), \
+         contextlib.redirect_stdout(buf):
+        scanner.main()
+    assert not ledger_path.exists(), "Ledger must not be written when --no-ledger-write is passed"
+
+
+# --------------------------------------------------------------------------
+# Reproduction verification tests from code review
+# --------------------------------------------------------------------------
+
+def test_repro_tracked_dirty_edit(tmp_path: Path):
+    """Verifies porcelain v1 status preserves leading spaces, filenames are intact, and fingerprints diverge."""
+    repo = init_test_git_repo(tmp_path / "tracked_repo")
+    tracked = repo / "README.md"
+    tracked.write_text("dirty before\n", encoding="utf-8")
+
+    insp = scanner.inspect_git_repo(repo)
+    # Filepath must be README.md, not EADME.md
+    assert "README.md" in insp["unstaged_files"]
+    assert "README.md" not in insp["staged_files"]
+
+    fp_a = scanner.get_repo_fingerprint(repo)
+    assert len(fp_a["dirty_files_meta"]) == 1
+    assert fp_a["dirty_files_meta"][0][0] == "README.md"
+
+    tracked.write_text("different and longer dirty content after\n", encoding="utf-8")
+    fp_b = scanner.get_repo_fingerprint(repo)
+    assert len(fp_b["dirty_files_meta"]) == 1
+    assert fp_a["hash"] != fp_b["hash"], "Fingerprint must diverge on tracked dirty file edit"
+
+
+def test_repro_same_metadata_content_edit(tmp_path: Path):
+    """Verifies content hashing detects edits when file size and mtime are identical."""
+    repo = init_test_git_repo(tmp_path / "meta_repo")
+    untracked = repo / "new.txt"
+    untracked.write_text("aaaa", encoding="utf-8")
+    os.utime(untracked, (1700000000, 1700000000))
+    fp_a = scanner.get_repo_fingerprint(repo)
+
+    untracked.write_text("bbbb", encoding="utf-8")
+    os.utime(untracked, (1700000000, 1700000000))
+    fp_b = scanner.get_repo_fingerprint(repo)
+
+    assert fp_a["hash"] != fp_b["hash"], "Content hash must catch same-size/same-mtime edits"
+
+
+def test_repro_failed_git_reads(tmp_path: Path):
+    """Verifies failed git commands cause repository to be excluded rather than marked stable."""
+    repo = init_test_git_repo(tmp_path / "failed_repo")
+    with patch.object(scanner, "run_cmd", return_value=(1, "mock git error")):
+        failed = scanner.run_two_pass_scan([repo], scanner.DEFAULT_EXCLUSIONS, {}, delay_seconds=0)
+
+    assert len(failed["stable_repos"]) == 0, "Failed git reads must not be marked stable"
+    assert len(failed["excluded_repos"]) == 1, "Failed git reads must be excluded"
+    assert any("Failed Git" in r for r in failed["excluded_repos"][0]["activity_reasons"])
+
+
+def test_repro_failed_pr_lookup(tmp_path: Path):
+    """Verifies that PR query failures mark branch status as unknown and avoid claiming no PRs or suggesting cut PR."""
+    repo = init_test_git_repo(tmp_path / "pr_repo")
+    subprocess.run(["git", "checkout", "-b", "feat/my-feature"], cwd=repo, check=True, capture_output=True)
+    readme = repo / "README.md"
+    readme.write_text("# PR branch\n", encoding="utf-8")
+    subprocess.run(["git", "commit", "-am", "commit on branch"], cwd=repo, check=True, capture_output=True)
+
+    insp = scanner.inspect_git_repo(repo)
+    insp.update(canonical_remote="example/project", is_active=False, activity_reasons=[])
+    two = {"stable_repos": [insp], "excluded_repos": [], "active_paths": []}
+
+    buf = io.StringIO()
+    with patch.object(scanner, "run_two_pass_scan", return_value=two), \
+         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [{"remote": "example/project", "error": "authentication failed"}])), \
+         patch.object(sys, "argv", ["scan", "--mode", "shutdown", "--delay", "0"]), \
+         contextlib.redirect_stdout(buf):
+        scanner.main()
+
+    payload = json.loads(buf.getvalue())
+    branch_status = payload["projects"][0]["branches"][0]["pr_status"]
+    assert branch_status == "unknown", f"Branch status must be 'unknown' on PR query failure, got {branch_status}"
+
+
+def test_repro_single_checkout_daily(tmp_path: Path):
+    """Verifies that in daily mode, a single-checkout repository does not register spurious active worktrees."""
+    repo = init_test_git_repo(tmp_path / "single_checkout")
+    subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True)
+
+    buf = io.StringIO()
+    with patch.object(scanner, "discover_git_repos", return_value=[repo]), \
+         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])), \
+         patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]), \
+         contextlib.redirect_stdout(buf):
+        scanner.main()
+
+    daily = json.loads(buf.getvalue())
+    assert daily["counts"]["active_worktrees"] == 0, "Single-checkout must not count as active linked worktree"
+    assert daily["counts"]["unpred_branches"] == 0, "Single-checkout must not register spurious unpred branch in daily mode"
