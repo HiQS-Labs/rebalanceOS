@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Reviewed — draft publication
+status: Draft PR open — broader gates outstanding
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
@@ -19,7 +19,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Canonical fix implemented; both copies pass CLIO suites; final Codex review approved. | Publish draft canonical PR and direct downstream commit; broader merge-readiness gates remain open. |
+| Canonical draft PR #200 opened; downstream main pushed; final Codex review approved. | Resolve the disclosed broader gates before canonical merge readiness. |
 
 Canonical issue: https://github.com/HiQS-Labs/rebalanceOS/issues/199.
 RebalanceOS owns CLIO; XYZ-CLIO receives the matching downstream commit after the
@@ -171,3 +171,12 @@ Final Codex review approved the implementation in one round with no required fix
 the relay driver returned zero. Approval is limited to this repair, with broader
 merge readiness still outstanding. Both review threads are retained under
 `relay-system/2026-09-08/`.
+
+## Publication
+
+- Canonical draft PR: https://github.com/HiQS-Labs/rebalanceOS/pull/200 (base `development`).
+- Downstream repair: https://github.com/HiQS-Labs/XYZ-CLIO/commit/03dc5e7.
+- Downstream executable-mode preservation: https://github.com/HiQS-Labs/XYZ-CLIO/commit/a067403.
+- Both runtime and harness contents match canonical commit `4a0ff1f`; standalone
+  installer differences and the harness executable permission are preserved.
+- Pushed remote refs verified. No primary checkout edits, live deployment or backfill.
