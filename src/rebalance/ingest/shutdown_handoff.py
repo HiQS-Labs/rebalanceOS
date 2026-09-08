@@ -151,7 +151,9 @@ def write_shutdown_handoff(
             temp_md_path = Path(tf_md.name)
 
         # 3. Write JSON temp file
-        with tempfile.NamedTemporaryFile("w", dir=target_dir, delete=False, suffix=".jsontmp", encoding="utf-8") as tf_json:
+        with tempfile.NamedTemporaryFile(
+            "w", dir=target_dir, delete=False, suffix=".jsontmp", encoding="utf-8"
+        ) as tf_json:
             tf_json.write(json_str)
             tf_json.flush()
             os.fsync(tf_json.fileno())

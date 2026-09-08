@@ -394,7 +394,7 @@ def inspect_git_repo(
     if (dirty_count > 0 or len(unpushed_branches) > 0) and not recent_commits and age_days > 3.0:
         is_undated_unresolved = True
 
-    git_error = (code_s != 0 or code_refs != 0)
+    git_error = code_s != 0 or code_refs != 0
 
     return {
         "path": str(repo_path),
@@ -429,10 +429,12 @@ def get_repo_fingerprint(
     """Compute a quick bounded fingerprint of a repository to detect active concurrent edits."""
     code_head, head_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_path)
     code_status, status_raw = run_cmd(["git", "status", "--porcelain=v1", "-uall"], cwd=repo_path)
-    code_refs, refs_raw = run_cmd(["git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"], cwd=repo_path)
+    code_refs, refs_raw = run_cmd(
+        ["git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"], cwd=repo_path
+    )
     _, stash_raw = run_cmd(["git", "rev-parse", "-q", "--verify", "refs/stash"], cwd=repo_path)
 
-    git_error = (code_status != 0 or code_refs != 0 or code_head != 0)
+    git_error = code_status != 0 or code_refs != 0 or code_head != 0
     uncertain = git_error
 
     dirty_files_meta: list[tuple[str, int, int, str]] = []
@@ -715,15 +717,30 @@ def update_close_the_loop_ledger(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scan and report unclosed loops across repositories")
-    parser.add_argument("--mode", choices=["daily", "shutdown"], default="daily", help="Operating mode: daily (default) or shutdown")
+    parser.add_argument(
+        "--mode", choices=["daily", "shutdown"], default="daily", help="Operating mode: daily (default) or shutdown"
+    )
     parser.add_argument("--json", action="store_true", help="Output raw JSON analysis")
     parser.add_argument("--summary-line", action="store_true", help="Output the 1-line markdown summary")
     parser.add_argument("--update-ledger", action="store_true", default=False, help="Update temp/close-the-loop.md")
     parser.add_argument("--no-ledger-write", action="store_true", help="Force no-ledger-write invariant")
     parser.add_argument("--config", type=str, help="Explicit path to configuration file (e.g. temp/rbos.config)")
-    parser.add_argument("--output-dir", "--output-home", dest="output_dir", type=str, help="Override output directory for shutdown handoff artifacts")
-    parser.add_argument("--days", type=int, default=3, help="Calendar day window (default 3: today + 2 previous local days)")
-    parser.add_argument("--delay", type=float, default=None, help="Delay between snapshots in seconds (default 30 for shutdown, 0 for daily)")
+    parser.add_argument(
+        "--output-dir",
+        "--output-home",
+        dest="output_dir",
+        type=str,
+        help="Override output directory for shutdown handoff artifacts",
+    )
+    parser.add_argument(
+        "--days", type=int, default=3, help="Calendar day window (default 3: today + 2 previous local days)"
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=None,
+        help="Delay between snapshots in seconds (default 30 for shutdown, 0 for daily)",
+    )
     args = parser.parse_args()
 
     cfg = load_shutdown_config(args.config)

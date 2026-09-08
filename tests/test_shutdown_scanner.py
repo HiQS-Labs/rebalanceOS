@@ -164,10 +164,12 @@ def test_a6_no_scan_mutations(tmp_path: Path):
 
     # Also test CLI execution with --no-ledger-write
     buf = io.StringIO()
-    with patch.object(scanner, "discover_git_repos", return_value=[repo]), \
-         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])), \
-         patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]), \
-         contextlib.redirect_stdout(buf):
+    with (
+        patch.object(scanner, "discover_git_repos", return_value=[repo]),
+        patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])),
+        patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]),
+        contextlib.redirect_stdout(buf),
+    ):
         scanner.main()
     assert not ledger_path.exists(), "Ledger must not be written when --no-ledger-write is passed"
 
@@ -175,6 +177,7 @@ def test_a6_no_scan_mutations(tmp_path: Path):
 # --------------------------------------------------------------------------
 # Reproduction verification tests from code review
 # --------------------------------------------------------------------------
+
 
 def test_repro_tracked_dirty_edit(tmp_path: Path):
     """Verifies porcelain v1 status preserves leading spaces, filenames are intact, and fingerprints diverge."""
@@ -236,10 +239,16 @@ def test_repro_failed_pr_lookup(tmp_path: Path):
     two = {"stable_repos": [insp], "excluded_repos": [], "active_paths": []}
 
     buf = io.StringIO()
-    with patch.object(scanner, "run_two_pass_scan", return_value=two), \
-         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [{"remote": "example/project", "error": "authentication failed"}])), \
-         patch.object(sys, "argv", ["scan", "--mode", "shutdown", "--delay", "0"]), \
-         contextlib.redirect_stdout(buf):
+    with (
+        patch.object(scanner, "run_two_pass_scan", return_value=two),
+        patch.object(
+            scanner,
+            "fetch_prs_for_remotes",
+            return_value=({}, [{"remote": "example/project", "error": "authentication failed"}]),
+        ),
+        patch.object(sys, "argv", ["scan", "--mode", "shutdown", "--delay", "0"]),
+        contextlib.redirect_stdout(buf),
+    ):
         scanner.main()
 
     payload = json.loads(buf.getvalue())
@@ -253,12 +262,16 @@ def test_repro_single_checkout_daily(tmp_path: Path):
     subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True)
 
     buf = io.StringIO()
-    with patch.object(scanner, "discover_git_repos", return_value=[repo]), \
-         patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])), \
-         patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]), \
-         contextlib.redirect_stdout(buf):
+    with (
+        patch.object(scanner, "discover_git_repos", return_value=[repo]),
+        patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])),
+        patch.object(sys, "argv", ["scan", "--json", "--no-ledger-write"]),
+        contextlib.redirect_stdout(buf),
+    ):
         scanner.main()
 
     daily = json.loads(buf.getvalue())
     assert daily["counts"]["active_worktrees"] == 0, "Single-checkout must not count as active linked worktree"
-    assert daily["counts"]["unpred_branches"] == 0, "Single-checkout must not register spurious unpred branch in daily mode"
+    assert daily["counts"]["unpred_branches"] == 0, (
+        "Single-checkout must not register spurious unpred branch in daily mode"
+    )

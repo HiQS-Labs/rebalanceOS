@@ -254,7 +254,9 @@ def test_a10_exclusion_boundary():
 
 def test_a11_claude_forwarding_compatibility(tmp_path: Path):
     """A11: .claude forwarding shim delegates to canonical scanner and returns 0."""
-    claude_script = Path(__file__).resolve().parents[1] / ".claude" / "skills" / "daily" / "scripts" / "scan_unclosed_loops.py"
+    claude_script = (
+        Path(__file__).resolve().parents[1] / ".claude" / "skills" / "daily" / "scripts" / "scan_unclosed_loops.py"
+    )
     assert claude_script.exists()
 
     res = subprocess.run([sys.executable, str(claude_script), "--help"], capture_output=True, text=True)
@@ -310,6 +312,7 @@ def test_a12_useful_restart(tmp_path: Path):
 # Reproduction verification tests from code review
 # --------------------------------------------------------------------------
 
+
 def test_repro_active_repo_nudges():
     """Verifies active repository branches/PRs are excluded from morning nudges."""
     active = {
@@ -350,4 +353,3 @@ def test_repro_same_run_id_interrupted_write(tmp_path: Path):
 
     assert latest.read_text(encoding="utf-8") == "first brief", "Failed write must not modify existing markdown"
     assert json.loads(js.read_text(encoding="utf-8")) == {"run": 1}, "Failed write must not corrupt existing JSON"
-
