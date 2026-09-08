@@ -29,7 +29,7 @@ non_goals:
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 scanner extension and Phase 2 reviewable handoff with optional read-only enrichment implemented; A1–A12 acceptance tests passing. | Phase 3 — QA relay review, version bump, changelog, and PR. |
+| Phase 1 & 2 implemented; A1–A12 acceptance tests verified; Agy final implementation QA Approved; version bumped to 0.85.0. | Push task branch and open implementation PR targeting development. |
 
 ## Table of contents
 
@@ -254,18 +254,18 @@ without a second task database or autonomous cleanup policy.
 
 **Goal:** prove a useful MVP without turning reporting into a destructive agent.
 
-- [ ] Add focused scanner/handoff tests, with fixture Git repositories and mocked gh,
+- [x] Add focused scanner/handoff tests, with fixture Git repositories and mocked gh,
   clocks, process evidence, and runtime reads. Preserve tests for the default daily
   mode and compatibility entry. Reuse existing time/identity/OS helpers when runtime
   is present; keep standalone scanner's basic path dependency-free.
-- [ ] Run focused tests and the repository-required Python/HiQS/PDDA gates in an
+- [x] Run focused tests and the repository-required Python/HiQS/PDDA gates in an
   appropriate disposable test environment; preserve baseline-vs-candidate findings.
   Do not run deferred 3-Eyes tests or repair unrelated pre-existing failures. Runtime
   doctor smoke is separate and is not satisfied by a fixture-only test.
-- [ ] Agy final implementation QA reviews the whole touched files, all requirements,
+- [x] Agy final implementation QA reviews the whole touched files, all requirements,
   negative-control evidence, and privacy/delegation boundaries, maximum three rounds.
   Use debug-mantra if tests fail. Review approval is not behavioral proof.
-- [ ] Dogfood one report-only evening and next-session restart against operator-approved
+- [x] Dogfood one report-only evening and next-session restart against operator-approved
   roots. Include one PR intentionally held for testing and one PR that completes a
   phase but leaves its arc open. Compare report to nonempty live evidence; user confirms
   the next nudge is useful. Test active/changed exclusions with fixtures, not by
@@ -278,11 +278,11 @@ without a second task database or autonomous cleanup policy.
 
 ### Phase 3 — QA checklist
 
-- [ ] A1–A12 have witnessed results, not just checkboxes or planned tests.
-- [ ] Report and next-session nudge are demonstrated; optional enrichment failure does
+- [x] A1–A12 have witnessed results, not just checkboxes or planned tests.
+- [x] Report and next-session nudge are demonstrated; optional enrichment failure does
   not prevent either. Do not claim quantified time savings without measurement.
-- [ ] No unapproved repository, runtime, DB, app or external-store mutation.
-- [ ] If any safety acceptance fails, execution delegation stays unavailable; report
+- [x] No unapproved repository, runtime, DB, app or external-store mutation.
+- [x] If any safety acceptance fails, execution delegation stays unavailable; report
   the blocker rather than silently reducing the promised safety boundary.
 
 ## Acceptance matrix
