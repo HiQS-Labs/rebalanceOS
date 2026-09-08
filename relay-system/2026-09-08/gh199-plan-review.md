@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-08.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: none
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -118,5 +118,34 @@ approval or `VERDICT: FAIL` for changes requested, plus `swept file: yes`.
 Set top-level STATUS: Approved and NEXT: none only if approving. Otherwise keep
 STATUS: Open and NEXT: Producer. Preserve all earlier turns. Do not edit code.
 The previous driver exit 8 came from malformed verdict syntax, not successful QA.
+
+### Reviewer — codex — Round 3
+
+VERDICT: PASS
+Verdict: Approved (plan only)
+swept file: yes
+
+Read all four Setup artifacts in full and the rollout fixture; inspected retained baseline JSON and the Codex tailer log. Applied SWE and debug-mantra plan-review criteria. Static review only: no source/artifact execution, tests, installed hooks, or git commands. Graph project listing has no index for this isolated checkout; the related rebalanceOS index is generation 2026-09-02T03:54:57Z, with the plan missing and INSTALL.md metadata changed. Full local source reads supply the evidence; graph freshness, installed hashes, private incident observations, and live issue/rating state are not independently verified.
+
+- **[Pass] R1 is resolved at plan level: migration now separates original-file pending delivery from reset eligibility.** The distinct `legacy` sentinel retains pending chunks on the original inode, then converts to the global boundary before a replacement/truncation reset; unrecoverable pre-boundary pending content after provenance loss is explicitly disclosed (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:89`, `PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:92`). This addresses the byte-zero reset at `utils/CLIO/clio-codex-tail.sh:176` without a blanket cutoff on legacy pending retries. The combined upgrade → writer-busy → deliver B → replace/truncate A+B control requires only B to remain (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:115`); corresponding mutated exclusion failures are required at line 118. Retain these controls in implementation QA.
+- **[Pass] R5 is resolved at plan level: partial completion cannot bypass a numeric cutoff.** The rule now applies on “EVERY extraction,” including incremental reads (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:90`), and paired pre/post-boundary partials completed on tick two must yield only the post-boundary row (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:100`). This explicitly replaces the old pre-start partial expectation at `test/clio-codex-tail.sh:54` and `test/clio-codex-tail.sh:60`, while preserving newline/cursor mechanics (`utils/CLIO/clio-codex-tail.sh:113`, `utils/CLIO/clio-codex-tail.sh:247`). The persisted header must initialize even without a sessions directory (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:82`), removing dependence on first discovery; absent/empty trees and clean delayed discovery are acceptance cases at line 113.
+- **[Pass] R2–R4 remain resolved within the stated scope.** Validated timezone-aware raw instants, full input precision, inclusive equality, invalid/naive rejection, and unchanged UTC-second IDs are explicit (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:98`). First-file child classification is independent of cached or later metadata, defers without complete first metadata, and has nonempty two-tick root/resume and paired mutation controls (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:104`). This covers the cached-context shortcut and mutable metadata boundaries at `utils/CLIO/clio-codex-tail.sh:107` and `utils/CLIO/clio-codex-tail.sh:132`. Abandoned-lock recovery remains an explicit operator prerequisite, not a downtime guarantee (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:144`; existing lock return at `utils/CLIO/clio-codex-tail.sh:46`).
+- **[Pass] Writer acceptance, retry, and dedup contracts remain preservation requirements.** The plan retains the writer, IDs, format, consumers, and atomic state updates (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:130`), and includes append-lock retry coverage at line 117. Writer exit 0 includes deliberate drops (`utils/CLIO/INSTALL.md:47`); nonzero writer results keep chunks pending (`utils/CLIO/clio-codex-tail.sh:234`, `utils/CLIO/clio-codex-tail.sh:247`); ID suppression occurs under the append lock (`utils/CLIO/INSTALL.md:168`, `utils/CLIO/INSTALL.md:175`). Implementation must preserve these behaviors while adding eligibility checks.
+- **[Pass] The evidence commitments are falsifiable and recurrence claims remain qualified.** The first-poll regression requires an exact positive row and retained baseline failure (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:79`); root/resume positives and corresponding baseline/mutated exclusions are required at lines 110 and 118. Retained producer output reports `"expected_rows": 1`, `"actual_rows": 0`, and `"nonempty_source_bytes": 430` (`TESTS-RESULTS/2026-09-08+GH-199/baseline-first-prompt.json`). These are inspected outputs, not a reproduction run this turn. The assessment distinguishes one observed incident from other issue classes and says “Trend remains unknown” (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:70`). Final QA must retain the promised deterministic results and negative-control evidence before claiming the defect fixed.
+
+Whole-file sweep revisited the existing rescan, timestamp-validation, and abandoned-lock weaknesses; no additional pre-existing defect material to this producer repair was identified. No open blocking or should-fix findings remain for this plan. Approval does not establish implementation correctness or authorize deployment or historical backfill.
+
+Relay closed (Approved), no further turn needed.
+
+### Producer — protocol receipt (no new review)
+
+The reviewer’s Round 3 approval and citations above are preserved verbatim.
+The driver rejected that block with exit 8 solely because it lacked the required
+`Basis:` label. This receipt labels the already-written basis; it does not change
+the reviewer’s decision or the reviewed artifact, and is not a self-review.
+
+Basis: Reviewer Round 3 states “No open blocking or should-fix findings remain for this plan,”
+with source citations resolving R1–R5 above. Only plan correctness was approved;
+implementation, tests and deployment are not approved by that statement.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
