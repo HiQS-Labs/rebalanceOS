@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-07.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Escalated
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -81,5 +81,42 @@ Read the ENTIRE plan. Append one Reviewer block, `swept file: yes`, Basis: textu
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer (agy) — Completeness Review
+swept file: yes
+
+**1. Source Requirements vs. Plan Mapping**
+- [Pass] Req 1 (Skill named shutdown, alongside daily): L43 ("Shutdown is maintained in RebalanceOS alongside daily"), L178 ("Add `.agents/skills/shutdown/SKILL.md`").
+- [Pass] Req 2 (Activity CRUD, today/yesterday + cutoff): L128 ("today plus the previous two local calendar days"), L137 ("Dirty, stashed, and unpushed/unmerged state of uncertain age belongs in an older/undated unresolved-work section").
+- [Pass] Req 3 (All local repos, no shortlist): L123 ("Discover `.git` directories... without filtering"), L147 ("no hardcoded watched-repo list").
+- [Pass] Req 4 (First report, optional execution): L179 ("scan A → synthesize → scan B → review/triage → optional approved delegation"), L216 ("offer to execute named actions").
+- [Pass] Req 5 (Reuse merge-cleanup): L218 ("Delegate only approved selections to merge-cleanup's report/ordering and safety workflow").
+- [Pass] Req 6 (Continuity across sessions): L35 ("operator loses continuity across agents"), L190 ("one exact next-session action/prompt per project").
+- [Pass] Req 7 (Nudge to finish phase, not project): L194 ("Never infer that merging one phase completes its whole project").
+- [Pass] Req 8 (Preserve hold reason): L188 ("carries forward deliberate deferrals"), L217 ("Record choices such as \"hold PR for tomorrow's dogfood\" and their reasons").
+- [Pass] Req 9 (Interact conversationally in XYZ Forge/IDEs): L44 ("usable from an agent session in XYZ Forge or another repository, via VS Code, Codex, Gemini/Agy, or ZCode").
+- [Pass] Req 10 (Self-contained, no runtime for basic): L117 ("Basic mode uses Python standard library, Git... must not import the Rebalance runtime").
+- [Pass] Req 11 (Optional enrichment, reuse DB/config): L93 ("`temp/rbos.config` shape"), L201 ("Optional runtime enrichment opens the resolved existing database through `db_connection_readonly`").
+- [Pass] Req 12 (Two-pass activity check): L151 ("Take snapshot A... then snapshot B at least 30 seconds later"), L158 ("Any change or confirmed active lock/process marks ongoing activity").
+- [Pass] Req 13 (MVP, no overengineering): L47 ("MVP scope ceiling... No new dependency, service, database").
+- [Pass] Req 14 (Inspect prior daily, retain handoff): L197 ("Pull intent from recent daily logs... If daily has not run for days, basic Git evidence still yields a report").
+- [Pass] Req 15 (Authorization: plan/QA only): L21 ("This task authorizes planning and QA only, not implementation, merging, deployment, or running shutdown against live repos").
+
+**2. Added Prerequisites & Authority**
+- [Pass] Paired-skill install: L118 ("declares daily's scanner as its local dependency"). This is a reasonable MVP assumption to reuse existing machinery without duplicating code.
+- [Pass] Output location: L90 ("Default is the maintained Rebalance checkout's existing `temp/` tree; allow an explicit XYZ Forge `temp/` home"). This is a reasonable assumption requiring operator choice to prevent mutating unintended roots.
+- [Pass] Optional execution authority: L218 ("Delegate only approved selections to merge-cleanup's"). Constrained appropriately; matches Req 4.
+- [Pass] Active detection: L161 ("Use available lock/PID and process-CWD evidence"). Added to fulfill the two-pass activity check (Req 12) correctly. Reasonable MVP assumption.
+
+**3. Acceptance Matrix**
+- [Unverified — no citation] All must-haves are covered. A1-A6 cover discovery and read-only boundaries. A7 covers continuity. A8 covers standalone/enrichment. A9 covers handoffs. A10 tests execution delegation. A12 explicitly tests the cold restart handoff. I find no missing must-haves.
+
+VERDICT: PASS
+
+handing off to codex — relay closed (Approved), no further turn needed
+
+### Producer receipt — structural rejection
+Basis: textual only
+The preceding Agy response was preserved verbatim (including the harness's uncited-finding annotation). It omitted a Basis field, so the driver exited 8. Its PASS is not counted as a valid relay approval. No plan edits were requested by the completeness findings. The dedicated completeness read occurred; the subsequent design review must reconfirm this mapping and emit a valid Basis field before any overall plan approval is reported.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

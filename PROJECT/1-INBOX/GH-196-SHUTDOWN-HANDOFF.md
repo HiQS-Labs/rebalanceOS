@@ -2,9 +2,9 @@
 gh_issue: 196
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/196
 title: Shutdown — end-of-day triage and next-session continuity
-status: Proposed (1-INBOX — plan QA, implementation not started)
+status: Proposed (1-INBOX — Agy plan approved, implementation not started)
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-08
 owner: Maintainer
 doc_type: feedback
 effort: 3
@@ -19,6 +19,21 @@ there. At implementation start, promote this capture to 2-WORKING and import the
 approved issue revision as the active execution plan. Do not maintain two editable
 execution plans. No shutdown code, deployment, merge, or cleanup is authorized by
 this planning task.
+
+## Plan QA result
+
+Agy approved the immutable `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md`
+snapshot, design relay commit `ffaea27`, driver exit 0, textual basis only.
+The earlier completeness review mapped all fifteen user requirements but was
+structurally rejected for omitting Basis (exit 8); its findings are retained, not
+counted as a valid approval. The valid design review was instructed to reconfirm
+the mapping. See the two relay threads and provenance in the evidence folder.
+
+Agy's one Should suggested guarding existing Rebalance imports in the scanner.
+Disposition: no change required. The current canonical scanner's imports at
+lines 10-20 are standard library only, and the approved plan already says basic
+mode must not import the runtime. Preserve that invariant when adding the optional
+adapter; no implementation or behavioral test is claimed here.
 
 ## Requirements
 
