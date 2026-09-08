@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-07.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: codex
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -61,6 +61,18 @@ Read the entire plan, `PROJECT/4-MISC/recon-gh196-shutdown.md`, and the user req
 
 Append one Reviewer block with `swept file: yes`, Basis: textual only, graded findings and file:line citations, and literal standalone `VERDICT: PASS` / `VERDICT: FAIL` / `VERDICT: PARKED` matching the human verdict. Findings must distinguish genuine plan blockers from optional future improvement. Approved/PASS is planning approval, not implementation safety proof. Do not edit the artifact, execute tests/runtime operations, commit code, or push; the shim owns the reviewer commit/token.
 
+The earlier completeness turn omitted Basis and was rejected (driver exit 8), despite finding all requirements mapped. Reconfirm its mapping against the current artifact; do not rely on its invalid approval. Your block MUST include the following plain, unbolded field lines with real content (not merely a description in your final chat):
+
+```text
+### Round 1 · Reviewer · agy
+Basis: textual only — reviewed the plan and cited source; no implementation executed
+swept file: yes
+Verdict: Approved OR Changes requested OR Blocked
+VERDICT: PASS OR FAIL OR PARKED
+```
+
+Choose one value for each verdict, not the literal OR list. Append graded findings and Answers with actual file:line citations. The absolute relay path supplied by the driver has a corresponding relative path inside your current isolated worktree; use that worktree-relative path. Do not search the whole filesystem. Do not change the original checkout directly. All plan phases are upcoming: review the phase-qa rubric (DRY, proportional SOLID, observability, phase-specific tests), but do not claim implementation tests or deployment happened.
+
 ## Ground rules
 1. This file is the single source of truth. The agents never share memory — read the whole file.
 2. Take a turn only if `NEXT` names your role — otherwise reply "not my turn" and stop.
@@ -70,5 +82,24 @@ Append one Reviewer block with `swept file: yes`, Basis: textual only, graded fi
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Round 1 · Reviewer · agy
+Basis: textual only — reviewed the plan and cited source; no implementation executed
+swept file: yes
+Verdict: Approved
+VERDICT: PASS
+
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:114-118`: Extends existing scanner, enforces one writer, and specifies basic mode uses only standard library/Git without Rebalance runtime.
+- [Should] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:118`: To achieve neutral CWD execution, explicitly state that existing Rebalance imports in `scan_unclosed_loops.py` must be moved inside functions or guarded. Fix: Note to guard imports when extending.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:125-145`: Activity admission correctly discovers without mtime filters, handles worktrees, bounds dates, and classifies missing/detached state as explicit unknowns.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:154-163`: Two-pass design uses content fingerprints, and excludes entire logical repo groups based on locks/processes.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:203-214`: Optional enrichment uses `db_connection_readonly` and explicitly forbids schema creation/refresh.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:188-190`, `231-233`: Deliberate deferrals are preserved; unique run IDs and atomic writes prevent partial reads.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:217-229`: Execution is report-only by default and cleanly delegates to `merge-cleanup` by name.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:286-297`: The acceptance matrix (A1-A12) is falsifiable with concrete red controls.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md:78-82`: Adjacency coordination is defined; it avoids duplicate work and explicitly does not wait for #150/#192.
+- [Pass] `TESTS-RESULTS/2026-09-07+GH-196/plan-r1.md`: Swept the artifact; no pre-existing defects found.
+
+relay closed (Approved), no further turn needed
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
