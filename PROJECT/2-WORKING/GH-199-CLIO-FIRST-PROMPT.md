@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Plan ready for Codex review
+status: Plan revised after Codex round 1
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
@@ -81,19 +81,32 @@ its existing rated pointer is the write authority; no new rating tool is install
    and retain the failure under TESTS-RESULTS/2026-09-08+GH-199.
 2. Store one capture-start timestamp header inside the existing cursor state under
    the tailer lock. Preserve it across state_update. Initialize even when the
-   sessions directory is absent. Existing legacy cursor rows remain valid; on
-   upgrade establish the boundary now, without replaying previously skipped history.
+   sessions directory is absent. Persist the boundary at full timestamp precision with an atomic state-header update.
+   Existing legacy cursor rows remain valid; on upgrade establish the global boundary
+   now, leaving legacy pending chunks eligible without replaying previously skipped history.
 3. For unseen files, read from byte zero and filter complete prompt timestamps
-   against that persisted boundary; explicit backfill bypasses the boundary only
-   for unseen files. Known files keep the existing cursor/retry path. First run
+   against that persisted boundary. Append a sixth per-file state field retaining
+   the eligibility cutoff (zero for legacy rows and explicit backfill); apply it
+   whenever reading from byte zero, including replacement/truncation and previously
+   empty files. Incremental reads retain existing pending/partial-line semantics.
+   Explicit backfill applies only to unseen files; known rows retain their policy. First run
    imports no historical complete prompts; events submitted after startup survive
-   any polling delay. Invalid timestamps do not become newly submitted prompts.
+   any polling delay. Validate raw timezone-aware ISO instants before comparison: >= boundary is eligible,
+   compare at full input precision, then normalize output/IDs to UTC seconds as before.
+   Missing, malformed and timezone-less instants are rejected; test before/equal/after
+   within one second and offset-equivalent instants using distinct session IDs.
 4. In the existing extractor, inspect the file's first session metadata independently
-   of mutable nearest-event context. Exclude files marked as child/subagent even if
-   later metadata switches to parent; no second writer or parser module. Preserve
-   genuine root resumes and the existing per-event context behavior.
+   of mutable nearest-event context on every extraction, including legacy cached reads.
+   Predicate: first session_meta source equals "subagent", is an object containing
+   "subagent", or has a nonempty parent_thread_id. Missing/incomplete metadata must
+   never infer a root from cached context; defer until a complete first metadata
+   record is available. Exclude such child files even if later metadata switches to parent; no second writer or parser module. Preserve
+   genuine root resumes and the existing per-event context behavior. Require an exact nonempty
+   root/resume control over multiple metadata records and two ticks; reject-all and
+   nearest-context-only mutations must fail the respective root/child controls.
 5. Verify initial history exclusion, completed/partial first prompt, absent/empty
-   sessions tree, delayed discovery, legacy cursor preservation, child replay and
+   sessions tree, clean delayed discovery, default-mode mixed old/new rotation and
+   truncation, empty-first-file discovery, legacy pending-row retry, child replay and
    second-tick child appends, backfill, rotation, overlap, and append-lock retry.
    Assert source bytes unchanged and make both new positive and exclusion gates
    fail under their corresponding baseline/mutated behavior. Run all four CLIO
@@ -114,3 +127,16 @@ atomic through state_update. No automatic recovery/backfill of the historical
 missing prompt, no installed-hook deployment, no scheduler edits, no dashboard
 collector. Tests use synthetic prompts and isolated homes; no private content in
 commits. Existing timestamp precision/dedup policy stays unchanged.
+
+## Review dispositions and limitations
+
+Codex round 1: R1 accepted (persist per-file eligibility for zero-offset rescans;
+legacy rows retain pending-delivery eligibility). R2 accepted (full-precision raw
+instant validation, equality inclusive, unchanged second-precision IDs). R3 accepted
+(first-file provenance checked independently each tick; nonempty root/resume controls).
+R4 accepted: clean polling delays are covered; an abandoned tailer lock after SIGKILL
+is a pre-existing limitation, not repaired here. An operator must verify no live
+owner and recover that lock before polling resumes. No crash-recovery/supervisor
+claim is made. The first review's driver returned 6 because parent-produced test
+evidence appeared during the isolated review; its retained backup was restored and
+committed before retry. No implementation proceeded on that failed driver result.
