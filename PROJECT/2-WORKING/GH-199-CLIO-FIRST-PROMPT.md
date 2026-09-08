@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Implemented — verification in progress
+status: Implemented — final QA pending
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
@@ -19,7 +19,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Codex approved the plan; first-prompt fix and synthetic regressions implemented. | Complete verification and final Codex QA, then publish canonical PR and downstream commit. |
+| CLIO suites and mutation controls pass in canonical and downstream copies; broader baseline failure reproduced unchanged. | Final Codex review, draft canonical PR with gate disclosure, then direct downstream push. |
 
 Canonical issue: https://github.com/HiQS-Labs/rebalanceOS/issues/199.
 RebalanceOS owns CLIO; XYZ-CLIO receives the matching downstream commit after the
@@ -159,3 +159,10 @@ under the explicitly bounded original-inode legacy policy. The second driver ret
 Round 3 approved the plan with no open findings. The reviewer omitted a protocol
 label; the unchanged approval and a separately labeled producer receipt are retained
 in the relay thread. The validator and relay driver then returned zero.
+
+## Verification
+
+[Retained results](../../TESTS-RESULTS/2026-09-08+GH-199/SUMMARY.md) record all four
+CLIO suites passing in both copies, witnessed-red controls, the identical baseline
+and candidate Python failure, incomplete doctor, and unrelated PDDA findings.
+Canonical merge readiness remains outstanding; no live deployment or backfill.
