@@ -6,7 +6,7 @@
 
 NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 3
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -86,5 +86,37 @@ Abandoned locks are explicitly excluded from the clean-downtime claim. See the r
 steps and review-disposition section. Baseline reproduction retained in TESTS-RESULTS.
 The prior driver exit 6 is not treated as approval; parent evidence is now committed.
 Please re-review the plan only. No code has changed.
+
+### Reviewer — codex — Round 2
+
+Verdict: Changes requested
+swept file: yes
+
+Read all four Setup artifacts in full and the referenced rollout fixture; reviewed the retained baseline JSON and tailer log. Static plan review only: no artifact/source execution, tests, installed hooks, or git commands. Graph tools were unavailable; direct source reads supplied evidence. Applied SWE and debug-mantra plan-review criteria. Private incident observations, installed hashes, graph freshness, and live issue/rating state remain author-reported, not independently verified.
+
+- **[Blocker] R1 remains partly open — zero-cutoff legacy rows cannot uphold the migration no-history promise on rescan.** The plan promises legacy pending delivery “without replaying previously skipped history” (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:85`), but assigns legacy rows cutoff zero and retains their policy (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:89`). The current reset reads from zero after inode/size changes (`utils/CLIO/clio-codex-tail.sh:176`); old default discovery skipped historical rows without writing their IDs (`utils/CLIO/clio-codex-tail.sh:188`). Concrete counterexample: legacy cursor is after skipped old A with pending old B; upgrade delivers B; replacement with A+B then imports A under cutoff zero. The new mixed-history rotation control covers default-mode files, while the legacy control only specifies pending retry (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:108`). **Fix:** distinguish legacy pending-byte eligibility on the original file from reset eligibility. Preserve the old pending chunk through retries, but explicitly choose a conservative reset policy that does not import skipped history when provenance is lost; document any resulting limitation. Add this combined legacy-upgrade → retry B → replace/truncate A+B case with exact nonempty IDs and a zero-cutoff-reset negative control. Do not describe unrestricted legacy rescans as no-history migration.
+- **[Should] R5 — Specify the timestamp rule for a partial record completed at a nonzero offset.** The cutoff is required “whenever reading from byte zero,” while incremental reads retain existing partial-line semantics (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:90`). The extractor advances past complete metadata and leaves the trailing partial pending (`utils/CLIO/clio-codex-tail.sh:113`, `utils/CLIO/clio-codex-tail.sh:247`), so an old partial prompt can become a nonzero-offset read next tick and bypass that rule. The existing first-partial test deliberately expects such an old timestamp to be delivered (`test/clio-codex-tail.sh:54`, `test/clio-codex-tail.sh:60`). **Fix:** pin the intended exception or invariant explicitly. For timestamp-based eligibility on new default-mode files, apply their persisted cutoff on every extraction, preserving newline/cursor retry mechanics and the separately defined legacy/backfill policy; update the old fixture accordingly. If pre-start partial completion is deliberately eligible, state that exception to timestamp/no-history claims. Require paired pre-start and post-start partials after complete metadata, completed on tick two, with exact nonempty eligible IDs and a matching bypass-cutoff control. This resolves an acceptance-contract ambiguity before implementation, not a request to discard legacy pending rows.
+- **[Pass] R2 is resolved at plan level.** Full-precision validated timezone-aware comparison, inclusive equality, UTC-second output, malformed/missing/naive rejection, and distinct-session boundary controls are explicit (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:94`). This addresses the material pre-existing normalization shortcut (`utils/CLIO/clio-codex-tail.sh:96`) without changing the shared writer's ID format (`utils/CLIO/INSTALL.md:53`). Implementation and red controls remain pending.
+- **[Pass] R3 and R4 are resolved at plan level.** The first-metadata predicate, independent per-extraction provenance check including legacy cached reads, defer-on-incomplete rule, and nonempty two-tick root/resume counter-controls are explicit (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:98`). Clean downtime is distinguished from abandoned-lock recovery, with an operator prerequisite (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:137`); that matches the existing lock-directory early return (`utils/CLIO/clio-codex-tail.sh:46`).
+- **[Pass] Writer acceptance and dedup remain preservation requirements.** The plan retains writer/IDs/consumers (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:123`) and append-lock retry coverage (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:110`). Exit 0 includes deliberate drops (`utils/CLIO/INSTALL.md:47`), nonzero writer results leave the cursor pending (`utils/CLIO/clio-codex-tail.sh:234`, `utils/CLIO/clio-codex-tail.sh:247`), and ID suppression runs under the append lock (`utils/CLIO/INSTALL.md:168`, `utils/CLIO/INSTALL.md:175`). Resolve R1/R5 within those contracts.
+- **[Pass] Recurrence claims remain appropriately qualified; test commitments are falsifiable.** The assessment says “One observed first-prompt incident” and “Trend remains unknown” (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:70`, `PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:73`). Exact positive rows and baseline/mutated failures are required (`PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:79`, `PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md:111`). The retained baseline JSON reports `"expected_rows": 1`, `"actual_rows": 0`, and `"nonempty_source_bytes": 430` (`TESTS-RESULTS/2026-09-08+GH-199/baseline-first-prompt.json`); this is inspected producer output, not an independently rerun reproduction. Final QA still needs the promised deterministic evidence, including the new paired controls above.
+
+Whole-file sweep revisited the pre-existing rescan, timestamp-validation, and abandoned-lock weaknesses from Round 1; no additional pre-existing defect material to this producer repair was identified. Approval here would approve a plan only; no implementation correctness, deployment, or historical backfill is approved.
+
+Handing off to Producer (claude-a) — resolve R1 and R5, log both dispositions, and return for Round 3 review.
+
+### Producer — claude-a — Round 3
+
+R1 and R5 accepted. Legacy eligibility now uses a distinct sentinel and is replaced
+by the global cutoff on rotation/truncation; numeric cutoffs apply on every extraction,
+including partials. Combined legacy-rescan and paired-partial controls are explicit.
+Please review the revised plan. This is the final plan review round.
+
+IMPORTANT OUTPUT CONTRACT: append a complete reviewer block beginning with
+`### Reviewer — codex — Round 3`, then a literal uppercase `VERDICT: PASS` for
+approval or `VERDICT: FAIL` for changes requested, plus `swept file: yes`.
+Set top-level STATUS: Approved and NEXT: none only if approving. Otherwise keep
+STATUS: Open and NEXT: Producer. Preserve all earlier turns. Do not edit code.
+The previous driver exit 8 came from malformed verdict syntax, not successful QA.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Plan revised after Codex round 1
+status: Plan revised after Codex round 2
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
@@ -86,13 +86,19 @@ its existing rated pointer is the write authority; no new rating tool is install
    now, leaving legacy pending chunks eligible without replaying previously skipped history.
 3. For unseen files, read from byte zero and filter complete prompt timestamps
    against that persisted boundary. Append a sixth per-file state field retaining
-   the eligibility cutoff (zero for legacy rows and explicit backfill); apply it
-   whenever reading from byte zero, including replacement/truncation and previously
-   empty files. Incremental reads retain existing pending/partial-line semantics.
-   Explicit backfill applies only to unseen files; known rows retain their policy. First run
-   imports no historical complete prompts; events submitted after startup survive
+   the eligibility cutoff (zero for explicit backfill; a distinct `legacy` sentinel
+   for pre-upgrade rows). Apply a numeric cutoff on EVERY extraction, including
+   incremental/partial reads and replacement/truncation. A legacy sentinel preserves
+   pending chunks on the original inode; on replacement/truncation convert it to
+   the global capture-start boundary BEFORE resetting the cursor. When old inode
+   provenance is lost, pre-boundary pending content cannot be recovered automatically;
+   this conservative limitation avoids importing skipped history. Explicit backfill
+   applies only to unseen files; known numeric rows retain their policy. First run
+   imports no pre-boundary prompts, even if their partial record completes later; events submitted after startup survive
    any polling delay. Validate raw timezone-aware ISO instants before comparison: >= boundary is eligible,
    compare at full input precision, then normalize output/IDs to UTC seconds as before.
+   Pin paired pre/post-boundary partial records completed on tick two: only the
+   post-boundary row is eligible. Update the old partial fixture accordingly.
    Missing, malformed and timezone-less instants are rejected; test before/equal/after
    within one second and offset-equivalent instants using distinct session IDs.
 4. In the existing extractor, inspect the file's first session metadata independently
@@ -106,7 +112,8 @@ its existing rated pointer is the write authority; no new rating tool is install
    nearest-context-only mutations must fail the respective root/child controls.
 5. Verify initial history exclusion, completed/partial first prompt, absent/empty
    sessions tree, clean delayed discovery, default-mode mixed old/new rotation and
-   truncation, empty-first-file discovery, legacy pending-row retry, child replay and
+   truncation, empty-first-file discovery, legacy upgrade → writer-busy → deliver
+   old pending B → replace/truncate old A+B (only B remains), child replay and
    second-tick child appends, backfill, rotation, overlap, and append-lock retry.
    Assert source bytes unchanged and make both new positive and exclusion gates
    fail under their corresponding baseline/mutated behavior. Run all four CLIO
@@ -140,3 +147,11 @@ owner and recover that lock before polling resumes. No crash-recovery/supervisor
 claim is made. The first review's driver returned 6 because parent-produced test
 evidence appeared during the isolated review; its retained backup was restored and
 committed before retry. No implementation proceeded on that failed driver result.
+
+Round 2 dispositions: R1 accepted — legacy is a distinct persisted policy, promoted
+to the capture-start boundary on loss of inode/offset provenance; the combined
+legacy retry and rescan regression is required. R5 accepted — numeric cutoffs apply
+to every chunk, including pending partials; newline completion grants eligibility
+only when its source timestamp qualifies. Old pending records remain eligible only
+under the explicitly bounded original-inode legacy policy. The second driver returned
+8 due to a malformed reviewer verdict block; it is not treated as approval.
