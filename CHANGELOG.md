@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.85.0] - 2026-09-06
+
+### Added
+- Machine CPU-health monitoring in the daily work-synthesis skill (#194): a deterministic, report-only scanner flags processes that have pinned a core far longer than legitimate work allows — high CPU, a near-1.0 duty cycle (CPU time over elapsed time), and hours of elapsed runtime, sustained across successive synthesis cycles or exceeding a day outright. Born from a real incident: a runaway test process burned ~67 CPU-hours over nearly three days and was found only by a chance look at the process table. Known long-lived services (servers, agent runtimes, system daemons) are exempt; the flagged line names the process, its duty cycle and persistence, and carries the ready stop command for the operator — the scanner itself never signals a process. The daily synthesis gains a matching falsifiable coaching trigger and a Machine CPU Health line.
+
 ## [0.84.1] - 2026-09-04
 
 ### Added
