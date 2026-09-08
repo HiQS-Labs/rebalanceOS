@@ -1,6 +1,6 @@
 ---
 title: CLIO — capture the first prompt of new Codex sessions
-status: Captured
+status: Plan ready for Codex review
 created: 2026-09-08
 updated: 2026-09-08
 owner: Codex
