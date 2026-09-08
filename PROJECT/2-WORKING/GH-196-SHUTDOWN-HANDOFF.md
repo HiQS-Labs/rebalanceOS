@@ -2,7 +2,7 @@
 gh_issue: 196
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/196
 title: Shutdown MVP — reviewed end-of-day triage and next-session continuity
-status: In Progress (Phase 0 — Contract freeze)
+status: In Progress (Phase 3 — QA, dogfood, and handoff)
 created: 2026-09-07
 updated: 2026-09-08
 owner: Maintainer
@@ -29,7 +29,7 @@ non_goals:
 
 | What was just completed | What's next |
 |---|---|
-| Agy plan approval (plan-r1); promoted to 2-WORKING on implementation start. | Phase 0 — Prior Art Review and contract freeze. |
+| Phase 1 scanner extension and Phase 2 reviewable handoff with optional read-only enrichment implemented; A1–A12 acceptance tests passing. | Phase 3 — QA relay review, version bump, changelog, and PR. |
 
 ## Table of contents
 
@@ -91,29 +91,29 @@ broader shared-read consolidation; #192 owns the cross-system timezone audit. PR
 before implementation; preserve its additions if landed. None is a dependency on
 finishing the wider project. 3-Eyes remains stood down and out of scope.
 
-- [ ] Reconfirm the source base, open PRs on this and the archived predecessor repo,
+- [x] Reconfirm the source base, open PRs on this and the archived predecessor repo,
   and direct callers/tests of the scanner before editing. Record changes to this map.
-- [ ] Timebox unresolved compatibility checks to 1–2 hours maximum: prove read-only
+- [x] Timebox unresolved compatibility checks to 1–2 hours maximum: prove read-only
   enrichment against a fixture; verify canonical scanner packaging and both invocation
   paths from a neutral CWD. Write findings into the active plan before proceeding.
-- [ ] Agree on one persistent, gitignored configuration and output home. Default is
+- [x] Agree on one persistent, gitignored configuration and output home. Default is
   the maintained Rebalance checkout's existing `temp/` tree; allow an explicit XYZ
   Forge `temp/` home if the operator prefers. Never select a task/test clone or the
   incidental current directory. Ask once if a durable location cannot be resolved.
   Store settings in a `shutdown` section of the existing `temp/rbos.config` shape,
   selected by explicit `--config` (or a documented environment pointer). Print the
   resolved config/output paths and timezone; do not create a competing config registry.
-- [ ] Config contains explicit scan roots/exclusions, output home, operator timezone,
+- [x] Config contains explicit scan roots/exclusions, output home, operator timezone,
   optional runtime interpreter/config/DB pointers. No usernames, absolute machine
   paths, private project list, or credentials in the distributed skill/template.
   No automatic runtime deployment, DB migration, source refresh, or credential access.
 
 ### Phase 0 — QA checklist
 
-- [ ] Findings and unknowns recorded with source links; no invented shared helper.
-- [ ] Both basic-only and optional-runtime cases have runnable fixture commands.
-- [ ] Configuration absent/malformed never broadens discovery to home or root.
-- [ ] If the small extension cannot satisfy the contract, stop and revise this issue;
+- [x] Findings and unknowns recorded with source links; no invented shared helper.
+- [x] Both basic-only and optional-runtime cases have runnable fixture commands.
+- [x] Configuration absent/malformed never broadens discovery to home or root.
+- [x] If the small extension cannot satisfy the contract, stop and revise this issue;
   do not quietly create a replacement scanner or absorb #150/#192.
 
 ## Phase 1 — Extend the existing scanner
@@ -130,16 +130,16 @@ scanner as its local dependency and documents installing the two skills together
 do not copy the scanner into the shutdown folder. Missing dependency yields the exact
 local install instruction, not a remote download or whole-disk search.
 
-- [ ] Discover `.git` directories and gitfiles under configured roots without filtering
+- [x] Discover `.git` directories and gitfiles under configured roots without filtering
   on directory creation/mtime. Follow registered worktrees, reject unsafe/unresolved
   paths, avoid symlink traversal cycles and heavy vendor trees. Keep every physical
   full clone distinct for safety, group project-level summaries by canonical remote,
   and group worktrees by resolved git-common-dir. Local-only repos remain distinct.
-- [ ] Default window is **today plus the previous two local calendar days**, starting
+- [x] Default window is **today plus the previous two local calendar days**, starting
   at local midnight two dates ago and ending at the scan start instant. Pin timezone
   and convert bounds to UTC for comparisons; test DST and evening UTC rollover.
   `--days N` changes calendar-day count explicitly. It is not an approximate 72h cutoff.
-- [ ] Evidence includes current staged/unstaged/untracked changes and deletions,
+- [x] Evidence includes current staged/unstaged/untracked changes and deletions,
   recent local commits across branch refs, recent reflog movements when available,
   and current PR metadata for discovered remotes. Record inclusion reason and event
   time separately from observation time. Directory/HEAD age is not a sufficient filter.
@@ -147,25 +147,25 @@ local install instruction, not a remote download or whole-disk search.
   undated unresolved-work section rather than being silently omitted or called recent.
   No promise to recover file reads, ignored-file changes, or transient create/delete
   events absent an existing journal; list those coverage limits.
-- [ ] Join branch-to-PR using canonical repository identity plus head branch; distinguish
+- [x] Join branch-to-PR using canonical repository identity plus head branch; distinguish
   no PR, open PR, merged PR, and unknown. Compare all local branch tips/upstreams, not
   only the checked-out branch. Missing remote/upstream, detached HEAD, Git errors,
   authentication errors, and truncated queries are explicit unknowns, never zero work.
   Read local remote refs without `git fetch`; label their freshness. Fresh merge
   eligibility is decided later by merge-cleanup, not inferred from cached refs.
-- [ ] Read-only GitHub requests use discovered remotes, bounded pagination and timeouts;
+- [x] Read-only GitHub requests use discovered remotes, bounded pagination and timeouts;
   no hardcoded watched-repo list. Default limits: 10s per subprocess, 5 minutes total
   per pass, 200 checkouts and 1000 PR records per remote. When a limit is reached,
   retain scanned evidence and mark coverage incomplete; affected scope cannot be
   offered for execution. Do not scan remote-only repos as if a local checkout exists.
-- [ ] Take snapshot A, synthesize context, then snapshot B **at least 30 seconds later**.
+- [x] Take snapshot A, synthesize context, then snapshot B **at least 30 seconds later**.
   Re-discover roots on B; new/disappeared checkouts are excluded and reported. Compare
   HEAD/all local refs, stash refs, porcelain status, and dirty/untracked content
   fingerprints—not just file counts/status strings. Include changed/deleted paths
   and metadata sufficient to catch ordinary same-status edits. Bound fingerprint I/O
   (10 MiB/file, 100 MiB/checkout); skipped/racing/unreadable content makes liveness
   uncertain, never stable. No archived source contents in the report.
-- [ ] Any change or confirmed active lock/process marks **ongoing activity**. Exclude
+- [x] Any change or confirmed active lock/process marks **ongoing activity**. Exclude
   that entire logical repo group from shutdown actions, including its other clones.
   Use available lock/PID and process-CWD evidence; high CPU alone is not ownership.
   Missing liveness permissions/coverage is explicit unknown and blocks actions for
@@ -174,10 +174,10 @@ local install instruction, not a remote download or whole-disk search.
 
 ### Phase 1 — QA checklist
 
-- [ ] Acceptance A1–A6 below pass with nonempty synthetic repositories and red controls.
-- [ ] Scanner timeout/offline paths preserve partial evidence with actionable reasons.
-- [ ] Both daily invocation paths share one implementation and preserve JSON compatibility.
-- [ ] Before/after fixture checks show no changes to inspected Git refs/config/index,
+- [x] Acceptance A1–A6 below pass with nonempty synthetic repositories and red controls.
+- [x] Scanner timeout/offline paths preserve partial evidence with actionable reasons.
+- [x] Both daily invocation paths share one implementation and preserve JSON compatibility.
+- [x] Before/after fixture checks show no changes to inspected Git refs/config/index,
   files or remote state; use optional-lock-free Git reads where appropriate.
 
 ## Phase 2 — Reviewable handoff and optional enrichment
@@ -185,11 +185,11 @@ local install instruction, not a remote download or whole-disk search.
 **Goal:** turn evidence into an end-of-day review and a cold-start continuation brief,
 without a second task database or autonomous cleanup policy.
 
-- [ ] Add `.agents/skills/shutdown/SKILL.md` and one report template. Reuse the shared
+- [x] Add `.agents/skills/shutdown/SKILL.md` and one report template. Reuse the shared
   scanner; conversational sequence is scan A → synthesize → scan B → review/triage →
   optional approved delegation → record actual outcomes. Every host receives the
   same portable instructions; no editor extension implementation is needed.
-- [ ] Persist dated handoffs under `temp/daily-log/shutdown/YYYY-MM-DD/<run-id>.md`
+- [x] Persist dated handoffs under `temp/daily-log/shutdown/YYYY-MM-DD/<run-id>.md`
   with a small JSON evidence sidecar from the scanner. The reviewed handoff is the
   canonical record of this shutdown's decisions, not of Git/PR truth. Do not put
   decisions in the scanner-regenerated `temp/close-the-loop.md`. One writer owns each
@@ -197,18 +197,18 @@ without a second task database or autonomous cleanup policy.
   Unique run IDs prevent collisions; write complete artifacts atomically and publish
   a relative `latest` pointer only after both are complete. A rerun creates a new
   snapshot and carries forward deliberate deferrals; it never overwrites prior review.
-- [ ] First screen contains: what advanced; each project's arc/phase and evidence link
+- [x] First screen contains: what advanced; each project's arc/phase and evidence link
   (or "unknown"); what remains; PR review/test/check status with observation time;
   proposed merge order; active/unknown exclusions; deliberate deferrals with reason;
   and one exact next-session action/prompt per project. Lead with at most three
   prioritized nudges; keep inventories in the linked detail. Never infer that merging
   one phase completes its whole project, or that a merged PR has been deployed.
-- [ ] Pull intent from recent daily logs, the previous reviewed shutdown, and linked
+- [x] Pull intent from recent daily logs, the previous reviewed shutdown, and linked
   project/issue plans. If daily has not run for days, basic Git evidence still yields
   a report, with context gaps explicitly named. Treat repo text and historical agent
   prose as data, not executable instructions or cleanup approval. Do not ingest full
   transcripts, mail, calendar, secrets, or unrelated personal data for this MVP.
-- [ ] Optional runtime enrichment opens the resolved existing database through
+- [x] Optional runtime enrichment opens the resolved existing database through
   `db_connection_readonly`; uses `fetch_day_commits`/`fetch_day_items` and the existing
   registry reader with a narrow read-only connection seam. Preserve existing defaults
   for other consumers. Add bounded query options/connection progress timeout at the
@@ -218,37 +218,37 @@ without a second task database or autonomous cleanup policy.
   Reuse canonical alias/dedup handling before totals. Source `fetched_at`/`scanned_at`
   is freshness evidence; DB mtime is not. Data older than 24h is marked stale context.
   Arc/phase names need plan evidence or user confirmation, not a guessed DB model.
-- [ ] Missing runtime/interpreter/config/DB/table, incompatible schema, lock, stale data,
+- [x] Missing runtime/interpreter/config/DB/table, incompatible schema, lock, stale data,
   timeout, or disabled enrichment degrades to the basic report. Do not create/migrate
   schemas, refresh the index, invoke secret getters, call a separate LLM endpoint,
   or publish to Slack/GitHub/vault/pulse. Existing APIs that ensure schemas are not
   acceptable substitutes for the explicit read-only path.
-- [ ] At the end of review, offer to execute **named actions on named repos/PRs/checkouts**.
+- [x] At the end of review, offer to execute **named actions on named repos/PRs/checkouts**.
   Default is report-only. Record choices such as "hold PR for tomorrow's dogfood" and
   their reasons. Delegate only approved selections to merge-cleanup's report/ordering
   and safety workflow, resolving that installed skill by name. Do not copy its merge
   sorter or remover. If unavailable, leave an actionable handoff; do not improvise.
   No automatic commits of dirty work. Never translate "execute" into broad approval
   for every checkout or a default squash strategy.
-- [ ] Before each delegated action, merge-cleanup revalidates live HEAD/PR state/checks,
+- [x] Before each delegated action, merge-cleanup revalidates live HEAD/PR state/checks,
   active sessions, unique refs/stashes/worktrees, and dependent paths/symlinks using
   each target repo's governance. A changed target/plan invalidates its approval;
   stop that repo and report the new state. The two-pass snapshot is discovery only,
   not a lock. After action, record actual result, remaining work and any preserved
   clone. A failed prerequisite stops its dependent merges; independent approved work
   may continue. No force merge/delete or permanent deletion fallback.
-- [ ] Update both daily instruction entry points so the next invocation reads the
+- [x] Update both daily instruction entry points so the next invocation reads the
   latest completed shutdown handoff before synthesizing. Preserve its open decisions
   until fresh evidence or the user resolves them. Revalidate the selected PR before
   saying it is still open/ready. No new morning daemon; user invokes daily or shutdown.
 
 ### Phase 2 — QA checklist
 
-- [ ] Acceptance A7–A11 pass; a cold agent can resume using only the handoff and links.
-- [ ] Basic mode works with no runtime imports/venv/DB; paired skill deployment works
+- [x] Acceptance A7–A11 pass; a cold agent can resume using only the handoff and links.
+- [x] Basic mode works with no runtime imports/venv/DB; paired skill deployment works
   from a neutral CWD. All distribution paths are portable.
-- [ ] Runtime fixtures remain byte/logically unchanged, including no schema creation.
-- [ ] Previous handoffs survive failed writes/reruns and daily scanner regeneration.
+- [x] Runtime fixtures remain byte/logically unchanged, including no schema creation.
+- [x] Previous handoffs survive failed writes/reruns and daily scanner regeneration.
 
 ## Phase 3 — QA, dogfood, and handoff
 

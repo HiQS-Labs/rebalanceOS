@@ -62,9 +62,9 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
 
 2. **Time-Gated Horizons (Exactly-Once Semantics)**:
    - **Local Timezone**: Evaluate against the operator's configured local timezone (e.g. `America/Los_Angeles` / PDT/PST).
-   - **🌅 Morning Retrospective (Yesterday's Arc)**:
-     - *Predicate*: Generated on the **first synthesis cycle written to `temp/daily-log/YYYY-MM-DD.log` for the day** (check if `🌅 Yesterday's Arc` is already present in today's log; if absent, generate it).
-     - *Action*: Inspect `temp/daily-log/YYYY-MM-[yesterday].log` and summarize yesterday's landed commits, PRs, and finished arcs in 2–3 crisp sentences.
+    - **🌅 Morning Retrospective (Yesterday's Arc & Shutdown Continuity)**:
+      - *Predicate*: Generated on the **first synthesis cycle written to `temp/daily-log/YYYY-MM-DD.log` for the day** (check if `🌅 Yesterday's Arc` is already present in today's log; if absent, generate it).
+      - *Action*: Inspect `temp/daily-log/shutdown/latest.md` (or the most recent shutdown handoff) if present, along with `temp/daily-log/YYYY-MM-[yesterday].log`. Summarize yesterday's landed commits, PRs, finished arcs, and any carried-over next-session nudges in 2–3 crisp sentences.
    - **📅 Monday Weekly Horizon**:
      - *Predicate*: Generated on the **first synthesis cycle written on Mondays** (`local_time.weekday() == 0`, check if `📅 Weekly Operational Horizon` is already present in today's log; if absent, generate it).
      - *Action*: Evaluate upcoming 5-day calendar (`calendar_events` Monday–Friday) and top-ranked next actions to outline key weekly milestones, meeting load distribution, and deep work runways.
