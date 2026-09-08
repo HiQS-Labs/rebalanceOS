@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.86.1] - 2026-09-08
+
+### Fixed
+- CLIO now captures the first prompt of a new Codex root session when it arrives between polling ticks. A persisted capture boundary excludes prior history, while first-file provenance excludes inherited subagent prompts even after parent metadata appears. Existing writer retry, deduplication, and resumed-session context are preserved; legacy pending records remain eligible until file replacement or truncation (#199).
+
 ## [0.86.0] - 2026-09-08
 
 ### Added

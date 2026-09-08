@@ -1,0 +1,3 @@
+PASS: bash
+SKIP: /bin/bash — same interpreter as `bash` on this host (/bin/bash);
+      a second run would repeat the first, not widen coverage.

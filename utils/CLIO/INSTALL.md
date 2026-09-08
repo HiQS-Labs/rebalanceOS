@@ -368,8 +368,21 @@ checkout (requires `jq` and `python3`):
 install -m 0755 utils/CLIO/clio-codex-tail.sh ~/.claude/hooks/clio-codex-tail.sh
 ```
 
-First run starts **now** (existing rollout history is not imported); set
-`CLIO_TAIL_BACKFILL=1` once if you want the backfill. Schedule it every minute:
+First run starts **now** and persists that capture boundary, even before a sessions
+folder exists. Later polls capture eligible first prompts from newly discovered root
+sessions, including prompts completed between polls. Existing pre-boundary history
+and inherited subagent prompts are excluded. Set `CLIO_TAIL_BACKFILL=1` for an
+explicit history import from **previously unseen root files**; known files retain
+their existing policy. Source timestamps must be valid and timezone-aware.
+
+Upgrading preserves legacy pending records on their original file. Replacement or
+truncation switches those legacy files to the capture boundary, so previously
+skipped history is not imported; older pending records cannot be recovered
+automatically once that file provenance is lost. Clean polling delays retain the
+boundary. An abandoned tailer lock after a forced kill still requires operator
+recovery after verifying no tailer is running; this update adds no lock supervisor.
+
+Schedule it every minute:
 
 ```bash
 PLIST=~/Library/LaunchAgents/com.claude.clio-codex-tail.plist
