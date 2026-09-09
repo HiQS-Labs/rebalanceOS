@@ -1,11 +1,16 @@
+import hashlib
+import json
+import os
 import re
 import subprocess
 from pathlib import Path
 
 __all__ = [
     "DEFAULT_PRUNE_DIRS",
+    "compute_origin_ref_digest",
     "git_pull_rebase_safe",
     "parse_github_remote_url",
+    "peek_remote_refs",
     "run_git",
     "should_descend",
 ]
@@ -89,6 +94,7 @@ def run_git(
     repo_path: Path,
     *args: str,
     timeout: float = 30.0,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``git`` in *repo_path* without raising for a non-zero exit code.
 
@@ -97,13 +103,68 @@ def run_git(
     the returned completed process; timeouts and executable failures still
     raise their standard ``subprocess`` exceptions.
     """
+    env = None
+    if extra_env:
+        env = os.environ.copy()
+        env.update(extra_env)
     return subprocess.run(
         ["git", "-C", str(repo_path), *args],
         capture_output=True,
         text=True,
         check=False,
         timeout=timeout,
+        env=env,
     )
+
+
+def peek_remote_refs(
+    repo_path: Path,
+    remote: str = "origin",
+    *,
+    timeout: float = 2.0,
+    extra_ssh_opts: str = "",
+) -> dict[str, str] | None:
+    """Peek remote refs via git ls-remote in a hardened, non-interactive environment.
+
+    Returns mapping of ref_name -> sha, or None if probe failed, timed out, or unverified.
+    """
+    ssh_cmd = os.environ.get("GIT_SSH_COMMAND", "ssh")
+    ssh_opts = "-o BatchMode=yes -o ConnectTimeout=5"
+    if extra_ssh_opts:
+        ssh_opts = f"{ssh_opts} {extra_ssh_opts}"
+
+    extra_env = {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_SSH_COMMAND": f"{ssh_cmd} {ssh_opts}",
+    }
+
+    try:
+        proc = run_git(repo_path, "ls-remote", remote, timeout=timeout, extra_env=extra_env)
+        if proc.returncode != 0:
+            return None
+
+        ref_map: dict[str, str] = {}
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                sha, ref_name = parts
+                ref_map[ref_name] = sha
+
+        return ref_map
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def compute_origin_ref_digest(ref_map: dict[str, str]) -> str:
+    """Compute canonical hash of all origin branch heads (refs/heads/*)."""
+    origin_branches = {
+        ref: sha for ref, sha in ref_map.items() if ref.startswith("refs/heads/")
+    }
+    encoded = json.dumps(sorted(origin_branches.items())).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def git_pull_rebase_safe(

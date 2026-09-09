@@ -53,6 +53,8 @@ class SemanticEmbedResult:
     model_name: str
     embedding_dim: int
     elapsed_seconds: float
+    deferred_battery: bool = False
+
 
 
 @dataclass
@@ -684,8 +686,26 @@ def embed_pending(
 
     instrument_embedding_pass("embed_pending")
     start = time.monotonic()
-    embed_fn = embed_texts or _default_embed_texts
     selected_sources = _normalize_sources(source_types)
+
+    from rebalance.lib.power_ops import should_defer_embeddings
+
+    if should_defer_embeddings():
+        with db_connection(database_path, ensure_semantic_schema) as conn:
+            total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
+            sem.set_semantic_embedding_meta(conn, "power_deferred", "1")
+            conn.commit()
+        return SemanticEmbedResult(
+            total_docs=total_docs,
+            embedded_docs=0,
+            skipped_unchanged=total_docs,
+            model_name=model_name,
+            embedding_dim=EMBEDDING_DIM,
+            elapsed_seconds=round(time.monotonic() - start, 2),
+            deferred_battery=True,
+        )
+
+    embed_fn = embed_texts or _default_embed_texts
     current_model_version = f"{model_name}|{EMBEDDING_DIM}"
 
     with db_connection(database_path, ensure_semantic_schema) as conn:
@@ -703,6 +723,8 @@ def embed_pending(
         total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
 
         if not rows:
+            sem.set_semantic_embedding_meta(conn, "power_deferred", "0")
+            conn.commit()
             return SemanticEmbedResult(
                 total_docs=total_docs,
                 embedded_docs=0,
@@ -710,6 +732,7 @@ def embed_pending(
                 model_name=model_name,
                 embedding_dim=EMBEDDING_DIM,
                 elapsed_seconds=round(time.monotonic() - start, 2),
+                deferred_battery=False,
             )
 
         embedded = 0
@@ -731,6 +754,7 @@ def embed_pending(
             ("embedding_dim", str(EMBEDDING_DIM)),
             ("embedder_version", current_model_version),
             ("last_embed_at", now_iso),
+            ("power_deferred", "0"),
         ]:
             sem.set_semantic_embedding_meta(conn, key, value)
         conn.commit()
@@ -742,6 +766,7 @@ def embed_pending(
         model_name=model_name,
         embedding_dim=EMBEDDING_DIM,
         elapsed_seconds=round(time.monotonic() - start, 2),
+        deferred_battery=False,
     )
 
 

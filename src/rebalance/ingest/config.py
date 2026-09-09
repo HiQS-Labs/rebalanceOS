@@ -1902,3 +1902,22 @@ def set_sleuth_client_mapping_path(path: str) -> None:
     config = _read_config()
     config["sleuth_client_mapping_path"] = path
     _write_config(config)
+
+
+def get_defer_embeddings_on_battery() -> bool:
+    """Return whether ML embeddings should be deferred when running on battery power.
+
+    Defaults to True. Configurable via rbos.config under 'defer_embeddings_on_battery'.
+    """
+    val = _read_config().get("defer_embeddings_on_battery")
+    if val is None:
+        return True
+    return bool(val)
+
+
+def set_defer_embeddings_on_battery(enabled: bool = True) -> None:
+    """Configure whether ML embeddings should be deferred on battery power."""
+    config = _read_config()
+    config["defer_embeddings_on_battery"] = bool(enabled)
+    _write_config(config)
+

@@ -27,6 +27,7 @@ missing, so the gap is computed against ``complete`` rows only, with
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -124,14 +125,22 @@ def remote_tip(repo_full_name: str, branch: str = "HEAD") -> str:
 
     This is the anchor that makes the check honest: without it, a stale clone
     and a stale DB agree with each other and report perfect coverage.
+    Hardened with non-interactive flags to prevent askpass/prompt hangs (GH-201).
     """
     url = f"https://github.com/{repo_full_name}.git"
+    ssh_cmd = os.environ.get("GIT_SSH_COMMAND", "ssh")
+    env = os.environ.copy()
+    env.update({
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_SSH_COMMAND": f"{ssh_cmd} -o BatchMode=yes -o ConnectTimeout=5",
+    })
     try:
         result = subprocess.run(
             ["git", "ls-remote", url, branch],
             capture_output=True,
             text=True,
             timeout=_LS_REMOTE_TIMEOUT_S,
+            env=env,
         )
     except (subprocess.TimeoutExpired, OSError):
         return ""

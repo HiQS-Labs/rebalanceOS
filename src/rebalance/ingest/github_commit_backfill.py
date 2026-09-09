@@ -22,6 +22,8 @@ Two invariants this module exists to hold:
 
 from __future__ import annotations
 
+import json
+import sqlite3
 import subprocess
 from functools import lru_cache
 from dataclasses import asdict, dataclass, field
@@ -30,7 +32,8 @@ from pathlib import Path
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.local_repos import scan_local_repos
-from rebalance.lib.time_ops import _now
+from rebalance.lib.git_ops import compute_origin_ref_digest, peek_remote_refs, run_git
+from rebalance.lib.time_ops import _now, now_utc
 
 # One ASCII unit separator between fields and a record separator between commits:
 # commit messages are multi-line and contain almost any printable character, so
@@ -67,10 +70,106 @@ class BackfillResult:
     fetched: bool = False
     api_calls_used: int = 0  # structurally always 0; asserted in tests
     capped: bool = False
+    skipped_cache: bool = False  # True when remote peek matched cached checkpoint (GH-201)
     warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+def is_commit_walk_cached(
+    conn: sqlite3.Connection,
+    canonical_remote_url: str,
+    current_remote_ref_map: dict[str, str],
+    requested_since_utc: str | None,
+) -> bool:
+    """Evaluate cache-hit equality across ALL origin branches and history window (GH-201).
+
+    Requires:
+    1. Table entry exists for canonical_remote_url.
+    2. ref_digest matches current digest across all origin branches (refs/heads/*).
+    3. Complete origin branch ref-name -> SHA mapping matches exactly.
+    4. Requested history window ('since') is within covered_since_utc.
+    Missing or unverified remote proof always returns False.
+    """
+    if not current_remote_ref_map:
+        return False
+
+    cur = conn.cursor()
+    row = cur.execute(
+        "SELECT ref_digest, sha_map_json, covered_since_utc FROM github_remote_peeks WHERE canonical_remote_url = ?",
+        (canonical_remote_url,),
+    ).fetchone()
+    if not row:
+        return False
+
+    cached_digest, cached_json, covered_since = row
+    current_digest = compute_origin_ref_digest(current_remote_ref_map)
+    if cached_digest != current_digest:
+        return False
+
+    try:
+        cached_map = json.loads(cached_json)
+        current_branches = {k: v for k, v in current_remote_ref_map.items() if k.startswith("refs/heads/")}
+        if cached_map != current_branches:
+            return False
+    except Exception:
+        return False
+
+    if requested_since_utc is not None:
+        if covered_since is not None and requested_since_utc < covered_since:
+            return False
+
+    return True
+
+
+def record_commit_coverage_checkpoint(
+    conn: sqlite3.Connection,
+    canonical_remote_url: str,
+    remote_ref_map: dict[str, str],
+    covered_since_utc: str | None,
+    verified_at_utc: str,
+    snapshot_time_utc: str,
+) -> bool:
+    """Publish an atomic commit coverage checkpoint with overlap protection (GH-201 / SCHEDULER.md:72).
+
+    Update is conditional on recorded verified_at <= snapshot_time_utc to prevent
+    stale overlapping runs from overwriting newer proofs.
+    """
+    origin_branches = {k: v for k, v in remote_ref_map.items() if k.startswith("refs/heads/")}
+    ref_digest = compute_origin_ref_digest(remote_ref_map)
+    sha_map_json = json.dumps(origin_branches, sort_keys=True)
+
+    cur = conn.cursor()
+    existing = cur.execute(
+        "SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?",
+        (canonical_remote_url,),
+    ).fetchone()
+
+    if existing is None:
+        cur.execute(
+            """
+            INSERT INTO github_remote_peeks
+                (canonical_remote_url, ref_digest, sha_map_json, covered_since_utc, verified_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (canonical_remote_url, ref_digest, sha_map_json, covered_since_utc, verified_at_utc),
+        )
+        return True
+
+    existing_verified_at = existing[0]
+    if existing_verified_at > snapshot_time_utc:
+        return False
+
+    cur.execute(
+        """
+        UPDATE github_remote_peeks
+        SET ref_digest = ?, sha_map_json = ?, covered_since_utc = ?, verified_at = ?
+        WHERE canonical_remote_url = ? AND (verified_at <= ? OR verified_at IS NULL)
+        """,
+        (ref_digest, sha_map_json, covered_since_utc, verified_at_utc, canonical_remote_url, snapshot_time_utc),
+    )
+    return cur.rowcount > 0
 
 
 def _git(repo_path: Path, *args: str) -> tuple[int, str, str]:
@@ -215,16 +314,17 @@ def _parse_log(raw: str) -> list[dict]:
     return commits
 
 
-def _changed_paths(repo_path: Path, sha: str) -> list[str]:
+def _changed_paths(repo_path: Path, sha: str) -> list[str] | None:
     """Changed paths for one commit.
 
     ``-m --first-parent`` makes merge commits report the files the merge
     actually brought in; without it git prints nothing for a merge, which is
     how merge commits ended up invisible in the first place.
+    Returns None if git show failed, allowing caller to mark the row retryable (GH-201).
     """
     code, out, _ = _git(repo_path, "show", "--pretty=format:", "--name-only", "-m", "--first-parent", sha)
     if code != 0:
-        return []
+        return None
     seen: list[str] = []
     for line in out.splitlines():
         path = line.strip()
@@ -263,6 +363,7 @@ def backfill_commits(
     clone_path: Path | None = None,
     roots: list[str] | None = None,
     branch: str | None = None,
+    force_refresh: bool = False,
 ) -> BackfillResult:
     """Enumerate *repo_full_name* from its local clone into the commit corpus.
 
@@ -272,6 +373,7 @@ def backfill_commits(
     """
     result = BackfillResult(repo=repo_full_name)
     now = _now()
+    snapshot_time = now_utc().isoformat()
 
     path = clone_path or resolve_clone(repo_full_name, roots=roots)
     if path is None:
@@ -283,6 +385,25 @@ def backfill_commits(
             conn.commit()
         return result
     result.local_path = str(path)
+
+    # 0-API Remote Peeking Checkpoint Gating (GH-201)
+    proc = run_git(path, "remote", "get-url", "origin", timeout=1.0)
+    canonical_url = proc.stdout.strip() if proc.returncode == 0 else f"https://github.com/{repo_full_name}.git"
+
+    peek_map: dict[str, str] | None = None
+    if not force_refresh:
+        peek_map = peek_remote_refs(path, remote="origin", timeout=2.0)
+        if peek_map:
+            with db_connection(database_path, ensure_github_schema) as conn:
+                conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+                if is_commit_walk_cached(conn, canonical_url, peek_map, since):
+                    result.skipped_cache = True
+                    result.default_branch = branch or _default_branch(path)
+                    result.state = "ok"
+                    result.reason = "remote refs unchanged (cached checkpoint)"
+                    _record_coverage(conn, repo_full_name, result, now)
+                    conn.commit()
+                    return result
 
     if fetch:
         code, _, err = _git(path, "fetch", "--quiet", "origin")
@@ -333,6 +454,11 @@ def backfill_commits(
         result.warnings.append(f"walk capped at {cap} commits; older history not enumerated this run")
     result.commits_seen = len(commits)
 
+    # Capture peek snapshot for checkpointing if not already captured
+    if peek_map is None:
+        peek_map = peek_remote_refs(path, remote="origin", timeout=2.0)
+
+    any_file_read_failed = False
     with db_connection(database_path, ensure_github_schema) as conn:
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         pr_shas = {
@@ -360,6 +486,12 @@ def backfill_commits(
                 continue
 
             paths = _changed_paths(path, sha)
+            path_cov = "complete"
+            if paths is None:
+                path_cov = "failed"
+                paths = []
+                any_file_read_failed = True
+
             if _is_merge(path, sha):
                 result.merge_commits += 1
             is_new = sha not in existing
@@ -376,7 +508,7 @@ def backfill_commits(
                     commit["message"],
                     commit["committed_at"],
                     f"https://github.com/{repo_full_name}/commit/{sha}",
-                    "complete",
+                    path_cov,
                     now,
                     now,
                 ),
@@ -400,6 +532,28 @@ def backfill_commits(
             if written % _COMMIT_BATCH == 0:
                 conn.commit()
 
+        # Atomic Checkpoint Contract (GH-201 / Codex R2):
+        # Only certify commit coverage checkpoint if:
+        # 1. peek_map was obtained successfully
+        # 2. git fetch succeeded
+        # 3. History walk was NOT capped
+        # 4. Zero commit file reads failed (no git show failure; all rows certified)
+        if (
+            peek_map is not None
+            and result.fetched
+            and not result.capped
+            and not any_file_read_failed
+            and canonical_url
+        ):
+            record_commit_coverage_checkpoint(
+                conn,
+                canonical_url,
+                peek_map,
+                covered_since_utc=since,
+                verified_at_utc=now,
+                snapshot_time_utc=snapshot_time,
+            )
+
         _record_coverage(conn, repo_full_name, result, now)
         conn.commit()
 
@@ -415,6 +569,7 @@ def backfill_repos(
     fetch: bool = True,
     roots: list[str] | None = None,
     branch: str | None = None,
+    force_refresh: bool = False,
 ) -> list[BackfillResult]:
     """Backfill several repos, never letting one repo's failure hide the rest."""
     return [
@@ -426,6 +581,7 @@ def backfill_repos(
             fetch=fetch,
             roots=roots,
             branch=branch,
+            force_refresh=force_refresh,
         )
         for repo in repos
     ]

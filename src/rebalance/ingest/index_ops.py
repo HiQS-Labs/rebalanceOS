@@ -544,6 +544,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             payload["sources"]["vault"]["last_ingested_at"],
         )
 
+        gh_meta = _safe_meta(conn, "github_embedding_meta")
         payload["sources"]["github"] = {
             "items": _safe_count(conn, "github_items"),
             "documents": _safe_count(conn, "github_documents"),
@@ -555,6 +556,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 conn, "github_activity", "julianday(scanned_at) >= julianday('now', '-7 days')"
             )
             or 0,
+            "power_deferred": gh_meta.get("power_deferred") == "1",
         }
 
         payload["sources"]["calendar"] = {
@@ -692,6 +694,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "embedding_dim": sem_meta.get("embedding_dim"),
             "embedder_version": sem_meta.get("embedder_version"),
             "last_embedded_at": sem_meta.get("last_embed_at"),
+            "power_deferred": sem_meta.get("power_deferred") == "1",
         }
 
         # Freshness drift checks: source rows that are NOT in semantic_documents
@@ -774,17 +777,21 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             drift["semantic_documents_pending_embed_oldest_minutes"] = (
                 round(oldest_minutes, 1) if oldest_minutes is not None else None
             )
+            sem_power_deferred = sem_meta.get("power_deferred") == "1"
+            drift["semantic_documents_pending_embed_power_deferred"] = sem_power_deferred
             if stuck_count:
+                power_note = " (embeddings deferred on battery)" if sem_power_deferred else ""
                 drift["semantic_documents_pending_embed_reason"] = (
                     f"{stuck_count} of {pending_total} pending-embed row(s) unembedded "
                     f"for over {_PENDING_EMBED_STUCK_MINUTES}m (oldest "
                     f"{round(oldest_minutes, 1) if oldest_minutes is not None else '?'}m) "
-                    "— likely a stuck/failed embed run, not just an in-flight tail"
+                    f"— likely a stuck/failed embed run, not just an in-flight tail{power_note}"
                 )
         except Exception:
             drift["semantic_documents_pending_embed"] = None
             drift["semantic_documents_pending_embed_stuck"] = None
             drift["semantic_documents_pending_embed_oldest_minutes"] = None
+            drift["semantic_documents_pending_embed_power_deferred"] = False
 
         # GH-169 Phase 3: commit-corpus completeness, anchored on the remote.
         # Cheap (local git + one ls-remote per repo, no REST API) so it can run
@@ -809,6 +816,9 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         except Exception as exc:  # never let a coverage probe break status
             drift["commit_coverage"] = {"error": str(exc)}
 
+        sem_power_def = sem_meta.get("power_deferred") == "1"
+        gh_power_def = gh_meta.get("power_deferred") == "1"
+        drift["power_deferred"] = sem_power_def or gh_power_def
         payload["freshness"] = {**drift, "signal_health": _derive_signal_health(payload["sources"])}
 
     return payload
@@ -1245,6 +1255,7 @@ def _refresh_github(
             "embedded": gh_embed.embedded_docs,
             "skipped_unchanged": gh_embed.skipped_unchanged,
             "elapsed_seconds": gh_embed.elapsed_seconds,
+            "deferred_battery": gh_embed.deferred_battery,
         },
     }
 
@@ -1555,6 +1566,7 @@ def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, A
             "embedded": sem_embed.embedded_docs,
             "skipped_unchanged": sem_embed.skipped_unchanged,
             "elapsed_seconds": sem_embed.elapsed_seconds,
+            "deferred_battery": sem_embed.deferred_battery,
         },
     }
 
