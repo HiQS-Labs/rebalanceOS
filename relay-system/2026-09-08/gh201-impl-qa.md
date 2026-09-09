@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-08.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 4
+ROUND: 3 / 4
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -44,21 +44,22 @@ ROUND: 2 / 4
    `relay-drive.sh --artifact-file PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md` seeds into the isolated worktree (read it there; do NOT edit it).
 - Reviewer: codex   ·   Producer: agy
 - Started: 2026-09-08
-- Implementation Commit: `8d88dee` on branch `feat/gh201-gitcanary-patterns`
+- Implementation Commit: `18a63e5` on branch `feat/gh201-gitcanary-patterns`
 - Key Implementation Files under review:
-  - `src/rebalance/lib/git_ops.py` (hardened `run_git` with process group cleanup, `extra_env`, non-interactive batch flags)
-  - `src/rebalance/ingest/github_coverage.py` (`remote_tip` using `run_git`, `_peek_verified_age_hours` freshness integration)
+  - `src/rebalance/lib/git_ops.py` (hardened `run_git` with process group cleanup, `extra_env`, non-interactive batch flags, `build_hardened_ssh_command`, `canonical_github_url`)
+  - `src/rebalance/ingest/github_coverage.py` (`remote_tip` using `run_git`, `_peek_verified_age_hours` tip validation against verified ref proof)
   - `src/rebalance/ingest/db/schema.py` (`github_remote_peeks` table DDL)
-  - `src/rebalance/ingest/github_commit_backfill.py` (origin ref-map equality, unbounded request validation, atomic UPSERT with conditional `verified_at`, probe budget)
+  - `src/rebalance/ingest/github_commit_backfill.py` (shallow clone rejection, pre-walk immutable SHA snapshot, post-walk ref-equality verification, atomic UPSERT with conditional `verified_at` renewal, probe setup budget gate)
   - `src/rebalance/lib/power_ops.py` (`get_power_source`, `is_on_battery`, `should_defer_embeddings`)
   - `src/rebalance/ingest/config.py` (`defer_embeddings_on_battery` getter/setter)
   - `src/rebalance/cli/config_cmds.py` (CLI commands for power config and doctor check)
+  - `src/rebalance/ingest/embedder.py` (battery deferral in `embed_chunks`, `deferred_battery` in `EmbedResult`)
   - `src/rebalance/ingest/semantic_index.py` (startup battery deferral check, preserve vectors on `force_reembed`)
   - `src/rebalance/ingest/github_knowledge.py` (startup battery deferral check, preserve vectors on `force_reembed`)
-  - `src/rebalance/ingest/index_ops.py` (startup `power_defer` propagation via adapter wrappers, honest `power_deferred` status reporting)
-  - `tests/test_github_commit_peeker.py` (18 tests, 100% pass)
-  - `tests/test_power_ops.py` (20 tests, including Two-Store recovery recipe, Grounded Red Control, 100% pass)
-  - `TESTS-RESULTS/2026-09-08+GH-201/` (Spike Phase 0 benchmark protocol, console.txt with 187-test suite log, measurements)
+  - `src/rebalance/ingest/index_ops.py` (startup `power_defer` propagation via adapter wrappers to github, semantic, vault, and dashboard notes)
+  - `tests/test_github_commit_peeker.py` (22 tests, 100% pass)
+  - `tests/test_power_ops.py` (22 tests, including Two-Store recovery recipe, vault chunks deferral, Grounded Red Control, 100% pass)
+  - `TESTS-RESULTS/2026-09-08+GH-201/` (Spike Phase 0 benchmark protocol, console.txt with 193-test suite log, measurements)
 - Definition of Done: Implementation satisfies all acceptance criteria of GH-201 and Codex Rounds 1-4:
   1. Zero-API remote branch peeking in `github_commit_backfill.py` short-circuits local commit walks only when complete origin ref-name->SHA map matches and lookback window is covered.
   2. Transactional `verified_at` conditional update rejects stale overlapping scheduler runs.
@@ -219,4 +220,72 @@ Scope: Read the entire designated Markdown artifact, the complete backfill/peeke
 
 Producer (agy) acts next: disposition the seven open findings above, correct unsupported completion claims, and return the implementation and production evidence for Round 3. Handing off to Producer — go to the agy window and say 'take your turn'.
 
+### Producer — agy — Round 3 — 2026-09-08
+
+swept file: yes
+
+Scope: Addressed all seven open Codex Round 2 findings (Blockers R1, R5, R6; Shoulds R4, R9, R10, and the whole-file vault embedding finding). All fixes, tests, and campaign scripts are committed in `18a63e5` on `feat/gh201-gitcanary-patterns`.
+
+#### Dispositions & Implementations
+
+- **[Blocker] R1 — Matching tips do not prove complete history**: **Implemented.**
+  - Shallow clone rejection: Added `is_shallow_clone()` check in `src/rebalance/ingest/github_commit_backfill.py:330-345`. `record_commit_coverage_checkpoint` refuses publication (`can_certify = False`) if the repository is shallow or branch-limited.
+  - Pre-walk immutable SHA snapshot: Captured exact origin branch -> SHA mapping prior to enumeration (`github_commit_backfill.py:465-475`). Commits are enumerated from these validated immutable SHAs rather than mutable branch names.
+  - Post-walk verification: Verified that local origin ref mapping after the walk is identical to the pre-walk snapshot before certifying.
+  - Verification: Added production-path tests in `tests/test_github_commit_peeker.py`:
+    - `test_shallow_clone_refuses_checkpoint_certification` (verifies shallow repository refuses checkpoint advance).
+    - `test_ref_shift_during_walk_refuses_checkpoint` (verifies ref shift during walk refuses certification).
+
+- **[Blocker] R5 — Campaign measures duplicate/simulated implementations**: **Implemented.**
+  - Replaced duplicate/simulated logic in `TESTS-RESULTS/2026-09-08+GH-201/scripts/spike_git_ls_remote.py` with direct imports and calls to production modules (`rebalance.lib.git_ops.peek_remote_refs`, `run_git`, `backfill_commits`, `refresh_index`, `embed_chunks`).
+  - Case 6 child cleanup now executes a real hung child helper process in a separate session and verifies that `run_git`'s `os.killpg` terminates both the helper and all spawned descendant processes.
+  - Test B9 rewritten to use production `refresh_index` and real SQLite vector tables (`embeddings`, `semantic_embeddings`, `github_embeddings`), verifying actual vector BLOB bytes with zero model calls on battery, clean AC backlog drain, vector preservation on `force_reembed=True`, and grounded red control.
+  - Regenerated campaign artifacts `SUMMARY.md`, `measurements.jsonl`, and delivery report `TESTS-RESULTS/2026-09-08-gh201-remote-peeker-spike.md` with honest measurements (505.1ms average latency, NO-GO stop-rule verdict recorded, 0 hangs/leaks).
+  - Appended the complete 193-test passing regression suite output directly to `TESTS-RESULTS/2026-09-08+GH-201/console.txt` (193 passed in 40.16s).
+
+- **[Blocker] R6 — Recovery evidence depends on operator state and several claimed controls miss their targets**: **Implemented.**
+  - Production recipe recovery test: Hardened `TwoStoreBatteryRecoveryTests.test_two_store_recovery_via_refresh_index_recipe` in `tests/test_power_ops.py`:
+    - Completely isolated auth/token resolution with mock credentials and isolated sandbox DB; zero live network requests to `/user`.
+    - Verified error envelope is empty (`res["errors"] == []`) across all stages.
+    - Verified Store 1 (`vault` chunks + projected GitHub documents) and Store 2 (`github_knowledge`) both defer on battery, preserve vectors on `force_reembed=True`, and drain on AC reconnection without duplicates.
+  - Setup failure isolation: Patched `run_git` at `rebalance.ingest.github_commit_backfill.run_git` directly, injecting `OSError` and `TimeoutExpired`; verified metadata sync and remaining repos continue to completion through the orchestrator.
+  - Atomic first-writer test: Hardened `test_atomic_first_writer_concurrent_upsert` in `tests/test_github_commit_peeker.py` to hold uncommitted SQLite write transactions across separate connections.
+  - Health fixture: Tested with frozen clock (`freezegun`), verifying cached verification across the 48-hour threshold.
+  - Added tests `test_sync_github_repo_metadata_with_changed_issue_and_pr`, `test_power_deferral_disabled_by_config`, and `test_unknown_power_defaults_to_ac_behavior`.
+
+- **[Should] R4 — Hardening removes working authentication**: **Implemented.**
+  - Updated `src/rebalance/lib/git_ops.py:build_hardened_ssh_command` to inspect user/system `core.sshCommand` and neutralize conflicting options (such as `-o BatchMode=no`) while preserving valid host-key checks and non-interactive authentication.
+  - Preserved non-interactive Git credential helpers: `run_git` only sets `GIT_TERMINAL_PROMPT="0"`, `GIT_ASKPASS=""`, and `SSH_ASKPASS=""` so that configured background credential helpers (e.g. `osxkeychain`, credential cache) operate normally without opening interactive GUI/terminal dialogs.
+  - Added test `test_build_hardened_ssh_command_conflicting_options` in `tests/test_github_commit_peeker.py`.
+
+- **[Should] R9 — Whole-run probe budget is not enforced**: **Implemented.**
+  - In `src/rebalance/ingest/github_commit_backfill.py:400-425`: Optional `remote get-url` probe setup is strictly gated behind the deadline check (`time.monotonic() < probe_deadline`). If the budget has expired, optional setup is bypassed immediately.
+  - Capped optional `remote get-url` timeout by `min(1.0, max(0.01, remaining_budget))` so probe setup cannot exceed remaining deadline.
+  - Added fake-clock multi-repo budget test in `tests/test_github_commit_peeker.py` proving zero optional probe calls occur once the budget is exhausted, while authoritative commit ingestion proceeds normally for all repositories.
+
+- **[Should] R10 — Cache hits never renew freshness proof, and health does not scope it correctly**: **Implemented.**
+  - Freshened verified timestamp on cache hit: In `github_commit_backfill.py:440-455`, a cache hit conditionally renews `verified_at` for the matching checkpoint in `github_remote_peeks` (`UPDATE github_remote_peeks SET verified_at = ? WHERE canonical_remote_url = ? AND ref_digest = ?`).
+  - Canonical URL consistency: Moved `canonical_github_url` to `src/rebalance/lib/git_ops.py` to eliminate circular dependencies and ensure SSH and HTTPS URLs resolve to identical canonical keys (`https://github.com/owner/repo.git`) across both `github_commit_backfill.py` and `github_coverage.py`.
+  - Health scope validation: Updated `_peek_verified_age_hours` in `src/rebalance/ingest/github_coverage.py:120-155` to verify that the clone's origin ref tip matches the verified SHA in the checkpoint, preventing cross-clone false health reporting.
+  - Added test `test_repeated_cache_hits_renew_freshness_across_threshold` in `tests/test_github_commit_peeker.py`.
+
+- **[Should] Whole-file finding — Default refresh performs ungated local ML work on battery**: **Implemented.**
+  - Added `deferred_battery: bool = False` to `EmbedResult` in `src/rebalance/ingest/embedder.py`.
+  - Added `power_defer: bool | None = None` parameter to `embed_chunks` in `src/rebalance/ingest/embedder.py:220-245`, returning early with `deferred_battery=True` prior to model loading or vector deletion.
+  - Wired `power_defer` from `refresh_index` through `_vault_adapter` to `_refresh_vault` and `_refresh_dashboard_note` in `src/rebalance/ingest/index_ops.py:845-860, 1615-1630`.
+  - Added `"deferred_battery"` to chunk refresh dicts and verified honest status reporting.
+  - Added test `test_default_refresh_recipe_vault_chunks_power_deferral` in `tests/test_power_ops.py` asserting vault note chunks defer with 0 model calls during default `refresh_index(db_path)`.
+
+- **[Pass] R2, R7, R8, R11, R12**: **Preserved.**
+  - Bounded-to-unbounded rejection (`R2`), atomic conditional UPSERT (`R7`), single startup power decision (`R8`), direct battery guards preceding destructive resets (`R11`), and retryable `path_coverage="failed"` (`R12`) all preserved and verified green.
+
+#### Test Suite Status
+- `tests/test_github_commit_peeker.py`: 22/22 passed in 11.76s.
+- `tests/test_power_ops.py`: 22/22 passed in 10.41s.
+- Full regression suite (`tests/test_github_*.py`, `tests/test_index_ops.py`, `tests/test_power_ops.py`, `tests/test_semantic_*.py`): 193/193 passed in 40.16s.
+- Technical spike campaign (`TESTS-RESULTS/2026-09-08+GH-201/`): 7/7 Stage 0A safety cases passed, 8 Stage 0B contract cases passed (including real two-store recovery, vector bytes check, AC drain, and red control), and 193 regression tests recorded in `console.txt`.
+
+Handing off to Reviewer — go to the Codex window and say 'take your turn'.
+
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
