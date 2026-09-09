@@ -417,6 +417,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         # 1. Run on battery via refresh_index entry point
         os.environ["REBALANCE_FORCE_BATTERY"] = "1"
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
              patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
@@ -429,7 +431,11 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             )
             mock_scan.return_value = MagicMock(events=[])
 
-            refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            res_battery = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            self.assertEqual(res_battery["errors"], [], f"Expected 0 errors on battery refresh, got: {res_battery['errors']}")
+            battery_scopes = [r["scope"] for r in res_battery["results"]]
+            self.assertIn("github", battery_scopes)
+            self.assertIn("semantic", battery_scopes)
 
             # Zero model calls on battery
             self.assertEqual(model_calls, 0, "refresh_index must make zero model calls on battery")
@@ -452,6 +458,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         os.environ["REBALANCE_FORCE_AC"] = "1"
 
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
              patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
@@ -464,7 +472,11 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             )
             mock_scan.return_value = MagicMock(events=[])
 
-            refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            res_ac = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            self.assertEqual(res_ac["errors"], [], f"Expected 0 errors on AC refresh, got: {res_ac['errors']}")
+            ac_scopes = [r["scope"] for r in res_ac["results"]]
+            self.assertIn("github", ac_scopes)
+            self.assertIn("semantic", ac_scopes)
 
             # Model calls occurred on AC
             self.assertGreater(model_calls, 0, "Model calls must occur to drain backlog on AC")
@@ -484,6 +496,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         # 3. Subsequent AC refresh on unchanged repos: zero new model calls
         calls_before = model_calls
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
              patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
@@ -496,7 +510,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             )
             mock_scan.return_value = MagicMock(events=[])
 
-            refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            res_unchanged = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            self.assertEqual(res_unchanged["errors"], [])
             self.assertEqual(model_calls, calls_before, "Unchanged AC run must make zero additional model calls")
 
     def test_document_projection_runs_on_battery_while_embeddings_deferred(self) -> None:
@@ -599,12 +614,12 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             self.assertGreater(model_calls, 0, "Bypassing gate invoked model on battery, proving assertions hold")
 
     def test_power_transition_between_stages_honors_startup_decision(self) -> None:
-        """Startup decision captured in refresh_index is honored across all stages,
-        even if laptop is plugged/unplugged between GitHub and Semantic stages (Codex R8).
-        """
+        """Startup decision captured in refresh_index is honored across all stages (Codex R8)."""
         os.environ["REBALANCE_FORCE_BATTERY"] = "1"
 
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
              patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
              patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
@@ -626,23 +641,130 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
             with patch("rebalance.lib.power_ops.should_defer_embeddings", side_effect=transitioning_power):
                 res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+                self.assertEqual(res["errors"], [])
                 sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
                 self.assertTrue(sem_res["semantic_embed"]["deferred_battery"])
 
+    def test_power_transition_startup_ac_to_unplug_honors_startup_decision(self) -> None:
+        """Startup decision on AC is honored across all stages even if unplugged mid-refresh (Codex R6 & R8)."""
+        call_count = 0
+
+        def transitioning_power() -> bool:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return False  # Startup check in refresh_index -> AC
+            return True  # Later checks -> Unplugged (Battery)
+
+        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
+             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
+             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
+             patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
+             patch("rebalance.lib.power_ops.should_defer_embeddings", side_effect=transitioning_power):
+            mock_sync_gh.return_value = MagicMock(
+                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
+                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+            )
+            mock_scan.return_value = MagicMock(events=[])
+
+            res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            self.assertEqual(res["errors"], [])
+            sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
+            self.assertFalse(sem_res["semantic_embed"]["deferred_battery"], "Startup AC decision must execute embeddings without deferral")
+
     def test_power_deferral_disabled_by_config(self) -> None:
-        """When defer_embeddings_on_battery is False, should_defer_embeddings is False even on battery."""
+        """When defer_embeddings_on_battery is False, refresh_index executes embeddings on battery (Codex R6)."""
         os.environ["REBALANCE_FORCE_BATTERY"] = "1"
         self.assertTrue(should_defer_embeddings())
 
         with patch("rebalance.ingest.config.get_defer_embeddings_on_battery", return_value=False):
             self.assertFalse(should_defer_embeddings(), "Disabled config must allow embeddings on battery")
 
+            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
+                 patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
+                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
+                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+                mock_sync_gh.return_value = MagicMock(
+                    branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
+                    commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                )
+                mock_scan.return_value = MagicMock(events=[])
+
+                res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+                self.assertEqual(res["errors"], [])
+                sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
+                self.assertFalse(sem_res["semantic_embed"]["deferred_battery"], "Disabled config must run embeddings")
+
     def test_unknown_power_defaults_to_ac_behavior(self) -> None:
-        """Unknown power source defaults to AC behavior (no deferral)."""
+        """Unknown power source defaults to AC behavior in refresh_index (Codex R6)."""
         os.environ["REBALANCE_POWER_SOURCE"] = "unknown"
         self.assertEqual(get_power_source(), "unknown")
         self.assertFalse(is_on_battery())
         self.assertFalse(should_defer_embeddings())
+
+        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
+             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
+             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
+             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
+             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+            mock_sync_gh.return_value = MagicMock(
+                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
+                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+            )
+            mock_scan.return_value = MagicMock(events=[])
+
+            res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
+            self.assertEqual(res["errors"], [])
+            sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
+            self.assertFalse(sem_res["semantic_embed"]["deferred_battery"], "Unknown power must default to AC embeddings")
+
+    def test_default_refresh_recipe_vault_chunks_power_deferral(self) -> None:
+        """Default refresh recipe defers vault chunks embedding on battery and drains on AC (Codex Whole-File)."""
+        with tempfile.TemporaryDirectory() as tmp_vault:
+            v_path = Path(tmp_vault)
+            (v_path / "Note.md").write_text("# Note\n\nSome meaningful content to be chunked and embedded in vault.")
+
+            # 1. Ingest vault files
+            from rebalance.ingest.note_ingester import ingest_vault
+            ingest_vault(vault_path=v_path, database_path=self.db_path)
+
+            with db_connection(self.db_path) as conn:
+                chunk_count = conn.execute("SELECT count(*) FROM chunks").fetchone()[0]
+                self.assertGreater(chunk_count, 0)
+
+            # 2. Run refresh_index on battery with vault scope
+            os.environ["REBALANCE_FORCE_BATTERY"] = "1"
+            res_battery = refresh_index(self.db_path, scope=["vault"], vault_path=str(v_path))
+            self.assertEqual(res_battery["errors"], [])
+            v_res = next(r for r in res_battery["results"] if r["scope"] == "vault")
+            self.assertTrue(v_res["embed_chunks"]["deferred_battery"])
+            self.assertEqual(v_res["embed_chunks"]["embedded"], 0)
+
+            # Embeddings table untouched
+            with db_connection(self.db_path) as conn:
+                embedded_count = conn.execute("SELECT count(*) FROM embeddings").fetchone()[0]
+                self.assertEqual(embedded_count, 0)
+
+            # 3. Drain on AC
+            os.environ.pop("REBALANCE_FORCE_BATTERY", None)
+            os.environ["REBALANCE_FORCE_AC"] = "1"
+            res_ac = refresh_index(self.db_path, scope=["vault"], vault_path=str(v_path))
+            self.assertEqual(res_ac["errors"], [])
+            v_res_ac = next(r for r in res_ac["results"] if r["scope"] == "vault")
+            self.assertFalse(v_res_ac["embed_chunks"]["deferred_battery"])
+            self.assertGreater(v_res_ac["embed_chunks"]["embedded"], 0)
+
+            with db_connection(self.db_path) as conn:
+                embedded_after = conn.execute("SELECT count(*) FROM embeddings").fetchone()[0]
+                self.assertEqual(embedded_after, chunk_count)
 
 
 if __name__ == "__main__":

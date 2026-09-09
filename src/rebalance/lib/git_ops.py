@@ -2,12 +2,15 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 from pathlib import Path
 
 __all__ = [
     "DEFAULT_PRUNE_DIRS",
+    "build_hardened_ssh_command",
+    "canonical_github_url",
     "compute_origin_ref_digest",
     "git_pull_rebase_safe",
     "parse_github_remote_url",
@@ -41,6 +44,25 @@ def parse_github_remote_url(remote_url: str | None) -> str | None:
     if not match:
         return None
     return f"{match.group('owner')}/{match.group('repo')}"
+
+
+def canonical_github_url(url_or_name: str) -> str:
+    """Normalize any GitHub URL or owner/repo shorthand to standard canonical https URL."""
+    s = (url_or_name or "").strip()
+    if s.endswith(".git"):
+        s = s[:-4]
+    if s.startswith("git@github.com:"):
+        s = s[len("git@github.com:"):]
+    elif s.startswith("https://github.com/"):
+        s = s[len("https://github.com/"):]
+    elif s.startswith("http://github.com/"):
+        s = s[len("http://github.com/"):]
+    elif s.startswith("ssh://git@github.com/"):
+        s = s[len("ssh://git@github.com/"):]
+    parts = s.strip("/").split("/")
+    if len(parts) == 2:
+        return f"https://github.com/{parts[0].lower()}/{parts[1].lower()}.git"
+    return url_or_name.strip()
 
 
 # Directories never worth descending into when walking for git checkouts or
@@ -151,6 +173,62 @@ def run_git(
         raise
 
 
+def build_hardened_ssh_command(
+    repo_path: Path | None = None,
+    extra_ssh_opts: str = "",
+) -> str:
+    """Build a hardened, non-interactive SSH command honoring user configuration.
+
+    Reads GIT_SSH_COMMAND or core.sshCommand, neutralizes conflicting prompt options
+    (e.g. BatchMode=no), and enforces BatchMode=yes and ConnectTimeout=5.
+    """
+    ssh_base = os.environ.get("GIT_SSH_COMMAND")
+    if not ssh_base and repo_path:
+        try:
+            cfg = run_git(repo_path, "config", "--get", "core.sshCommand", timeout=1.0)
+            if cfg.returncode == 0 and cfg.stdout.strip():
+                ssh_base = cfg.stdout.strip()
+        except Exception:
+            pass
+    if not ssh_base:
+        ssh_base = "ssh"
+
+    try:
+        tokens = shlex.split(ssh_base)
+    except ValueError:
+        tokens = ["ssh"]
+    if not tokens:
+        tokens = ["ssh"]
+
+    binary = tokens[0]
+    user_tokens = tokens[1:]
+
+    filtered_tokens: list[str] = []
+    skip_next = False
+    for i, tok in enumerate(user_tokens):
+        if skip_next:
+            skip_next = False
+            continue
+        tok_lower = tok.lower()
+        if tok == "-o" and i + 1 < len(user_tokens):
+            val = user_tokens[i + 1].lower()
+            if val.startswith("batchmode=") or val.startswith("connecttimeout="):
+                skip_next = True
+                continue
+        elif tok_lower.startswith("-obatchmode=") or tok_lower.startswith("-oconnecttimeout="):
+            continue
+        filtered_tokens.append(tok)
+
+    enforced = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5"]
+    if extra_ssh_opts:
+        try:
+            enforced.extend(shlex.split(extra_ssh_opts))
+        except ValueError:
+            enforced.append(extra_ssh_opts)
+
+    return shlex.join([binary] + enforced + filtered_tokens)
+
+
 def peek_remote_refs(
     repo_path: Path,
     remote: str = "origin",
@@ -162,26 +240,18 @@ def peek_remote_refs(
 
     Returns mapping of ref_name -> sha, or None if probe failed, timed out, or unverified.
     """
-    ssh_cmd = os.environ.get("GIT_SSH_COMMAND", "ssh")
-    ssh_opts = "-o BatchMode=yes -o ConnectTimeout=5"
-    if extra_ssh_opts:
-        ssh_opts = f"{ssh_opts} {extra_ssh_opts}"
+    ssh_cmd = build_hardened_ssh_command(repo_path, extra_ssh_opts)
 
     extra_env = {
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_ASKPASS": "",
         "SSH_ASKPASS": "",
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_ATTR_NOSYSTEM": "1",
-        "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_SSH_COMMAND": f"{ssh_cmd} {ssh_opts}",
+        "GIT_SSH_COMMAND": ssh_cmd,
     }
 
     try:
         proc = run_git(
             repo_path,
-            "-c",
-            "credential.helper=",
             "ls-remote",
             remote,
             timeout=timeout,

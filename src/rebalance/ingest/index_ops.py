@@ -829,6 +829,7 @@ def _refresh_vault(
     vault_path: Path,
     *,
     dry_run: bool,
+    power_defer: bool | None = None,
 ) -> dict[str, Any]:
     plan = {
         "steps": [
@@ -848,7 +849,7 @@ def _refresh_vault(
         exclude_patterns=[".obsidian/*", ".trash/*", "node_modules/*", ".git/*", ".venv/*", "*/.venv/*"],
         dry_run=False,
     )
-    embed_result = embed_chunks(database_path=database_path)
+    embed_result = embed_chunks(database_path=database_path, power_defer=power_defer)
 
     return {
         "scope": "vault",
@@ -867,6 +868,7 @@ def _refresh_vault(
             "embedded": embed_result.embedded_chunks,
             "skipped_unchanged": embed_result.skipped_unchanged,
             "elapsed_seconds": embed_result.elapsed_seconds,
+            "deferred_battery": embed_result.deferred_battery,
         },
     }
 
@@ -1590,6 +1592,7 @@ def _refresh_dashboard_note(
     since_days: int,
     dry_run: bool,
     note_path: str = "Dashboards/rebalanceOS Dashboard.md",
+    power_defer: bool | None = None,
 ) -> dict[str, Any]:
     output_path = (vault_path / note_path).resolve()
     plan = {
@@ -1621,7 +1624,7 @@ def _refresh_dashboard_note(
     )
     note_file = write_dashboard_note(output_path, markdown)
     ingest_result = ingest_vault(vault_path=vault_path, database_path=database_path)
-    embed_result = embed_chunks(database_path=database_path)
+    embed_result = embed_chunks(database_path=database_path, power_defer=power_defer)
 
     return {
         "scope": "dashboard",
@@ -1641,6 +1644,7 @@ def _refresh_dashboard_note(
             "embedded": embed_result.embedded_chunks,
             "skipped_unchanged": embed_result.skipped_unchanged,
             "elapsed_seconds": embed_result.elapsed_seconds,
+            "deferred_battery": embed_result.deferred_battery,
         },
     }
 
@@ -1877,6 +1881,7 @@ def refresh_index(
                         vault_path=resolved_vault,
                         since_days=since_days,
                         dry_run=dry_run,
+                        power_defer=power_defer,
                     )
                 )
             except Exception as e:
@@ -1928,7 +1933,9 @@ def _vault_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # Safe to retry: ingest_vault deletes then re-inserts per file (CASCADE covers
     # chunks/keywords/links), so a rerun replaces rather than duplicates, and
     # embed_chunks only embeds rows with no existing embedding.
-    return _retry_on_db_locked(lambda: _refresh_vault(db_path, vault_path, dry_run=opts["dry_run"]))
+    return _retry_on_db_locked(
+        lambda: _refresh_vault(db_path, vault_path, dry_run=opts["dry_run"], power_defer=opts.get("power_defer"))
+    )
 
 
 def _retry_on_db_locked(

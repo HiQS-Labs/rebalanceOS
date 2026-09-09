@@ -27,6 +27,7 @@ missing, so the gap is computed against ``complete`` rows only, with
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -34,6 +35,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from rebalance.lib.git_ops import canonical_github_url
 from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.ingest.github_commit_backfill import _git, resolve_clone
@@ -122,17 +124,48 @@ def _fetch_age_hours(repo_path: Path) -> float | None:
     return (now_utc().timestamp() - mtime) / 3600.0
 
 
-def _peek_verified_age_hours(database_path: Path, repo_full_name: str) -> float | None:
-    """Check how recently github_remote_peeks recorded a verified remote peek for this repo."""
+def _peek_verified_age_hours(
+    database_path: Path,
+    repo_full_name: str,
+    clone_path: Path | None = None,
+) -> float | None:
+    """Check how recently github_remote_peeks recorded a verified remote peek for this repo.
+
+    Verifies canonical remote URL equivalence and, when clone_path is supplied, ensures
+    the examined clone's local origin tip matches the verified ref proof (preventing a divergent
+    second clone from claiming false freshness).
+    """
+    canonical_url = canonical_github_url(repo_full_name)
     try:
         with sqlite3.connect(f"file:{database_path}?mode=ro", uri=True) as conn:
             row = conn.execute(
-                "SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url LIKE ? OR canonical_remote_url LIKE ?",
-                (f"%/{repo_full_name}", f"%/{repo_full_name}.git"),
+                "SELECT sha_map_json, verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?",
+                (canonical_url,),
             ).fetchone()
-            if row and row[0]:
-                verified_dt = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
-                return (now_utc() - verified_dt).total_seconds() / 3600.0
+            if not row or not row[1]:
+                return None
+            sha_map_json, verified_at_str = row
+            if clone_path:
+                try:
+                    ref_map = json.loads(sha_map_json)
+                    code, tip_sha, _ = _git(clone_path, "rev-parse", "origin/HEAD")
+                    if code != 0:
+                        code, tip_sha, _ = _git(clone_path, "rev-parse", "refs/remotes/origin/main")
+                    if code != 0:
+                        code, tip_sha, _ = _git(clone_path, "rev-parse", "refs/remotes/origin/development")
+                    if code != 0:
+                        code, tip_sha, _ = _git(clone_path, "rev-parse", "HEAD")
+                    if code == 0 and tip_sha.strip():
+                        # Verify tip exists in verified ref map
+                        if tip_sha.strip() not in ref_map.values():
+                            return None
+                    else:
+                        return None
+                except Exception:
+                    return None
+
+            verified_dt = datetime.fromisoformat(verified_at_str.replace("Z", "+00:00"))
+            return (now_utc() - verified_dt).total_seconds() / 3600.0
     except Exception:
         return None
     return None
@@ -146,24 +179,19 @@ def remote_tip(repo_full_name: str, branch: str = "HEAD") -> str:
     Hardened with non-interactive flags to prevent askpass/prompt hangs (GH-201).
     Routes through rebalance.lib.git_ops.run_git for shared subprocess boundary.
     """
+    from rebalance.lib.git_ops import build_hardened_ssh_command, run_git
+
     url = f"https://github.com/{repo_full_name}.git"
-    ssh_cmd = os.environ.get("GIT_SSH_COMMAND", "ssh")
+    ssh_cmd = build_hardened_ssh_command()
     extra_env = {
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_ASKPASS": "",
         "SSH_ASKPASS": "",
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_ATTR_NOSYSTEM": "1",
-        "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_SSH_COMMAND": f"{ssh_cmd} -o BatchMode=yes -o ConnectTimeout=5",
+        "GIT_SSH_COMMAND": ssh_cmd,
     }
     try:
-        from rebalance.lib.git_ops import run_git
-
         result = run_git(
             Path("."),
-            "-c",
-            "credential.helper=",
             "ls-remote",
             url,
             branch,
@@ -212,7 +240,7 @@ def check_repo_coverage(
     fetch_age_hours = _fetch_age_hours(path)
     coverage.fetch_age_hours = fetch_age_hours
     if not check_remote:
-        peek_verified_hours = _peek_verified_age_hours(database_path, repo_full_name)
+        peek_verified_hours = _peek_verified_age_hours(database_path, repo_full_name, clone_path=path)
         effective_ages = [a for a in (fetch_age_hours, peek_verified_hours) if a is not None]
         effective_age = min(effective_ages) if effective_ages else None
         if effective_age is None or effective_age > STALE_FETCH_WARN_HOURS:

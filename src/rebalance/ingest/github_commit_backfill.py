@@ -34,8 +34,23 @@ from pathlib import Path
 from rebalance.ingest.db import db_connection, ensure_github_schema
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.local_repos import scan_local_repos
-from rebalance.lib.git_ops import compute_origin_ref_digest, peek_remote_refs, run_git
+from rebalance.lib.git_ops import (
+    canonical_github_url,
+    compute_origin_ref_digest,
+    peek_remote_refs,
+    run_git,
+)
 from rebalance.lib.time_ops import _now, now_utc
+
+
+def is_shallow_clone(path: Path) -> bool:
+    """Return True if the repository clone is shallow (truncated commit history)."""
+    try:
+        proc = run_git(path, "rev-parse", "--is-shallow-repository", timeout=1.0)
+        return proc.returncode == 0 and proc.stdout.strip().lower() == "true"
+    except Exception:
+        return (path / ".git" / "shallow").exists()
+
 
 # One ASCII unit separator between fields and a record separator between commits:
 # commit messages are multi-line and contain almost any printable character, so
@@ -397,14 +412,7 @@ def backfill_commits(
     result.local_path = str(path)
 
     # 0-API Remote Peeking Checkpoint Gating (GH-201)
-    # Setup probe with safe fallback on any error (Codex R3)
-    canonical_url = f"https://github.com/{repo_full_name}.git"
-    try:
-        proc = run_git(path, "remote", "get-url", "origin", timeout=1.0)
-        if proc.returncode == 0 and proc.stdout.strip():
-            canonical_url = proc.stdout.strip()
-    except (subprocess.TimeoutExpired, OSError):
-        pass
+    canonical_url = canonical_github_url(repo_full_name)
 
     # Probe budget enforcement (Codex R9):
     can_probe = not force_refresh
@@ -413,15 +421,38 @@ def backfill_commits(
 
     peek_map: dict[str, str] | None = None
     if can_probe:
-        rem_timeout = min(2.0, max(0.1, probe_deadline - time.monotonic())) if probe_deadline else 2.0
-        try:
-            peek_map = peek_remote_refs(path, remote="origin", timeout=rem_timeout)
-        except Exception:
-            peek_map = None
+        rem_setup = min(1.0, probe_deadline - time.monotonic()) if probe_deadline else 1.0
+        if rem_setup > 0:
+            try:
+                proc = run_git(path, "remote", "get-url", "origin", timeout=rem_setup)
+                if proc.returncode == 0 and proc.stdout.strip():
+                    parsed = canonical_github_url(proc.stdout.strip())
+                    if parsed.startswith("https://github.com/"):
+                        canonical_url = parsed
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+        rem_timeout = min(2.0, probe_deadline - time.monotonic()) if probe_deadline else 2.0
+        if rem_timeout > 0:
+            try:
+                peek_map = peek_remote_refs(path, remote="origin", timeout=rem_timeout)
+            except Exception:
+                peek_map = None
+
         if peek_map:
             with db_connection(database_path, ensure_github_schema) as conn:
                 conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
                 if is_commit_walk_cached(conn, canonical_url, peek_map, since):
+                    # Codex R10: Renew verified_at timestamp on successful cache hit against the same checkpoint proof!
+                    digest = compute_origin_ref_digest(peek_map)
+                    conn.execute(
+                        """
+                        UPDATE github_remote_peeks
+                        SET verified_at = ?
+                        WHERE canonical_remote_url = ? AND ref_digest = ?
+                        """,
+                        (snapshot_time, canonical_url, digest),
+                    )
                     result.skipped_cache = True
                     result.default_branch = branch or _default_branch(path)
                     result.state = "ok"
@@ -438,24 +469,43 @@ def backfill_commits(
             # read the result as authoritative coverage.
             result.warnings.append(f"fetch failed ({err or 'unknown error'}); clone may be stale")
 
-    # Scope: ALL remote branches by default, not just the default branch.
-    #
-    # Found by running this against the real clone: `origin/HEAD` here points at
-    # `main`, but this repo's actual trunk is `development` -- so a
-    # default-branch walk enumerated 515 commits of the wrong branch and missed
-    # the measured gap entirely. Deriving "where the work is" from origin/HEAD
-    # is an assumption the repo layout does not honour, and the same is true of
-    # any repo using a main/develop split.
-    #
-    # Walking `--remotes=origin` also closes a second hole: commits on branches
-    # that were never merged to any trunk. Dedup is by (repo, sha), so overlap
-    # between branches costs nothing.
     result.default_branch = branch or _default_branch(path)
+    is_shallow = is_shallow_clone(path)
+
+    # Codex R1: Capture and validate local origin ref map BEFORE walk
+    pre_walk_local_refs: dict[str, str] = {}
+    code, local_refs_out, _ = _git(
+        path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin"
+    )
+    if code == 0:
+        for line in local_refs_out.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                ref_name, ref_sha = parts
+                if ref_name.endswith("/HEAD"):
+                    continue
+                head_ref = ref_name.replace("refs/remotes/origin/", "refs/heads/")
+                pre_walk_local_refs[head_ref] = ref_sha
+
+    pre_walk_ref_match = False
+    if peek_map is not None and pre_walk_local_refs:
+        remote_origin_branches = {
+            k: v for k, v in peek_map.items() if k.startswith("refs/heads/")
+        }
+        if pre_walk_local_refs == remote_origin_branches:
+            pre_walk_ref_match = True
+
     if branch:
         ref_args = [f"origin/{branch}"]
         code, _, _ = _git(path, "rev-parse", "--verify", f"origin/{branch}")
         if code != 0:
             ref_args = [branch]
+    elif pre_walk_local_refs:
+        # Codex R1: Walk validated immutable SHAs instead of mutable branch refs
+        ref_args = sorted(set(pre_walk_local_refs.values()))
     else:
         ref_args = ["--remotes=origin"]
 
@@ -560,22 +610,27 @@ def backfill_commits(
         # 3. git fetch succeeded.
         # 4. History walk was NOT capped (all requested history was enumerated).
         # 5. Zero commit file reads failed (all commit rows complete).
-        # 6. Complete origin ref-map equality: local origin branches must exactly match remote origin branches!
-        local_ref_match = False
-        if (
+        # 6. Complete origin ref-map equality matched BEFORE walk.
+        # 7. Clone is NOT shallow (shallow clone has truncated history, cannot certify complete coverage).
+        # 8. No concurrent ref changes during walk (re-verify local origin refs match pre-walk snapshot).
+        can_certify = (
             branch is None
             and peek_map is not None
             and result.fetched
             and not result.capped
             and not any_file_read_failed
-            and canonical_url
-        ):
-            code, local_refs_out, _ = _git(
+            and pre_walk_ref_match
+            and not is_shallow
+            and bool(canonical_url)
+        )
+        if can_certify:
+            # Re-verify local origin refs did not change during walk
+            code, post_refs_out, _ = _git(
                 path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin"
             )
             if code == 0:
-                local_origin_refs: dict[str, str] = {}
-                for line in local_refs_out.splitlines():
+                post_walk_local_refs: dict[str, str] = {}
+                for line in post_refs_out.splitlines():
                     line = line.strip()
                     if not line:
                         continue
@@ -585,15 +640,13 @@ def backfill_commits(
                         if ref_name.endswith("/HEAD"):
                             continue
                         head_ref = ref_name.replace("refs/remotes/origin/", "refs/heads/")
-                        local_origin_refs[head_ref] = ref_sha
+                        post_walk_local_refs[head_ref] = ref_sha
+                if post_walk_local_refs != pre_walk_local_refs:
+                    can_certify = False
+            else:
+                can_certify = False
 
-                remote_origin_branches = {
-                    k: v for k, v in peek_map.items() if k.startswith("refs/heads/")
-                }
-                if local_origin_refs and local_origin_refs == remote_origin_branches:
-                    local_ref_match = True
-
-        if local_ref_match and peek_map is not None:
+        if can_certify and peek_map is not None:
             record_commit_coverage_checkpoint(
                 conn,
                 canonical_url,

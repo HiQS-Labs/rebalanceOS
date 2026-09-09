@@ -111,6 +111,7 @@ class EmbedResult:
     model_name: str
     embedding_dim: int
     elapsed_seconds: float
+    deferred_battery: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ def embed_chunks(
     model_name: str = DEFAULT_MODEL,
     batch_size: int = 32,
     force_reembed: bool = False,
+    power_defer: bool | None = None,
 ) -> EmbedResult:
     """Batch-embed all chunks that need embedding.
 
@@ -208,6 +210,21 @@ def embed_chunks(
     on this leaf rather than on :func:`embed_vault_chunks`, because that facade
     delegates here — guarding both would self-deadlock on the same ``flock``.
     """
+    if power_defer is None:
+        from rebalance.lib.power_ops import should_defer_embeddings
+
+        power_defer = should_defer_embeddings()
+    if power_defer:
+        return EmbedResult(
+            total_chunks=0,
+            embedded_chunks=0,
+            skipped_unchanged=0,
+            model_name=model_name,
+            embedding_dim=0,
+            elapsed_seconds=0.0,
+            deferred_battery=True,
+        )
+
     instrument_embedding_pass("embed_chunks")
     start = time.monotonic()
 
