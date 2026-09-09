@@ -1057,6 +1057,8 @@ def _refresh_github(
     dry_run: bool,
     backfill_since: str | None = None,
     artifact_sync_days: int | None = None,
+    power_defer: bool | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     # GH-148: the per-item artifact fan-out (PR detail/comments/reviews/commits/
     # check-runs, per-issue comment walks) is the dominant API cost of a refresh —
@@ -1123,7 +1125,11 @@ def _refresh_github(
     # walk is the correctness backstop and runs after it — the ratchet in
     # upsert_direct_commit() means neither path can undo the other's work.
     # Zero API calls, so it adds no rate-limit pressure to the refresh.
-    backfill_results = backfill_repos(database_path, target_repos, since=backfill_since)
+    try:
+        backfill_results = backfill_repos(database_path, target_repos, since=backfill_since)
+    except Exception as exc:
+        logger.warning("Commit backfill encountered error, proceeding to authoritative metadata sync: %s", exc)
+        backfill_results = []
 
     repo_results: list[dict[str, Any]] = []
     for repo in target_repos:
@@ -1182,7 +1188,7 @@ def _refresh_github(
 
     from rebalance.ingest.github_knowledge import embed_github_documents
 
-    gh_embed = embed_github_documents(database_path=database_path)
+    gh_embed = embed_github_documents(database_path=database_path, power_defer=power_defer)
 
     # Coverage guard: snapshot the resolved watched set and alarm on a silent
     # reduction. Runs LAST, only on a clean sync (an earlier raise never reaches
@@ -1528,7 +1534,13 @@ def _all_semantic_sources() -> list[str]:
     return _LADDER + registry_extra
 
 
-def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
+def _refresh_semantic_only(
+    database_path: Path,
+    *,
+    dry_run: bool,
+    power_defer: bool | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
     sources = _all_semantic_sources()
     if dry_run:
         return {
@@ -1549,7 +1561,7 @@ def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, A
         source_types=sources,
         use_registry_providers=True,
     )
-    sem_embed = embed_pending(database_path, source_types=sources)
+    sem_embed = embed_pending(database_path, source_types=sources, power_defer=power_defer)
     return {
         "scope": "semantic",
         "dry_run": False,
@@ -1720,6 +1732,10 @@ def refresh_index(
     if "figma" in requested_scopes:
         resolved_figma_token = (get_figma_token() or "").strip()
 
+    from rebalance.lib.power_ops import should_defer_embeddings
+
+    power_defer = should_defer_embeddings()
+
     # Per-collector kwargs bundle. Each collector ignores keys it doesn't need.
     collector_opts: dict[str, Any] = {
         "vault_path": resolved_vault,
@@ -1735,6 +1751,7 @@ def refresh_index(
         # watched-set resolution, events scan, watched-repo rollups — keeps
         # since_days, so no other consumer's semantics move.
         "artifact_sync_days": artifact_sync_days,
+        "power_defer": power_defer,
     }
 
     # Bring the database schema to the latest version before any collector
@@ -1953,6 +1970,7 @@ def _github_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
             repos=opts.get("repos") or [],
             dry_run=opts["dry_run"],
             artifact_sync_days=opts.get("artifact_sync_days"),
+            power_defer=opts.get("power_defer"),
         )
     )
 
@@ -2006,7 +2024,13 @@ def _semantic_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # GH-131 (extended 2026-07-27) — see _vault_adapter. Safe to retry: the semantic
     # embed is content-hash keyed, so a rerun re-skips unchanged rows rather than
     # re-embedding them (2026-07-27 run: 29,099 of 29,956 skipped unchanged).
-    return _retry_on_db_locked(lambda: _refresh_semantic_only(db_path, dry_run=opts["dry_run"]))
+    return _retry_on_db_locked(
+        lambda: _refresh_semantic_only(
+            db_path,
+            dry_run=opts["dry_run"],
+            power_defer=opts.get("power_defer"),
+        )
+    )
 
 
 def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:

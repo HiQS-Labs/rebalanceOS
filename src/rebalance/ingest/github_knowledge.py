@@ -883,6 +883,7 @@ def refresh_github_embeddings(
     min_chars: int = MIN_EMBED_CHARS,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> GitHubEmbedResult:
     """Source-owned 1:1 facade over :func:`embed_github_documents` so CLI
     `github-embed` doesn't import the leaf directly (forwards all flags + the
@@ -895,6 +896,7 @@ def refresh_github_embeddings(
         min_chars=min_chars,
         force_reembed=force_reembed,
         embed_texts=embed_texts,
+        power_defer=power_defer,
     )
 
 
@@ -906,12 +908,18 @@ def embed_github_documents(
     min_chars: int = MIN_EMBED_CHARS,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> GitHubEmbedResult:
     start = time.monotonic()
 
-    from rebalance.lib.power_ops import should_defer_embeddings
+    if power_defer is None:
+        from rebalance.lib.power_ops import should_defer_embeddings
 
-    if should_defer_embeddings():
+        defer_on_battery = should_defer_embeddings()
+    else:
+        defer_on_battery = power_defer
+
+    if defer_on_battery:
         with db_connection(database_path, ensure_github_schema) as conn:
             total_docs = gh.count_embeddable_github_documents(conn, min_chars)
             gh.set_github_embedding_meta(conn, "power_deferred", "1")

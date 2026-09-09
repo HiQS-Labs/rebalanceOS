@@ -28,8 +28,10 @@ missing, so the gap is computed against ``complete`` rows only, with
 from __future__ import annotations
 
 import os
+import sqlite3
 import subprocess
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from rebalance.lib.time_ops import now_utc
@@ -120,33 +122,65 @@ def _fetch_age_hours(repo_path: Path) -> float | None:
     return (now_utc().timestamp() - mtime) / 3600.0
 
 
+def _peek_verified_age_hours(database_path: Path, repo_full_name: str) -> float | None:
+    """Check how recently github_remote_peeks recorded a verified remote peek for this repo."""
+    try:
+        with sqlite3.connect(f"file:{database_path}?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url LIKE ? OR canonical_remote_url LIKE ?",
+                (f"%/{repo_full_name}", f"%/{repo_full_name}.git"),
+            ).fetchone()
+            if row and row[0]:
+                verified_dt = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+                return (now_utc() - verified_dt).total_seconds() / 3600.0
+    except Exception:
+        return None
+    return None
+
+
 def remote_tip(repo_full_name: str, branch: str = "HEAD") -> str:
     """Remote tip SHA via ``git ls-remote`` — one cheap call, no clone needed.
 
     This is the anchor that makes the check honest: without it, a stale clone
     and a stale DB agree with each other and report perfect coverage.
     Hardened with non-interactive flags to prevent askpass/prompt hangs (GH-201).
+    Routes through rebalance.lib.git_ops.run_git for shared subprocess boundary.
     """
     url = f"https://github.com/{repo_full_name}.git"
     ssh_cmd = os.environ.get("GIT_SSH_COMMAND", "ssh")
-    env = os.environ.copy()
-    env.update({
+    extra_env = {
         "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_SSH_COMMAND": f"{ssh_cmd} -o BatchMode=yes -o ConnectTimeout=5",
-    })
+    }
     try:
-        result = subprocess.run(
-            ["git", "ls-remote", url, branch],
-            capture_output=True,
-            text=True,
+        from rebalance.lib.git_ops import run_git
+
+        result = run_git(
+            Path("."),
+            "-c",
+            "credential.helper=",
+            "ls-remote",
+            url,
+            branch,
             timeout=_LS_REMOTE_TIMEOUT_S,
-            env=env,
+            extra_env=extra_env,
         )
     except (subprocess.TimeoutExpired, OSError):
         return ""
     if result.returncode != 0 or not result.stdout.strip():
         return ""
-    return result.stdout.split()[0].strip()
+    parts = result.stdout.split()
+    if not parts:
+        return ""
+    sha = parts[0].strip()
+    if len(sha) not in (40, 64) or not all(c in "0123456789abcdefABCDEF" for c in sha):
+        return ""
+    return sha
 
 
 def check_repo_coverage(
@@ -178,12 +212,15 @@ def check_repo_coverage(
     fetch_age_hours = _fetch_age_hours(path)
     coverage.fetch_age_hours = fetch_age_hours
     if not check_remote:
-        if fetch_age_hours is None or fetch_age_hours > STALE_FETCH_WARN_HOURS:
+        peek_verified_hours = _peek_verified_age_hours(database_path, repo_full_name)
+        effective_ages = [a for a in (fetch_age_hours, peek_verified_hours) if a is not None]
+        effective_age = min(effective_ages) if effective_ages else None
+        if effective_age is None or effective_age > STALE_FETCH_WARN_HOURS:
             coverage.state = "stale"
             coverage.reason = (
                 "clone not fetched recently"
-                if fetch_age_hours is None
-                else f"clone last fetched {fetch_age_hours:.0f}h ago"
+                if effective_age is None
+                else f"clone last fetched/verified {effective_age:.0f}h ago"
             )
             return coverage
 

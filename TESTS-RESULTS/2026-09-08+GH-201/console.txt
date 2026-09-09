@@ -71,3 +71,36 @@ Saved campaign report to:
   - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08+GH-201/SUMMARY.md
   - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08-gh201-remote-peeker-spike.md
   - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08+GH-201/measurements.jsonl
+
+============================================================
+STAGE 0C: FULL PRODUCTION REGRESSION SUITE (187 TESTS)
+============================================================
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201
+configfile: pyproject.toml
+plugins: hypothesis-6.167.1, anyio-4.13.0
+collected 187 items
+
+tests/test_github_commit_backfill.py ..................                  [  9%]
+tests/test_github_commit_peeker.py ..................                    [ 19%]
+tests/test_github_coverage.py ..............                             [ 26%]
+tests/test_github_direct_commits.py ........                             [ 31%]
+tests/test_github_ignore_cli.py ......                                   [ 34%]
+tests/test_github_knowledge.py .......                                   [ 37%]
+tests/test_github_org_aliases.py .......                                 [ 41%]
+tests/test_github_push_event_accounting.py ........                      [ 45%]
+tests/test_github_rate_limit_grading.py ........                         [ 50%]
+tests/test_github_readiness.py ..                                        [ 51%]
+tests/test_github_reconciliation.py ...                                  [ 52%]
+tests/test_github_scan.py .........                                      [ 57%]
+tests/test_github_vector_invariants.py ........                          [ 62%]
+tests/test_index_ops.py .................................                [ 79%]
+tests/test_power_ops.py ....................                             [ 90%]
+tests/test_semantic_hybrid.py ........                                   [ 94%]
+tests/test_semantic_index.py ...                                         [ 96%]
+tests/test_semantic_query_prefix.py ....                                 [ 98%]
+tests/test_semantic_source_contract.py ...                               [100%]
+
+======================= 187 passed in 142.82s (0:02:22) ========================
+github_http_job_summary {"attempts": 4, "endpoint_attempt_counts": {"/user": 4}, "endpoint_counts": {"/user": 4}, "endpoint_seconds": {"/user": 1.173}, "endpoint_seconds_max": {"/user": 0.362}, "job_label": "github-api", "logical_requests": 4, "rate_limit_headers": {"first": {"attempt": 1, "limit": "5000", "remaining": "4991", "reset": "1788925213", "status": 200, "used": "9"}, "last": {"attempt": 1, "limit": "5000", "remaining": "4988", "reset": "1788925213", "status": 200, "used": "12"}, "remaining_min": 4988, "remaining_min_endpoint": "/user", "reset_epochs": ["1788925213"]}, "rate_limit_note": "Header values are samples, not a per-job quota delta.", "run_id": "pid-90031-1788921519602212000", "slowest_requests": [{"endpoint": "/user", "seconds": 0.362}, {"endpoint": "/user", "seconds": 0.325}, {"endpoint": "/user", "seconds": 0.29}, {"endpoint": "/user", "seconds": 0.196}], "total_seconds": 1.173}

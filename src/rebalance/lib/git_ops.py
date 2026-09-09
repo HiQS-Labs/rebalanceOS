@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 from pathlib import Path
 
@@ -102,19 +103,52 @@ def run_git(
     Callers retain ownership of command-specific error handling by inspecting
     the returned completed process; timeouts and executable failures still
     raise their standard ``subprocess`` exceptions.
+    Spawns in a new session (dedicated process group) so timeouts cleanly kill
+    the entire descendant process tree (SSH helpers, credential helpers).
     """
     env = None
     if extra_env:
         env = os.environ.copy()
         env.update(extra_env)
-    return subprocess.run(
-        ["git", "-C", str(repo_path), *args],
-        capture_output=True,
+
+    cmd = ["git", "-C", str(repo_path), *args]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        check=False,
-        timeout=timeout,
         env=env,
+        start_new_session=True,
     )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=proc.returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    except subprocess.TimeoutExpired as exc:
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGKILL)
+        except OSError:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        proc.communicate()
+        raise exc
+    except Exception:
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGKILL)
+        except OSError:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        raise
 
 
 def peek_remote_refs(
@@ -135,11 +169,24 @@ def peek_remote_refs(
 
     extra_env = {
         "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_SSH_COMMAND": f"{ssh_cmd} {ssh_opts}",
     }
 
     try:
-        proc = run_git(repo_path, "ls-remote", remote, timeout=timeout, extra_env=extra_env)
+        proc = run_git(
+            repo_path,
+            "-c",
+            "credential.helper=",
+            "ls-remote",
+            remote,
+            timeout=timeout,
+            extra_env=extra_env,
+        )
         if proc.returncode != 0:
             return None
 
@@ -149,9 +196,15 @@ def peek_remote_refs(
             if not line:
                 continue
             parts = line.split(None, 1)
-            if len(parts) == 2:
-                sha, ref_name = parts
-                ref_map[ref_name] = sha
+            if len(parts) != 2:
+                return None
+            sha, ref_name = parts
+            if len(sha) not in (40, 64) or not all(c in "0123456789abcdefABCDEF" for c in sha):
+                return None
+            ref_map[ref_name] = sha
+
+        if not ref_map or not any(k.startswith("refs/heads/") for k in ref_map):
+            return None
 
         return ref_map
     except (subprocess.TimeoutExpired, OSError):

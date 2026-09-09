@@ -649,6 +649,7 @@ def embed_semantic_pending(
     min_chars: int = 1,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> SemanticEmbedResult:
     """Source-owned facade over :func:`embed_pending` for the `semantic-embed`
     maintenance command, so the CLI doesn't import the leaf directly
@@ -661,6 +662,7 @@ def embed_semantic_pending(
         min_chars=min_chars,
         force_reembed=force_reembed,
         embed_texts=embed_texts,
+        power_defer=power_defer,
     )
 
 
@@ -674,6 +676,7 @@ def embed_pending(
     force_reembed: bool = False,
     source_types: Iterable[str] | None = None,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> SemanticEmbedResult:
     """Embed pending semantic document rows via the shared local embedder.
 
@@ -688,9 +691,14 @@ def embed_pending(
     start = time.monotonic()
     selected_sources = _normalize_sources(source_types)
 
-    from rebalance.lib.power_ops import should_defer_embeddings
+    if power_defer is None:
+        from rebalance.lib.power_ops import should_defer_embeddings
 
-    if should_defer_embeddings():
+        defer_on_battery = should_defer_embeddings()
+    else:
+        defer_on_battery = power_defer
+
+    if defer_on_battery:
         with db_connection(database_path, ensure_semantic_schema) as conn:
             total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
             sem.set_semantic_embedding_meta(conn, "power_deferred", "1")
