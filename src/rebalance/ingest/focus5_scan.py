@@ -1270,13 +1270,57 @@ def summarize_focus5(
                     _row_to_signals(r)
                     for r in conn.execute("SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)).fetchall()
                 ]
+                seen_keys: set[str] = set()
+                clustered_bases: list[dict[str, Any]] = []
                 for b in bases:
                     b_sig = _row_to_signals(b)
                     b_key = detect_repo_parent_key(b_sig)
-                    b["clones"] = [
-                        s for s in all_signals
-                        if detect_repo_parent_key(s) == b_key and s.local_path != b["local_path"]
-                    ]
+                    if b_key in seen_keys:
+                        continue
+                    seen_keys.add(b_key)
+                    cluster = [s for s in all_signals if detect_repo_parent_key(s) == b_key]
+                    parent = pick_parent_checkout(cluster)
+                    clones = [s for s in cluster if s.local_path != parent.local_path]
+                    effective = roll_up_parent_signals(parent, clones)
+                    card = {
+                        **asdict(effective),
+                        "position": len(clustered_bases) + 1,
+                        "rank_reason": b["rank_reason"],
+                        "ranking_mode": b["ranking_mode"],
+                        "computed_at": b["computed_at"],
+                        "clones": clones,
+                    }
+                    clustered_bases.append(card)
+
+                target_roster_size = len(bases)
+                if len(clustered_bases) < target_roster_size:
+                    from rebalance.ingest.config import get_focus5_hidden_repos
+                    hidden_set = set(get_focus5_hidden_repos())
+                    now_ts = int(now_utc().timestamp())
+                    ranked = rank_repos(
+                        all_signals,
+                        mode="recent_activity",
+                        now_ts=now_ts,
+                        hidden=hidden_set,
+                        limit=target_roster_size * 2,
+                    )
+                    for r in ranked:
+                        k = detect_repo_parent_key(r.signals)
+                        if k not in seen_keys and focus5_repo_identity(r.signals) not in hidden_set:
+                            seen_keys.add(k)
+                            card = {
+                                **asdict(r.signals),
+                                "position": len(clustered_bases) + 1,
+                                "rank_reason": r.reason,
+                                "ranking_mode": "recent_activity",
+                                "computed_at": clustered_bases[0]["computed_at"] if clustered_bases else None,
+                                "clones": list(r.clones),
+                            }
+                            clustered_bases.append(card)
+                            if len(clustered_bases) == target_roster_size:
+                                break
+
+                bases = clustered_bases
             else:
                 # Transient view (Dirty Five): re-rank the cached signals in memory
                 # under *mode* — never writes focus5_roster, so the default snapshot
@@ -1307,6 +1351,8 @@ def summarize_focus5(
             # pure-ranking unit tests that seed synthetic (non-on-disk) signal rows.
             if drop_missing_paths:
                 bases = [b for b in bases if _repo_path_live(b.get("local_path"))]
+            for idx, b in enumerate(bases, 1):
+                b["position"] = idx
             roster = [
                 _build_roster_card(conn, b, with_activity=with_activity, with_live_health=with_live_health)
                 for b in bases

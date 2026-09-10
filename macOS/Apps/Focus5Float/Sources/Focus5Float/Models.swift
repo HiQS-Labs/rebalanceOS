@@ -106,6 +106,22 @@ struct RepoCard: Codable, Identifiable {
             anyCloneDirty: anyCloneDirty ?? self.anyCloneDirty
         )
     }
+
+    func asClone() -> RepoClone {
+        RepoClone(
+            repoName: repoName,
+            localPath: localPath,
+            branch: branch,
+            ahead: ahead,
+            behind: behind,
+            modifiedCount: modifiedCount,
+            untrackedCount: untrackedCount,
+            isDirty: isDirty,
+            lastCommitAt: lastCommitAt,
+            myLastCommitTs: myLastCommitTs,
+            vscodeUrl: vscodeUrl
+        )
+    }
 }
 
 struct RepoClone: Codable, Identifiable, Equatable {
@@ -159,6 +175,23 @@ struct OffRosterWarning: Codable, Identifiable {
     // GH-104: server-computed off-roster reason ("uncommitted changes",
     // "N ahead of origin", fallback) from focus5_scan.off_roster_reason().
     let warningReason: String?
+
+    func asClone() -> RepoClone {
+        let vscode = "vscode://file\(localPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? localPath)"
+        return RepoClone(
+            repoName: repoName,
+            localPath: localPath,
+            branch: branch,
+            ahead: ahead,
+            behind: 0,
+            modifiedCount: modifiedCount,
+            untrackedCount: untrackedCount,
+            isDirty: isDirty,
+            lastCommitAt: nil,
+            myLastCommitTs: myLocalCommitTs,
+            vscodeUrl: vscode
+        )
+    }
 }
 
 struct Focus5GoalsResponse: Codable {

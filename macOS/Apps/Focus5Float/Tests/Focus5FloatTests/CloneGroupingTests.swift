@@ -156,4 +156,80 @@ final class CloneGroupingTests: XCTestCase {
         XCTAssertEqual(folded[1].activeClones.count, 1)
         XCTAssertEqual(folded[1].activeClones[0].repoName, "rebalanceOS-gh144")
     }
+
+    func testFoldClonesPromotesParentFromOffRoster() {
+        let cards = [
+            makeCard(position: 1, name: "LTVera-Pandas-gh462-settings", path: "/repos/LTVera-Pandas-gh462-settings", repoFullName: "BinoidCBD/LTVera-Pandas", branch: "feat/gh462-system-settings-page"),
+            makeCard(position: 2, name: "LTVera-Pandas-prs-backfill-20260908", path: "/repos/LTVera-Pandas-prs-backfill-20260908", repoFullName: "BinoidCBD/LTVera-Pandas", branch: "docs/prs-backfill-20260908"),
+            makeCard(position: 3, name: "XYZ-forge", path: "/repos/XYZ-forge", repoFullName: "HiQS-Labs/XYZ-forge", branch: "development"),
+            makeCard(position: 4, name: "rebalanceOS-gh201", path: "/repos/rebalanceOS-gh201", repoFullName: "HiQS-Labs/rebalanceOS", branch: "feat/gh201"),
+            makeCard(position: 5, name: "XYZ-forge-skills-only", path: "/repos/XYZ-forge-skills-only", repoFullName: "HiQS-Labs/XYZ-forge", branch: "skills-only")
+        ]
+
+        let warnings = [
+            OffRosterWarning(
+                repoName: "LTVera-Pandas",
+                localPath: "/repos/LTVera-Pandas",
+                repoFullName: "BinoidCBD/LTVera-Pandas",
+                branch: "development",
+                ahead: 0,
+                modifiedCount: 1,
+                untrackedCount: 6,
+                isDirty: true,
+                probedAt: "2026-09-10T14:54:15Z",
+                myLocalCommitTs: 1788456792,
+                warningReason: "uncommitted changes"
+            ),
+            OffRosterWarning(
+                repoName: "rebalanceOS",
+                localPath: "/repos/rebalanceOS",
+                repoFullName: "HiQS-Labs/rebalanceOS",
+                branch: "development",
+                ahead: 0,
+                modifiedCount: 2,
+                untrackedCount: 4,
+                isDirty: true,
+                probedAt: "2026-09-10T14:54:15Z",
+                myLocalCommitTs: 1788729942,
+                warningReason: "uncommitted changes"
+            ),
+            OffRosterWarning(
+                repoName: "aegis-sleuth",
+                localPath: "/repos/aegis-sleuth",
+                repoFullName: "HiQS-Labs/AEGIS-Sleuth",
+                branch: "main",
+                ahead: 0,
+                modifiedCount: 0,
+                untrackedCount: 0,
+                isDirty: false,
+                probedAt: "2026-09-10T14:54:15Z",
+                myLocalCommitTs: 1788000000,
+                warningReason: "clean"
+            )
+        ]
+
+        let (folded, pruned) = Focus5Model.foldClones(into: cards, offRoster: warnings)
+
+        XCTAssertEqual(folded[0].repoName, "LTVera-Pandas")
+        XCTAssertEqual(folded[0].position, 1)
+        XCTAssertEqual(folded[0].activeClones.count, 2)
+        XCTAssertEqual(Set(folded[0].activeClones.map(\.repoName)), ["LTVera-Pandas-gh462-settings", "LTVera-Pandas-prs-backfill-20260908"])
+
+        XCTAssertEqual(folded[1].repoName, "XYZ-forge")
+        XCTAssertEqual(folded[1].position, 2)
+        XCTAssertEqual(folded[1].activeClones.count, 1)
+        XCTAssertEqual(folded[1].activeClones[0].repoName, "XYZ-forge-skills-only")
+
+        XCTAssertEqual(folded[2].repoName, "rebalanceOS")
+        XCTAssertEqual(folded[2].position, 3)
+        XCTAssertEqual(folded[2].activeClones.count, 1)
+        XCTAssertEqual(folded[2].activeClones[0].repoName, "rebalanceOS-gh201")
+
+        XCTAssertEqual(folded[3].repoName, "aegis-sleuth")
+        XCTAssertEqual(folded[3].position, 4)
+
+        XCTAssertFalse(pruned.contains(where: { $0.repoName == "LTVera-Pandas" }))
+        XCTAssertFalse(pruned.contains(where: { $0.repoName == "rebalanceOS" }))
+        XCTAssertFalse(pruned.contains(where: { $0.repoName == "aegis-sleuth" }))
+    }
 }
