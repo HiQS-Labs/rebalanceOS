@@ -147,19 +147,38 @@ def _peek_verified_age_hours(
             sha_map_json, verified_at_str = row
             if clone_path:
                 try:
+                    from rebalance.ingest.github_commit_backfill import is_shallow_clone
+                    if is_shallow_clone(clone_path):
+                        return None
+
+                    code, out, _ = _git(
+                        clone_path,
+                        "for-each-ref",
+                        "refs/remotes/origin/",
+                        "--format=%(refname) %(objectname)",
+                    )
+                    if code != 0 or not out.strip():
+                        return None
+
+                    clone_branches: dict[str, str] = {}
+                    for line in out.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split(None, 1)
+                        if len(parts) != 2:
+                            continue
+                        ref_name, sha = parts
+                        if ref_name == "refs/remotes/origin/HEAD":
+                            continue
+                        branch_name = ref_name.removeprefix("refs/remotes/origin/")
+                        clone_branches[f"refs/heads/{branch_name}"] = sha
+
                     ref_map = json.loads(sha_map_json)
-                    code, tip_sha, _ = _git(clone_path, "rev-parse", "origin/HEAD")
-                    if code != 0:
-                        code, tip_sha, _ = _git(clone_path, "rev-parse", "refs/remotes/origin/main")
-                    if code != 0:
-                        code, tip_sha, _ = _git(clone_path, "rev-parse", "refs/remotes/origin/development")
-                    if code != 0:
-                        code, tip_sha, _ = _git(clone_path, "rev-parse", "HEAD")
-                    if code == 0 and tip_sha.strip():
-                        # Verify tip exists in verified ref map
-                        if tip_sha.strip() not in ref_map.values():
-                            return None
-                    else:
+                    expected_branches = {
+                        k: v for k, v in ref_map.items() if k.startswith("refs/heads/")
+                    }
+                    if not clone_branches or clone_branches != expected_branches:
                         return None
                 except Exception:
                     return None

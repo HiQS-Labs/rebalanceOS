@@ -1921,3 +1921,22 @@ def set_defer_embeddings_on_battery(enabled: bool = True) -> None:
     config["defer_embeddings_on_battery"] = bool(enabled)
     _write_config(config)
 
+
+def get_enable_remote_peeking() -> bool:
+    """Return whether git remote peeking is enabled.
+
+    Defaults to False pending campaign network stabilization or operator rollout (GH-201).
+    Configurable via rbos.config under 'enable_remote_peeking'.
+    """
+    val = _read_config().get("enable_remote_peeking")
+    if val is None:
+        return False
+    return bool(val)
+
+
+def set_enable_remote_peeking(enabled: bool = False) -> None:
+    """Configure whether git remote peeking is enabled."""
+    config = _read_config()
+    config["enable_remote_peeking"] = bool(enabled)
+    _write_config(config)
+

@@ -29,7 +29,14 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 # Ensure 'src' is importable from repo root
-repo_root = Path(__file__).resolve().parents[3]
+current = Path(__file__).resolve()
+repo_root = None
+for parent in [current] + list(current.parents):
+    if (parent / "src" / "rebalance").is_dir():
+        repo_root = parent
+        break
+if repo_root is None:
+    repo_root = current.parent.parent
 if str(repo_root / "src") not in sys.path:
     sys.path.insert(0, str(repo_root / "src"))
 
@@ -46,6 +53,7 @@ from rebalance.ingest.github_commit_backfill import (
     compute_origin_ref_digest,
     default_roots,
     is_commit_walk_cached,
+    is_shallow_clone,
     record_commit_coverage_checkpoint,
 )
 from rebalance.ingest.github_coverage import remote_tip
@@ -250,6 +258,7 @@ def run_stage_0a_live_sweep() -> list[ProbeMeasurement]:
     except sqlite3.OperationalError as e:
         print(f"  ✓ Read-only guarantee confirmed: {e}")
 
+    total_start = time.perf_counter()
     roots = default_roots()
     clones = _clone_index(tuple(roots))
     print(f"Discovered {len(clones)} local clones on machine.")
@@ -271,7 +280,6 @@ def run_stage_0a_live_sweep() -> list[ProbeMeasurement]:
             candidates.append(name)
 
     measurements: list[ProbeMeasurement] = []
-    total_start = time.perf_counter()
 
     for full_name in candidates:
         repo_path = clones.get(full_name)
@@ -367,6 +375,25 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
         print("  ✓ Test B2 Passed: Checkpoint published and verified cache-hit")
 
         # Test B3: Failed-File-Read -> Retry Control
+        with tempfile.TemporaryDirectory() as b3_dir:
+            b3_path = Path(b3_dir) / "b3_repo"
+            b3_path.mkdir()
+            subprocess.run(["git", "-C", str(b3_path), "init", "-q", "-b", "development"], check=True)
+            subprocess.run(["git", "-C", str(b3_path), "config", "user.email", "t@example.com"], check=True)
+            subprocess.run(["git", "-C", str(b3_path), "config", "user.name", "Tester"], check=True)
+            (b3_path / "README.md").write_text("initial")
+            subprocess.run(["git", "-C", str(b3_path), "add", "README.md"], check=True)
+            subprocess.run(["git", "-C", str(b3_path), "commit", "-q", "-m", "init"], check=True)
+
+            with patch("rebalance.ingest.github_commit_backfill._changed_paths", return_value=None):
+                res_b3 = backfill_commits(temp_db_path, "test/b3", clone_path=b3_path, branch="development")
+                assert res_b3.state == "ok"
+                with db_connection(temp_db_path) as c_b3:
+                    cov_row = c_b3.execute("SELECT path_coverage FROM github_direct_commits WHERE repo_full_name = 'test/b3'").fetchone()
+                    assert cov_row and cov_row[0] == "failed", "Commit row must be marked failed on file read failure"
+                    chk_b3 = c_b3.execute("SELECT * FROM github_remote_peeks WHERE canonical_remote_url LIKE '%test/b3%'").fetchone()
+                    assert chk_b3 is None, "Checkpoint publication must be refused when commit files fail"
+
         test_results["test_b3_failed_file_retry"] = {
             "status": "PASS",
             "note": "Production backfill_commits flags incomplete rows and skips checkpoint on file errors",
@@ -422,11 +449,17 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
         # Test B7: Negative Broken Checkpoint Control
         empty_hit = is_commit_walk_cached(conn, canonical_url, {}, "2026-08-01T00:00:00Z")
         assert not empty_hit, "Empty ref map must never produce a cache hit"
+        with tempfile.TemporaryDirectory() as b7_dir:
+            b7_path = Path(b7_dir) / "b7_repo"
+            b7_path.mkdir()
+            subprocess.run(["git", "-C", str(b7_path), "init", "-q", "-b", "main"], check=True)
+            (b7_path / ".git" / "shallow").write_text("1234\n")
+            assert is_shallow_clone(b7_path), "is_shallow_clone must detect shallow repository"
         test_results["test_b7_negative_broken_control"] = {
             "status": "PASS",
-            "note": "Empty/corrupted ref proof safely yields cache-miss",
+            "note": "Empty/corrupted ref proof safely yields cache-miss and shallow clone refused",
         }
-        print("  ✓ Test B7 Passed: Negative control verified (Empty/broken proof rejected)")
+        print("  ✓ Test B7 Passed: Negative control verified (Empty/broken proof & shallow rejected)")
 
         # Test B8: Widened Lookback Window Invalidation
         widened_hit = is_commit_walk_cached(conn, canonical_url, base_ref_map, "2026-07-01T00:00:00Z")

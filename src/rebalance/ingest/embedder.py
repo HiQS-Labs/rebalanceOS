@@ -215,12 +215,39 @@ def embed_chunks(
 
         power_defer = should_defer_embeddings()
     if power_defer:
+        total = 0
+        dim = 384
+        try:
+            with db_connection(database_path, ensure_schema) as conn:
+                r_tot = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
+                if r_tot:
+                    total = r_tot[0]
+                r_dim = conn.execute("SELECT value FROM embedding_meta WHERE key = 'embedding_dim'").fetchone()
+                if r_dim and r_dim["value"]:
+                    try:
+                        dim = int(r_dim["value"])
+                    except Exception:
+                        pass
+                pending_res = conn.execute("""
+                    SELECT COUNT(*) FROM chunks c
+                    LEFT JOIN embeddings e ON e.chunk_id = c.id
+                    WHERE e.chunk_id IS NULL AND c.body IS NOT NULL AND length(trim(c.body)) > 0
+                """).fetchone()
+                if pending_res and pending_res[0] > 0:
+                    conn.execute(
+                        "INSERT INTO embedding_meta (key, value) VALUES ('power_deferred', '1') "
+                        "ON CONFLICT(key) DO UPDATE SET value = '1'"
+                    )
+                    conn.commit()
+        except Exception:
+            pass
+
         return EmbedResult(
-            total_chunks=0,
+            total_chunks=total,
             embedded_chunks=0,
             skipped_unchanged=0,
             model_name=model_name,
-            embedding_dim=0,
+            embedding_dim=dim,
             elapsed_seconds=0.0,
             deferred_battery=True,
         )
@@ -229,6 +256,13 @@ def embed_chunks(
     start = time.monotonic()
 
     with db_connection(database_path, ensure_schema) as conn:
+        # Clear vault power deferral flag when running on AC
+        try:
+            conn.execute("DELETE FROM embedding_meta WHERE key = 'power_deferred'")
+            conn.commit()
+        except Exception:
+            pass
+
         # Check for model version change
         stored_model = None
         try:

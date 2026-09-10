@@ -86,7 +86,9 @@ Per Codex QA findings, existing RebalanceOS subsystems are reused directly with 
 - [x] **Go / No-Go Stop Rule**:
   - If any test reveals a prompt hang, askpass hang, or child-process leak: HALT rollout.
   - If average `git ls-remote` probe latency on local clones exceeds 500ms: HALT rollout.
-  - All compatibility cases must pass before proceeding to Phase 1.
+  - **Campaign Verdict**: **NO-GO (HALT ROLLOUT)**. Average probe latency on local clones was 609.1ms (exceeding the 500ms ceiling). All 7/7 subprocess safety cases and 9/9 Stage 0B sandbox recovery tests passed.
+  - **Rollout Enforcement**: To strictly honor the Stop Rule without loosening the threshold, the remote peeking optimization is **DISABLED BY DEFAULT** in production (`enable_remote_peeking = False` via `rebalance.ingest.config`). Live backfill bypasses peeking probes unless explicitly enabled. Rollout is halted pending passing network conditions or explicit operator sign-off.
+  - **Independent Phase 2**: Battery-aware ML embedding deferral (Phase 2) is independent of the network gate, fully verified across both stores, and enabled by default.
 - [x] Deliverable 0A: Benchmark protocol and read-only matrix published in `TESTS-RESULTS/` per SOP §§1–3, reporting: `Repo | Canonical Remote URL | Branch | Remote Peek SHA | SQLite Stored SHA | Divergence Match? | Latency (ms) | Probe Status`.
 
 #### Stage 0B: Isolated Sandboxed Read/Write Contract Test (Zero Production Risk)
@@ -117,7 +119,7 @@ Per Codex QA findings, existing RebalanceOS subsystems are reused directly with 
 ---
 
 ### Phase 1: Repo-Level Commit Gating & Atomic Checkpoint Cache
-*Objective*: Short-circuit expensive local commit history walking (`github_commit_backfill.py`) when remote branch SHAs are unchanged.
+*Objective*: Short-circuit expensive local commit history walking (`github_commit_backfill.py`) when remote branch SHAs are unchanged (Rollout Status: Implemented & fully verified; disabled by default via config flag pending Phase 0 stop-rule disposition).
 
 - [x] **Strict Scope Boundary (Codex R1)**: Gating applies **exclusively to the local commit history walk in `github_commit_backfill.py`**. `sync_github_repo` (issues, PRs, comments, reviews, check-runs, and PR commit endpoints) remains 100% authoritative and untouched by this gate.
 - [x] Single Checkpoint Writer: `record_commit_coverage_checkpoint(conn, canonical_remote_url, ref_digest, sha_map_json, covered_since_utc)` in `github_commit_backfill.py`.
@@ -149,6 +151,6 @@ Per Codex QA findings, existing RebalanceOS subsystems are reused directly with 
 ## Acceptance Criteria
 
 1. Phase 0 spike proves safe, non-interactive execution with named assertions across offline, timeout, askpass, conflicting SSH options, and detached HEAD cases; Stage 0B validates production completion predicate with failed-file-read retry, branch addition/deletion, out-of-order overlap protection, and negative broken-checkpoint control.
-2. Unchanged local repositories skip redundant commit history walks while `sync_github_repo` continues authoritative metadata polling, confirmed by non-empty unchanged-repo-SHA/changed-item and newly discovered PR fixtures.
+2. Unchanged local repositories skip redundant commit history walks when remote peeking is enabled, while remaining safely disabled by default per Phase 0 Stop-Rule NO-GO; sync_github_repo continues authoritative metadata polling, confirmed by non-empty unchanged-repo-SHA/changed-item and newly discovered PR fixtures.
 3. Startup-only power throttling halts `embed_pending`, `embed_semantic_pending`, and `embed_github_documents` on battery before model loading or vector reset across both `semantic_index` and `github_knowledge` stores, with zero model calls and intact vectors; AC reconnection via default recipe `refresh_index(db_path)` cleanly drains backlog without duplicates; verified with a red control.
 4. All existing pytest suites (`tests/test_github_*.py`, `tests/test_index_ops.py`) remain 100% green.

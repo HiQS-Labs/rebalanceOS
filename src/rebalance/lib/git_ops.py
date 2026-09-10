@@ -5,6 +5,7 @@ import re
 import shlex
 import signal
 import subprocess
+import time
 from pathlib import Path
 
 __all__ = [
@@ -176,6 +177,7 @@ def run_git(
 def build_hardened_ssh_command(
     repo_path: Path | None = None,
     extra_ssh_opts: str = "",
+    timeout: float = 1.0,
 ) -> str:
     """Build a hardened, non-interactive SSH command honoring user configuration.
 
@@ -185,7 +187,7 @@ def build_hardened_ssh_command(
     ssh_base = os.environ.get("GIT_SSH_COMMAND")
     if not ssh_base and repo_path:
         try:
-            cfg = run_git(repo_path, "config", "--get", "core.sshCommand", timeout=1.0)
+            cfg = run_git(repo_path, "config", "--get", "core.sshCommand", timeout=timeout)
             if cfg.returncode == 0 and cfg.stdout.strip():
                 ssh_base = cfg.stdout.strip()
         except Exception:
@@ -238,9 +240,16 @@ def peek_remote_refs(
 ) -> dict[str, str] | None:
     """Peek remote refs via git ls-remote in a hardened, non-interactive environment.
 
+    Enforces a strict shared deadline through SSH config lookup, remote execution, and cleanup.
     Returns mapping of ref_name -> sha, or None if probe failed, timed out, or unverified.
     """
-    ssh_cmd = build_hardened_ssh_command(repo_path, extra_ssh_opts)
+    start_time = time.monotonic()
+    config_timeout = min(0.5, max(0.01, timeout * 0.25))
+    ssh_cmd = build_hardened_ssh_command(repo_path, extra_ssh_opts, timeout=config_timeout)
+
+    rem_timeout = timeout - (time.monotonic() - start_time)
+    if rem_timeout <= 0:
+        return None
 
     extra_env = {
         "GIT_TERMINAL_PROMPT": "0",
@@ -254,7 +263,7 @@ def peek_remote_refs(
             repo_path,
             "ls-remote",
             remote,
-            timeout=timeout,
+            timeout=rem_timeout,
             extra_env=extra_env,
         )
         if proc.returncode != 0:

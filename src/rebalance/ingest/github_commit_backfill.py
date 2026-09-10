@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from rebalance.ingest.db import db_connection, ensure_github_schema
+from rebalance.ingest.config import get_enable_remote_peeking
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.local_repos import scan_local_repos
 from rebalance.lib.git_ops import (
@@ -44,12 +45,36 @@ from rebalance.lib.time_ops import _now, now_utc
 
 
 def is_shallow_clone(path: Path) -> bool:
-    """Return True if the repository clone is shallow (truncated commit history)."""
+    """Return True if the repository clone is shallow (truncated commit history) or unverifiable.
+
+    Requires positive confirmation that the repository is complete and non-shallow.
+    Any nonzero exit code, unknown output, timeout, or shallow file in the common
+    git directory is treated as shallow (refusing unbounded coverage certification).
+    """
     try:
         proc = run_git(path, "rev-parse", "--is-shallow-repository", timeout=1.0)
-        return proc.returncode == 0 and proc.stdout.strip().lower() == "true"
+        if proc.returncode != 0:
+            return True
+        out = proc.stdout.strip().lower()
+        if out == "true":
+            return True
+        if out != "false":
+            return True
+
+        # Check git common directory for shallow file (supports linked worktrees)
+        common_proc = run_git(path, "rev-parse", "--git-common-dir", timeout=1.0)
+        if common_proc.returncode == 0 and common_proc.stdout.strip():
+            common_dir = Path(common_proc.stdout.strip())
+            if not common_dir.is_absolute():
+                common_dir = (path / common_dir).resolve()
+            if (common_dir / "shallow").exists():
+                return True
+        elif (path / ".git" / "shallow").exists():
+            return True
+
+        return False
     except Exception:
-        return (path / ".git" / "shallow").exists()
+        return True
 
 
 # One ASCII unit separator between fields and a record separator between commits:
@@ -414,8 +439,8 @@ def backfill_commits(
     # 0-API Remote Peeking Checkpoint Gating (GH-201)
     canonical_url = canonical_github_url(repo_full_name)
 
-    # Probe budget enforcement (Codex R9):
-    can_probe = not force_refresh
+    # Probe budget enforcement and rollout stop-rule gate (Codex R9 & Round 3 Blocker):
+    can_probe = not force_refresh and get_enable_remote_peeking()
     if probe_deadline is not None and time.monotonic() >= probe_deadline:
         can_probe = False
 
@@ -443,23 +468,34 @@ def backfill_commits(
             with db_connection(database_path, ensure_github_schema) as conn:
                 conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
                 if is_commit_walk_cached(conn, canonical_url, peek_map, since):
-                    # Codex R10: Renew verified_at timestamp on successful cache hit against the same checkpoint proof!
+                    # Codex R10 / Round 3: Renew verified_at monotonically against the exact proof
                     digest = compute_origin_ref_digest(peek_map)
-                    conn.execute(
-                        """
-                        UPDATE github_remote_peeks
-                        SET verified_at = ?
-                        WHERE canonical_remote_url = ? AND ref_digest = ?
-                        """,
-                        (snapshot_time, canonical_url, digest),
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url = ? AND ref_digest = ?",
+                        (canonical_url, digest),
                     )
-                    result.skipped_cache = True
-                    result.default_branch = branch or _default_branch(path)
-                    result.state = "ok"
-                    result.reason = "remote refs unchanged (cached checkpoint)"
-                    _record_coverage(conn, repo_full_name, result, now)
-                    conn.commit()
-                    return result
+                    existing = cur.fetchone()
+                    if existing is not None:
+                        existing_verified = existing[0]
+                        if existing_verified is None or snapshot_time >= existing_verified:
+                            cur.execute(
+                                """
+                                UPDATE github_remote_peeks
+                                SET verified_at = ?
+                                WHERE canonical_remote_url = ?
+                                  AND ref_digest = ?
+                                  AND (verified_at <= ? OR verified_at IS NULL)
+                                """,
+                                (snapshot_time, canonical_url, digest, snapshot_time),
+                            )
+                        result.skipped_cache = True
+                        result.default_branch = branch or _default_branch(path)
+                        result.state = "ok"
+                        result.reason = "remote refs unchanged (cached checkpoint)"
+                        _record_coverage(conn, repo_full_name, result, now)
+                        conn.commit()
+                        return result
 
     if fetch:
         code, _, err = _git(path, "fetch", "--quiet", "origin")

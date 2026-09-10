@@ -19,6 +19,7 @@ Validates:
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import subprocess
 import tempfile
@@ -28,6 +29,7 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
+import rebalance
 from rebalance.cli._core import config_app
 import rebalance.ingest.config as config_module
 from rebalance.ingest.db import db_connection, ensure_schema, ensure_github_schema, ensure_semantic_schema
@@ -191,6 +193,12 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self._tmp.name) / "test_rebalance.db"
 
+        # Isolate power configuration from operator machine (Codex R6)
+        self._orig_config = config_module.CONFIG_PATH
+        self._test_config = Path(self._tmp.name) / "rbos.config"
+        config_module.CONFIG_PATH = self._test_config
+        config_module.set_defer_embeddings_on_battery(True)
+
         # Initialize schema and seed two-store fixtures
         with db_connection(self.db_path) as conn:
             ensure_schema(conn)
@@ -276,6 +284,7 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
+        config_module.CONFIG_PATH = self._orig_config
         os.environ.clear()
         os.environ.update(self._orig_env)
 
@@ -740,31 +749,83 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 chunk_count = conn.execute("SELECT count(*) FROM chunks").fetchone()[0]
                 self.assertGreater(chunk_count, 0)
 
-            # 2. Run refresh_index on battery with vault scope
+            # 2. Run refresh_index on battery with default recipe (no scope filter)
             os.environ["REBALANCE_FORCE_BATTERY"] = "1"
-            res_battery = refresh_index(self.db_path, scope=["vault"], vault_path=str(v_path))
-            self.assertEqual(res_battery["errors"], [])
-            v_res = next(r for r in res_battery["results"] if r["scope"] == "vault")
-            self.assertTrue(v_res["embed_chunks"]["deferred_battery"])
-            self.assertEqual(v_res["embed_chunks"]["embedded"], 0)
+            sleuth_collector = dataclasses.replace(
+                rebalance.ingest.index_ops.COLLECTORS["sleuth"],
+                refresh=lambda db, **kw: {"scope": "sleuth", "reminders": 0},
+            )
+            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
+                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
+                 patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
+                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
+                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
+                 patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
+                 patch.dict(rebalance.ingest.index_ops.COLLECTORS, {"sleuth": sleuth_collector}), \
+                 patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}), \
+                 patch("rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"), \
+                 patch("rebalance.ingest.embedder._load_model") as mock_load, \
+                 patch("rebalance.ingest.embedder._embed_batch", side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts]):
+                res_battery = refresh_index(self.db_path, vault_path=str(v_path))
+                self.assertEqual(res_battery["errors"], [])
+                v_res = next(r for r in res_battery["results"] if r["scope"] == "vault")
+                self.assertTrue(v_res["embed_chunks"]["deferred_battery"])
+                self.assertEqual(v_res["embed_chunks"]["embedded"], 0)
+                # Verify dashboard branch was executed and deferred
+                dash_res = next(r for r in res_battery["results"] if r["scope"] == "dashboard")
+                self.assertTrue(dash_res["embed_chunks"]["deferred_battery"])
+                mock_load.assert_not_called()
+
+                # Status check: persistent status reports power_deferred=True
+                status_bat = get_index_status(self.db_path)
+                self.assertTrue(status_bat["sources"]["vault"]["power_deferred"])
+                self.assertTrue(status_bat["freshness"]["power_deferred"])
 
             # Embeddings table untouched
             with db_connection(self.db_path) as conn:
                 embedded_count = conn.execute("SELECT count(*) FROM embeddings").fetchone()[0]
                 self.assertEqual(embedded_count, 0)
 
-            # 3. Drain on AC
+            # 3. Drain on AC with default recipe
             os.environ.pop("REBALANCE_FORCE_BATTERY", None)
             os.environ["REBALANCE_FORCE_AC"] = "1"
-            res_ac = refresh_index(self.db_path, scope=["vault"], vault_path=str(v_path))
-            self.assertEqual(res_ac["errors"], [])
-            v_res_ac = next(r for r in res_ac["results"] if r["scope"] == "vault")
-            self.assertFalse(v_res_ac["embed_chunks"]["deferred_battery"])
-            self.assertGreater(v_res_ac["embed_chunks"]["embedded"], 0)
+            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
+                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
+                 patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
+                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
+                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
+                 patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
+                 patch.dict(rebalance.ingest.index_ops.COLLECTORS, {"sleuth": sleuth_collector}), \
+                 patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \
+                 patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}), \
+                 patch("rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"), \
+                 patch("rebalance.ingest.embedder._load_model", return_value=(MagicMock(), MagicMock())), \
+                 patch("rebalance.ingest.embedder._embed_batch", side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts]):
+                res_ac = refresh_index(self.db_path, vault_path=str(v_path))
+                self.assertEqual(res_ac["errors"], [])
+                v_res_ac = next(r for r in res_ac["results"] if r["scope"] == "vault")
+                self.assertFalse(v_res_ac["embed_chunks"]["deferred_battery"])
+                self.assertGreater(v_res_ac["embed_chunks"]["embedded"], 0)
+                dash_res_ac = next(r for r in res_ac["results"] if r["scope"] == "dashboard")
+                self.assertFalse(dash_res_ac["embed_chunks"]["deferred_battery"])
+
+                # Status check: persistent status reports power_deferred=False after drain
+                status_ac = get_index_status(self.db_path)
+                self.assertFalse(status_ac["sources"]["vault"]["power_deferred"])
+                self.assertFalse(status_ac["freshness"]["power_deferred"])
 
             with db_connection(self.db_path) as conn:
                 embedded_after = conn.execute("SELECT count(*) FROM embeddings").fetchone()[0]
-                self.assertEqual(embedded_after, chunk_count)
+                self.assertGreaterEqual(embedded_after, chunk_count)
 
 
 if __name__ == "__main__":

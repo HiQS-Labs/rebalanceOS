@@ -525,6 +525,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         return payload
 
     with db_connection(db_path, ensure_semantic_schema) as conn:
+        vault_meta = _safe_meta(conn, "embedding_meta")
         payload["sources"]["vault"] = {
             "files": _safe_count(conn, "vault_files"),
             "chunks": _safe_count(conn, "chunks"),
@@ -534,6 +535,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 conn, "vault_files", "julianday(last_modified) >= julianday('now', '-7 days')"
             )
             or 0,
+            "power_deferred": vault_meta.get("power_deferred") == "1",
         }
         # GH-166: how far the ingester is behind the vault writer, in minutes.
         # Positive means the newest edit on disk hasn't been ingested yet;
@@ -816,9 +818,10 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         except Exception as exc:  # never let a coverage probe break status
             drift["commit_coverage"] = {"error": str(exc)}
 
+        vault_power_def = vault_meta.get("power_deferred") == "1"
         sem_power_def = sem_meta.get("power_deferred") == "1"
         gh_power_def = gh_meta.get("power_deferred") == "1"
-        drift["power_deferred"] = sem_power_def or gh_power_def
+        drift["power_deferred"] = sem_power_def or gh_power_def or vault_power_def
         payload["freshness"] = {**drift, "signal_health": _derive_signal_health(payload["sources"])}
 
     return payload

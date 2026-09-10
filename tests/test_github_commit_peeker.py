@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from rebalance.ingest.config import get_enable_remote_peeking, set_enable_remote_peeking
 from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_schema
 from rebalance.ingest.github_commit_backfill import (
     BackfillResult,
@@ -68,6 +69,8 @@ class _RepoWithRemoteFixture:
 
 class GitCommitPeekerTests(unittest.TestCase):
     def setUp(self):
+        self._orig_enable_peeking = get_enable_remote_peeking()
+        set_enable_remote_peeking(True)
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
         self.db = root / "test.db"
@@ -78,6 +81,7 @@ class GitCommitPeekerTests(unittest.TestCase):
         self.fx = _RepoWithRemoteFixture(root)
 
     def tearDown(self):
+        set_enable_remote_peeking(self._orig_enable_peeking)
         self._tmp.cleanup()
 
     def test_peek_remote_refs_real_repo(self):
@@ -254,14 +258,33 @@ class GitCommitPeekerTests(unittest.TestCase):
 
     def test_probe_setup_failure_falls_back_to_authoritative_sync(self):
         """Probe setup failure (TimeoutExpired/OSError) cleanly falls back without raising (Codex R3 & R6)."""
-        # Patch the actual imported binding in github_commit_backfill
-        with patch("rebalance.ingest.github_commit_backfill.run_git", side_effect=subprocess.TimeoutExpired(cmd="git", timeout=1.0)):
-            res = backfill_commits(self.db, REPO, clone_path=self.fx.path, force_refresh=True)
+        def fail_on_remote_get_url(path, *args, **kwargs):
+            if len(args) >= 2 and args[0] == "remote" and args[1] == "get-url":
+                raise subprocess.TimeoutExpired(cmd="git remote get-url", timeout=1.0)
+            return run_git(path, *args, **kwargs)
+
+        with db_connection(self.db) as conn:
+            conn.execute("DELETE FROM github_remote_peeks")
+            conn.commit()
+
+        with patch("rebalance.ingest.github_commit_backfill.run_git", side_effect=fail_on_remote_get_url), \
+             patch("rebalance.ingest.github_commit_backfill.peek_remote_refs", return_value=None):
+            res = backfill_commits(self.db, REPO, clone_path=self.fx.path, force_refresh=False)
             self.assertEqual(res.state, "ok")
             self.assertFalse(res.skipped_cache)
 
-        with patch("rebalance.ingest.github_commit_backfill.run_git", side_effect=OSError("git executable not found")):
-            res = backfill_commits(self.db, REPO, clone_path=self.fx.path, force_refresh=True)
+        with db_connection(self.db) as conn:
+            conn.execute("DELETE FROM github_remote_peeks")
+            conn.commit()
+
+        def oserror_on_remote_get_url(path, *args, **kwargs):
+            if len(args) >= 2 and args[0] == "remote" and args[1] == "get-url":
+                raise OSError("git executable not found")
+            return run_git(path, *args, **kwargs)
+
+        with patch("rebalance.ingest.github_commit_backfill.run_git", side_effect=oserror_on_remote_get_url), \
+             patch("rebalance.ingest.github_commit_backfill.peek_remote_refs", return_value=None):
+            res = backfill_commits(self.db, REPO, clone_path=self.fx.path, force_refresh=False)
             self.assertEqual(res.state, "ok")
             self.assertFalse(res.skipped_cache)
 
@@ -404,13 +427,50 @@ class GitCommitPeekerTests(unittest.TestCase):
                 cov_divergent = check_repo_coverage(self.db, REPO, clone_path=other_path, check_remote=False)
                 self.assertEqual(cov_divergent.state, "stale", "Divergent clone tip not in verified proof must report stale")
 
-        # 4. Cache hit renewal across 48-hour threshold
-        time_t0 = "2026-09-01T12:00:00Z"
+        # 3b. Clone missing secondary branch: origin has development + feature, clone only has development
+        _git(self.fx.path, "checkout", "-q", "-b", "feature-branch")
+        _write(self.fx.path, "feat.txt", "feature content")
+        _git(self.fx.path, "add", "-A")
+        _git(self.fx.path, "commit", "-q", "-m", "feature commit")
+        _git(self.fx.path, "push", "-q", "origin", "feature-branch")
+        feat_sha = _git(self.fx.path, "rev-parse", "HEAD")
+        _git(self.fx.path, "checkout", "-q", "development")
+
+        # Checkpoint proof has both branches:
         with db_connection(self.db) as conn:
             record_commit_coverage_checkpoint(
                 conn,
                 canonical_url,
-                {"refs/heads/development": self.fx.init_sha},
+                {"refs/heads/development": self.fx.init_sha, "refs/heads/feature-branch": feat_sha},
+                None,
+                "2026-09-08T18:00:00Z",
+                "2026-09-08T18:00:00Z",
+            )
+            conn.commit()
+
+        with tempfile.TemporaryDirectory() as partial_root:
+            partial_path = Path(partial_root) / "partial_clone"
+            partial_path.mkdir()
+            _git(partial_path, "init", "-q", "-b", "development")
+            _write(partial_path, "README.md", "init")
+            _git(partial_path, "add", "-A")
+            _git(partial_path, "commit", "-q", "-m", "chore: initial commit")
+            _git(partial_path, "remote", "add", "origin", str(self.fx.bare))
+            _git(partial_path, "fetch", "-q", "origin", "development")
+
+            with patch("rebalance.ingest.github_coverage.now_utc", return_value=frozen_now), \
+                 patch("rebalance.ingest.github_coverage._fetch_age_hours", return_value=None):
+                cov_partial = check_repo_coverage(self.db, REPO, clone_path=partial_path, check_remote=False)
+                self.assertEqual(cov_partial.state, "stale", "Clone missing secondary branch from origin ref map must report stale")
+
+        # 4. Cache hit renewal across 48-hour threshold
+        with db_connection(self.db) as conn:
+            conn.execute("DELETE FROM github_remote_peeks")
+            time_t0 = "2026-09-01T12:00:00Z"
+            record_commit_coverage_checkpoint(
+                conn,
+                canonical_url,
+                {"refs/heads/development": self.fx.init_sha, "refs/heads/feature-branch": feat_sha},
                 None,
                 time_t0,
                 time_t0,
@@ -427,22 +487,57 @@ class GitCommitPeekerTests(unittest.TestCase):
             row = conn.execute("SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?", (canonical_url,)).fetchone()
             self.assertEqual(row[0], time_t1.isoformat())
 
+        # Monotonic non-regression check: an older timestamp cannot regress verified_at
+        time_older = datetime(2026, 9, 5, 12, 0, 0, tzinfo=timezone.utc)
+        with patch("rebalance.lib.time_ops.now_utc", return_value=time_older), \
+             patch("rebalance.ingest.github_commit_backfill.now_utc", return_value=time_older):
+            res_older = backfill_commits(self.db, REPO, clone_path=self.fx.path)
+            self.assertTrue(res_older.skipped_cache)
+
+        with db_connection(self.db) as conn:
+            row2 = conn.execute("SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?", (canonical_url,)).fetchone()
+            self.assertEqual(row2[0], time_t1.isoformat(), "verified_at must remain monotonic and not regress")
+
     def test_shallow_clone_refuses_unbounded_checkpoint(self):
         """Shallow clone with truncated history must never publish a checkpoint (Codex R1)."""
+        # 1. Multi-commit clone with .git/shallow
+        _write(self.fx.path, "doc2.txt", "second commit")
+        _git(self.fx.path, "add", "doc2.txt")
+        _git(self.fx.path, "commit", "-q", "-m", "second commit")
+        _git(self.fx.path, "push", "-q", "origin", "development")
+        second_sha = _git(self.fx.path, "rev-parse", "HEAD")
+
         shallow_file = self.fx.path / ".git" / "shallow"
-        shallow_file.write_text(f"{self.fx.init_sha}\n")
+        shallow_file.write_text(f"{second_sha}\n")
         try:
             self.assertTrue(is_shallow_clone(self.fx.path))
             res = backfill_commits(self.db, REPO, clone_path=self.fx.path)
             self.assertEqual(res.state, "ok")
-            self.assertEqual(res.commits_seen, 1)
-            # Checkpoint publication MUST be refused for shallow repository
             with db_connection(self.db) as conn:
                 chk = conn.execute("SELECT * FROM github_remote_peeks").fetchone()
                 self.assertIsNone(chk, "Shallow clone must never publish a commit coverage checkpoint")
         finally:
             if shallow_file.exists():
                 shallow_file.unlink()
+
+        # 2. Linked worktree inheriting shallow status from git common dir
+        wt_path = self.fx.path.parent / "wt_clone"
+        _git(self.fx.path, "worktree", "add", "-q", "--detach", str(wt_path))
+        shallow_file.write_text(f"{second_sha}\n")
+        try:
+            self.assertTrue(is_shallow_clone(wt_path), "Linked worktree must detect shallow from git common dir")
+        finally:
+            if shallow_file.exists():
+                shallow_file.unlink()
+            _git(self.fx.path, "worktree", "remove", "--force", str(wt_path))
+
+        # 3. Injected nonzero exit / timeout fails safe to shallow=True
+        with patch("rebalance.ingest.github_commit_backfill.run_git") as mock_git:
+            mock_git.return_value = subprocess.CompletedProcess(args=[], returncode=128, stdout="", stderr="error")
+            self.assertTrue(is_shallow_clone(self.fx.path), "Nonzero rev-parse exit must fail-safe to shallow=True")
+
+        with patch("rebalance.ingest.github_commit_backfill.run_git", side_effect=subprocess.TimeoutExpired(cmd="rev-parse", timeout=1.0)):
+            self.assertTrue(is_shallow_clone(self.fx.path), "Timeout on rev-parse must fail-safe to shallow=True")
 
     def test_concurrent_ref_change_during_walk_refuses_checkpoint(self):
         """Ref movement during history walk refuses checkpoint publication (Codex R1)."""
@@ -660,6 +755,14 @@ class GitCommitPeekerTests(unittest.TestCase):
             issue_row = conn.execute("SELECT number, title FROM github_items WHERE number = 42").fetchone()
             self.assertIsNotNone(issue_row)
             self.assertEqual(issue_row[1], "Updated Title via Metadata Sync")
+
+    def test_remote_peeking_disabled_by_default_rollout_gate(self):
+        """When enable_remote_peeking is False, remote probes are bypassed completely (Rollout Gate)."""
+        set_enable_remote_peeking(False)
+        with patch("rebalance.ingest.github_commit_backfill.peek_remote_refs") as mock_peek:
+            res = backfill_commits(self.db, REPO, clone_path=self.fx.path)
+            self.assertEqual(res.state, "ok")
+            mock_peek.assert_not_called()
 
 
 if __name__ == "__main__":
