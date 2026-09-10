@@ -405,4 +405,114 @@ final class PromptLogTests: XCTestCase {
 
         XCTAssertNil(model.vscodeOpenInfo(forRepoName: "SOME-OTHER-REPO"))
     }
+
+    // MARK: - IDE token extraction & IDELauncher
+
+    func testParsesThreePartMetadataLineWithIDE() {
+        let fixture = """
+        <!-- CLIO:ENTRIES -->
+
+        ## LTVERA-PANDAS
+        2026-09-10 15:39:19 PDT
+        noel’s Mac Studio · development · claude-code
+
+        > "test prompt with claude-code"
+        """
+        let entries = PromptLogReader.parse(fixture)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0].repo, "LTVERA-PANDAS")
+        XCTAssertEqual(entries[0].machine, "noel’s Mac Studio")
+        XCTAssertEqual(entries[0].branch, "development")
+        XCTAssertEqual(entries[0].ide, "claude-code")
+        XCTAssertEqual(entries[0].prompt, "test prompt with claude-code")
+    }
+
+    func testParsesTwoPartMetadataLineWithKnownIDE() {
+        let fixture = """
+        <!-- CLIO:ENTRIES -->
+
+        ## REBALANCEOS
+        2026-09-10 15:44:56 PDT
+        noel’s Mac Studio · agy
+
+        > "test prompt with agy"
+        """
+        let entries = PromptLogReader.parse(fixture)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0].repo, "REBALANCEOS")
+        XCTAssertEqual(entries[0].machine, "noel’s Mac Studio")
+        XCTAssertNil(entries[0].branch)
+        XCTAssertEqual(entries[0].ide, "agy")
+        XCTAssertEqual(entries[0].prompt, "test prompt with agy")
+    }
+
+    func testIDELauncherTargetBundleIDMapping() {
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "codex"), "com.openai.codex")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "Codex"), "com.openai.codex")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "agy"), "com.google.antigravity")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "antigravity"), "com.google.antigravity")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "zcode"), "dev.zcode.app")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "claude-code"), "com.microsoft.VSCode")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: nil), "com.microsoft.VSCode")
+        XCTAssertEqual(IDELauncher.targetBundleID(for: "unknown-ide"), "com.microsoft.VSCode")
+    }
+
+    // MARK: - Prompt resolution for cards & clones
+
+    private func makeRepoCardWithClones(repoName: String, localPath: String, activeClones: [(repoName: String, localPath: String, branch: String?)]) -> RepoCard {
+        let clonesJSON = activeClones.map { clone in
+            let b = clone.branch.map { "\"\($0)\"" } ?? "null"
+            return """
+            {"repo_name":"\(clone.repoName)","local_path":"\(clone.localPath)","vscode_url":"vscode://file\(clone.localPath)",
+             "branch":\(b),"ahead":0,"behind":0,"modified_count":0,"untracked_count":0,"is_dirty":false}
+            """
+        }.joined(separator: ",")
+        let json = """
+        {"position":1,"repo_name":"\(repoName)","local_path":"\(localPath)","vscode_url":"vscode://file\(localPath)",
+         "rank_reason":"r","ranking_mode":"recent_activity","computed_at":"2026-01-01T00:00:00Z",
+         "ahead":0,"behind":0,"modified_count":0,"untracked_count":0,"is_dirty":false,
+         "health_available":true,"recent_activity":[],"clones":[\(clonesJSON)]}
+        """
+        return try! Focus5JSON.decoder().decode(RepoCard.self, from: Data(json.utf8))
+    }
+
+    func testLatestPromptForCardMatchesParentAndClones() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+
+        // Newest entry is for the clone
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "rebalanceOS-gh204", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "clone prompt"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "parent prompt")
+        ]
+
+        let promptForCard = model.latestPrompt(for: card)
+        XCTAssertEqual(promptForCard?.prompt, "clone prompt")
+    }
+
+    func testLatestPromptForCloneMatchesByBranchOrCloneName() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+        guard let clone = card.activeClones.first else {
+            XCTFail("Expected clone")
+            return
+        }
+
+        // When prompt repo header is the parent repo, but branch matches clone
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "branch-matched prompt"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "parent prompt")
+        ]
+
+        let clonePrompt = model.latestPrompt(for: clone, in: card)
+        XCTAssertEqual(clonePrompt?.prompt, "branch-matched prompt")
+    }
 }

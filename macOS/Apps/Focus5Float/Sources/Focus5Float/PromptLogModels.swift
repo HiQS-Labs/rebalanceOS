@@ -9,7 +9,17 @@ struct PromptLogEntry: Identifiable, Equatable {
     let timestamp: String      // raw ISO-8601, e.g. "2026-07-09T18:42:11Z"
     let machine: String
     let branch: String?
+    let ide: String?
     let prompt: String
+
+    init(repo: String, timestamp: String, machine: String, branch: String? = nil, ide: String? = nil, prompt: String) {
+        self.repo = repo
+        self.timestamp = timestamp
+        self.machine = machine
+        self.branch = branch
+        self.ide = ide
+        self.prompt = prompt
+    }
 
     var id: String { "\(repo)|\(timestamp)" }
 

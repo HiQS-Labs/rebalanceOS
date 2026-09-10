@@ -41,14 +41,30 @@ enum PromptLogReader {
 
             var machine = ""
             var branch: String?
+            var ide: String?
             if j < lines.count {
                 let machineLine = lines[j].trimmingCharacters(in: .whitespaces)
-                if let sep = machineLine.range(of: " · ") {
-                    machine = String(machineLine[..<sep.lowerBound])
-                    let b = String(machineLine[sep.upperBound...])
+                let parts = machineLine.components(separatedBy: " · ")
+                if parts.count >= 3 {
+                    machine = parts[0]
+                    let b = parts[1].trimmingCharacters(in: .whitespaces)
                     branch = b.isEmpty ? nil : b
-                } else {
-                    machine = machineLine
+                    let rawIDE = parts[2...].joined(separator: " · ").trimmingCharacters(in: .whitespaces)
+                    ide = rawIDE.isEmpty ? nil : rawIDE
+                } else if parts.count == 2 {
+                    machine = parts[0]
+                    let candidate = parts[1].trimmingCharacters(in: .whitespaces)
+                    let lower = candidate.lowercased()
+                    let knownIDEs: Set<String> = ["agy", "claude-code", "zcode", "codex", "cursor", "windsurf", "aider", "claude"]
+                    if knownIDEs.contains(lower) {
+                        ide = candidate.isEmpty ? nil : candidate
+                        branch = nil
+                    } else {
+                        branch = candidate.isEmpty ? nil : candidate
+                        ide = nil
+                    }
+                } else if parts.count == 1 {
+                    machine = parts[0]
                 }
                 j += 1
             }
@@ -72,7 +88,7 @@ enum PromptLogReader {
             if prompt.hasSuffix("\"") { prompt.removeLast() }
 
             if !timestamp.isEmpty, !isMachineNoise(prompt) {
-                entries.append(PromptLogEntry(repo: repo, timestamp: timestamp, machine: machine, branch: branch, prompt: prompt))
+                entries.append(PromptLogEntry(repo: repo, timestamp: timestamp, machine: machine, branch: branch, ide: ide, prompt: prompt))
             }
             i = j
         }

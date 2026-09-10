@@ -222,6 +222,7 @@ final class Focus5Model {
             await refreshNote()
             await reminders.refresh()   // EventKit; no-ops until access granted
             await obsidianReminders.refresh()
+            refreshPromptLog()
         }
     }
 
@@ -339,6 +340,7 @@ final class Focus5Model {
             return
         }
         guard let entries = PromptLogReader.load(from: url) else {
+            promptLogEntries = []
             promptLogLoadError = "Could not read \"\(url.lastPathComponent)\"."
             return
         }
@@ -384,6 +386,48 @@ final class Focus5Model {
             return (w.localPath, VSCodeLauncher.fileURL(forLocalPath: w.localPath))
         }
         return nil
+    }
+
+    /// Canonical key for repo fuzzy-matching across uppercase/hyphenated variations in CLIO
+    /// (e.g. `REBALANCEOS` == `rebalance-OS` == `rebalanceOS`).
+    static func canonicalRepoKey(_ name: String) -> String {
+        name.lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: " ", with: "")
+    }
+
+    /// Finds the latest prompt relevant to `card`, checking both the parent repository name
+    /// and any of its full clones. Since `promptLogEntries` is newest-first, the first match wins.
+    func latestPrompt(for card: RepoCard) -> PromptLogEntry? {
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+        let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
+        let cloneBranches = Set(card.activeClones.compactMap(\.branch))
+
+        return promptLogEntries.first { entry in
+            let entryKey = Self.canonicalRepoKey(entry.repo)
+            if entryKey == parentKey { return true }
+            if cloneKeys.contains(entryKey) { return true }
+            if let b = entry.branch, cloneBranches.contains(b) { return true }
+            return false
+        }
+    }
+
+    /// Finds the latest prompt specifically associated with `clone`. Matches if the prompt's
+    /// repo matches `clone.repoName`, or if the prompt's repo matches `card.repoName` and the
+    /// prompt's branch matches `clone.branch`.
+    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+        let cloneKey = Self.canonicalRepoKey(clone.repoName)
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+
+        return promptLogEntries.first { entry in
+            let entryKey = Self.canonicalRepoKey(entry.repo)
+            if entryKey == cloneKey { return true }
+            if entryKey == parentKey, let eb = entry.branch, let cb = clone.branch, eb == cb {
+                return true
+            }
+            return false
+        }
     }
 
     /// Max telemetry rows held in memory / rendered (newest-first after sort).
@@ -463,11 +507,260 @@ final class Focus5Model {
     }
 
     private func apply(_ resp: Focus5Response) {
-        roster = resp.roster
-        offRoster = resp.offRosterWarnings
-        dirtyBanner = resp.dirtyBanner
+        let (foldedRoster, prunedOffRoster) = Self.foldClones(into: resp.roster, offRoster: resp.offRosterWarnings)
+        roster = foldedRoster
+        offRoster = prunedOffRoster
+
+        if let banner = resp.dirtyBanner {
+            let allRosterPaths = Set(roster.flatMap { [$0.localPath] + $0.activeClones.map(\.localPath) })
+            dirtyBanner = allRosterPaths.contains(banner.localPath) ? nil : banner
+        } else {
+            dirtyBanner = nil
+        }
+
         rankingMode = resp.rankingMode
         lastUpdated = resp.computedAt
+    }
+
+    /// Client-side clone grouping fallback (GH-204).
+    /// Detects when multiple checkouts share the same repo identity (e.g. from an
+    /// un-migrated cache or older server) and ensures the primary parent checkout
+    /// is chosen as the card header, folding child checkouts into the `clones` list.
+    nonisolated static func foldClones(
+        into cards: [RepoCard],
+        offRoster: [OffRosterWarning] = []
+    ) -> (roster: [RepoCard], offRoster: [OffRosterWarning]) {
+        guard !cards.isEmpty else { return ([], offRoster) }
+
+        func clusterKey(name: String, fullName: String?, path: String) -> String {
+            if let fullName = fullName, !fullName.isEmpty {
+                return fullName.lowercased()
+            }
+            if let match = name.range(
+                of: #"-(?:gh\d+.*|task.*|qual\d*|clone\d*|\d{8}|prs-backfill.*)$"#,
+                options: [.regularExpression, .caseInsensitive]
+            ) {
+                let prefix = String(name[..<match.lowerBound])
+                if !prefix.isEmpty { return prefix.lowercased() }
+            }
+            return path.lowercased()
+        }
+
+        func scoreCandidate(name: String, fullName: String?, branch: String?, path: String) -> (Int, Int, Int, Int) {
+            let targetName = fullName?.split(separator: "/").last.map(String.init)?.lowercased() ?? ""
+            let exactMatch = (!targetName.isEmpty && name.lowercased() == targetName) ? 1 : 0
+            let hasSuffix = name.range(
+                of: #"-(?:gh\d+.*|task.*|qual\d*|clone\d*|\d{8}|prs-backfill.*)$"#,
+                options: [.regularExpression, .caseInsensitive]
+            ) != nil ? 1 : 0
+            let noSuffix = 1 - hasSuffix
+            let isMain = ["development", "main", "master"].contains((branch ?? "").lowercased()) ? 1 : 0
+            let pathLen = -path.count
+            return (exactMatch, noSuffix, isMain, pathLen)
+        }
+
+        var groups: [String: [RepoCard]] = [:]
+        var keyOrder: [String] = []
+        for card in cards {
+            let k = clusterKey(name: card.repoName, fullName: card.repoFullName, path: card.localPath)
+            if groups[k] == nil {
+                keyOrder.append(k)
+                groups[k] = []
+            }
+            groups[k]?.append(card)
+        }
+
+        var offRosterByCluster: [String: [OffRosterWarning]] = [:]
+        for warn in offRoster {
+            let k = clusterKey(name: warn.repoName, fullName: warn.repoFullName, path: warn.localPath)
+            offRosterByCluster[k, default: []].append(warn)
+        }
+
+        var result: [RepoCard] = []
+        var consumedWarningPaths: Set<String> = []
+        var nextPosition = 1
+
+        for k in keyOrder {
+            guard let cluster = groups[k], !cluster.isEmpty else { continue }
+            let matchingWarnings = offRosterByCluster[k] ?? []
+
+            let bestCard = cluster.max { a, b in
+                let sa = scoreCandidate(name: a.repoName, fullName: a.repoFullName, branch: a.branch, path: a.localPath)
+                let sb = scoreCandidate(name: b.repoName, fullName: b.repoFullName, branch: b.branch, path: b.localPath)
+                if sa.0 != sb.0 { return sa.0 < sb.0 }
+                if sa.1 != sb.1 { return sa.1 < sb.1 }
+                if sa.2 != sb.2 { return sa.2 < sb.2 }
+                return sa.3 < sb.3
+            } ?? cluster[0]
+
+            let bestWarning = matchingWarnings.max { a, b in
+                let sa = scoreCandidate(name: a.repoName, fullName: a.repoFullName, branch: a.branch, path: a.localPath)
+                let sb = scoreCandidate(name: b.repoName, fullName: b.repoFullName, branch: b.branch, path: b.localPath)
+                if sa.0 != sb.0 { return sa.0 < sb.0 }
+                if sa.1 != sb.1 { return sa.1 < sb.1 }
+                if sa.2 != sb.2 { return sa.2 < sb.2 }
+                return sa.3 < sb.3
+            }
+
+            let cardScore = scoreCandidate(
+                name: bestCard.repoName,
+                fullName: bestCard.repoFullName,
+                branch: bestCard.branch,
+                path: bestCard.localPath
+            )
+
+            let parentCard: RepoCard
+            let promoteWarning: Bool
+
+            if let bw = bestWarning {
+                let warnScore = scoreCandidate(
+                    name: bw.repoName,
+                    fullName: bw.repoFullName,
+                    branch: bw.branch,
+                    path: bw.localPath
+                )
+                let warnIsBetter: Bool
+                if warnScore.0 != cardScore.0 { warnIsBetter = warnScore.0 > cardScore.0 }
+                else if warnScore.1 != cardScore.1 { warnIsBetter = warnScore.1 > cardScore.1 }
+                else if warnScore.2 != cardScore.2 { warnIsBetter = warnScore.2 > cardScore.2 }
+                else { warnIsBetter = warnScore.3 > cardScore.3 }
+
+                promoteWarning = warnIsBetter
+            } else {
+                promoteWarning = false
+            }
+
+            var allClones: [RepoClone] = []
+
+            if promoteWarning, let bw = bestWarning {
+                consumedWarningPaths.insert(bw.localPath)
+                let vscode = "vscode://file\(bw.localPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? bw.localPath)"
+                parentCard = RepoCard(
+                    position: nextPosition,
+                    repoName: bw.repoName,
+                    repoFullName: bw.repoFullName,
+                    localPath: bw.localPath,
+                    remoteUrl: bestCard.remoteUrl,
+                    vscodeUrl: vscode,
+                    rankReason: bestCard.rankReason,
+                    rankingMode: bestCard.rankingMode,
+                    computedAt: bestCard.computedAt,
+                    branch: bw.branch,
+                    upstream: nil,
+                    hasUpstream: nil,
+                    ahead: bw.ahead,
+                    behind: 0,
+                    modifiedCount: bw.modifiedCount,
+                    untrackedCount: bw.untrackedCount,
+                    isDirty: bw.isDirty,
+                    healthAvailable: true,
+                    healthProbedAt: bw.probedAt,
+                    lastCommitAt: bestCard.lastCommitAt,
+                    lastCommitTs: bestCard.lastCommitTs,
+                    myLastCommitTs: bestCard.myLastCommitTs ?? bw.myLocalCommitTs,
+                    probedAt: bw.probedAt,
+                    newestPr: bestCard.newestPr,
+                    recentActivity: bestCard.recentActivity,
+                    clones: nil,
+                    clonesDirtyCount: nil,
+                    anyCloneDirty: nil
+                )
+                for c in cluster {
+                    allClones.append(c.asClone())
+                    for sc in c.activeClones {
+                        if !allClones.contains(where: { $0.localPath == sc.localPath }) {
+                            allClones.append(sc)
+                        }
+                    }
+                }
+            } else {
+                parentCard = bestCard
+                allClones.append(contentsOf: parentCard.activeClones)
+                for other in cluster where other.localPath != parentCard.localPath {
+                    if !allClones.contains(where: { $0.localPath == other.localPath }) {
+                        allClones.append(other.asClone())
+                    }
+                    for sc in other.activeClones {
+                        if !allClones.contains(where: { $0.localPath == sc.localPath }) {
+                            allClones.append(sc)
+                        }
+                    }
+                }
+            }
+
+            for mw in matchingWarnings where mw.localPath != parentCard.localPath {
+                consumedWarningPaths.insert(mw.localPath)
+                if !allClones.contains(where: { $0.localPath == mw.localPath }) {
+                    allClones.append(mw.asClone())
+                }
+            }
+
+            let dirtyCount = allClones.filter(\.isDirty).count
+            let foldedParent = parentCard.with(
+                position: nextPosition,
+                clones: allClones,
+                clonesDirtyCount: dirtyCount,
+                anyCloneDirty: dirtyCount > 0
+            )
+            result.append(foldedParent)
+            nextPosition += 1
+        }
+
+        var remainingOffRoster = offRoster.filter { !consumedWarningPaths.contains($0.localPath) }
+
+        // If grouping collapsed duplicate roster slots below 5, backfill from remaining off-roster items
+        let targetCount = min(5, max(cards.count, 5))
+        if result.count < targetCount {
+            var i = 0
+            while i < remainingOffRoster.count && result.count < targetCount {
+                let candidate = remainingOffRoster[i]
+                let k = clusterKey(name: candidate.repoName, fullName: candidate.repoFullName, path: candidate.localPath)
+                if !groups.keys.contains(k) {
+                    let vscode = "vscode://file\(candidate.localPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? candidate.localPath)"
+                    let promoted = RepoCard(
+                        position: nextPosition,
+                        repoName: candidate.repoName,
+                        repoFullName: candidate.repoFullName,
+                        localPath: candidate.localPath,
+                        remoteUrl: nil,
+                        vscodeUrl: vscode,
+                        rankReason: candidate.warningReason ?? "attention needed",
+                        rankingMode: "recent_activity",
+                        computedAt: candidate.probedAt ?? "",
+                        branch: candidate.branch,
+                        upstream: nil,
+                        hasUpstream: nil,
+                        ahead: candidate.ahead,
+                        behind: 0,
+                        modifiedCount: candidate.modifiedCount,
+                        untrackedCount: candidate.untrackedCount,
+                        isDirty: candidate.isDirty,
+                        healthAvailable: true,
+                        healthProbedAt: candidate.probedAt,
+                        lastCommitAt: nil,
+                        lastCommitTs: nil,
+                        myLastCommitTs: candidate.myLocalCommitTs,
+                        probedAt: candidate.probedAt,
+                        newestPr: nil,
+                        recentActivity: [],
+                        clones: [],
+                        clonesDirtyCount: 0,
+                        anyCloneDirty: false
+                    )
+                    result.append(promoted)
+                    nextPosition += 1
+                    remainingOffRoster.remove(at: i)
+                } else {
+                    i += 1
+                }
+            }
+        }
+
+        return (result, remainingOffRoster)
+    }
+
+    nonisolated static func foldClones(into cards: [RepoCard]) -> [RepoCard] {
+        foldClones(into: cards, offRoster: []).roster
     }
 
     static let offlineMessage =
