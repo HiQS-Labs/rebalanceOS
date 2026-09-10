@@ -11,10 +11,8 @@ from rebalance.ingest.focus5_scan import (
     pick_parent_checkout,
     roll_up_parent_signals,
     rank_repos,
-    summarize_focus5,
     _build_roster_card,
 )
-from rebalance.ingest.db import db_connection, run_migrations
 
 
 def _make_sig(

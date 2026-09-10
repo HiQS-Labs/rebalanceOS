@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Callable, Iterable, Iterator
