@@ -67,9 +67,21 @@ class CloneDetectionTests(unittest.TestCase):
         self.assertEqual(detect_repo_parent_key(s3), "xyz-forge")
 
     def test_pick_parent_checkout_exact_name_match_wins(self) -> None:
-        parent = _make_sig("XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", branch="development")
-        clone1 = _make_sig("XYZ-forge-gh365", "/repos/XYZ-forge-gh365", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", branch="feat/gh365")
-        clone2 = _make_sig("XYZ-forge-gh384", "/repos/XYZ-forge-gh384", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", branch="feat/gh384")
+        parent = _make_sig(
+            "XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", branch="development"
+        )
+        clone1 = _make_sig(
+            "XYZ-forge-gh365",
+            "/repos/XYZ-forge-gh365",
+            repo_full_name="Hypercart-Dev-Tools/XYZ-forge",
+            branch="feat/gh365",
+        )
+        clone2 = _make_sig(
+            "XYZ-forge-gh384",
+            "/repos/XYZ-forge-gh384",
+            repo_full_name="Hypercart-Dev-Tools/XYZ-forge",
+            branch="feat/gh384",
+        )
         chosen = pick_parent_checkout([clone1, parent, clone2])
         self.assertEqual(chosen.repo_name, "XYZ-forge")
         self.assertEqual(chosen.local_path, "/repos/XYZ-forge")
@@ -92,14 +104,35 @@ class CloneDetectionTests(unittest.TestCase):
 
     def test_rank_repos_groups_clones_into_single_slot(self) -> None:
         now = 10000
-        xyz_main = _make_sig("XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=1000)
-        xyz_clone1 = _make_sig("XYZ-forge-gh365", "/repos/XYZ-forge-gh365", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=9900)
-        xyz_clone2 = _make_sig("XYZ-forge-gh384", "/repos/XYZ-forge-gh384", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=9800)
+        xyz_main = _make_sig(
+            "XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=1000
+        )
+        xyz_clone1 = _make_sig(
+            "XYZ-forge-gh365",
+            "/repos/XYZ-forge-gh365",
+            repo_full_name="Hypercart-Dev-Tools/XYZ-forge",
+            my_local_commit_ts=9900,
+        )
+        xyz_clone2 = _make_sig(
+            "XYZ-forge-gh384",
+            "/repos/XYZ-forge-gh384",
+            repo_full_name="Hypercart-Dev-Tools/XYZ-forge",
+            my_local_commit_ts=9800,
+        )
 
-        rb_main = _make_sig("rebalanceOS", "/repos/rebalanceOS", repo_full_name="HiQS-Labs/rebalanceOS", my_local_commit_ts=2000)
-        rb_clone = _make_sig("rebalanceOS-gh144", "/repos/rebalanceOS-gh144", repo_full_name="HiQS-Labs/rebalanceOS", my_local_commit_ts=9500)
+        rb_main = _make_sig(
+            "rebalanceOS", "/repos/rebalanceOS", repo_full_name="HiQS-Labs/rebalanceOS", my_local_commit_ts=2000
+        )
+        rb_clone = _make_sig(
+            "rebalanceOS-gh144",
+            "/repos/rebalanceOS-gh144",
+            repo_full_name="HiQS-Labs/rebalanceOS",
+            my_local_commit_ts=9500,
+        )
 
-        repo3 = _make_sig("LTVera-Pandas", "/repos/LTVera-Pandas", repo_full_name="BinoidCBD/LTVera-Pandas", my_local_commit_ts=9000)
+        repo3 = _make_sig(
+            "LTVera-Pandas", "/repos/LTVera-Pandas", repo_full_name="BinoidCBD/LTVera-Pandas", my_local_commit_ts=9000
+        )
         repo4 = _make_sig("AI-DDTK", "/repos/AI-DDTK", repo_full_name="Org/AI-DDTK", my_local_commit_ts=8000)
         repo5 = _make_sig("ask-self", "/repos/ask-self", repo_full_name="Org/ask-self", my_local_commit_ts=7000)
 
@@ -123,7 +156,9 @@ class CloneDetectionTests(unittest.TestCase):
         self.assertEqual(ranked[4].signals.repo_name, "ask-self")
 
     def test_build_roster_card_attaches_clone_info(self) -> None:
-        parent = _make_sig("XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=1000)
+        parent = _make_sig(
+            "XYZ-forge", "/repos/XYZ-forge", repo_full_name="Hypercart-Dev-Tools/XYZ-forge", my_local_commit_ts=1000
+        )
         clone = _make_sig(
             "XYZ-forge-gh365",
             "/repos/XYZ-forge-gh365",

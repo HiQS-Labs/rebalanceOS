@@ -450,9 +450,7 @@ def pick_parent_checkout(cluster: list[RepoSignals]) -> RepoSignals:
         return cluster[0]
 
     def score(s: RepoSignals) -> tuple[int, int, int, int]:
-        target_name = (
-            s.repo_full_name.split("/")[1].lower() if s.repo_full_name and "/" in s.repo_full_name else ""
-        )
+        target_name = s.repo_full_name.split("/")[1].lower() if s.repo_full_name and "/" in s.repo_full_name else ""
         exact_match = 1 if target_name and s.repo_name.lower() == target_name else 0
         has_suffix = 1 if _CLONE_SUFFIX_RE.search(s.repo_name) else 0
         no_suffix = 1 - has_suffix
@@ -558,7 +556,9 @@ def rank_repos(
 
     # Sort by score desc, then local_path for a stable tiebreak across runs.
     scored.sort(key=lambda t: (t[0], t[1].local_path), reverse=True)
-    return [RankedRepo(parent, i, v.reason, clones=clones) for i, (_k, parent, v, clones) in enumerate(scored[:limit], 1)]
+    return [
+        RankedRepo(parent, i, v.reason, clones=clones) for i, (_k, parent, v, clones) in enumerate(scored[:limit], 1)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1295,6 +1295,7 @@ def summarize_focus5(
                 target_roster_size = len(bases)
                 if len(clustered_bases) < target_roster_size:
                     from rebalance.ingest.config import get_focus5_hidden_repos
+
                     hidden_set = set(get_focus5_hidden_repos())
                     now_ts = int(now_utc().timestamp())
                     ranked = rank_repos(
