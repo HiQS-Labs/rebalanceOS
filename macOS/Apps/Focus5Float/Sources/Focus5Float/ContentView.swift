@@ -731,7 +731,7 @@ struct RepoCardView: View {
                 KeyCap(text: "#\(card.position)", font: Theme.monoSmall, height: 24)
                 Spacer(minLength: Theme.Space.s)
                 OpenRepoButton(repoName: card.repoName, localPath: card.localPath, vscodeURL: card.vscodeUrl)
-                StatusDot(isDirty: card.isDirty, healthAvailable: card.healthAvailable)
+                StatusDot(isDirty: card.isDirty || card.isAnyCloneDirty, healthAvailable: card.healthAvailable)
                 Image(systemName: expanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Theme.text3)
@@ -754,6 +754,15 @@ struct RepoCardView: View {
                 if let branch = card.branch { GroupTag(name: branch) }
                 Text("↑\(card.ahead) ↓\(card.behind)")
                 Text("\(card.modifiedCount)M \(card.untrackedCount)U")
+                if card.hasClones {
+                    Text("·")
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.on.square")
+                            .font(.system(size: 9))
+                        Text("\(card.activeClones.count) clone\(card.activeClones.count == 1 ? "" : "s")")
+                    }
+                    .foregroundStyle(card.isAnyCloneDirty ? Theme.attention : Theme.text2)
+                }
                 Spacer(minLength: 0)
             }
             .font(Theme.monoSmall)
@@ -798,6 +807,37 @@ struct RepoCardView: View {
             if let branch = card.branch {
                 Text("\(branch) · ↑\(card.ahead) ↓\(card.behind)")
                     .font(Theme.monoSmall).foregroundStyle(Theme.text3)
+            }
+            if card.hasClones {
+                let dirtyCount = card.activeClones.filter(\.isDirty).count
+                if dirtyCount > 0 {
+                    Text("\(dirtyCount) clone\(dirtyCount == 1 ? " has" : "s have") uncommitted changes")
+                        .font(Theme.monoSmall).foregroundStyle(Theme.attention)
+                }
+            }
+        }
+
+        if card.hasClones {
+            CardSection(label: "Full clones (\(card.activeClones.count))") {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(card.activeClones) { clone in
+                        HStack(spacing: 6) {
+                            StatusDot(isDirty: clone.isDirty, healthAvailable: true)
+                            Text(clone.repoName)
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundStyle(Theme.text)
+                                .lineLimit(1)
+                            if let b = clone.branch {
+                                GroupTag(name: b)
+                            }
+                            Spacer(minLength: Theme.Space.xs)
+                            Text("↑\(clone.ahead) ↓\(clone.behind) \(clone.modifiedCount)M \(clone.untrackedCount)U")
+                                .font(Theme.monoSmall)
+                                .foregroundStyle(Theme.text3)
+                            OpenRepoButton(repoName: clone.repoName, localPath: clone.localPath, vscodeURL: clone.vscodeUrl)
+                        }
+                    }
+                }
             }
         }
 

@@ -463,11 +463,120 @@ final class Focus5Model {
     }
 
     private func apply(_ resp: Focus5Response) {
-        roster = resp.roster
+        roster = Self.foldClones(into: resp.roster)
         offRoster = resp.offRosterWarnings
         dirtyBanner = resp.dirtyBanner
         rankingMode = resp.rankingMode
         lastUpdated = resp.computedAt
+    }
+
+    /// Client-side clone grouping fallback (GH-204).
+    /// Detects when multiple cards in the roster share the same repo identity
+    /// (e.g. from an un-migrated cache or older server) and folds child checkouts
+    /// into the parent card's `clones` list.
+    nonisolated static func foldClones(into cards: [RepoCard]) -> [RepoCard] {
+        guard !cards.isEmpty else { return [] }
+
+        func clusterKey(for card: RepoCard) -> String {
+            if let fullName = card.repoFullName, !fullName.isEmpty {
+                return fullName.lowercased()
+            }
+            let name = card.repoName
+            if let match = name.range(of: #"-(?:gh\d+|task.*|qual\d*|clone\d*|\d{8}|prs-backfill.*)$"#, options: [.regularExpression, .caseInsensitive]) {
+                let prefix = String(name[..<match.lowerBound])
+                if !prefix.isEmpty { return prefix.lowercased() }
+            }
+            return card.localPath.lowercased()
+        }
+
+        var groups: [String: [RepoCard]] = [:]
+        var keyOrder: [String] = []
+        for card in cards {
+            let k = clusterKey(for: card)
+            if groups[k] == nil {
+                keyOrder.append(k)
+                groups[k] = []
+            }
+            groups[k]?.append(card)
+        }
+
+        var result: [RepoCard] = []
+        var nextPosition = 1
+
+        for k in keyOrder {
+            guard let cluster = groups[k], !cluster.isEmpty else { continue }
+            if cluster.count == 1 {
+                let card = cluster[0]
+                if card.position != nextPosition {
+                    result.append(card.with(position: nextPosition))
+                } else {
+                    result.append(card)
+                }
+                nextPosition += 1
+                continue
+            }
+
+            let parent = pickParentCard(cluster)
+            var allClones: [RepoClone] = parent.activeClones
+
+            for other in cluster where other.localPath != parent.localPath {
+                if !allClones.contains(where: { $0.localPath == other.localPath }) {
+                    allClones.append(
+                        RepoClone(
+                            repoName: other.repoName,
+                            localPath: other.localPath,
+                            branch: other.branch,
+                            ahead: other.ahead,
+                            behind: other.behind,
+                            modifiedCount: other.modifiedCount,
+                            untrackedCount: other.untrackedCount,
+                            isDirty: other.isDirty,
+                            lastCommitAt: other.lastCommitAt,
+                            myLastCommitTs: other.myLastCommitTs,
+                            vscodeUrl: other.vscodeUrl
+                        )
+                    )
+                }
+                for subClone in other.activeClones {
+                    if !allClones.contains(where: { $0.localPath == subClone.localPath }) {
+                        allClones.append(subClone)
+                    }
+                }
+            }
+
+            let dirtyCount = allClones.filter(\.isDirty).count
+            let foldedParent = parent.with(
+                position: nextPosition,
+                clones: allClones,
+                clonesDirtyCount: dirtyCount,
+                anyCloneDirty: dirtyCount > 0
+            )
+            result.append(foldedParent)
+            nextPosition += 1
+        }
+
+        return result
+    }
+
+    nonisolated private static func pickParentCard(_ cluster: [RepoCard]) -> RepoCard {
+        cluster.max { a, b in
+            let sa = scoreParent(a)
+            let sb = scoreParent(b)
+            if sa.0 != sb.0 { return sa.0 < sb.0 }
+            if sa.1 != sb.1 { return sa.1 < sb.1 }
+            if sa.2 != sb.2 { return sa.2 < sb.2 }
+            return sa.3 < sb.3
+        } ?? cluster[0]
+    }
+
+    nonisolated private static func scoreParent(_ card: RepoCard) -> (Int, Int, Int, Int) {
+        let targetName = card.repoFullName?.split(separator: "/").last.map(String.init)?.lowercased() ?? ""
+        let exactMatch = (!targetName.isEmpty && card.repoName.lowercased() == targetName) ? 1 : 0
+        let hasSuffix = card.repoName.range(of: #"-(?:gh\d+|task.*|qual\d*|clone\d*|\d{8})$"#, options: [.regularExpression, .caseInsensitive]) != nil ? 1 : 0
+        let noSuffix = 1 - hasSuffix
+        let isMain = ["development", "main", "master"].contains((card.branch ?? "").lowercased()) ? 1 : 0
+        let pathLen = -card.localPath.count
+        return (exactMatch, noSuffix, isMain, pathLen)
     }
 
     static let offlineMessage =

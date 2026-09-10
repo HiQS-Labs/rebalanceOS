@@ -59,6 +59,69 @@ struct RepoCard: Codable, Identifiable {
 
     let newestPr: NewestPR?
     let recentActivity: [Commit]
+
+    // Active full clones (GH-204)
+    let clones: [RepoClone]?
+    let clonesDirtyCount: Int?
+    let anyCloneDirty: Bool?
+
+    var activeClones: [RepoClone] { clones ?? [] }
+    var hasClones: Bool { !activeClones.isEmpty }
+    var isAnyCloneDirty: Bool { anyCloneDirty ?? activeClones.contains { $0.isDirty } }
+
+    func with(
+        position: Int? = nil,
+        clones: [RepoClone]? = nil,
+        clonesDirtyCount: Int? = nil,
+        anyCloneDirty: Bool? = nil
+    ) -> RepoCard {
+        RepoCard(
+            position: position ?? self.position,
+            repoName: self.repoName,
+            repoFullName: self.repoFullName,
+            localPath: self.localPath,
+            remoteUrl: self.remoteUrl,
+            vscodeUrl: self.vscodeUrl,
+            rankReason: self.rankReason,
+            rankingMode: self.rankingMode,
+            computedAt: self.computedAt,
+            branch: self.branch,
+            upstream: self.upstream,
+            hasUpstream: self.hasUpstream,
+            ahead: self.ahead,
+            behind: self.behind,
+            modifiedCount: self.modifiedCount,
+            untrackedCount: self.untrackedCount,
+            isDirty: self.isDirty,
+            healthAvailable: self.healthAvailable,
+            healthProbedAt: self.healthProbedAt,
+            lastCommitAt: self.lastCommitAt,
+            lastCommitTs: self.lastCommitTs,
+            myLastCommitTs: self.myLastCommitTs,
+            probedAt: self.probedAt,
+            newestPr: self.newestPr,
+            recentActivity: self.recentActivity,
+            clones: clones ?? self.clones,
+            clonesDirtyCount: clonesDirtyCount ?? self.clonesDirtyCount,
+            anyCloneDirty: anyCloneDirty ?? self.anyCloneDirty
+        )
+    }
+}
+
+struct RepoClone: Codable, Identifiable, Equatable {
+    var id: String { localPath }
+
+    let repoName: String
+    let localPath: String            // LOCAL-ONLY
+    let branch: String?
+    let ahead: Int
+    let behind: Int
+    let modifiedCount: Int
+    let untrackedCount: Int
+    let isDirty: Bool
+    let lastCommitAt: String?
+    let myLastCommitTs: Int?
+    let vscodeUrl: String            // LOCAL-ONLY
 }
 
 struct NewestPR: Codable {
