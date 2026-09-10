@@ -222,6 +222,7 @@ final class Focus5Model {
             await refreshNote()
             await reminders.refresh()   // EventKit; no-ops until access granted
             await obsidianReminders.refresh()
+            refreshPromptLog()
         }
     }
 
@@ -339,6 +340,7 @@ final class Focus5Model {
             return
         }
         guard let entries = PromptLogReader.load(from: url) else {
+            promptLogEntries = []
             promptLogLoadError = "Could not read \"\(url.lastPathComponent)\"."
             return
         }
@@ -384,6 +386,48 @@ final class Focus5Model {
             return (w.localPath, VSCodeLauncher.fileURL(forLocalPath: w.localPath))
         }
         return nil
+    }
+
+    /// Canonical key for repo fuzzy-matching across uppercase/hyphenated variations in CLIO
+    /// (e.g. `REBALANCEOS` == `rebalance-OS` == `rebalanceOS`).
+    static func canonicalRepoKey(_ name: String) -> String {
+        name.lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: " ", with: "")
+    }
+
+    /// Finds the latest prompt relevant to `card`, checking both the parent repository name
+    /// and any of its full clones. Since `promptLogEntries` is newest-first, the first match wins.
+    func latestPrompt(for card: RepoCard) -> PromptLogEntry? {
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+        let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
+        let cloneBranches = Set(card.activeClones.compactMap(\.branch))
+
+        return promptLogEntries.first { entry in
+            let entryKey = Self.canonicalRepoKey(entry.repo)
+            if entryKey == parentKey { return true }
+            if cloneKeys.contains(entryKey) { return true }
+            if let b = entry.branch, cloneBranches.contains(b) { return true }
+            return false
+        }
+    }
+
+    /// Finds the latest prompt specifically associated with `clone`. Matches if the prompt's
+    /// repo matches `clone.repoName`, or if the prompt's repo matches `card.repoName` and the
+    /// prompt's branch matches `clone.branch`.
+    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+        let cloneKey = Self.canonicalRepoKey(clone.repoName)
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+
+        return promptLogEntries.first { entry in
+            let entryKey = Self.canonicalRepoKey(entry.repo)
+            if entryKey == cloneKey { return true }
+            if entryKey == parentKey, let eb = entry.branch, let cb = clone.branch, eb == cb {
+                return true
+            }
+            return false
+        }
     }
 
     /// Max telemetry rows held in memory / rendered (newest-first after sort).
