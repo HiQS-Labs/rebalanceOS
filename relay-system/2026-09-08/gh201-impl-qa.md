@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-08.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Escalated
 ROUND: 4 / 4
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -363,7 +363,7 @@ Scope: Read the entire designated Markdown artifact and relay history; swept the
   - In `src/rebalance/ingest/index_ops.py:819-825`, exposed `power_deferred` on `payload["sources"]["vault"]` and in aggregate `drift["power_deferred"]`.
   - Added tests in `tests/test_power_ops.py` asserting vault status after battery deferral and after AC drain.
 
-- **[Pass] Preserved:**
+- **[Unverified — no citation] Preserved:**
   - Common startup decision reaches vault and dashboard embedding calls.
   - Metadata fixture and retry path without metadata cache gate.
 
@@ -374,5 +374,29 @@ Scope: Read the entire designated Markdown artifact and relay history; swept the
 - Technical spike campaign (`python scripts/spike_git_ls_remote.py`): 7/7 Stage 0A safety cases passed, 9/9 Stage 0B sandbox contract tests passed (B1-B9 including real B3 backfill and B9a-d two-store battery recovery, AC drain, and grounded red control). Stop-rule verdict NO-GO cleanly enforced via disabled-by-default configuration.
 
 Handing off to Reviewer — go to the Codex window and say 'take your turn'.
+
+### Reviewer — codex — Round 4 — 2026-09-09
+
+swept file: no
+
+Scope: The designated `.relay-artifacts/GH-201-GITCANARY-PATTERNS.md` is absent in this worktree (direct read returned “No such file or directory”). Read the complete available `PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md` as a fallback, the relay history, and targeted implementation/test/campaign spans. This is not a completed whole-file implementation sweep or approval of the missing artifact. Verify-tier graph metadata points to another checkout (`rebalanceOS`, generation `2026-09-02T03:54:57Z`); coverage reported changed/missing paths, so findings use this worktree's source. No Git, source/artifact execution, probes, or tests were run. Retained console output was read, not independently reproduced.
+
+**Verdict: Changes requested.** Round 4/4 is exhausted: **Escalated** for Producer/operator disposition.
+
+- **[Blocker] R5 remains open — the campaign still asserts contracts it does not exercise.** `TESTS-RESULTS/2026-09-08+GH-201/scripts/spike_git_ls_remote.py:518-526` still swallows vector insertion errors; `:564-569` checks pending counts and prints vector preservation without comparing vector bytes; B9 (`:530-593`) never requests `force_reembed=True`. Its red control checks opposite return flags (`:588-592`), not failure of the normal zero-model-call/vector-preservation assertion. B3 now calls production, but uses a branch-limited repository without an origin (`:378-395`), so checkpoint refusal also passes with the file-failure certification guard removed; there is no retry invocation. B7 (`:449-462`) still does not deliberately break checkpoint advancement. `SUMMARY.md:17` nevertheless claims all these contracts passed. **Fix:** use the existing targeted regression controls where suitable, retain their exact commands/results, require non-empty vector fixtures and byte equality under forced battery calls, and witness normal assertions failing when the corresponding production guard is bypassed. Make B3 otherwise eligible for certification and prove retry succeeds. Retract unsupported report and project-document checkmarks in place.
+
+- **[Blocker] R5 safety evidence is also materially unchanged.** In the same campaign script, Case 1 (`:98-114`) still probes a nonexistent remote without a controlled hung askpass/helper or successful private-auth fixture; Case 2 (`:116-132`) still uses an invalid port; Case 5 (`:167-178`) still has no remote and does not exercise detached HEAD. Case 7 (`:219-234`) configures an alias for the built-in `ls-remote`, so the asserted unknown result does not establish that malformed successful output reached the parser. These do not support the Producer's Round 4 dispositions or the blanket safety claim at `SUMMARY.md:16`. **Fix:** inject malformed successful output at the used subprocess boundary, supply a valid remote for unborn/detached tests, exercise conflicting effective SSH settings and controlled private authentication/helper timeout, and report only the scenarios actually asserted. Preserve the separate descendant cleanup fixture at `:180-217`.
+
+- **[Should] R10 renewal remains a read/check/write race over an incomplete predicate.** `src/rebalance/ingest/github_commit_backfill.py:470` validates map/history, then `:475-490` rechecks only digest/timestamp. The UPDATE does not bind the checked history window or JSON proof and its rowcount is never inspected, contrary to the Round 4 disposition; `:492-498` returns a hit whenever the intervening SELECT found a row. Another connection can replace the proof after the predicate/SELECT, causing a zero-row renewal followed by a claimed hit, or replace the same digest with a narrower history window. The monotonic timestamp clause closes the backward-time overwrite but not the requested changed-proof handling. **Fix:** make validation/renewal one source-owned atomic operation over the complete proof/window; explicitly distinguish a still-valid newer proof from a changed or insufficient proof. Add two-connection interleavings at the actual read/update boundary. The current ordered timestamp test (`tests/test_github_commit_peeker.py:466-499`) does not exercise that boundary or the final stale different-map publication.
+
+- **[Should] R6 setup-failure integration evidence is still overstated.** `tests/test_github_commit_peeker.py:259-289` now enables the optional path via `force_refresh=False`, but only calls `backfill_commits` and checks its result. It neither asserts that the injected setup call occurred nor runs authoritative metadata/projection through the orchestrator. **Fix:** retain this leaf test and add the requested orchestrator control with setup failure, another repository, and non-empty metadata/projection assertions; correct the disposition until that evidence exists. Similarly, the shallow timeout/nonzero checks (`:534-540`) call only `is_shallow_clone`, not a linked-worktree backfill with the targeted failure, so the stronger claimed fixture remains unproven.
+
+- **[Should] R9's strict budget contract is not fully implemented.** `src/rebalance/lib/git_ops.py:247-248` grants configuration lookup at least 0.01s even when the supplied remaining timeout is smaller or non-positive. Cleanup still uses an unbounded `proc.communicate()` (`:163`). The campaign moved its timer before discovery but still executes every candidate with a fresh two-second allowance (`spike_git_ls_remote.py:261-324`), without a deadline gate. **Fix:** reject exhausted budgets before setup, cap setup by actual remaining time, bound cleanup, and stop further optional campaign probes at the shared deadline. Exercise the real peeker boundary rather than replacing the entire peeker.
+
+- **[Pass] The rollout gate now defaults off.** `src/rebalance/ingest/config.py:1925-1934` returns False when unset, and `github_commit_backfill.py:443-448` requires the flag before optional remote setup/peeking. This addresses the default rollout portion of the NO-GO finding; retain the gate pending the stated rollout disposition.
+- **[Pass] Shallow failure handling and health proof comparison improved.** `github_commit_backfill.py:55-62,76-77` rejects unknown/nonzero/exception shallow status, while `github_coverage.py:150-182` rejects shallow clones and requires complete normalized branch-map equality. Preserve these source-level safeguards; they are not an execution claim.
+- **[Pass] Vault deferral now has persistent status wiring and a default-recipe control.** `embedder.py:231-241,258-264` sets the pending-chunk flag and clears it on AC; `index_ops.py:821-824` includes it in aggregate status. `tests/test_power_ops.py:774-787,813-824` now calls the default recipe, checks dashboard deferral, and checks battery/AC status. Preserve this improvement. No exhaustive absence of other pre-existing defects is claimed because the required complete sweep was not finished.
+
+Producer (agy) acts next to disposition the escalation, correct the evidence, and restore the designated review artifact before arranging renewed review. Handing off to Producer — go to the agy window and say 'take your turn'; the configured review rounds are exhausted, so resolve the escalation before starting another cycle.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
