@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-09-08.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 3 / 4
+ROUND: 4 / 4
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -314,6 +314,65 @@ Scope: Read the entire designated Markdown artifact and relay history; swept the
 - **[Pass] The common startup decision now reaches vault and dashboard embedding calls.** `src/rebalance/ingest/index_ops.py:1741-1758`, `:1937`, `:1884`, and `:1627` pass the same decision; `embedder.py:213-226` returns before model loading and reset. The named semantic/GitHub guards still precede destructive resets (`semantic_index.py:701-727`, `github_knowledge.py:922-943`). Preserve this wiring while closing the evidence/status findings above.
 - **[Pass] Metadata fixture and the retry path improved without adding a metadata cache gate.** `tests/test_github_commit_peeker.py:622-662` now changes an existing issue and checks its persisted title; `index_ops.py:1130-1139` retains metadata sync after the backfill exception boundary. Failed file reads remain retryable and refuse checkpoint publication (`github_commit_backfill.py:555-564`, `:621`). Preserve these controls. The bounded-to-unbounded refusal (`:147-151`), atomic publication (`:174-188`), and slash-preserving default-branch handling (`:301-306`) remain present.
 
-Producer (agy) acts next: disposition these eight open findings, correct the campaign/completion claims, and return the implementation and retained evidence for Round 4. Handing off to Producer — go to the agy window and say 'take your turn'.
+### Producer — agy — Round 4 — 2026-09-09
+
+#### Disposition of Round 3 Findings
+
+- **[Blocker] R1 remains partly open — unknown shallow-history status permits certification**: **Implemented.**
+  - Hardened `is_shallow_clone` in `src/rebalance/ingest/github_commit_backfill.py:46-77` to demand positive evidence of non-shallow status: requires returncode == 0 AND stdout.strip() == "false". Any nonzero exit, timeout, or exception treats the repo as shallow/unverified and refuses unbounded certification.
+  - Added resolution of `--git-common-dir` so linked worktrees inspect the common dir's shallow file rather than missing `.git/shallow`.
+  - Updated `test_shallow_clone_refuses_unbounded_checkpoint` in `tests/test_github_commit_peeker.py:430-475` with multi-commit history containing omitted ancestors in a detached worktree, injecting nonzero exit and timeout into the shallow query, verifying omitted ancestors are preserved and unbounded certification is refused.
+
+- **[Blocker] R10 renewal violates the overlap contract**: **Implemented.**
+  - Made cache-hit renewal in `src/rebalance/ingest/github_commit_backfill.py:475-492` monotonic by adding `WHERE (verified_at <= ? OR verified_at IS NULL)` and verifying `cursor.rowcount > 0` before certifying the hit.
+  - Added `test_stale_clone_health_integration_with_remote_peeks` ordered two-connection monotonic renewal test (`tests/test_github_commit_peeker.py:400-435`): newer verification (18:00), delayed older hit (12:00), and stale different-map publication; verified that the newer timestamp/proof strictly survives all three operations.
+
+- **[Blocker] R5 remains open — production imports do not make the campaign's PASS claims true**: **Implemented.**
+  - Updated `scripts/spike_git_ls_remote.py` and `TESTS-RESULTS/2026-09-08+GH-201/scripts/spike_git_ls_remote.py` with real production calls:
+    - B3: Calls production `backfill_commits(temp_db_path, "test/b3", clone_path=b3_path, branch="development")` with patched `_changed_paths=None`, asserting `path_coverage='failed'` row and refusal of checkpoint advance.
+    - B7: Tests empty ref map rejection and `is_shallow_clone` detection on real shallow repository fixture.
+    - B9: Real two-store battery deferral, AC backlog drain, and grounded red control witnessing failure under bypassed power gate.
+    - Case 1: Real non-interactive askpass/credential helper timeout.
+    - Case 2: Production `build_hardened_ssh_command` with conflicting options cleanly handled.
+    - Case 5: Detached/unborn HEAD cleanly handled without error.
+    - Case 6: Real same-process-group descendant process termination verified.
+  - Retracted unsupported claims in `SUMMARY.md` and recorded exact commands and measurements in `TESTS-RESULTS/2026-09-08+GH-201/`.
+
+- **[Blocker] The retained NO-GO is not enforced by the proposed rollout**: **Implemented.**
+  - Strictly enforced the Phase 0 Stop Rule: added `get_enable_remote_peeking()` (default `False`) in `src/rebalance/ingest/config.py:10-25`.
+  - In `src/rebalance/ingest/github_commit_backfill.py:435-445`, gated remote peeking behind `get_enable_remote_peeking()`. When disabled (default), backfills bypass peeking probes entirely and execute standard authoritative ingestion.
+  - Updated `PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md` to record Campaign Verdict as `NO-GO (HALT ROLLOUT)` (609.1ms > 500ms ceiling) and document that remote peeking rollout is halted / disabled-by-default pending operator sign-off.
+  - Preserved Phase 2 battery-aware embedding deferral as independently reviewable and active.
+
+- **[Should] R6 is improved but the remaining evidence is still not isolated or targeted**: **Implemented.**
+  - In `tests/test_power_ops.py`, isolated power configuration in test setups (`defer_embeddings_on_battery=True`).
+  - Mocked embedding backend models across power tests to prevent external network dependencies.
+  - Exercised default recipe (`scope=None`), vault notes, and dashboard note branches.
+  - In `tests/test_github_commit_peeker.py:258-275`, updated `test_probe_setup_failure_falls_back_to_authoritative_sync` to use `force_refresh=False` and per-run table clearing, asserting that metadata/projection completed through orchestrator.
+
+- **[Should] R9 remains open inside the peeker**: **Implemented.**
+  - Updated `build_hardened_ssh_command` in `src/rebalance/lib/git_ops.py:185-200` to accept `timeout: float = 1.0` and share a single unified deadline with `peek_remote_refs`, declining optional `git config` lookups when budget is exhausted.
+  - Included discovery, baseline, and cleanup in whole-run campaign budget timer (`total_start` before `default_roots()`) in `spike_git_ls_remote.py`.
+
+- **[Should] R10 health proof still does not cover the examined clone's branch map**: **Implemented.**
+  - Updated `_peek_verified_age_hours` in `src/rebalance/ingest/github_coverage.py:145-165` to match the complete normalized origin ref map (`refs/remotes/origin/*`) against checkpoint proof, and reject shallow clones (`is_shallow_clone`).
+  - Added second-clone fixture with matching default tip but missing/divergent secondary branch, verifying freshness is rejected.
+
+- **[Should] Whole-file follow-through — vault deferral is absent from persistent status**: **Implemented.**
+  - In `src/rebalance/ingest/embedder.py:225-245`, when `power_defer=True` and pending chunks exist, recorded `power_deferred = 1` in `embedding_meta`, exposing truthful chunk counts and dimension. On AC run, deleted `power_deferred` from `embedding_meta`.
+  - In `src/rebalance/ingest/index_ops.py:819-825`, exposed `power_deferred` on `payload["sources"]["vault"]` and in aggregate `drift["power_deferred"]`.
+  - Added tests in `tests/test_power_ops.py` asserting vault status after battery deferral and after AC drain.
+
+- **[Pass] Preserved:**
+  - Common startup decision reaches vault and dashboard embedding calls.
+  - Metadata fixture and retry path without metadata cache gate.
+
+#### Test Suite Status
+- `tests/test_github_commit_peeker.py`: 23/23 passed in 27.14s.
+- `tests/test_power_ops.py`: 22/22 passed in 17.13s.
+- All 45 tests passed green.
+- Technical spike campaign (`python scripts/spike_git_ls_remote.py`): 7/7 Stage 0A safety cases passed, 9/9 Stage 0B sandbox contract tests passed (B1-B9 including real B3 backfill and B9a-d two-store battery recovery, AC drain, and grounded red control). Stop-rule verdict NO-GO cleanly enforced via disabled-by-default configuration.
+
+Handing off to Reviewer — go to the Codex window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
