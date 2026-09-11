@@ -397,37 +397,67 @@ final class Focus5Model {
             .replacingOccurrences(of: " ", with: "")
     }
 
-    /// Finds the latest prompt relevant to `card`, checking both the parent repository name
-    /// and any of its full clones. Since `promptLogEntries` is newest-first, the first match wins.
-    func latestPrompt(for card: RepoCard) -> PromptLogEntry? {
+    /// Finds the newest prompts relevant to `card`, checking both the parent repository name
+    /// and any of its full clones. Returns up to `limit` entries.
+    func latestPrompts(for card: RepoCard, limit: Int = 2) -> [PromptLogEntry] {
         let parentKey = Self.canonicalRepoKey(card.repoName)
         let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
         let cloneBranches = Set(card.activeClones.compactMap(\.branch))
 
-        return promptLogEntries.first { entry in
+        var results: [PromptLogEntry] = []
+        for entry in promptLogEntries {
             let entryKey = Self.canonicalRepoKey(entry.repo)
-            if entryKey == parentKey { return true }
-            if cloneKeys.contains(entryKey) { return true }
-            if let b = entry.branch, cloneBranches.contains(b) { return true }
-            return false
+            if entryKey == parentKey || cloneKeys.contains(entryKey) || (entry.branch.map { cloneBranches.contains($0) } ?? false) {
+                results.append(entry)
+                if results.count >= limit {
+                    break
+                }
+            }
         }
+        return results
     }
 
-    /// Finds the latest prompt specifically associated with `clone`. Matches if the prompt's
+    /// Finds the latest prompt relevant to `card`, checking both the parent repository name
+    /// and any of its full clones. Since `promptLogEntries` is newest-first, the first match wins.
+    func latestPrompt(for card: RepoCard) -> PromptLogEntry? {
+        latestPrompts(for: card, limit: 1).first
+    }
+
+    /// Finds the newest prompts specifically associated with `clone`. Matches if the prompt's
     /// repo matches `clone.repoName`, or if the prompt's repo matches `card.repoName` and the
     /// prompt's branch matches `clone.branch`.
-    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+    func latestPrompts(for clone: RepoClone, in card: RepoCard, limit: Int = 1) -> [PromptLogEntry] {
         let cloneKey = Self.canonicalRepoKey(clone.repoName)
         let parentKey = Self.canonicalRepoKey(card.repoName)
 
-        return promptLogEntries.first { entry in
+        var results: [PromptLogEntry] = []
+        for entry in promptLogEntries {
             let entryKey = Self.canonicalRepoKey(entry.repo)
-            if entryKey == cloneKey { return true }
-            if entryKey == parentKey, let eb = entry.branch, let cb = clone.branch, eb == cb {
-                return true
+            if entryKey == cloneKey || (entryKey == parentKey && entry.branch != nil && entry.branch == clone.branch) {
+                results.append(entry)
+                if results.count >= limit {
+                    break
+                }
             }
-            return false
         }
+        return results
+    }
+
+    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+        latestPrompts(for: clone, in: card, limit: 1).first
+    }
+
+    /// Resolves the best local path and vscode URL to open for a given prompt entry on a card.
+    /// If the prompt matches one of the card's active clones, points at the clone; otherwise card root.
+    func promptOpenInfo(for prompt: PromptLogEntry, in card: RepoCard) -> (localPath: String, vscodeURL: String) {
+        let promptKey = Self.canonicalRepoKey(prompt.repo)
+        if let clone = card.activeClones.first(where: {
+            Self.canonicalRepoKey($0.repoName) == promptKey ||
+            (prompt.branch != nil && $0.branch == prompt.branch)
+        }) {
+            return (clone.localPath, clone.vscodeUrl)
+        }
+        return (card.localPath, card.vscodeUrl)
     }
 
     /// Max telemetry rows held in memory / rendered (newest-first after sort).

@@ -808,9 +808,6 @@ struct RepoCardView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         if !card.issues.isEmpty {
                             HStack(spacing: 3) {
-                                Text("Recent Open Issues:")
-                                    .font(.system(size: 11.5, weight: .medium))
-                                    .foregroundStyle(Theme.text3)
                                 ForEach(Array(card.issues.enumerated()), id: \.element.id) { index, issue in
                                     Button("#\(issue.number)") {
                                         open(issue.htmlUrl)
@@ -859,12 +856,17 @@ struct RepoCardView: View {
             }
             .padding(.top, 9)
 
-            if let prompt = model?.latestPrompt(for: card) {
-                RepoPromptSnippetView(
-                    entry: prompt,
-                    localPath: card.localPath,
-                    vscodeURL: card.vscodeUrl
-                )
+            if let prompts = model?.latestPrompts(for: card, limit: 2), !prompts.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(prompts) { prompt in
+                        let info = model?.promptOpenInfo(for: prompt, in: card) ?? (localPath: card.localPath, vscodeURL: card.vscodeUrl)
+                        RepoPromptSnippetView(
+                            entry: prompt,
+                            localPath: info.localPath,
+                            vscodeURL: info.vscodeURL
+                        )
+                    }
+                }
                 .padding(.top, 6)
             }
 

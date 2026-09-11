@@ -537,4 +537,44 @@ final class PromptLogTests: XCTestCase {
         let clonePrompt = model.latestPrompt(for: clone, in: card)
         XCTAssertEqual(clonePrompt?.prompt, "branch-matched prompt")
     }
+
+    func testLatestPromptsForCardReturnsUpToLimitInOrder() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "rebalanceOS-gh204", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "prompt 1 (clone)"),
+            PromptLogEntry(repo: "OTHER-REPO", timestamp: "2026-09-10 15:30:00 PDT", machine: "M", branch: "main", ide: "codex", prompt: "other repo prompt"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "prompt 2 (parent)"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 14:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "prompt 3 (older)")
+        ]
+
+        let prompts = model.latestPrompts(for: card, limit: 2)
+        XCTAssertEqual(prompts.count, 2)
+        XCTAssertEqual(prompts[0].prompt, "prompt 1 (clone)")
+        XCTAssertEqual(prompts[1].prompt, "prompt 2 (parent)")
+    }
+
+    func testPromptOpenInfoResolvesClonePathWhenMatched() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+
+        let clonePrompt = PromptLogEntry(repo: "rebalanceOS-gh204", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "clone prompt")
+        let parentPrompt = PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "parent prompt")
+
+        let cloneInfo = model.promptOpenInfo(for: clonePrompt, in: card)
+        XCTAssertEqual(cloneInfo.localPath, "/repos/rebalanceOS-gh204")
+
+        let parentInfo = model.promptOpenInfo(for: parentPrompt, in: card)
+        XCTAssertEqual(parentInfo.localPath, "/repos/rebalanceOS")
+    }
 }
+
