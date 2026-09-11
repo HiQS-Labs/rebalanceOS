@@ -87,7 +87,7 @@ final class Focus5Model {
     }
 
     var pinnedPromptLogEntries: [PromptLogEntry] {
-        let byID = Dictionary(uniqueKeysWithValues: promptLogEntries.map { ($0.id, $0) })
+        let byID = Dictionary(promptLogEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
     }
 

@@ -576,5 +576,19 @@ final class PromptLogTests: XCTestCase {
         let parentInfo = model.promptOpenInfo(for: parentPrompt, in: card)
         XCTAssertEqual(parentInfo.localPath, "/repos/rebalanceOS")
     }
+
+    func testPinnedPromptLogEntriesHandlesDuplicateIDsWithoutCrashing() {
+        let model = Focus5Model()
+        // Simulate duplicate entries with identical repo and timestamp (e.g. batch parallel prompt dispatch)
+        let dup1 = PromptLogEntry(repo: "LTVERA-PANDAS", timestamp: "2026-08-31 19:08:36 PDT", machine: "M", branch: nil, prompt: "chunk 1")
+        let dup2 = PromptLogEntry(repo: "LTVERA-PANDAS", timestamp: "2026-08-31 19:08:36 PDT", machine: "M", branch: nil, prompt: "chunk 2")
+        model.promptLogEntries = [dup1, dup2]
+        model.togglePin(dup1)
+
+        // Must not trap / fatalError with Duplicate keys in Dictionary:
+        let pinned = model.pinnedPromptLogEntries
+        XCTAssertEqual(pinned.count, 1)
+        XCTAssertEqual(pinned.first?.prompt, "chunk 1")
+    }
 }
 
