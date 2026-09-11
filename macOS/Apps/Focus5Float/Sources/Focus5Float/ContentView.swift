@@ -167,10 +167,24 @@ struct ContentView: View {
 
     private var rosterStatus: some View {
         HStack(spacing: 6) {
-            Text("\(model.roster.count) repos")
+            Text("\(model.visibleRoster.count) repos")
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .fixedSize()
+            if model.hasHiddenRepos {
+                Button("(\(model.hiddenRosterCount) hidden · restore)") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        model.unhideAllRepos()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
+                .help("Restore hidden repos to the roster")
+                .onHover { inside in
+                    if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
             if !model.lastUpdatedAgo.isEmpty {
                 Text("·")
                     .font(.system(size: 12.5))
@@ -319,9 +333,27 @@ struct ContentView: View {
                         if let banner = model.dirtyBanner {
                             DirtyBannerView(warning: banner)
                         }
-                        RosterLayout(tiled: model.tileCards) {
-                            ForEach(Array(model.roster.enumerated()), id: \.element.id) { index, card in
-                                RepoCardView(card: card, model: model, darker: !index.isMultiple(of: 2))
+                        if model.visibleRoster.isEmpty && !model.roster.isEmpty {
+                            emptyState(
+                                icon: "eye.slash",
+                                title: "All repos hidden",
+                                detail: "\(model.roster.count) repos hidden by operator."
+                            )
+                            .frame(minHeight: 140)
+                            Button("Restore Hidden Repos") {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    model.unhideAllRepos()
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.accent)
+                            .padding(.top, Theme.Space.xs)
+                        } else {
+                            RosterLayout(tiled: model.tileCards) {
+                                ForEach(Array(model.visibleRoster.enumerated()), id: \.element.id) { index, card in
+                                    RepoCardView(card: card, displayPosition: index + 1, model: model, darker: !index.isMultiple(of: 2))
+                                }
                             }
                         }
                         if !model.offRoster.isEmpty {
@@ -769,10 +801,34 @@ struct RepoPromptSnippetView: View {
     }
 }
 
+// MARK: - Repo trash button (hides repo from roster)
+
+private struct RepoTrashButton: View {
+    let repoName: String
+    let onHide: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onHide) {
+            Image(systemName: "trash")
+                .font(.system(size: 11.5))
+                .foregroundStyle(isHovered ? Theme.text2 : Theme.text3.opacity(0.4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Hide \(repoName) from roster")
+        .onHover { inside in
+            isHovered = inside
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+}
+
 // MARK: - Repo card (collapsible)
 
 struct RepoCardView: View {
     let card: RepoCard
+    var displayPosition: Int? = nil
     var model: Focus5Model? = nil
     var darker: Bool = false
     @State private var expanded = false
@@ -781,7 +837,8 @@ struct RepoCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Theme.Space.s) {
-                KeyCap(text: "#\(card.position)", font: Theme.monoSmall, height: 24)
+                KeyCap(text: "#\(displayPosition ?? card.position)", font: Theme.monoSmall, height: 24)
+                    .help(displayPosition != nil && displayPosition != card.position ? "Ranked #\(card.position) from server" : "")
                 Spacer(minLength: Theme.Space.s)
                 OpenRepoButton(repoName: card.repoName, localPath: card.localPath, vscodeURL: card.vscodeUrl)
                 StatusDot(isDirty: card.isDirty || card.isAnyCloneDirty, healthAvailable: card.healthAvailable)
@@ -792,11 +849,19 @@ struct RepoCardView: View {
 
             HStack(alignment: .top, spacing: Theme.Space.m) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(card.repoName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.text)
-                        .lineSpacing(1)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .center, spacing: 6) {
+                        Text(card.repoName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.text)
+                            .lineSpacing(1)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        RepoTrashButton(repoName: card.repoName) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                model?.hideRepo(card.repoName)
+                            }
+                        }
+                    }
 
                     Text(commitLine)
                         .font(.system(size: 12.5))

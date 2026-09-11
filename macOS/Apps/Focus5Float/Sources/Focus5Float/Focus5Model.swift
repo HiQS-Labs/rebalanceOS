@@ -86,6 +86,44 @@ final class Focus5Model {
         }
     }
 
+    /// User-hidden repositories excluded from the active roster view.
+    /// Normalized with `canonicalRepoKey` and persisted across relaunches.
+    var hiddenRepoNames: Set<String> = [] {
+        didSet {
+            UserDefaults.standard.set(Array(hiddenRepoNames), forKey: "hiddenRepoNames")
+        }
+    }
+
+    /// Active roster filtered to exclude hidden repositories.
+    var visibleRoster: [RepoCard] {
+        roster.filter { !isRepoHidden($0.repoName) }
+    }
+
+    /// Number of repositories currently in `roster` that are hidden.
+    var hiddenRosterCount: Int {
+        roster.filter { isRepoHidden($0.repoName) }.count
+    }
+
+    var hasHiddenRepos: Bool {
+        hiddenRosterCount > 0
+    }
+
+    func isRepoHidden(_ name: String) -> Bool {
+        hiddenRepoNames.contains(Self.canonicalRepoKey(name))
+    }
+
+    func hideRepo(_ name: String) {
+        hiddenRepoNames.insert(Self.canonicalRepoKey(name))
+    }
+
+    func unhideRepo(_ name: String) {
+        hiddenRepoNames.remove(Self.canonicalRepoKey(name))
+    }
+
+    func unhideAllRepos() {
+        hiddenRepoNames.removeAll()
+    }
+
     var pinnedPromptLogEntries: [PromptLogEntry] {
         let byID = Dictionary(promptLogEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
@@ -180,6 +218,9 @@ final class Focus5Model {
         pinnedPromptLogIDs = UserDefaults.standard.stringArray(forKey: "pinnedPromptLogIDs") ?? []
         if let path = UserDefaults.standard.string(forKey: "promptLogFilePath") {
             promptLogFileURL = URL(fileURLWithPath: path)
+        }
+        if let hidden = UserDefaults.standard.stringArray(forKey: "hiddenRepoNames") {
+            hiddenRepoNames = Set(hidden)
         }
         // Tiling defaults ON, so an absent key must NOT collapse to bool(forKey:)'s
         // false. object(forKey:) distinguishes "never set" from "set to false",
