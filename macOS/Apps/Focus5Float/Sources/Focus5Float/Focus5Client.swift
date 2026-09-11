@@ -202,7 +202,7 @@ struct Focus5Client {
 
         var req = URLRequest(url: comps.url!)
         req.httpMethod = "GET"                       // read-only, always GET
-        req.timeoutInterval = 6
+        req.timeoutInterval = 15
         req.cachePolicy = .reloadIgnoringLocalCacheData
         return try await decode(Focus5Response.self, from: req)
     }

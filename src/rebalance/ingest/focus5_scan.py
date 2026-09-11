@@ -1021,6 +1021,7 @@ def recent_activity(local_path: str, *, limit: int = 3) -> list[dict[str, Any]]:
         "log",
         f"-{limit}",
         "--format=%h%x1f%s%x1f%cI%x1f%ce",
+        timeout=GIT_TIMEOUT,
     )
     items: list[dict[str, Any]] = []
     for line in (out or "").splitlines():
@@ -1058,7 +1059,7 @@ def live_health(local_path: str) -> dict[str, Any]:
     that can't be read yields ``health_available=False`` (never raises).
     """
     probed_at = now_iso()
-    out = _git(Path(local_path), "status", "--porcelain=v2", "--branch")
+    out = _git(Path(local_path), "status", "--porcelain=v2", "--branch", timeout=GIT_TIMEOUT)
     if out is None:
         return {"health_available": False, "health_probed_at": probed_at}
     h = _parse_status(out)
