@@ -225,7 +225,7 @@ struct ContentView: View {
     }
 
     private var rosterAttentionBadge: some View {
-        let attentionCount = model.offRoster.count
+        let attentionCount = model.visibleOffRoster.count
         return statusBadge(
             count: attentionCount,
             tint: attentionCount == 0 ? Theme.diffAdd : Theme.attention,
@@ -356,8 +356,8 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        if !model.offRoster.isEmpty {
-                            OffRosterFooter(warnings: model.offRoster)
+                        if !model.visibleOffRoster.isEmpty {
+                            OffRosterFooter(warnings: model.visibleOffRoster)
                         }
                         bottomSections
                     }

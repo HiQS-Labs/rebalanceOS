@@ -262,6 +262,40 @@ struct Focus5Client {
         req.httpBody = try JSONEncoder().encode(GoalCompletePayload(title: title, lineIndex: lineIndex))
         return try await decode(Focus5GoalCompleteResponse.self, from: req)
     }
+
+    /// Hide a repository on the local server so it is excluded from future scans.
+    func hideRepo(identity: String) async {
+        struct HidePayload: Encodable { let repo: String }
+        for base in candidateBaseURLs {
+            var req = URLRequest(url: base.appendingPathComponent("api/focus5/hide"))
+            req.httpMethod = "POST"
+            req.timeoutInterval = 3
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONEncoder().encode(HidePayload(repo: identity))
+            if let (_, response) = try? await session.data(for: req),
+               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                return
+            }
+        }
+    }
+
+    /// Unhide a repository on the local server so it can re-enter the roster.
+    func unhideRepo(identity: String) async {
+        struct HidePayload: Encodable { let repo: String }
+        for base in candidateBaseURLs {
+            var req = URLRequest(url: base.appendingPathComponent("api/focus5/unhide"))
+            req.httpMethod = "POST"
+            req.timeoutInterval = 3
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONEncoder().encode(HidePayload(repo: identity))
+            if let (_, response) = try? await session.data(for: req),
+               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                return
+            }
+        }
+    }
 }
 
 /// Wire shape of `GET /focus-5/note` — the Focus 5 Float bottom note.

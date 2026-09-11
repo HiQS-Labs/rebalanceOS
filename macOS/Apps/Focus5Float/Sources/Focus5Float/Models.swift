@@ -272,6 +272,42 @@ struct OffRosterWarning: Codable, Identifiable {
             vscodeUrl: vscode
         )
     }
+
+    func asRepoCard(position: Int) -> RepoCard {
+        let vscode = "vscode://file\(localPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? localPath)"
+        return RepoCard(
+            position: position,
+            repoName: repoName,
+            repoFullName: repoFullName,
+            localPath: localPath,
+            remoteUrl: nil,
+            vscodeUrl: vscode,
+            rankReason: warningReason ?? "Promoted candidate",
+            rankingMode: "promoted",
+            computedAt: probedAt ?? "",
+            branch: branch,
+            upstream: nil,
+            hasUpstream: nil,
+            ahead: ahead,
+            behind: 0,
+            modifiedCount: modifiedCount,
+            untrackedCount: untrackedCount,
+            isDirty: isDirty,
+            healthAvailable: true,
+            healthProbedAt: probedAt,
+            lastCommitAt: nil,
+            lastCommitTs: nil,
+            myLastCommitTs: myLocalCommitTs,
+            probedAt: probedAt,
+            newestPr: nil,
+            recentIssues: nil,
+            recentPrs: nil,
+            recentActivity: [],
+            clones: [],
+            clonesDirtyCount: 0,
+            anyCloneDirty: false
+        )
+    }
 }
 
 struct Focus5GoalsResponse: Codable {

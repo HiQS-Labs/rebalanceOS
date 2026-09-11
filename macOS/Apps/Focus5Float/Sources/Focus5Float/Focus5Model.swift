@@ -94,9 +94,38 @@ final class Focus5Model {
         }
     }
 
-    /// Active roster filtered to exclude hidden repositories.
+    /// Candidate off-roster items promoted into the visible roster to maintain up to 5 cards.
+    var promotedCards: [RepoCard] {
+        let unhiddenRoster = roster.filter { !isRepoHidden($0.repoName) }
+        let targetCount = roster.count
+        let deficit = targetCount - unhiddenRoster.count
+        guard deficit > 0 else { return [] }
+
+        let existingPaths = Set(unhiddenRoster.map(\.localPath))
+        var promoted: [RepoCard] = []
+        for warning in offRoster {
+            if isRepoHidden(warning.repoName) || existingPaths.contains(warning.localPath) {
+                continue
+            }
+            promoted.append(warning.asRepoCard(position: unhiddenRoster.count + promoted.count + 1))
+            if promoted.count >= deficit {
+                break
+            }
+        }
+        return promoted
+    }
+
+    /// Active roster filtered to exclude hidden repositories and backfilled by promoting
+    /// the highest-ranked unhidden off-roster candidates up into the empty slots.
     var visibleRoster: [RepoCard] {
-        roster.filter { !isRepoHidden($0.repoName) }
+        let unhidden = roster.filter { !isRepoHidden($0.repoName) }
+        return unhidden + promotedCards
+    }
+
+    /// Off-roster warnings excluding hidden repos and any items promoted into the visible roster.
+    var visibleOffRoster: [OffRosterWarning] {
+        let promotedPaths = Set(promotedCards.map(\.localPath))
+        return offRoster.filter { !isRepoHidden($0.repoName) && !promotedPaths.contains($0.localPath) }
     }
 
     /// Number of repositories currently in `roster` that are hidden.
@@ -114,14 +143,34 @@ final class Focus5Model {
 
     func hideRepo(_ name: String) {
         hiddenRepoNames.insert(Self.canonicalRepoKey(name))
+        let identity = roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? offRoster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? offRoster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? name
+        Task {
+            await client.hideRepo(identity: identity)
+        }
     }
 
     func unhideRepo(_ name: String) {
         hiddenRepoNames.remove(Self.canonicalRepoKey(name))
+        let identity = roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? name
+        Task {
+            await client.unhideRepo(identity: identity)
+        }
     }
 
     func unhideAllRepos() {
+        let previous = hiddenRepoNames
         hiddenRepoNames.removeAll()
+        Task {
+            for name in previous {
+                await client.unhideRepo(identity: name)
+            }
+        }
     }
 
     var pinnedPromptLogEntries: [PromptLogEntry] {
