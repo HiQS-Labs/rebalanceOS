@@ -43,7 +43,18 @@ command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is requir
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+# Stale lock detection: reap any lock held longer than 300s so dead processes cannot deadlock tailing.
+if ! mkdir "$TAIL_LOCK" 2>/dev/null; then
+  now=$(date +%s)
+  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "$now")
+  if [ -n "$born" ] && [ "$born" -gt 0 ] 2>/dev/null && [ $((now - born)) -gt 300 ]; then
+    diag "reaped stale tail lock born at $born ($((now - born))s old)"
+    rm -rf "$TAIL_LOCK"
+    mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+  else
+    exit 0
+  fi
+fi
 trap 'rm -rf "$TAIL_LOCK"' EXIT
 date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
 
@@ -140,6 +151,12 @@ if cut != -1 and cut >= (offset - scan_start):
         text = payload.get("message")
         if not isinstance(text, str) or not text.strip() or not session_id:
             continue
+        if "# Context from my IDE setup:" in text and "## My request:" in text:
+            text = text.split("## My request:", 1)[-1].strip()
+        elif "## My request:" in text:
+            text = text.split("## My request:", 1)[-1].strip()
+        if not text:
+            continue
         repo = cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else ""
         print(json.dumps({
             "timestamp": norm_ts(str(obj.get("timestamp") or "")),
@@ -168,10 +185,7 @@ while IFS= read -r -d '' file; do
 
   offset=""
   if cached=$(state_lookup "$file"); then
-    cached_inode=$(printf '%s' "$cached" | awk -F'\t' '{print $1}')
-    cached_offset=$(printf '%s' "$cached" | awk -F'\t' '{print $2}')
-    cached_sid=$(printf '%s' "$cached" | awk -F'\t' '{print $3}')
-    cached_cwd=$(printf '%s' "$cached" | awk -F'\t' '{print $4}')
+    IFS=$'\t' read -r cached_inode cached_offset cached_sid cached_cwd <<< "$cached"
     case "$cached_offset" in ''|*[!0-9]*) cached_offset=0 ;; esac
     if [ "$cached_inode" != "$inode" ] || [ "$size" -lt "$cached_offset" ]; then
       offset=0          # rotated or truncated -> full rescan (IDs suppress dups)
@@ -190,7 +204,12 @@ while IFS= read -r -d '' file; do
     continue
   fi
 
-  [ "$offset" -ge "$size" ] && { state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd"; continue; }
+  if [ "$offset" -ge "$size" ]; then
+    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ]; then
+      state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd"
+    fi
+    continue
+  fi
 
   rows_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-rows.XXXXXX")
   err_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-err.XXXXXX")

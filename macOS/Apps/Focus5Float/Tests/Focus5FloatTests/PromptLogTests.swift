@@ -208,6 +208,28 @@ final class PromptLogTests: XCTestCase {
         XCTAssertEqual(entries[0].prompt, "real prompt about the checkout flow")
     }
 
+    func testUnwrapsMyRequestInPreamble() {
+        let fixture = """
+        <!-- CLIO:ENTRIES -->
+
+        ## AI-DDTK
+        2026-09-10 16:23:28 PDT
+        noels-Mac-Studio · development · codex
+
+        > "# Context from my IDE setup:
+        > 
+        > ## Active file: foo.md
+        > 
+        > ## My request:
+        > Please check this work on disk."
+        """
+        let entries = PromptLogReader.parse(fixture)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0].repo, "AI-DDTK")
+        XCTAssertEqual(entries[0].ide, "codex")
+        XCTAssertEqual(entries[0].prompt, "Please check this work on disk.")
+    }
+
     func testPromptStartingWithBracketedRealTextIsNotFilteredIfNotMachineWrapper() {
         // Only the specific `<...>` / `[...]` wrapper shapes are noise; a
         // genuine prompt happening to start with a bracket-like character is
