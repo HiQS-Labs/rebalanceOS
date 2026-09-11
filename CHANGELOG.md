@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.0] - 2026-09-10
+
+### Added
+- Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
+
 ## [0.87.0] - 2026-09-10
 
 ### Added

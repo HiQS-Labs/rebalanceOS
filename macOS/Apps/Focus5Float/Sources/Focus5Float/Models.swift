@@ -58,6 +58,8 @@ struct RepoCard: Codable, Identifiable {
     let probedAt: String?
 
     let newestPr: NewestPR?
+    let recentIssues: [GitHubItemRef]?
+    let recentPrs: [GitHubItemRef]?
     let recentActivity: [Commit]
 
     // Active full clones (GH-204)
@@ -68,12 +70,81 @@ struct RepoCard: Codable, Identifiable {
     var activeClones: [RepoClone] { clones ?? [] }
     var hasClones: Bool { !activeClones.isEmpty }
     var isAnyCloneDirty: Bool { anyCloneDirty ?? activeClones.contains { $0.isDirty } }
+    var issues: [GitHubItemRef] { recentIssues ?? [] }
+    var prs: [GitHubItemRef] { recentPrs ?? [] }
+    var hasRecentGitHubItems: Bool { !issues.isEmpty || !prs.isEmpty }
+
+    init(
+        position: Int,
+        repoName: String,
+        repoFullName: String?,
+        localPath: String,
+        remoteUrl: String?,
+        vscodeUrl: String,
+        rankReason: String,
+        rankingMode: String,
+        computedAt: String,
+        branch: String?,
+        upstream: String?,
+        hasUpstream: Bool?,
+        ahead: Int,
+        behind: Int,
+        modifiedCount: Int,
+        untrackedCount: Int,
+        isDirty: Bool,
+        healthAvailable: Bool,
+        healthProbedAt: String?,
+        lastCommitAt: String?,
+        lastCommitTs: Int?,
+        myLastCommitTs: Int?,
+        probedAt: String?,
+        newestPr: NewestPR?,
+        recentIssues: [GitHubItemRef]? = nil,
+        recentPrs: [GitHubItemRef]? = nil,
+        recentActivity: [Commit],
+        clones: [RepoClone]?,
+        clonesDirtyCount: Int?,
+        anyCloneDirty: Bool?
+    ) {
+        self.position = position
+        self.repoName = repoName
+        self.repoFullName = repoFullName
+        self.localPath = localPath
+        self.remoteUrl = remoteUrl
+        self.vscodeUrl = vscodeUrl
+        self.rankReason = rankReason
+        self.rankingMode = rankingMode
+        self.computedAt = computedAt
+        self.branch = branch
+        self.upstream = upstream
+        self.hasUpstream = hasUpstream
+        self.ahead = ahead
+        self.behind = behind
+        self.modifiedCount = modifiedCount
+        self.untrackedCount = untrackedCount
+        self.isDirty = isDirty
+        self.healthAvailable = healthAvailable
+        self.healthProbedAt = healthProbedAt
+        self.lastCommitAt = lastCommitAt
+        self.lastCommitTs = lastCommitTs
+        self.myLastCommitTs = myLastCommitTs
+        self.probedAt = probedAt
+        self.newestPr = newestPr
+        self.recentIssues = recentIssues
+        self.recentPrs = recentPrs
+        self.recentActivity = recentActivity
+        self.clones = clones
+        self.clonesDirtyCount = clonesDirtyCount
+        self.anyCloneDirty = anyCloneDirty
+    }
 
     func with(
         position: Int? = nil,
         clones: [RepoClone]? = nil,
         clonesDirtyCount: Int? = nil,
-        anyCloneDirty: Bool? = nil
+        anyCloneDirty: Bool? = nil,
+        recentIssues: [GitHubItemRef]? = nil,
+        recentPrs: [GitHubItemRef]? = nil
     ) -> RepoCard {
         RepoCard(
             position: position ?? self.position,
@@ -100,6 +171,8 @@ struct RepoCard: Codable, Identifiable {
             myLastCommitTs: self.myLastCommitTs,
             probedAt: self.probedAt,
             newestPr: self.newestPr,
+            recentIssues: recentIssues ?? self.recentIssues,
+            recentPrs: recentPrs ?? self.recentPrs,
             recentActivity: self.recentActivity,
             clones: clones ?? self.clones,
             clonesDirtyCount: clonesDirtyCount ?? self.clonesDirtyCount,
@@ -147,6 +220,13 @@ struct NewestPR: Codable {
     let htmlUrl: String
     let isDraft: Bool
     let isMerged: Bool
+}
+
+struct GitHubItemRef: Codable, Identifiable, Equatable {
+    var id: Int { number }
+    let number: Int
+    let htmlUrl: String
+    let title: String?
 }
 
 struct Commit: Codable, Identifiable {

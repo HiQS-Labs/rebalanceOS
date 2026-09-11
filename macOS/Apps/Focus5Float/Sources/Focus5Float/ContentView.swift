@@ -790,18 +790,74 @@ struct RepoCardView: View {
                     .foregroundStyle(Theme.text3)
             }
 
-            Text(card.repoName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.text)
-                .lineSpacing(1)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 9)
+            HStack(alignment: .top, spacing: Theme.Space.m) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(card.repoName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .lineSpacing(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            Text(commitLine)
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.text3)
-                .padding(.top, 8)
+                    Text(commitLine)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.text3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if card.hasRecentGitHubItems {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if !card.issues.isEmpty {
+                            HStack(spacing: 3) {
+                                Text("Recent Open Issues:")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(Theme.text3)
+                                ForEach(Array(card.issues.enumerated()), id: \.element.id) { index, issue in
+                                    Button("#\(issue.number)") {
+                                        open(issue.htmlUrl)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.accent)
+                                    .onHover { inside in
+                                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                                    }
+                                    if index < card.issues.count - 1 {
+                                        Text(",")
+                                            .font(.system(size: 11.5))
+                                            .foregroundStyle(Theme.text3)
+                                    }
+                                }
+                            }
+                        }
+
+                        if !card.prs.isEmpty {
+                            HStack(spacing: 3) {
+                                Text("PRs:")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(Theme.text3)
+                                ForEach(Array(card.prs.enumerated()), id: \.element.id) { index, pr in
+                                    Button("#\(pr.number)") {
+                                        open(pr.htmlUrl)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.accent)
+                                    .onHover { inside in
+                                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                                    }
+                                    if index < card.prs.count - 1 {
+                                        Text(",")
+                                            .font(.system(size: 11.5))
+                                            .foregroundStyle(Theme.text3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            .padding(.top, 9)
 
             if let prompt = model?.latestPrompt(for: card) {
                 RepoPromptSnippetView(

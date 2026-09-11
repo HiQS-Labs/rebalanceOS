@@ -660,6 +660,8 @@ final class Focus5Model {
                     myLastCommitTs: bestCard.myLastCommitTs ?? bw.myLocalCommitTs,
                     probedAt: bw.probedAt,
                     newestPr: bestCard.newestPr,
+                    recentIssues: bestCard.recentIssues,
+                    recentPrs: bestCard.recentPrs,
                     recentActivity: bestCard.recentActivity,
                     clones: nil,
                     clonesDirtyCount: nil,

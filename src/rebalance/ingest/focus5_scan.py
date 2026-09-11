@@ -37,6 +37,7 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from datetime import timedelta
 from time import perf_counter
 from typing import Any, Callable, Iterable, Iterator
 
@@ -1119,6 +1120,50 @@ def _newest_pr(conn: Any, repo_full_name: str | None) -> dict[str, Any] | None:
     }
 
 
+def _recent_open_items(
+    conn: Any,
+    repo_full_name: str | None,
+    item_type: str,
+    limit: int,
+    window_hours: int = 24,
+) -> list[dict[str, Any]]:
+    """Return up to *limit* open items for *repo_full_name* and *item_type*.
+
+    If any open items were created within the last *window_hours*, return the newest
+    such items (up to *limit*). Otherwise, fall back to the most recent open items in
+    descending order of ID (number). Closed items are strictly excluded.
+    """
+    if not repo_full_name:
+        return []
+    try:
+        cutoff = (now_utc() - timedelta(hours=window_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        rows = conn.execute(
+            "SELECT number, html_url, title "
+            "FROM github_items "
+            "WHERE repo_full_name=? AND item_type=? AND state='open' AND created_at >= ? "
+            "ORDER BY number DESC LIMIT ?",
+            (repo_full_name, item_type, cutoff, limit),
+        ).fetchall()
+        if not rows:
+            rows = conn.execute(
+                "SELECT number, html_url, title "
+                "FROM github_items "
+                "WHERE repo_full_name=? AND item_type=? AND state='open' "
+                "ORDER BY number DESC LIMIT ?",
+                (repo_full_name, item_type, limit),
+            ).fetchall()
+    except Exception:  # noqa: BLE001 — corpus table may not exist yet
+        return []
+    return [
+        {
+            "number": row["number"],
+            "html_url": row["html_url"],
+            "title": row["title"],
+        }
+        for row in rows
+    ]
+
+
 def _repo_path_live(local_path: Any) -> bool:
     """True if *local_path* is still a git repo on disk (the discovery predicate).
 
@@ -1189,6 +1234,8 @@ def _build_roster_card(
     card["has_upstream"] = bool(card["has_upstream"])
     card["vscode_url"] = vscode_url(card["local_path"])
     card["newest_pr"] = _newest_pr(conn, card.get("repo_full_name"))
+    card["recent_issues"] = _recent_open_items(conn, card.get("repo_full_name"), "issue", 3)
+    card["recent_prs"] = _recent_open_items(conn, card.get("repo_full_name"), "pull_request", 2)
     card["recent_activity"] = recent_activity(card["local_path"]) if with_activity else []
     # Attach active full clones (GH-204)
     clone_candidates = clones if clones is not None else base.get("clones", [])
