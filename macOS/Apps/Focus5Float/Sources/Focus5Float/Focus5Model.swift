@@ -492,12 +492,11 @@ final class Focus5Model {
     func latestPrompts(for card: RepoCard, limit: Int = 2) -> [PromptLogEntry] {
         let parentKey = Self.canonicalRepoKey(card.repoName)
         let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
-        let cloneBranches = Set(card.activeClones.compactMap(\.branch))
 
         var results: [PromptLogEntry] = []
         for entry in promptLogEntries {
             let entryKey = Self.canonicalRepoKey(entry.repo)
-            if entryKey == parentKey || cloneKeys.contains(entryKey) || (entry.branch.map { cloneBranches.contains($0) } ?? false) {
+            if entryKey == parentKey || cloneKeys.contains(entryKey) {
                 results.append(entry)
                 if results.count >= limit {
                     break
@@ -541,9 +540,10 @@ final class Focus5Model {
     /// If the prompt matches one of the card's active clones, points at the clone; otherwise card root.
     func promptOpenInfo(for prompt: PromptLogEntry, in card: RepoCard) -> (localPath: String, vscodeURL: String) {
         let promptKey = Self.canonicalRepoKey(prompt.repo)
+        let parentKey = Self.canonicalRepoKey(card.repoName)
         if let clone = card.activeClones.first(where: {
             Self.canonicalRepoKey($0.repoName) == promptKey ||
-            (prompt.branch != nil && $0.branch == prompt.branch)
+            (promptKey == parentKey && prompt.branch != nil && $0.branch == prompt.branch)
         }) {
             return (clone.localPath, clone.vscodeUrl)
         }

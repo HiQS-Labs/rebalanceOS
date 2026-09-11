@@ -590,5 +590,37 @@ final class PromptLogTests: XCTestCase {
         XCTAssertEqual(pinned.count, 1)
         XCTAssertEqual(pinned.first?.prompt, "chunk 1")
     }
+
+    func testLatestPromptsDoesNotLeakPromptsAcrossReposSharingCommonBranchNames() {
+        let model = Focus5Model()
+        let ltveraCard = makeRepoCardWithClones(
+            repoName: "LTVera-Pandas",
+            localPath: "/repos/LTVera-Pandas",
+            activeClones: [
+                (repoName: "LTVera-Pandas-wt1", localPath: "/repos/LTVera-Pandas-wt1", branch: "development"),
+                (repoName: "LTVera-Pandas-wt2", localPath: "/repos/LTVera-Pandas-wt2", branch: "main")
+            ]
+        )
+        let xyzCard = makeRepoCardWithClones(
+            repoName: "XYZ-forge",
+            localPath: "/repos/XYZ-forge",
+            activeClones: [
+                (repoName: "XYZ-forge-wt1", localPath: "/repos/XYZ-forge-wt1", branch: "development")
+            ]
+        )
+
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "XYZ-forge", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "development", ide: "zcode", prompt: "XYZ-forge prompt on dev branch"),
+            PromptLogEntry(repo: "LTVera-Pandas", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "main", ide: "agy", prompt: "LTVera prompt on main branch")
+        ]
+
+        let ltveraPrompts = model.latestPrompts(for: ltveraCard, limit: 2)
+        XCTAssertEqual(ltveraPrompts.count, 1)
+        XCTAssertEqual(ltveraPrompts[0].prompt, "LTVera prompt on main branch")
+
+        let xyzPrompts = model.latestPrompts(for: xyzCard, limit: 2)
+        XCTAssertEqual(xyzPrompts.count, 1)
+        XCTAssertEqual(xyzPrompts[0].prompt, "XYZ-forge prompt on dev branch")
+    }
 }
 
