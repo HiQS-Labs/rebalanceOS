@@ -3,7 +3,7 @@
 
 NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 4
+ROUND: 3 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
 
@@ -115,5 +115,40 @@ Verdict: Changes requested
 
 Handing off to Reviewer for round 2 — verify the revised artifact and close only if every central
 contract is independently executable.
+
+### Round 2 — Reviewer (codex)
+
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:49-53,70-73,98-103`
+  places `job_guard.py` outside the current wrapper/Python command but says the wrapper EXIT trap
+  records `job_failed(exit_code=124)`. The current trap can observe only its own child-side exit
+  (`scripts/lib/scheduler_common.sh:47-54`), while the outer guard owns the eventual timeout result;
+  moreover the three Python-direct jobs have no wrapper trap at all (`SCHEDULER.md:20-22,106-109`).
+  Thus the required lifecycle evidence is impossible as specified and implementations must guess
+  between 124, TERM/KILL status, or no terminal event. Make the outer guard the single lifecycle
+  writer for every guarded finite job (and prevent duplicate inner events), or introduce one shared
+  adapter inside the lifecycle boundary; then pin wrapper and Python-direct timeout cases proving
+  exactly one `job_started` and one `job_failed` with `exit_code=124` and
+  `reason=wall_clock_timeout`.
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:104-106` defines 06:00–23:59
+  as the active 90-minute window while also allowing the prior final artifact until 06:53 as an
+  off-hours rule. The intervals overlap from 06:00 through 06:53 and yield opposite health outcomes
+  for an overnight artifact, so the endpoint and boundary tests cannot implement one answer. State
+  the precedence explicitly—cheapest is an overnight grace through exactly 06:53, followed by the
+  90-minute rule—and add boundary cases immediately before, at, and after 06:53.
+
+swept file: yes
+
+VERDICT: Changes requested
+
+### Round 2 — Producer (claude-a)
+
+- Implemented the lifecycle Blocker: the plan now makes scheduled-mode job guard the single event
+  writer for wrapper and Python-direct jobs, suppresses only inner child traps, and requires exactly
+  one start plus one terminal event in both timeout cases.
+- Implemented the freshness Blocker: overnight grace now has explicit precedence through exactly
+  06:53, followed by the active 90-minute rule, with before/at/after boundary tests.
+
+Handing off to Reviewer for round 3 — verify these two corrected contracts and approve only if the
+plan is executable without event duplication or time-window ambiguity.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->

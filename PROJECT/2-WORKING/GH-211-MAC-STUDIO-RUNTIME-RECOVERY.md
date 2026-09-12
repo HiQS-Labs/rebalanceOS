@@ -68,9 +68,12 @@ daemon. Tests reject missing, duplicate, zero, negative, non-integer, or other s
 | daily-synthesis | 900 s | recorded completions are under 23 s |
 
 Timeout is exit `124`, distinct from conflict `3`, resource ceiling `4`, preflight defer `75`,
-eviction `143`, and child exits. The guard emits `reason=wall_clock_timeout`; the wrapper EXIT trap
-records `job_failed` with `exit_code=124`; stack and doctor classify a terminal 124 or a live PID
-older than policy as unhealthy. Tests pin the guard result, lifecycle detail, and both presentations.
+eviction `143`, and child exits. In scheduled mode the outer guard is the single lifecycle writer:
+it records one `job_started`, suppresses the inner wrapper trap through a child-only environment
+flag, and records one terminal event. This gives Python-direct and wrapper jobs the same contract.
+Timeout produces `job_failed` with `exit_code=124` and `reason=wall_clock_timeout`; stack and doctor
+classify terminal 124 or a live PID older than policy as unhealthy. Tests pin exactly one start and
+one terminal event for both wrapper and Python-direct timeout cases, plus both presentations.
 
 ## Phase 1: Executable timeout and health contracts
 
@@ -96,14 +99,17 @@ older than policy as unhealthy. Tests pin the guard result, lifecycle detail, an
 **Goal:** Every finite scheduled batch has one existing-guard deadline and truthful terminal health.
 
 - [ ] Extend `utils/job_guard.py` with an optional positive wall-clock limit using its current child
-  process group and TERM/KILL path; emit a distinct timeout reason and preserve existing exit codes.
+  process group and TERM/KILL path; emit a distinct timeout reason, preserve existing exit codes,
+  and add scheduled-mode lifecycle ownership while `scheduler_common.sh` honors the child-only
+  suppression flag.
 - [ ] Route every finite managed plist through the existing job-guard CLI using the matrix above;
   keep the current wrapper/Python commands behind it and keep 3-Eyes untouched.
 - [ ] Extend the policy parser and tests with maximum runtime; make stack and doctor report an
   over-age live PID as unhealthy rather than RUNNING/OK.
-- [ ] Make pulse health non-healthy/503 in the active 06:00–23:59 local window when the artifact is
-  older than 90 minutes (boundary: exactly 90 minutes is healthy); off-hours accept the final
-  scheduled artifact only until 06:53, fifteen minutes after the first 06:38 completion window.
+- [ ] Make pulse health non-healthy/503 using this precedence: overnight grace accepts the final
+  scheduled artifact through exactly 06:53 local; after 06:53 and through 23:59, an artifact is
+  healthy through exactly 90 minutes old; otherwise it is stale. Test immediately before, at, and
+  after 06:53 plus the 90-minute boundary.
 - [ ] Route pulse, snapshot, HiQS digest, and daily-synthesis publication through one shared Git
   helper and advisory lock spanning content write through verified push. Conflict defers without
   writing. Verify dirty-identical, staged, divergent HEAD, concurrent writer, push failure, and
