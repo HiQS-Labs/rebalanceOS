@@ -449,8 +449,13 @@ def orphaned_embedding_ids(conn: sqlite3.Connection) -> list[int]:
                 """
             ).fetchall()
         ]
-    except sqlite3.OperationalError:
-        return []
+    except sqlite3.OperationalError as exc:
+        message = str(exc).lower()
+        if "no such table" in message and any(
+            table in message for table in ("semantic_embeddings", "semantic_documents")
+        ):
+            return []
+        raise
 
 
 def count_unembedded_documents(

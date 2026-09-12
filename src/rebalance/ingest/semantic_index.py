@@ -81,17 +81,21 @@ def repair_semantic_orphans(
     from rebalance.ingest import audit
 
     with db_connection(database_path) as conn:
-        orphan_ids = sem.orphaned_embedding_ids(conn)
-        count = len(orphan_ids)
-        result = SemanticOrphanRepairResult(count, 0, tuple(orphan_ids[:10]), False)
-        if not apply or count == 0:
-            return result
-        if not confirm:
-            raise ValueError("destructive repair requires --apply --confirm")
-        if count > 1000 and not confirm_large:
-            raise ValueError(f"repair affects {count} rows; add --confirm-large")
+        if not apply:
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            return SemanticOrphanRepairResult(len(orphan_ids), 0, tuple(orphan_ids[:10]), False)
         try:
             conn.execute("BEGIN IMMEDIATE")
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            count = len(orphan_ids)
+            result = SemanticOrphanRepairResult(count, 0, tuple(orphan_ids[:10]), False)
+            if count == 0:
+                conn.rollback()
+                return result
+            if not confirm:
+                raise ValueError("destructive repair requires --apply --confirm")
+            if count > 1000 and not confirm_large:
+                raise ValueError(f"repair affects {count} rows; add --confirm-large")
             _delete_orphan_ids(conn, orphan_ids)
             conn.commit()
         except Exception:

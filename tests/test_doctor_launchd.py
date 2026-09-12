@@ -128,6 +128,22 @@ def test_runtime_limit_is_strictly_greater_than_boundary(tmp_path: Path) -> None
     assert checks[0].detail == "running"
 
 
+def test_missing_runtime_policy_header_is_a_doctor_failure(tmp_path: Path) -> None:
+    policy = tmp_path / "SCHEDULER.md"
+    policy.write_text("# Scheduler\n\nNo policy table.\n", encoding="utf-8")
+
+    checks = _check_launchd(
+        "4242\t0\tcom.rebalance-os.github-sync\n",
+        log_dir=tmp_path / "logs",
+        now=NOW,
+        policy_path=policy,
+    )
+
+    assert checks[0].name == "scheduler runtime policy"
+    assert checks[0].status == FAIL
+    assert "header is missing" in checks[0].detail
+
+
 def test_unrecognised_daily_log_keeps_legacy_launchctl_behavior(tmp_path: Path) -> None:
     check = _daily_check(tmp_path, None)
 

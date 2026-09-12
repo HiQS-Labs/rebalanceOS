@@ -238,6 +238,42 @@ def test_sync_to_clio_writes_and_commits(mock_get_cfg, mock_commit, tmp_path):
     assert kwargs["push"] is True
 
 
+@pytest.mark.parametrize(
+    ("publish_result", "expected_deferred"),
+    [
+        (
+            {
+                "wrote_file": False,
+                "committed": False,
+                "pushed": False,
+                "deferred": True,
+                "git_error": "publisher lock busy",
+            },
+            True,
+        ),
+        (
+            {"wrote_file": True, "committed": True, "pushed": False, "git_error": "push rejected"},
+            False,
+        ),
+    ],
+)
+@patch("rebalance.ingest.pulse._commit_and_push_if_changed")
+@patch("rebalance.ingest.config.get_pulse_config")
+def test_sync_to_clio_reports_publish_failure(mock_get_cfg, mock_commit, publish_result, expected_deferred, tmp_path):
+    (tmp_path / ".git").mkdir()
+    mock_get_cfg.return_value = {
+        "git_pulse_clio_enabled": True,
+        "pulse_target_path": str(tmp_path),
+    }
+    mock_commit.return_value = publish_result
+
+    result = ds.sync_to_clio("summary", datetime(2026, 7, 9, 18, 0))
+
+    assert result["ok"] is False
+    assert bool(result.get("deferred")) is expected_deferred
+    assert "git publish failed" in result["reason"]
+
+
 @patch("rebalance.ingest.config.get_pulse_config")
 def test_sync_to_clio_dry_run_writes_nothing(mock_get_cfg, tmp_path):
     (tmp_path / ".git").mkdir()
@@ -384,6 +420,32 @@ class TestRunGitPulseHalf:
         assert code == 0
         mock_synthesize.assert_called_once()
         mock_sync_clio.assert_called_once_with("A summary", now, dry_run=False)
+
+    @pytest.mark.parametrize(
+        ("clio_result", "expected_code"),
+        [
+            ({"ok": False, "deferred": True, "reason": "publisher lock busy"}, 75),
+            ({"ok": False, "reason": "push rejected"}, 1),
+        ],
+    )
+    @patch("daily_synthesis.sync_to_clio")
+    @patch("daily_synthesis.synthesize_git_pulse", return_value="A summary")
+    @patch("daily_synthesis.collect_git_pulse_activity", return_value=("tsv data", 0))
+    @patch("rebalance.ingest.config.get_pulse_config", return_value={"git_pulse_clio_enabled": True})
+    @patch("daily_synthesis.vault_ready", return_value=False)
+    def test_run_propagates_clio_publish_outcome(
+        self,
+        _mock_vault,
+        _mock_config,
+        _mock_collect,
+        _mock_synthesize,
+        mock_sync,
+        clio_result,
+        expected_code,
+    ):
+        mock_sync.return_value = clio_result
+
+        assert ds.run(now=datetime(2026, 7, 9, 18, 30)) == expected_code
 
     @patch("daily_synthesis.synthesize_git_pulse")
     @patch("daily_synthesis.collect_git_pulse_activity")

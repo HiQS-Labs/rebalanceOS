@@ -1001,7 +1001,7 @@ def _verify_remote_content(target_repo: Path, file_rel: str, expected: str) -> b
     if proc.returncode != 0 or not upstream:
         return False
     proc = run_git(target_repo, "show", f"{upstream}:{file_rel}")
-    return proc.returncode == 0 and proc.stdout.strip() == expected.strip()
+    return proc.returncode == 0 and proc.stdout == expected
 
 
 # ---------------------------------------------------------------------------

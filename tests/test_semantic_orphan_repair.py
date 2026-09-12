@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,3 +67,54 @@ def test_delete_failure_rolls_back_and_does_not_audit(tmp_path: Path) -> None:
         repair_semantic_orphans(db, apply=True, confirm=True)
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 3
     assert not audit_path.exists()
+
+
+def test_apply_queries_orphans_only_after_owning_write_transaction(tmp_path: Path) -> None:
+    db = _database(tmp_path / "semantic.db", 1)
+    primary = sqlite3.connect(db)
+
+    class RacingConnection:
+        def execute(self, sql, *args):
+            if sql == "BEGIN IMMEDIATE":
+                with sqlite3.connect(db) as writer:
+                    writer.execute("INSERT INTO semantic_documents(id) VALUES (1)")
+            return primary.execute(sql, *args)
+
+        def __getattr__(self, name):
+            return getattr(primary, name)
+
+    @contextmanager
+    def racing_connection(_path):
+        try:
+            yield RacingConnection()
+        finally:
+            primary.close()
+
+    with patch("rebalance.ingest.semantic_index.db_connection", racing_connection):
+        result = repair_semantic_orphans(db, apply=True, confirm=True)
+
+    assert result.orphan_count == 0
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 1
+
+
+def test_orphan_query_propagates_database_lock(tmp_path: Path) -> None:
+    from rebalance.ingest.db.semantic import orphaned_embedding_ids
+
+    db = _database(tmp_path / "semantic.db", 1)
+    holder = sqlite3.connect(db)
+    contender = sqlite3.connect(db, timeout=0)
+    try:
+        holder.execute("BEGIN EXCLUSIVE")
+        with pytest.raises(sqlite3.OperationalError, match="locked"):
+            orphaned_embedding_ids(contender)
+    finally:
+        holder.rollback()
+        holder.close()
+        contender.close()
+
+
+def test_orphan_query_allows_uninitialized_database(tmp_path: Path) -> None:
+    from rebalance.ingest.db.semantic import orphaned_embedding_ids
+
+    with sqlite3.connect(tmp_path / "empty.db") as conn:
+        assert orphaned_embedding_ids(conn) == []

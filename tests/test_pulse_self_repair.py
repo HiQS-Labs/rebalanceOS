@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from rebalance.ingest.pulse import _commit_and_push_if_changed
+from rebalance.ingest.pulse import _commit_and_push_if_changed, _verify_remote_content
 from rebalance.lib.git_ops import git_publish_lock
 
 
@@ -180,6 +180,15 @@ class TestPulseSelfRepair:
             assert result["pushed"] is True
             assert _git(["show", "@{u}:pulse.md"], cwd=local).stdout == expected
 
+    def test_remote_verification_requires_exact_whitespace(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            _remote, local = _make_repos(tmp)
+
+            assert _verify_remote_content(local, "pulse.md", "# initial\n") is True
+            assert _verify_remote_content(local, "pulse.md", "# initial\n\n") is False
+            assert _verify_remote_content(local, "pulse.md", "  # initial\n") is False
+
     def test_repair_failure_propagates_error(self) -> None:
         """If pull --rebase itself fails, repair_error is returned and pushed stays False."""
         with tempfile.TemporaryDirectory() as td:
@@ -248,7 +257,7 @@ class TestPulseSelfRepair:
                 text=True,
                 check=True,
             ).stdout
-            assert remote_content.strip() == expected_content.strip(), (
+            assert remote_content == expected_content, (
                 f"remote content does not match rendered output:\n"
                 f"expected: {expected_content!r}\n"
                 f"actual:   {remote_content!r}"

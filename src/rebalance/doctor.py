@@ -677,7 +677,7 @@ def _scheduler_runtime_limits(policy_path: Path | None = None) -> dict[str, int 
     try:
         start = next(i for i, line in enumerate(lines) if line.startswith(header))
     except StopIteration:
-        return {}
+        raise ValueError("scheduler policy table header is missing") from None
     limits: dict[str, int | None] = {}
     for line in lines[start + 2 :]:
         if not line.startswith("|"):
@@ -702,6 +702,8 @@ def _scheduler_runtime_limits(policy_path: Path | None = None) -> dict[str, int 
             limits[job] = int(raw)
         else:
             raise ValueError(f"invalid max runtime for {job}: {raw!r}")
+    if not limits:
+        raise ValueError("scheduler runtime policy is empty")
     return limits
 
 
