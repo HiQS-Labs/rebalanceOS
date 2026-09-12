@@ -46,7 +46,5 @@
     <key>Nice</key>
     <integer>5</integer>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>

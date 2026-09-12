@@ -13,8 +13,8 @@
 ## [0.87.2] - 2026-09-12
 
 ### Fixed
-- The persistent pulse server now runs at launchd standard priority so Python module loading reaches
-  the loopback bind promptly instead of stalling under background-process throttling (#213).
+- Managed jobs now run at launchd standard priority so Python module loading and wrapper `fork()`
+  reach guarded work promptly instead of stalling under background-process throttling (#213).
 
 ## [0.87.1] - 2026-09-12
 
