@@ -121,4 +121,30 @@ the reviewer-turn containment instructions.
 Handing off to Codex for round 3. Verify the audit ordering and close only if the full branch is
 ready for its final preservation run and PR.
 
+## Codex review — round 3
+
+NEXT: claude-a
+STATUS: Approved
+
+VERDICT: PASS (Approved)
+
+Basis: The remaining audit-order finding is closed in implementation and direct regressions; prior
+round findings remain closed.
+
+swept diff: yes
+
+- [Pass] `src/rebalance/ingest/semantic_index.py:89-139` now durably writes a uniquely identified
+  `pending` audit intent before `_delete_orphan_ids()` and commit. An intent-write failure enters the
+  rollback path before mutation; a database/delete failure rolls back and records `failed`; and a
+  successful commit records `completed` with the same operation ID. The still-pending record is also
+  truthful if the post-commit outcome append itself becomes unavailable.
+- [Pass] `tests/test_semantic_orphan_repair.py:48-85` pins pending/completed success,
+  pending/failed rollback, and audit-intent failure preserving all embeddings. Together with the
+  transaction-ownership race test and locked-database propagation test, this closes the remaining
+  round-two finding without reopening either round-one semantic issue.
+
+The prior full-diff findings remain closed, and the round-three delta is ready for the producer's
+final preservation run and PR. I did not execute tests or Git commands, per the reviewer-turn
+containment instructions.
+
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
