@@ -105,6 +105,9 @@ since GH-175 **no two jobs share a minute**:
   `none` limit because launchd intentionally keeps it alive; its health is the generated artifact's
   freshness. Missing, duplicate, non-positive, malformed, or misplaced `none` policy values are
   configuration errors, not silent exemptions.
+- `pulse-server` deliberately uses launchd's standard process priority rather than `ProcessType`
+  `Background`. It is a persistent, user-facing loopback service; background priority can defer
+  Python extension loading long enough that the service never reaches its bind on a pressured Mac.
 - Installers source `scripts/lib/install_common.sh`: chmod the wrapper,
   always-unload, render the template (`{{REBALANCE_DIR}}`, `{{PYTHON}}`,
   `{{HOME}}`), `plutil -lint`, load, poll-verify registration. Rendered plists

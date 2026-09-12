@@ -297,6 +297,13 @@ class TestPlistTemplates(unittest.TestCase):
                 f"{job}: KeepAlive",
             )
 
+    def test_pulse_server_uses_standard_launch_priority(self):
+        self.assertNotIn(
+            "ProcessType",
+            _parse("pulse-server"),
+            "persistent loopback server must not be starved at launchd background priority",
+        )
+
     def test_program_arguments_reference_real_files(self):
         for job in POLICY:
             for arg in _parse(job)["ProgramArguments"]:
