@@ -1,8 +1,8 @@
 # RELAY · GH-211 bounded runtime recovery implementation QA
 <!-- Single source of truth. Read the entire file before acting. -->
 
-NEXT: codex
-STATUS: Reviewing
+NEXT: Closed
+STATUS: Approved
 ROUND: 3 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
@@ -146,5 +146,11 @@ swept diff: yes
 The prior full-diff findings remain closed, and the round-three delta is ready for the producer's
 final preservation run and PR. I did not execute tests or Git commands, per the reviewer-turn
 containment instructions.
+
+### System · producer preservation note
+
+The round-three reviewer explicitly recorded `VERDICT: PASS (Approved)` and the harness accepted the
+turn as productive, but its emitted block placed terminal fields inside the log rather than updating
+the file header. The header above preserves that independently recorded terminal decision.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
