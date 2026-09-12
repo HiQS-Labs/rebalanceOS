@@ -43,6 +43,35 @@ fleet stop plus verified DB/Git backups; the tripwire is any live DB holder, fai
 transaction, unpreserved Git change, failed test, or stale post-deploy artifact. A tripwire stops
 the phase before later mutation.
 
+### Runtime policy matrix
+
+Limits are conservative first-release ceilings derived from non-empty completed-run history through
+2026-09-12, not performance targets. Enforcement for every finite job is the existing
+`utils/job_guard.py` CLI placed at the outer plist `ProgramArguments` boundary, before the current
+wrapper or Python command. Live-process health age comes from the launchd PID's OS start time; the
+lifecycle log records the terminal result. `none` is the only sentinel and is valid only for the
+daemon. Tests reject missing, duplicate, zero, negative, non-integer, or other sentinel values.
+
+| Job | Max runtime | Evidence / policy reason |
+| --- | ---: | --- |
+| daily-sync | 10,800 s | completed runs reached 6,737 s; incident runs reached 57,278 s |
+| obsidian-vault-embeddings | 7,200 s | completed runs reached 2,871 s before multi-hour incidents |
+| github-sync | 7,200 s | completed runs reached 5,869 s before 9-hour incidents |
+| pulse-sync | 1,800 s | ordinary runs are minutes; multi-hour failures are not useful work |
+| pulse-web-sync | 7,200 s | completed pressure runs reached 4,010 s; day-long runs are stale |
+| pulse-server | none | intentional KeepAlive daemon; artifact freshness is its health contract |
+| pulse-warning-watch | 300 s | one bounded loopback probe |
+| health-check | 900 s | deterministic doctor/report pass; doctor subprocesses are bounded |
+| health-check-triage | 1,800 s | bounded doctor plus at most five model triages |
+| obsidian-rollover | 300 s | recorded completions are sub-second |
+| hiqs-digest | 14,400 s | a completed pressure run reached 9,167 s; incident ran about 7 hours |
+| daily-synthesis | 900 s | recorded completions are under 23 s |
+
+Timeout is exit `124`, distinct from conflict `3`, resource ceiling `4`, preflight defer `75`,
+eviction `143`, and child exits. The guard emits `reason=wall_clock_timeout`; the wrapper EXIT trap
+records `job_failed` with `exit_code=124`; stack and doctor classify a terminal 124 or a live PID
+older than policy as unhealthy. Tests pin the guard result, lifecycle detail, and both presentations.
+
 ## Phase 1: Executable timeout and health contracts
 
 **Goal:** Red tests demonstrate that overlong jobs and stale pulse artifacts cannot remain green.
@@ -68,15 +97,21 @@ the phase before later mutation.
 
 - [ ] Extend `utils/job_guard.py` with an optional positive wall-clock limit using its current child
   process group and TERM/KILL path; emit a distinct timeout reason and preserve existing exit codes.
-- [ ] Add one shared scheduler helper and wire finite managed wrappers through the guard. Keep
-  3-Eyes untouched.
+- [ ] Route every finite managed plist through the existing job-guard CLI using the matrix above;
+  keep the current wrapper/Python commands behind it and keep 3-Eyes untouched.
 - [ ] Extend the policy parser and tests with maximum runtime; make stack and doctor report an
   over-age live PID as unhealthy rather than RUNNING/OK.
-- [ ] Make pulse health non-healthy/503 when the generated artifact exceeds its documented age.
-- [ ] Make shared-Git publication verify tracked/staged/HEAD state before returning unchanged and
-  serialize in-repo publishers with an advisory lock without changing schemas.
-- [ ] Add a supported semantic-orphan command with read-only default, explicit apply, transaction,
-  counts, and audit output.
+- [ ] Make pulse health non-healthy/503 in the active 06:00–23:59 local window when the artifact is
+  older than 90 minutes (boundary: exactly 90 minutes is healthy); off-hours accept the final
+  scheduled artifact only until 06:53, fifteen minutes after the first 06:38 completion window.
+- [ ] Route pulse, snapshot, HiQS digest, and daily-synthesis publication through one shared Git
+  helper and advisory lock spanning content write through verified push. Conflict defers without
+  writing. Verify dirty-identical, staged, divergent HEAD, concurrent writer, push failure, and
+  remote-content cases. The external `com.user.git-pulse` collector remains separately owned and
+  receives recovery-only handling, not a code change in this issue.
+- [ ] Add semantic-orphan maintenance through the semantic CLI/stage owner with read-only default,
+  `--apply --confirm`, transaction, counts, and audit output. Above 1,000 rows it refuses unless an
+  additional `--confirm-large` is present; tests cover audit content and transaction rollback.
 
 ### Phase 2 — QA checklist
 
@@ -95,8 +130,10 @@ preserved and publishable.
   capture non-empty evidence under `TESTS-RESULTS/2026-09-12+GH-211/`.
 - [ ] Stop the managed stack through `stack.sh down`, verify descendants exited, and ignore inert
   job-guard lockfile contents as ownership evidence.
-- [ ] Create and verify a DB backup, checkpoint WAL, prove an exclusive transaction, sample orphan
-  IDs, run supported repair dry-run then apply, and prove zero orphans without unexpected backlog.
+- [ ] After stack-down, prove no DB/WAL holders and `BEGIN EXCLUSIVE; COMMIT`, then create a WAL-safe
+  backup with SQLite `.backup`, verify the backup's `PRAGMA integrity_check`, and record the exact
+  restore command (`sqlite3 <live-db> ".restore '<backup-db>'"`). Sample orphan IDs, run dry-run,
+  then `--apply --confirm --confirm-large`, and prove zero orphans without unexpected backlog.
 - [ ] Preserve tracked, staged, untracked, ref, and lock evidence from the shared Git checkout. Move
   the proven-ownerless lock aside, reconcile without reset/tree-wide stash, then verify remote data.
 
@@ -112,16 +149,21 @@ preserved and publishable.
 
 **Goal:** CI-equivalent proof, independent relay approval, merged code, and a fresh stable runtime.
 
-- [ ] Run format/lint/type gates, `pytest tests/`, doctor, PDDA, and relevant shell tests; publish
-  non-empty outputs in the GH-211 campaign directory.
+- [ ] Run `ruff check .`, `ruff format --check .`, `mypy src/`, banned-import/doc/frontdoor/PDDA
+  checks, the root suite under Python 3.12 and 3.13 excluding only the two CI-declared embedding
+  seam files, those two seam tests with embeddings installed, and `HiQS/tests/`. Keep the explicitly
+  stood-down `utils/3-eyes/tests` excluded. Separately capture non-empty focused guard,
+  scheduler-policy, stack/doctor, pulse-health, Git-publication, and semantic-repair outputs.
 - [ ] Run Codex relay final QA with an empty reviewer allowlist; cap at four productive rounds and
   stop if two consecutive rounds add no qualifying improvement.
 - [ ] Push, open the PR with evidence/rollback, wait for checks, merge to `development`, and verify
   the remote merge commit.
-- [ ] Fast-forward the declared runtime, refresh its editable install, reinstall bounded plists,
-  start only safe jobs initially, then bring up the fleet after DB/Git tripwires stay green.
-- [ ] Prove current drift, fresh pulse health, no GH-211 doctor errors, and bounded job outcomes over
-  two observations.
+- [ ] Fast-forward the declared runtime, refresh its editable install, and reinstall bounded plists.
+  First kickstart only `pulse-server`, verify loopback semantics, then `pulse-warning-watch`, then one
+  `pulse-web-sync` read after DB tripwires pass. Use the supported per-job installers and
+  `launchctl kickstart -k gui/$UID/<label>`; only then use `stack.sh up` for the finite fleet.
+- [ ] Prove current drift, fresh pulse health, no GH-211 doctor errors, and bounded job outcomes in
+  observations separated by at least the relevant cadence or maximum runtime (whichever is longer).
 - [ ] Comment #211 with evidence, then create the fresh GH-210 branch from updated development and
   begin its Phase 0 spike.
 
@@ -132,4 +174,3 @@ preserved and publishable.
 - [ ] Deployment is a runtime fast-forward; rollback is a revert PR plus forward deployment.
 - [ ] Pulse freshness and doctor/stack status close the user/operator loop.
 - [ ] Status table and `updated:` date refreshed before #211 is shipped.
-

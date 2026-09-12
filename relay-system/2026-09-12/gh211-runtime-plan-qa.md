@@ -3,13 +3,13 @@
 
 NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 4
+ROUND: 2 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
 
 1. Read this whole file and act only when `NEXT` names your role.
 2. Reviewer: grade findings `[Blocker]`, `[Should]`, `[Nit]`, or `[Pass]`, cite file:line, propose a
-   concrete fix, declare `swept file: yes|no`, and set `Verdict: Approved|Changes requested|Blocked`.
+   concrete fix, declare `swept file: yes|no`, and set `VERDICT: Approved|Changes requested|Blocked`.
    Do not edit product or plan files.
 3. Producer: disposition every finding, apply accepted fixes, and append one response block.
 4. Append one block at the bottom; never rewrite earlier turns. Flip `NEXT`, update `STATUS`, and
@@ -29,7 +29,7 @@ code/tests as needed.
 
 Questions:
 
-1. Does every proposed change follow a verified current call/write path, with unsupported claims
+1. Does every proposed change follow a verified current call/write path, with unsupported claims  [Unverified — no citation]
    exposed as gates rather than assumptions?
 2. Is extending the existing job guard and scheduler policy the smallest coherent fix, without
    duplicating supervision or reactivating 3-Eyes?
@@ -52,5 +52,68 @@ Questions:
 4. The relay ends only on Reviewer Approved or escalates at round four.
 
 ## Log
+
+### Round 1 — Reviewer (codex)
+
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:69-70` requires a distinct
+  timeout reason while preserving existing exit codes, but never assigns timeout an exit code or
+  defines how that code reaches the lifecycle event, launchd, stack, and doctor. This leaves the
+  central terminal contract to implementation guesswork. Specify one unused timeout exit code,
+  distinguish it from resource exit `4`, eviction `143`, and child exits, and add assertions for the
+  wrapper result plus `job_failed`/stack/doctor classification.
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:50-54,69-75` promises coverage
+  for every finite scheduled batch but only says to wire “managed wrappers”; the policy includes
+  finite Python-direct jobs as well as a ceiling-free daemon. Add a per-job matrix naming the
+  measured ceiling, unit/sentinel, enforcement entry point (wrapper or plist/adapter), health age
+  source, and explicit daemon exemption. Pin parser rejection of missing, zero, negative, duplicate,
+  and malformed values so no finite job silently escapes the contract.
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:98-99` says “backup, checkpoint”
+  without naming a WAL-safe backup mechanism or ordering it after exclusive access is proven. A
+  file copy can omit committed WAL state. Require stack-down and no-holder/exclusive proof first,
+  then either a successful checkpoint followed by the DB copy or SQLite's backup API; verify the
+  restored copy with integrity checks before orphan apply, and state the exact restore command.
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:78-79,98-100` gives semantic
+  orphan deletion an `apply` switch but omits the repository's mandatory destructive confirmation
+  and >1,000-row escalation contract. Route the command through the semantic-stage owner, require an
+  explicit confirmation flag in addition to apply, stop before mutation above 1,000 unless the
+  additional confirmation is present, and test audit output and transaction rollback on failure.
+- [Should] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:76-77` leaves “shared-Git
+  publication” and the advisory-lock contract ambiguous even though the Recon Map names several
+  writers. Enumerate every in-scope publisher, reuse one shared Git helper/lock identity, define lock
+  acquisition boundaries and conflict behavior, and test the unchanged-but-dirty, staged, divergent
+  HEAD, concurrent publisher, push-failure, and remote-content cases. Gate any external fleet
+  check-in change separately if it is not owned by this repository.
+- [Should] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:75,121-124` does not define the
+  artifact-age threshold, the two observation times, or which jobs are safe for staged startup;
+  `stack.sh up` is fleet-wide. State the freshness threshold and boundary behavior, name the exact
+  initial job subset and supported start commands, and require observations separated by at least
+  the relevant cadence/ceiling rather than two immediate samples.
+- [Should] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:115-116` names `pytest tests/`
+  and “relevant” shell tests, which is weaker than the repository's full-suite requirement including
+  CI-skipped surfaces. Name the canonical full gate and explicit non-3-Eyes exclusions, plus the
+  focused guard, scheduler-policy, stack/doctor, pulse-health, Git-publication, and semantic-repair
+  tests whose non-empty outputs must be published.
+
+swept file: yes
+
+Verdict: Changes requested
+
+### Round 1 — Producer (claude-a)
+
+- Implemented all four Blockers: the plan now assigns conventional timeout exit 124 and its full
+  lifecycle/status contract; adds a twelve-job enforcement/health matrix with the daemon exemption
+  and parser rejection rules; orders no-holder/exclusive proof before SQLite `.backup` plus integrity
+  and explicit restore; and adds `--confirm` plus a greater-than-1,000-row `--confirm-large` gate,
+  transaction rollback, and audit assertions.
+- Implemented the Git-publication Should: the plan enumerates the four in-repo publishers, one lock
+  boundary, conflict behavior, six required cases, and keeps the externally owned collector recovery
+  only.
+- Implemented the freshness/startup Should: the plan defines the schedule-aware 90-minute boundary,
+  exact staged jobs and kickstart command, and cadence-or-limit-separated observations.
+- Implemented the gate Should: the plan names every CI-equivalent command family, Python lanes,
+  embedding seam, HiQS suite, focused outputs, and the sole 3-Eyes exclusion.
+
+Handing off to Reviewer for round 2 — verify the revised artifact and close only if every central
+contract is independently executable.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
