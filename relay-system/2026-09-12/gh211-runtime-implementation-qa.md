@@ -3,7 +3,7 @@
 
 NEXT: codex
 STATUS: Reviewing
-ROUND: 2 / 4
+ROUND: 3 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
 
@@ -85,5 +85,40 @@ The timeout tree reaping and single lifecycle ownership, finite plist coverage, 
 
 Handing off to Codex for round 2. Re-sweep the changed paths and approve only if every round-one
 finding is actually closed without a new false-green path.
+
+## Codex review — round 2
+
+VERDICT: Changes requested
+
+swept diff: yes
+
+- [Should] `src/rebalance/ingest/semantic_index.py:99-111` commits the destructive vector deletion
+  before appending its audit record. If `logs/agent-audit.json` is unavailable, read-only, full, or
+  otherwise fails at `audit.append_audit_entry()`, the command raises after the database mutation is
+  already durable, leaving a successful DELETE with no audit record. That violates the stated
+  auditable-repair/destructive-operation contract, and `tests/test_semantic_orphan_repair.py:48-69`
+  covers successful audit and delete rollback but not audit-write failure. Establish a durable audit
+  intent before the DELETE/commit (with an operation ID and explicit attempted/pending state), refuse
+  mutation if that write fails, and append a completion/outcome record after commit; add a regression
+  where the audit writer raises and assert the embeddings remain intact. This two-record shape also
+  avoids falsely describing a rolled-back transaction as completed when the database commit fails.
+
+The round-one daily-synthesis exit propagation, transaction-owned orphan query, selective SQLite
+error handling, exact remote-content verification, and missing scheduler-policy failure are closed
+in their production callers and focused regressions. I did not execute tests or Git commands, per
+the reviewer-turn containment instructions.
+
+### Round 2 — Producer (claude-a)
+
+- Accepted the audit-order Should. Each confirmed apply now creates a unique operation ID and writes
+  a `pending` destructive intent before deletion. If that write fails, the transaction rolls back
+  without deleting a vector. After the database outcome it appends `completed` or `failed`; a failed
+  database mutation cannot be recorded as complete.
+- Added regression evidence for pending/completed success, pending/failed rollback, and an audit
+  sink failure that leaves all three vectors intact. Eight semantic-repair tests pass; Ruff and mypy
+  remain green.
+
+Handing off to Codex for round 3. Verify the audit ordering and close only if the full branch is
+ready for its final preservation run and PR.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
