@@ -40,11 +40,16 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from rebalance.lib.time_ops import now_iso, now_utc
-from rebalance.lib.git_ops import git_pull_rebase_safe, run_git
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.ingest.db import db_connection
 from rebalance.ingest.db.schema import ensure_calendar_schema, ensure_email_schema
+from rebalance.lib.git_ops import (
+    GitPublishLockBusy,
+    git_publish_lock,
+    git_pull_rebase_safe,
+    run_git,
+)
+from rebalance.lib.time_ops import now_iso, now_utc
 from rebalance.repair import RepairFSM, RepairResult, RepairStatus
 
 SCHEMA_VERSION = 1
@@ -254,12 +259,26 @@ def commit_and_push_sync(
     *,
     device_id: str,
     generated_at: str,
+    lock_acquired: bool = False,
 ) -> dict[str, Any]:
     """Stage ``sync_subdir/``, commit, and push to the remote.
 
     Uses RepairFSM for non-fast-forward push failures (same circuit breakers
     as pulse). Returns a structured result dict.
     """
+    if not lock_acquired:
+        try:
+            with git_publish_lock(target_repo):
+                return commit_and_push_sync(
+                    target_repo,
+                    sync_subdir,
+                    device_id=device_id,
+                    generated_at=generated_at,
+                    lock_acquired=True,
+                )
+        except GitPublishLockBusy as exc:
+            return {"committed": False, "pushed": False, "deferred": True, "git_error": str(exc)}
+
     proc = run_git(target_repo, "add", sync_subdir)
     if proc.returncode != 0:
         return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}

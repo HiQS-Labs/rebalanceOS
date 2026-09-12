@@ -11,6 +11,12 @@
          jobs — so no new Full Disk Access entry is needed. -->
     <key>ProgramArguments</key>
     <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-obsidian-rollover</string>
+        <string>--max-runtime-seconds</string><string>300</string>
+        <string>--lifecycle-job</string><string>obsidian-rollover</string>
+        <string>--</string>
         <string>{{REBALANCE_DIR}}/utils/obsidian_rollover.sh</string>
     </array>
 

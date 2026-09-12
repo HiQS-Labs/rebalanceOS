@@ -331,11 +331,19 @@ def log_job_completed(job: str, elapsed: float | None = None) -> None:
     _append("launchd", "job_completed", detail)
 
 
-def log_job_failed(job: str, exit_code: int, elapsed: float | None = None) -> None:
+def log_job_failed(
+    job: str,
+    exit_code: int,
+    elapsed: float | None = None,
+    *,
+    reason: str | None = None,
+) -> None:
     """Emit a job_failed event (non-zero exit)."""
     detail: dict[str, Any] = {"job": job, "exit_code": exit_code}
     if elapsed is not None:
         detail["elapsed_seconds"] = round(elapsed, 2)
+    if reason is not None:
+        detail["reason"] = reason
     _append("launchd", "job_failed", detail)
 
 

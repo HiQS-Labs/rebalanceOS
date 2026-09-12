@@ -436,6 +436,23 @@ def count_orphaned_embeddings(conn: sqlite3.Connection) -> tuple[int, int]:
         return 0, 0
 
 
+def orphaned_embedding_ids(conn: sqlite3.Connection) -> list[int]:
+    """Return every vector rowid whose semantic document no longer exists."""
+    try:
+        return [
+            int(row[0])
+            for row in conn.execute(
+                """
+                SELECT e.rowid FROM semantic_embeddings e
+                WHERE NOT EXISTS (SELECT 1 FROM semantic_documents d WHERE d.id = e.rowid)
+                ORDER BY e.rowid
+                """
+            ).fetchall()
+        ]
+    except sqlite3.OperationalError:
+        return []
+
+
 def count_unembedded_documents(
     conn: sqlite3.Connection,
     source_types: Sequence[str] | None,

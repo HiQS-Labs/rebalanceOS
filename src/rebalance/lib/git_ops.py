@@ -1,14 +1,46 @@
+import fcntl
 import re
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator, TextIO
 
 __all__ = [
     "DEFAULT_PRUNE_DIRS",
     "git_pull_rebase_safe",
+    "git_publish_lock",
+    "GitPublishLockBusy",
     "parse_github_remote_url",
     "run_git",
     "should_descend",
 ]
+
+
+class GitPublishLockBusy(RuntimeError):
+    """Another Rebalance publisher owns the target checkout."""
+
+
+@contextmanager
+def git_publish_lock(repo_path: Path) -> Iterator[TextIO]:
+    """Hold the one non-blocking advisory lock shared by Rebalance publishers."""
+    result = run_git(repo_path, "rev-parse", "--absolute-git-dir")
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(result.stderr.strip() or "cannot resolve git directory")
+    lock_path = Path(result.stdout.strip()) / "rebalance-publish.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise GitPublishLockBusy(f"publisher busy for {repo_path}") from exc
+        yield handle
+    finally:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+
 
 # remote_url forms mapped to owner/repo:
 #   https://github.com/Owner/Repo.git

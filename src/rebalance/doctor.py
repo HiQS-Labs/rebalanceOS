@@ -666,6 +666,80 @@ def _scheduler_policy_jobs(policy_path: Path | None = None) -> list[str]:
     return jobs
 
 
+def _scheduler_runtime_limits(policy_path: Path | None = None) -> dict[str, int | None]:
+    """Return the strict final-column runtime policy from ``SCHEDULER.md``."""
+    if policy_path is None:
+        from rebalance.paths import resolve_project_root
+
+        policy_path = resolve_project_root(Path(__file__)) / "SCHEDULER.md"
+    lines = policy_path.read_text(encoding="utf-8").splitlines()
+    header = "| Job (label suffix) |"
+    try:
+        start = next(i for i, line in enumerate(lines) if line.startswith(header))
+    except StopIteration:
+        return {}
+    limits: dict[str, int | None] = {}
+    for line in lines[start + 2 :]:
+        if not line.startswith("|"):
+            break
+        cells = [cell.strip() for cell in line.split("|")[1:-1]]
+        if not cells:
+            continue
+        match = re.fullmatch(r"`([a-z0-9-]+)`", cells[0])
+        if not match:
+            continue
+        job = match.group(1)
+        if len(cells) != 7:
+            raise ValueError(f"missing max runtime column for {job}")
+        raw = cells[-1]
+        if job in limits:
+            raise ValueError(f"duplicate scheduler policy row: {job}")
+        if job == "pulse-server" and raw != "none":
+            raise ValueError("pulse-server must use max runtime 'none'")
+        if raw == "none" and job == "pulse-server":
+            limits[job] = None
+        elif raw.isdigit() and int(raw) > 0:
+            limits[job] = int(raw)
+        else:
+            raise ValueError(f"invalid max runtime for {job}: {raw!r}")
+    return limits
+
+
+def _parse_ps_elapsed(value: str) -> int | None:
+    """Parse macOS ``ps -o etime=`` output into whole elapsed seconds."""
+    value = value.strip()
+    if not value:
+        return None
+    days = 0
+    if "-" in value:
+        day_text, value = value.split("-", 1)
+        if not day_text.isdigit():
+            return None
+        days = int(day_text)
+    parts = value.split(":")
+    if len(parts) not in (2, 3) or not all(part.isdigit() for part in parts):
+        return None
+    if len(parts) == 2:
+        hours = 0
+        minutes, seconds = map(int, parts)
+    else:
+        hours, minutes, seconds = map(int, parts)
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
+
+
+def _process_elapsed_seconds(pid: str) -> int | None:
+    try:
+        result = subprocess.run(
+            ["ps", "-p", pid, "-o", "etime="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    return _parse_ps_elapsed(result.stdout) if result.returncode == 0 else None
+
+
 def _loaded_rebalance_labels(launchctl_output: str) -> set[str]:
     """Extract ``com.rebalance-os.*`` labels from ``launchctl list`` output."""
     labels: set[str] = set()
@@ -1000,6 +1074,7 @@ def _check_launchd(
     *,
     log_dir: Path | None = None,
     now: datetime | None = None,
+    policy_path: Path | None = None,
 ) -> list[Check]:
     """Report rebalance launchd jobs and their last exit status (macOS only).
 
@@ -1023,6 +1098,10 @@ def _check_launchd(
         except RuntimeError:
             log_dir = Path("temp/logs")
     now = now or now_utc()
+    try:
+        runtime_limits = _scheduler_runtime_limits(policy_path)
+    except (OSError, RuntimeError, ValueError) as exc:
+        return [Check("scheduler runtime policy", FAIL, f"invalid SCHEDULER.md: {exc}")]
 
     crash_state_path = _launchd_crash_state_path(log_dir)
     crash_state = _load_launchd_crash_state(crash_state_path)
@@ -1035,6 +1114,23 @@ def _check_launchd(
             continue
         pid, status, label = parts
         short = label.replace("com.rebalance-os.", "").replace("com.user.", "")
+        pid_val = pid.strip()
+        status_val = status.strip()
+        has_live_pid = pid_val != "-"
+        max_runtime = runtime_limits.get(short)
+        if has_live_pid and max_runtime is not None:
+            elapsed = _process_elapsed_seconds(pid_val)
+            if elapsed is not None and elapsed > max_runtime:
+                checks.append(
+                    Check(
+                        f"launchd:{short}",
+                        FAIL,
+                        f"running {elapsed}s, beyond {max_runtime}s policy limit",
+                        "inspect the job log and child tree; the outer job guard should terminate "
+                        "this process with exit 124",
+                    )
+                )
+                continue
         # daily-sync has a richer JSON outcome that supersedes its sticky
         # launchctl status (GH-146 Root cause A, from development).
         if short == "daily-sync":
@@ -1044,10 +1140,6 @@ def _check_launchd(
         # Every other job: a live PID means it is up now, and a negative (signal,
         # e.g. -15 SIGTERM from `kickstart -k`) status is a clean stop, not a crash
         # (GH-146 Root cause B). WARN only on a positive non-zero exit with no PID.
-        pid_val = pid.strip()
-        status_val = status.strip()
-        has_live_pid = pid_val != "-"
-
         is_negative_signal = False
         try:
             val = int(status_val)
@@ -2190,7 +2282,8 @@ def _check_orphaned_vectors(db_path: Path) -> list[Check]:
                         "orphaned vectors:semantic",
                         FAIL,
                         f"{sem_count} orphaned vectors (est. {sem_wasted} bytes wasted)",
-                        "Run full re-embed or database cleanup",
+                        "inspect with `rebalance semantic-repair-orphans`; after a verified backup, "
+                        "apply with the command's explicit confirmation flags",
                     )
                 )
             else:

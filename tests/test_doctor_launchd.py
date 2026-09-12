@@ -6,10 +6,9 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from rebalance.doctor import ERROR, FAIL, OK, WARN, _check_launchd, _check_scheduler_liveness
-from unittest.mock import patch, Mock
-
 
 NOW = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
 DAILY_SYNC_STATUS_ONE = "-\t1\tcom.rebalance-os.daily-sync\n"
@@ -88,6 +87,45 @@ def test_job_without_structured_result_fails_on_nonzero_exit(tmp_path: Path) -> 
     assert checks[0].status == FAIL
     assert checks[0].severity == ERROR
     assert checks[0].detail == "last run exited with status 1"
+
+
+def test_overlong_live_job_fails_instead_of_reporting_running(tmp_path: Path) -> None:
+    policy = tmp_path / "SCHEDULER.md"
+    policy.write_text(
+        "| Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs | Max runtime seconds |\n"
+        "|---|---|---|---|---|---|---|\n"
+        "| `github-sync` | hourly | wrapper | work | prereq | output | 7200 |\n",
+        encoding="utf-8",
+    )
+    with patch("rebalance.doctor._process_elapsed_seconds", return_value=7201):
+        checks = _check_launchd(
+            "4242\t0\tcom.rebalance-os.github-sync\n",
+            log_dir=tmp_path / "logs",
+            now=NOW,
+            policy_path=policy,
+        )
+
+    assert checks[0].status == FAIL
+    assert "beyond 7200s" in checks[0].detail
+
+
+def test_runtime_limit_is_strictly_greater_than_boundary(tmp_path: Path) -> None:
+    policy = tmp_path / "SCHEDULER.md"
+    policy.write_text(
+        "| Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs | Max runtime seconds |\n"
+        "|---|---|---|---|---|---|---|\n"
+        "| `github-sync` | hourly | wrapper | work | prereq | output | 7200 |\n",
+        encoding="utf-8",
+    )
+    with patch("rebalance.doctor._process_elapsed_seconds", return_value=7200):
+        checks = _check_launchd(
+            "4242\t0\tcom.rebalance-os.github-sync\n",
+            log_dir=tmp_path / "logs",
+            now=NOW,
+            policy_path=policy,
+        )
+    assert checks[0].status == OK
+    assert checks[0].detail == "running"
 
 
 def test_unrecognised_daily_log_keeps_legacy_launchctl_behavior(tmp_path: Path) -> None:

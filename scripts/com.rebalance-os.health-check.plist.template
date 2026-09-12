@@ -8,6 +8,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-health-check</string>
+        <string>--max-runtime-seconds</string><string>900</string>
+        <string>--lifecycle-job</string><string>health-check</string>
+        <string>--</string>
+        <string>{{PYTHON}}</string>
         <string>{{REBALANCE_DIR}}/scripts/health_issue_reporter.py</string>
         <!-- FAIL-only, no LLM — runs every hour, cheap and fast -->
         <string>--close</string>

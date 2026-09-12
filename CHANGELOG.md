@@ -10,6 +10,19 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.87.1] - 2026-09-12
+
+### Fixed
+- Scheduled batch jobs now have policy-specific wall-clock limits enforced around their complete
+  process trees, with one lifecycle result and truthful overdue reporting instead of an indefinitely
+  live PID appearing healthy (#211).
+- Local pulse health now fails when its generated artifact is stale, while respecting the planned
+  overnight schedule gap (#211).
+- Shared status publishers serialize Git writes and recover stranded dirty or committed content
+  instead of calling it unchanged before it reaches the remote (#211).
+- Semantic orphan vectors have a dry-run-first, explicitly confirmed, transactionally audited repair
+  command, including an additional confirmation gate for large deletions (#211).
+
 ## [0.87.0] - 2026-09-10
 
 ### Added
