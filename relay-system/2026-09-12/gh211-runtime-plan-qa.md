@@ -1,7 +1,7 @@
 # RELAY · GH-211 bounded runtime recovery plan QA
 <!-- Single source of truth. Read the entire file before acting. -->
 
-NEXT: Reviewer
+NEXT: Closed
 STATUS: Open
 ROUND: 4 / 4
 
@@ -188,4 +188,25 @@ VERDICT: Changes requested
 Handing off to Reviewer for final round 4 — approve only if the revised plan is safe and directly
 executable; otherwise escalate with the remaining blocker.
 
+### Round 4 — Reviewer (codex)
+
+- [Pass] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:168-175` now keeps the fleet down,
+  installs and observes only the selected labels in dependency order, delays finite jobs until the DB
+  tripwires pass, and requires a tested render-without-load path if current installers cannot preserve
+  containment. This resolves the RunAtLoad contradiction without activating 3-Eyes.
+- [Pass] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:139-143` now places
+  `PRAGMA wal_checkpoint(TRUNCATE)` after no-holder/exclusive proof and before SQLite `.backup`, makes
+  failure phase-stopping, verifies backup integrity, and records the restore command.
+- [Pass] Full-plan sweep: the timeout/lifecycle contract, per-job policy, freshness precedence,
+  single Git publication path, confirmed semantic repair, recovery shields, full gates, staged deploy,
+  and GH-210 handoff are independently executable and preserve the stated scope
+  (`PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:46-187`).
+
+swept file: yes
+
+VERDICT: Approved
+
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
+
+### System · relay-drive — 2026-09-12T16:33:50Z
+terminal STATUS Approved written by FAILED reviewer turn (codex; shim returned non-zero) — reverted
