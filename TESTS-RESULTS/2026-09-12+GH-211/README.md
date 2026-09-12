@@ -37,10 +37,10 @@ Git, and SQLite state; their mutations were confined to temporary test locations
 | Focused integrated suite | 124 passed, 1 warning |
 | Python 3.13 root suite | 2,347 passed, 20 skipped, 10 xfailed, 143 subtests passed, 1 warning |
 | Python 3.13 HiQS suite | 163 passed, 1 skipped, 1 xfailed |
-| Python 3.12 root non-seam lane | 2,339 passed, 20 skipped, 10 xfailed, 143 subtests passed, 2 warnings |
+| Final Python 3.12 root non-seam lane | 2,349 passed, 20 skipped, 10 xfailed, 143 subtests passed, 2 warnings |
 | Python 3.12 embedding seam | 8 passed |
 | Python 3.12 HiQS suite | 163 passed, 1 skipped, 1 xfailed |
-| Relay round-one regression suite | 89 passed |
+| Relay focused regression suites | 89 passed after round one; 8 passed after round two |
 | Ruff lint | clean |
 | Ruff format check | 620 files already formatted |
 | mypy `src/` | success, 113 source files |
@@ -48,8 +48,9 @@ Git, and SQLite state; their mutations were confined to temporary test locations
 | Shell syntax | `stack.sh` and `scheduler_common.sh` clean |
 
 Both supported Python lanes and the separately installed embedding seam completed. The independent
-implementation relay found publication/race/error-masking gaps in round one; accepted fixes are
-under re-review and will be followed by one final full-suite run.
+implementation relay found and closed publication, transaction, error-masking, exact-content, and
+audit-order gaps, then approved the full branch in round three. The final full Python 3.12 run above
+was executed after all review fixes.
 
 ## Recovery safeguards
 

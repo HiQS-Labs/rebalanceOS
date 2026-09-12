@@ -158,12 +158,12 @@ preserved and publishable.
 
 **Goal:** CI-equivalent proof, independent relay approval, merged code, and a fresh stable runtime.
 
-- [ ] Run `ruff check .`, `ruff format --check .`, `mypy src/`, banned-import/doc/frontdoor/PDDA
+- [x] Run `ruff check .`, `ruff format --check .`, `mypy src/`, banned-import/doc/frontdoor/PDDA
   checks, the root suite under Python 3.12 and 3.13 excluding only the two CI-declared embedding
   seam files, those two seam tests with embeddings installed, and `HiQS/tests/`. Keep the explicitly
   stood-down `utils/3-eyes/tests` excluded. Separately capture non-empty focused guard,
   scheduler-policy, stack/doctor, pulse-health, Git-publication, and semantic-repair outputs.
-- [ ] Run Codex relay final QA with an empty reviewer allowlist; cap at four productive rounds and
+- [x] Run Codex relay final QA with an empty reviewer allowlist; cap at four productive rounds and
   stop if two consecutive rounds add no qualifying improvement.
 - [ ] Push, open the PR with evidence/rollback, wait for checks, merge to `development`, and verify
   the remote merge commit.
