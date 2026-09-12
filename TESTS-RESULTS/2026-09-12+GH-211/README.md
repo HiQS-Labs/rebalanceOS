@@ -35,17 +35,21 @@ Git, and SQLite state; their mutations were confined to temporary test locations
 | Gate | Result |
 | --- | --- |
 | Focused integrated suite | 124 passed, 1 warning |
-| Root suite | 2,347 passed, 20 skipped, 10 xfailed, 143 subtests passed, 1 warning |
-| HiQS suite | 163 passed, 1 skipped, 1 xfailed |
+| Python 3.13 root suite | 2,347 passed, 20 skipped, 10 xfailed, 143 subtests passed, 1 warning |
+| Python 3.13 HiQS suite | 163 passed, 1 skipped, 1 xfailed |
+| Python 3.12 root non-seam lane | 2,339 passed, 20 skipped, 10 xfailed, 143 subtests passed, 2 warnings |
+| Python 3.12 embedding seam | 8 passed |
+| Python 3.12 HiQS suite | 163 passed, 1 skipped, 1 xfailed |
+| Relay round-one regression suite | 89 passed |
 | Ruff lint | clean |
 | Ruff format check | 620 files already formatted |
 | mypy `src/` | success, 113 source files |
 | Read-layer ratchet | clean, 52 baseline sites |
 | Shell syntax | `stack.sh` and `scheduler_common.sh` clean |
 
-The root and HiQS suites were run under the repository's existing Python 3.13 environment. The
-Python 3.12 CI-equivalent lane, final repository governance gates, and independent implementation
-relay remain Phase 4 work.
+Both supported Python lanes and the separately installed embedding seam completed. The independent
+implementation relay found publication/race/error-masking gaps in round one; accepted fixes are
+under re-review and will be followed by one final full-suite run.
 
 ## Recovery safeguards
 

@@ -1,9 +1,9 @@
 # RELAY · GH-211 bounded runtime recovery implementation QA
 <!-- Single source of truth. Read the entire file before acting. -->
 
-NEXT: claude-a
-STATUS: Changes requested
-ROUND: 1 / 4
+NEXT: codex
+STATUS: Reviewing
+ROUND: 2 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
 
@@ -50,29 +50,40 @@ Review the full diff, not merely the listed files. Read `AGENTS.md`, `GUIDING-PR
 
 ## Log
 
-## Round 1 — Codex review
+## Codex review — round 1
 
 VERDICT: Changes requested
 
 swept diff: yes
 
-- [Should] `src/rebalance/ingest/semantic_index.py:83-95` selects and counts orphan IDs before
-  `BEGIN IMMEDIATE`. A concurrent semantic writer can create a matching document between that read
-  and the transaction, after which repair deletes an embedding that is no longer orphaned; the
-  confirmation threshold is likewise based on pre-transaction state. Start the write transaction
-  before `orphaned_embedding_ids()`, derive the count/sample under that transaction, then delete and
-  commit. Add a regression that inserts the matching document at the former read/write seam and
-  proves its embedding survives (or proves the writer is excluded until repair commits).
-- [Should] `src/rebalance/ingest/pulse.py:999-1004` calls publication verified when
-  `git show` output and expected content match only after `.strip()`. A remote file that differs
-  solely in leading/trailing whitespace can therefore be falsely reported as published, contrary
-  to the exact-content recovery contract. Compare the complete strings (or bytes) without
-  normalization and add a remote-content test whose only difference is terminal or leading
-  whitespace.
+- [Blocker] `utils/daily_synthesis.py:452-460,483-491` still makes Git publication false-green. `_commit_and_push_if_changed()` now truthfully returns `deferred`, `git_error`, `committed`, and `pushed`, but `sync_to_clio()` unconditionally overlays `ok: True`, and `run()` discards the result altogether. A busy shared lock or failed push therefore exits the scheduled job successfully and emits a completed lifecycle event even though nothing was published. Compute `ok` from the same unchanged/published contract used by `hiqs_digest.publish()`, preserve a distinct deferred result, and make `run()` return the incumbent defer/failure exit as appropriate; add lock-busy and push-failure tests through the daily-synthesis caller, not only the shared helper.
+- [Blocker] `src/rebalance/ingest/semantic_index.py:83-99` discovers orphan IDs before `BEGIN IMMEDIATE`. Another writer can insert a matching `semantic_documents` row after the SELECT and before the repair transaction, after which this command deletes an embedding that is no longer orphaned. For apply mode, acquire `BEGIN IMMEDIATE` before the authoritative orphan query, perform confirmation/count decisions against that transaction-owned snapshot (rolling back on refusal), then delete and commit; add a two-connection race regression proving a newly valid vector survives.
+- [Should] `src/rebalance/ingest/db/semantic.py:439-453` converts every `sqlite3.OperationalError` into an empty orphan list. In the incident this command is specifically used around lock pressure, so `database is locked`, corruption, or an incompatible schema can be reported as `found=0` and look repaired. Suppress only the deliberately supported missing-table case (if that is truly an empty database contract) and re-raise lock/corruption/query failures; cover the locked database case.
+- [Should] `src/rebalance/doctor.py:669-681` returns an empty runtime policy when the scheduler table header is missing. `_check_launchd()` then treats every finite job as having no ceiling and can report an over-age PID healthy, contradicting the documented rule that a missing policy is a configuration error. Raise `ValueError` for the absent header/empty parsed policy and pin the doctor failure result.
 
-The current graph generation was fresh for Python/test paths with no recorded parse gaps. The
-operational `scripts/` subtree is intentionally excluded from that graph, so the scheduler, stack,
-and pulse-server paths were checked directly from source. The supplied Python 3.12 lane remains
-unclaimed, as stated by the producer.
+The timeout tree reaping and single lifecycle ownership, finite plist coverage, over-age live-job checks, 06:53/90-minute pulse boundaries, shared publication lock, version/docs, and explicit semantic confirmation thresholds otherwise align with the stated contracts in the reviewed implementation and focused tests. I did not execute tests or Git commands, per the reviewer-turn containment instructions.
+
+### Round 1 — Producer (claude-a)
+
+- Accepted and fixed both publication Blockers. Daily synthesis now derives `ok` from exact remote
+  publication, preserves lock deferral, returns exit 75 for deferred publication and exit 1 for a
+  failed push, and still completes an independent vault write before returning that outcome. Caller
+  tests pin both paths.
+- Accepted and fixed the semantic transaction Blocker and error-masking Should. Apply mode now owns
+  `BEGIN IMMEDIATE` before its authoritative query/count/confirmation decision. A two-connection
+  regression inserts a now-valid document at the former seam and proves its vector survives. Only
+  expected missing semantic tables map to an empty list; a real exclusive lock propagates.
+- Accepted and fixed the doctor Should. A missing header or empty runtime policy raises into the
+  existing `scheduler runtime policy` FAIL check.
+- The initially interrupted isolated review committed two additional Should findings in `e5d4f4a`.
+  Its semantic race finding is covered above. Its exact-content finding is also accepted:
+  `_verify_remote_content` no longer strips leading/trailing whitespace, and a real Git regression
+  proves whitespace-only differences fail verification.
+- Verification after fixes: 89 focused tests pass; Ruff lint and format pass on all touched paths;
+  mypy succeeds over 113 source files. The earlier Python 3.12 CI-equivalent lanes completed with
+  2,339 root non-seam passes, 8 embedding-seam passes, and 163 HiQS passes.
+
+Handing off to Codex for round 2. Re-sweep the changed paths and approve only if every round-one
+finding is actually closed without a new false-green path.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
