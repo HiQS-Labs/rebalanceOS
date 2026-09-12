@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -53,6 +54,89 @@ class SemanticEmbedResult:
     model_name: str
     embedding_dim: int
     elapsed_seconds: float
+
+
+@dataclass(frozen=True)
+class SemanticOrphanRepairResult:
+    orphan_count: int
+    deleted_count: int
+    sample_ids: tuple[int, ...]
+    applied: bool
+
+
+def _delete_orphan_ids(conn, orphan_ids: list[int]) -> None:
+    conn.executemany(
+        "DELETE FROM semantic_embeddings WHERE rowid = ?",
+        [(doc_id,) for doc_id in orphan_ids],
+    )
+
+
+def repair_semantic_orphans(
+    database_path: Path,
+    *,
+    apply: bool = False,
+    confirm: bool = False,
+    confirm_large: bool = False,
+) -> SemanticOrphanRepairResult:
+    """Inspect or transactionally remove vectors without semantic documents."""
+    from rebalance.ingest import audit
+
+    operation_id: str | None = None
+    with db_connection(database_path) as conn:
+        if not apply:
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            return SemanticOrphanRepairResult(len(orphan_ids), 0, tuple(orphan_ids[:10]), False)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            count = len(orphan_ids)
+            result = SemanticOrphanRepairResult(count, 0, tuple(orphan_ids[:10]), False)
+            if count == 0:
+                conn.rollback()
+                return result
+            if not confirm:
+                raise ValueError("destructive repair requires --apply --confirm")
+            if count > 1000 and not confirm_large:
+                raise ValueError(f"repair affects {count} rows; add --confirm-large")
+            operation_id = uuid.uuid4().hex
+            audit.append_audit_entry(
+                "DELETE",
+                "semantic_embeddings orphan vectors",
+                operation_id=operation_id,
+                state="pending",
+                rows=count,
+                database=str(database_path),
+                confirmation="confirm-large" if count > 1000 else "confirm",
+            )
+            _delete_orphan_ids(conn, orphan_ids)
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            if operation_id is not None:
+                try:
+                    audit.append_audit_entry(
+                        "DELETE",
+                        "semantic_embeddings orphan vectors",
+                        operation_id=operation_id,
+                        state="failed",
+                        rows=count,
+                        database=str(database_path),
+                        error=type(exc).__name__,
+                    )
+                except OSError:
+                    pass
+            raise
+
+    audit.append_audit_entry(
+        "DELETE",
+        "semantic_embeddings orphan vectors",
+        operation_id=operation_id,
+        state="completed",
+        rows=count,
+        database=str(database_path),
+        confirmation="confirm-large" if count > 1000 else "confirm",
+    )
+    return SemanticOrphanRepairResult(count, count, tuple(orphan_ids[:10]), True)
 
 
 @dataclass

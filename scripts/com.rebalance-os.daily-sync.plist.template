@@ -7,6 +7,12 @@
 
     <key>ProgramArguments</key>
     <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-daily-sync</string>
+        <string>--max-runtime-seconds</string><string>10800</string>
+        <string>--lifecycle-job</string><string>daily-sync</string>
+        <string>--</string>
         <string>{{REBALANCE_DIR}}/scripts/daily_sync.sh</string>
     </array>
 
