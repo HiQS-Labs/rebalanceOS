@@ -136,10 +136,11 @@ preserved and publishable.
   capture non-empty evidence under `TESTS-RESULTS/2026-09-12+GH-211/`.
 - [ ] Stop the managed stack through `stack.sh down`, verify descendants exited, and ignore inert
   job-guard lockfile contents as ownership evidence.
-- [ ] After stack-down, prove no DB/WAL holders and `BEGIN EXCLUSIVE; COMMIT`, then create a WAL-safe
-  backup with SQLite `.backup`, verify the backup's `PRAGMA integrity_check`, and record the exact
-  restore command (`sqlite3 <live-db> ".restore '<backup-db>'"`). Sample orphan IDs, run dry-run,
-  then `--apply --confirm --confirm-large`, and prove zero orphans without unexpected backlog.
+- [ ] After stack-down, prove no DB/WAL holders and `BEGIN EXCLUSIVE; COMMIT`, run
+  `PRAGMA wal_checkpoint(TRUNCATE)` as a phase-stopping tripwire, then create a WAL-safe backup with
+  SQLite `.backup`, verify the backup's `PRAGMA integrity_check`, and record the exact restore
+  command (`sqlite3 <live-db> ".restore '<backup-db>'"`). Sample orphan IDs, run dry-run, then
+  `--apply --confirm --confirm-large`, and prove zero orphans without unexpected backlog.
 - [ ] Preserve tracked, staged, untracked, ref, and lock evidence from the shared Git checkout. Move
   the proven-ownerless lock aside, reconcile without reset/tree-wide stash, then verify remote data.
 
@@ -164,10 +165,14 @@ preserved and publishable.
   stop if two consecutive rounds add no qualifying improvement.
 - [ ] Push, open the PR with evidence/rollback, wait for checks, merge to `development`, and verify
   the remote merge commit.
-- [ ] Fast-forward the declared runtime, refresh its editable install, and reinstall bounded plists.
-  First kickstart only `pulse-server`, verify loopback semantics, then `pulse-warning-watch`, then one
-  `pulse-web-sync` read after DB tripwires pass. Use the supported per-job installers and
-  `launchctl kickstart -k gui/$UID/<label>`; only then use `stack.sh up` for the finite fleet.
+- [ ] Keep the fleet down while fast-forwarding the declared runtime and refreshing its editable
+  install. Install/load only `pulse-server` and observe loopback semantics; next install/load only
+  `pulse-warning-watch`; after DB tripwires pass, install/load `pulse-web-sync` and deliberately
+  trigger it with `launchctl kickstart -k gui/$UID/com.rebalance-os.pulse-web-sync`. Only after those
+  checks install/load the remaining finite jobs one at a time, with `daily-sync` last because its
+  installer fires RunAtLoad. Do not use fleet-wide `stack.sh up` until every bounded plist is loaded
+  and observed. If existing installers cannot preserve this order, implement and test a
+  render-without-load mode that never bootstraps an unselected label.
 - [ ] Prove current drift, fresh pulse health, no GH-211 doctor errors, and bounded job outcomes in
   observations separated by at least the relevant cadence or maximum runtime (whichever is longer).
 - [ ] Comment #211 with evidence, then create the fresh GH-210 branch from updated development and

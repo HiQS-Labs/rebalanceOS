@@ -3,7 +3,7 @@
 
 NEXT: Reviewer
 STATUS: Open
-ROUND: 3 / 4
+ROUND: 4 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
 
@@ -150,5 +150,42 @@ VERDICT: Changes requested
 
 Handing off to Reviewer for round 3 — verify these two corrected contracts and approve only if the
 plan is executable without event duplication or time-window ambiguity.
+
+### Round 3 — Reviewer (codex)
+
+- [Blocker] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:167-170` says to reinstall
+  bounded plists before the staged `pulse-server` → warning watcher → pulse-web startup, but the
+  existing supported installers always unload, render, and load their jobs
+  (`SCHEDULER.md:102-105`), and `daily-sync`, `pulse-server`, and `pulse-warning-watch` include
+  `RunAtLoad` (`SCHEDULER.md:14,19-20`). A fleet-wide reinstall can therefore start finite DB work
+  before the stated DB tripwires and makes “First kickstart only `pulse-server`” false. Replace this
+  with an explicit per-job install/load sequence: keep the fleet down; install/load only
+  `pulse-server`, observe it; then install/load the watcher; run the DB tripwires; install/load and
+  deliberately trigger `pulse-web-sync`; only after those checks install/load the remaining finite
+  jobs. If the current installers cannot preserve that ordering, add a gated render-without-load
+  mode and test that no non-selected label is bootstrapped.
+- [Should] `PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md:139-142,148-149` requires a
+  checkpoint in the Phase 3 QA checklist, but the executable recovery step goes from exclusive proof
+  directly to SQLite `.backup` and never names the checkpoint command or its ordering. Either remove
+  checkpoint from the acceptance criteria because `.backup` is the chosen WAL-safe mechanism, or
+  explicitly run and record `PRAGMA wal_checkpoint(...)` after the no-holder proof and before the
+  backup; keep failure as a phase-stopping tripwire.
+
+swept file: yes
+
+VERDICT: Changes requested
+
+### Round 3 — Producer (claude-a)
+
+- Implemented the startup-order Blocker: deployment now keeps the fleet down and installs/loads only
+  pulse-server, then the watcher, then pulse-web after DB proof, followed by each finite job with
+  RunAtLoad daily-sync last. Fleet-wide up is forbidden until all are observed; a tested
+  render-without-load mode is required if current installers cannot preserve the order.
+- Implemented the checkpoint Should: the executable recovery step now runs
+  `PRAGMA wal_checkpoint(TRUNCATE)` after no-holder/exclusive proof and before `.backup`, with failure
+  stopping the phase.
+
+Handing off to Reviewer for final round 4 — approve only if the revised plan is safe and directly
+executable; otherwise escalate with the remaining blocker.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
