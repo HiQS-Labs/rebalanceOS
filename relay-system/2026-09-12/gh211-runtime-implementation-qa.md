@@ -1,8 +1,8 @@
 # RELAY · GH-211 bounded runtime recovery implementation QA
 <!-- Single source of truth. Read the entire file before acting. -->
 
-NEXT: codex
-STATUS: Reviewing
+NEXT: claude-a
+STATUS: Changes requested
 ROUND: 1 / 4
 
 ## ▶ TAKE YOUR TURN — read this first
@@ -49,5 +49,30 @@ Review the full diff, not merely the listed files. Read `AGENTS.md`, `GUIDING-PR
 - Python 3.12 lane is running independently and is not claimed complete until recorded below.
 
 ## Log
+
+## Round 1 — Codex review
+
+VERDICT: Changes requested
+
+swept diff: yes
+
+- [Should] `src/rebalance/ingest/semantic_index.py:83-95` selects and counts orphan IDs before
+  `BEGIN IMMEDIATE`. A concurrent semantic writer can create a matching document between that read
+  and the transaction, after which repair deletes an embedding that is no longer orphaned; the
+  confirmation threshold is likewise based on pre-transaction state. Start the write transaction
+  before `orphaned_embedding_ids()`, derive the count/sample under that transaction, then delete and
+  commit. Add a regression that inserts the matching document at the former read/write seam and
+  proves its embedding survives (or proves the writer is excluded until repair commits).
+- [Should] `src/rebalance/ingest/pulse.py:999-1004` calls publication verified when
+  `git show` output and expected content match only after `.strip()`. A remote file that differs
+  solely in leading/trailing whitespace can therefore be falsely reported as published, contrary
+  to the exact-content recovery contract. Compare the complete strings (or bytes) without
+  normalization and add a remote-content test whose only difference is terminal or leading
+  whitespace.
+
+The current graph generation was fresh for Python/test paths with no recorded parse gaps. The
+operational `scripts/` subtree is intentionally excluded from that graph, so the scheduler, stack,
+and pulse-server paths were checked directly from source. The supplied Python 3.12 lane remains
+unclaimed, as stated by the producer.
 
 <!-- ↓↓↓ NEXT TURN goes here; marker stays last ↓↓↓ -->
