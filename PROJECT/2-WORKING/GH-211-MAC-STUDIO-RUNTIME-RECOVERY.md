@@ -17,9 +17,11 @@ reversibility: Costly — runtime and database recovery touch shared operational
 
 # GH-211 — Mac Studio bounded runtime recovery
 
-| Most recently completed phase | What's next |
+## Status
+
+| What was just completed | What's next |
 | --- | --- |
-| Phase 0: incident reproduction and Recon Map | Phase 1: executable timeout and health contracts |
+| Phase 2: bounded scheduler implementation and preservation suite | Phase 3: recover persisted state |
 
 ## Table of contents
 
@@ -79,53 +81,53 @@ one terminal event for both wrapper and Python-direct timeout cases, plus both p
 
 **Goal:** Red tests demonstrate that overlong jobs and stale pulse artifacts cannot remain green.
 
-- [ ] Derive conservative per-job maximum runtimes from non-empty lifecycle history and record the
+- [x] Derive conservative per-job maximum runtimes from non-empty lifecycle history and record the
   values in `SCHEDULER.md`; finite jobs have positive ceilings and the server has none.
-- [ ] Add a red-control test proving `run_guarded` fails to terminate a child tree at its deadline.
-- [ ] Add hermetic red controls proving stack/doctor label an over-age live job healthy and pulse
+- [x] Add a red-control test proving `run_guarded` fails to terminate a child tree at its deadline.
+- [x] Add hermetic red controls proving stack/doctor label an over-age live job healthy and pulse
   health accepts an expired artifact.
-- [ ] Add red controls for matching dirty Git content that is not committed and targeted semantic
+- [x] Add red controls for matching dirty Git content that is not committed and targeted semantic
   orphan repair dry-run/apply behavior.
 
 ### Phase 1 — QA checklist
 
-- [ ] Every test was witnessed red against the unmodified production path.
-- [ ] Fixtures are non-empty and launchctl/Git/SQLite effects remain hermetic.
-- [ ] Each retry and process-reap loop has a finite attempt or time bound.
-- [ ] Status table and `updated:` date refreshed.
+- [x] Every test was witnessed red against the unmodified production path.
+- [x] Fixtures are non-empty and launchctl/Git/SQLite effects remain hermetic.
+- [x] Each retry and process-reap loop has a finite attempt or time bound.
+- [x] Status table and `updated:` date refreshed.
 
 ## Phase 2: Bounded scheduler implementation
 
 **Goal:** Every finite scheduled batch has one existing-guard deadline and truthful terminal health.
 
-- [ ] Extend `utils/job_guard.py` with an optional positive wall-clock limit using its current child
+- [x] Extend `utils/job_guard.py` with an optional positive wall-clock limit using its current child
   process group and TERM/KILL path; emit a distinct timeout reason, preserve existing exit codes,
   and add scheduled-mode lifecycle ownership while `scheduler_common.sh` honors the child-only
   suppression flag.
-- [ ] Route every finite managed plist through the existing job-guard CLI using the matrix above;
+- [x] Route every finite managed plist through the existing job-guard CLI using the matrix above;
   keep the current wrapper/Python commands behind it and keep 3-Eyes untouched.
-- [ ] Extend the policy parser and tests with maximum runtime; make stack and doctor report an
+- [x] Extend the policy parser and tests with maximum runtime; make stack and doctor report an
   over-age live PID as unhealthy rather than RUNNING/OK.
-- [ ] Make pulse health non-healthy/503 using this precedence: overnight grace accepts the final
+- [x] Make pulse health non-healthy/503 using this precedence: overnight grace accepts the final
   scheduled artifact through exactly 06:53 local; after 06:53 and through 23:59, an artifact is
   healthy through exactly 90 minutes old; otherwise it is stale. Test immediately before, at, and
   after 06:53 plus the 90-minute boundary.
-- [ ] Route pulse, snapshot, HiQS digest, and daily-synthesis publication through one shared Git
+- [x] Route pulse, snapshot, HiQS digest, and daily-synthesis publication through one shared Git
   helper and advisory lock spanning content write through verified push. Conflict defers without
   writing. Verify dirty-identical, staged, divergent HEAD, concurrent writer, push failure, and
   remote-content cases. The external `com.user.git-pulse` collector remains separately owned and
   receives recovery-only handling, not a code change in this issue.
-- [ ] Add semantic-orphan maintenance through the semantic CLI/stage owner with read-only default,
+- [x] Add semantic-orphan maintenance through the semantic CLI/stage owner with read-only default,
   `--apply --confirm`, transaction, counts, and audit output. Above 1,000 rows it refuses unless an
   additional `--confirm-large` is present; tests cover audit content and transaction rollback.
 
 ### Phase 2 — QA checklist
 
-- [ ] Focused tests run and pass; each assertion has Phase 1 red-control evidence.
-- [ ] Timeout logs name job, limit, child PID/group, and reason without polling heartbeats.
-- [ ] No new dependency, supervisor, database writer, or published schema exists.
-- [ ] Version is bumped PATCH in both owners and a dated changelog entry names #211.
-- [ ] Status table and `updated:` date refreshed.
+- [x] Focused tests run and pass; each assertion has Phase 1 red-control evidence.
+- [x] Timeout logs name job, limit, child PID/group, and reason without polling heartbeats.
+- [x] No new dependency, supervisor, database writer, or published schema exists.
+- [x] Version is bumped PATCH in both owners and a dated changelog entry names #211.
+- [x] Status table and `updated:` date refreshed.
 
 ## Phase 3: Recover persisted state
 

@@ -10,6 +10,12 @@ roadmap_exempt: true
 
 # GH-211 bounded runtime recovery — Recon Map
 
+## Status
+
+| What was just completed | What's next |
+| --- | --- |
+| Recon verified and complete | Use this evidence for GH-211 implementation and runtime recovery |
+
 ## Scope and evidence
 
 Verified against commit `3801fa5` in a fresh clone. The code graph generation was dated
