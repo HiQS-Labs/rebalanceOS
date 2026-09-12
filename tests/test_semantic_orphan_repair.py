@@ -54,9 +54,11 @@ def test_confirmed_apply_is_transactional_and_audited(tmp_path: Path) -> None:
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 0
     assert '"action": "DELETE"' in audit_path.read_text(encoding="utf-8")
     assert '"rows": 3' in audit_path.read_text(encoding="utf-8")
+    assert '"state": "pending"' in audit_path.read_text(encoding="utf-8")
+    assert '"state": "completed"' in audit_path.read_text(encoding="utf-8")
 
 
-def test_delete_failure_rolls_back_and_does_not_audit(tmp_path: Path) -> None:
+def test_delete_failure_rolls_back_and_audits_failed_outcome(tmp_path: Path) -> None:
     db = _database(tmp_path / "semantic.db", 3)
     audit_path = tmp_path / "agent-audit.json"
     with (
@@ -66,7 +68,21 @@ def test_delete_failure_rolls_back_and_does_not_audit(tmp_path: Path) -> None:
     ):
         repair_semantic_orphans(db, apply=True, confirm=True)
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 3
-    assert not audit_path.exists()
+    audit_text = audit_path.read_text(encoding="utf-8")
+    assert '"state": "pending"' in audit_text
+    assert '"state": "failed"' in audit_text
+    assert '"state": "completed"' not in audit_text
+
+
+def test_audit_intent_failure_prevents_delete(tmp_path: Path) -> None:
+    db = _database(tmp_path / "semantic.db", 3)
+    with (
+        patch("rebalance.ingest.audit.append_audit_entry", side_effect=OSError("audit unavailable")),
+        pytest.raises(OSError, match="audit unavailable"),
+    ):
+        repair_semantic_orphans(db, apply=True, confirm=True)
+
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM semantic_embeddings").fetchone()[0] == 3
 
 
 def test_apply_queries_orphans_only_after_owning_write_transaction(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -80,6 +81,7 @@ def repair_semantic_orphans(
     """Inspect or transactionally remove vectors without semantic documents."""
     from rebalance.ingest import audit
 
+    operation_id: str | None = None
     with db_connection(database_path) as conn:
         if not apply:
             orphan_ids = sem.orphaned_embedding_ids(conn)
@@ -96,15 +98,40 @@ def repair_semantic_orphans(
                 raise ValueError("destructive repair requires --apply --confirm")
             if count > 1000 and not confirm_large:
                 raise ValueError(f"repair affects {count} rows; add --confirm-large")
+            operation_id = uuid.uuid4().hex
+            audit.append_audit_entry(
+                "DELETE",
+                "semantic_embeddings orphan vectors",
+                operation_id=operation_id,
+                state="pending",
+                rows=count,
+                database=str(database_path),
+                confirmation="confirm-large" if count > 1000 else "confirm",
+            )
             _delete_orphan_ids(conn, orphan_ids)
             conn.commit()
-        except Exception:
+        except Exception as exc:
             conn.rollback()
+            if operation_id is not None:
+                try:
+                    audit.append_audit_entry(
+                        "DELETE",
+                        "semantic_embeddings orphan vectors",
+                        operation_id=operation_id,
+                        state="failed",
+                        rows=count,
+                        database=str(database_path),
+                        error=type(exc).__name__,
+                    )
+                except OSError:
+                    pass
             raise
 
     audit.append_audit_entry(
         "DELETE",
         "semantic_embeddings orphan vectors",
+        operation_id=operation_id,
+        state="completed",
         rows=count,
         database=str(database_path),
         confirmation="confirm-large" if count > 1000 else "confirm",
