@@ -297,6 +297,14 @@ class TestPlistTemplates(unittest.TestCase):
                 f"{job}: KeepAlive",
             )
 
+    def test_managed_jobs_use_standard_launch_priority(self):
+        for job in POLICY:
+            self.assertNotIn(
+                "ProcessType",
+                _parse(job),
+                f"{job}: launchd background priority can starve startup before guarded work begins",
+            )
+
     def test_program_arguments_reference_real_files(self):
         for job in POLICY:
             for arg in _parse(job)["ProgramArguments"]:

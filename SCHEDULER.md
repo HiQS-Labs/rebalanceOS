@@ -105,6 +105,11 @@ since GH-175 **no two jobs share a minute**:
   `none` limit because launchd intentionally keeps it alive; its health is the generated artifact's
   freshness. Missing, duplicate, non-positive, malformed, or misplaced `none` policy values are
   configuration errors, not silent exemptions.
+- Managed jobs deliberately use launchd's standard process priority rather than `ProcessType`
+  `Background`. On the recovered Mac, background priority stalled both Python extension loading in
+  the persistent server and `fork()` in a finite wrapper; the same rendered jobs at standard
+  priority reached their work promptly. Staggered cadences and the finite-job guards bound resource
+  pressure without asking launchd to starve process startup.
 - Installers source `scripts/lib/install_common.sh`: chmod the wrapper,
   always-unload, render the template (`{{REBALANCE_DIR}}`, `{{PYTHON}}`,
   `{{HOME}}`), `plutil -lint`, load, poll-verify registration. Rendered plists

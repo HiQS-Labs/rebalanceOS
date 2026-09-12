@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.87.2] - 2026-09-12
+
+### Fixed
+- Managed jobs now run at launchd standard priority so Python module loading and wrapper `fork()`
+  reach guarded work promptly instead of stalling under background-process throttling (#213).
+
 ## [0.87.1] - 2026-09-12
 
 ### Fixed
