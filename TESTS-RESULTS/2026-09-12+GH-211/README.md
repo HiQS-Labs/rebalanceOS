@@ -1,7 +1,9 @@
 # GH-211 bounded runtime recovery — campaign record
 
-Date: 2026-09-12  
-Implementation commit: `ca798c0`  
+Date: 2026-09-12
+
+Implementation commit: `ca798c0`
+
 Baseline commit: `3801fa5`
 
 ## Status
