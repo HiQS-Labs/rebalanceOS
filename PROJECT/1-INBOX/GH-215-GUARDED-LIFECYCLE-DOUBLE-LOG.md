@@ -65,8 +65,9 @@ The bash-side suppression in `scheduler_common.sh` stays (same env var, same con
 
 ## Acceptance
 
-- [ ] Red control first: a test that fails on today's code (double pair under the guard) and
-      passes after the fix.
+- [x] Red control first: a test that fails on today's code (double pair under the guard) and
+      passes after the fix. Evidence: all three red controls fail at pre-fix commit `554ebc5`
+      (tests checked out from HEAD) — retained output `/tmp/gh215-red-evidence.txt`; green at `828a77f`.
 - [ ] Guarded `daily-synthesis`-shaped run records exactly one pair.
 - [ ] Manual (unguarded) invocation still records the self-reported pair.
 - [ ] Guard outcomes unchanged: timeout/ceiling/eviction still `job_failed` with the right `reason`.
