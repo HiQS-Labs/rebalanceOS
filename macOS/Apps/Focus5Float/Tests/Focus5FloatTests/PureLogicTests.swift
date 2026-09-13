@@ -234,4 +234,3 @@ final class PureLogicTests: XCTestCase {
         XCTAssertTrue(model.promotedCards.isEmpty)
     }
 }
-

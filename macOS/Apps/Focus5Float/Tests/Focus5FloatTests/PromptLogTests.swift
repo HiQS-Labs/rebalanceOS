@@ -217,9 +217,9 @@ final class PromptLogTests: XCTestCase {
         noels-Mac-Studio · development · codex
 
         > "# Context from my IDE setup:
-        > 
+        >
         > ## Active file: foo.md
-        > 
+        >
         > ## My request:
         > Please check this work on disk."
         """
@@ -623,4 +623,3 @@ final class PromptLogTests: XCTestCase {
         XCTAssertEqual(xyzPrompts[0].prompt, "XYZ-forge prompt on dev branch")
     }
 }
-
