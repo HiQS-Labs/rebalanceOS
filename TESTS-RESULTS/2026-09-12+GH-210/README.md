@@ -202,3 +202,42 @@ unrun.
 7. Remaining P0 work includes cancellation/timeout receipts, privacy/redaction rules,
    request-receipt sanitization, frozen windows, controls, budgets, and witnessed
    malformed-output/empty-input/auth/quota failure paths.
+
+## Opt-in real-work canary pivot
+
+Later on 2026-09-12, the operator explicitly approved beginning a bounded Terra
+`/daily` canary while the historical evaluation continues. This authorizes the
+minimized Daily evidence packet to leave the Mac Studio for `gpt-5.6-terra`; it does
+not promote the synthetic battery into a product grade or waive the pending blinded
+comparison.
+
+The new runner is default-off and scheduled separately from the incumbent 18:20
+publisher. It reads existing CLIO, ranked-action, calendar, Sleuth, Apple Reminder,
+repository-loop and CPU-health seams; redacts obvious secret assignments and email
+addresses; caps packet size; invokes Terra Low ephemerally in an empty directory with
+read-only sandboxing, no rules, no tools and provider-enforced structured output; then
+validates citations before a deterministic append. Daily call, input/output-token,
+estimated-cost and consecutive-failure ceilings fail closed. A local kill switch can
+disable it without changing source or the existing publisher.
+
+The first real accepted cycle used 18 evidence records and a 4,835-character packet.
+Its Codex receipt reported 21,020 input tokens, 0 cached input tokens, 361 output
+tokens and 109 reasoning-output tokens in one accepted call. The conservative dated
+list-price estimate was $0.0477; this is not billed cost. The output correctly
+abstained because the persisted CLIO table was stale and the packet carried no recent
+intent record. That observation produced a pre-deploy correction: the packet now
+reads the bounded live CLIO JSONL tail first and uses the persisted table only as a
+fallback. A post-correction dry run contained 30 evidence records in 10,418
+characters. Real usefulness, sleep/wake behavior, and Low-versus-Medium quality remain
+unmeasured until the canary accumulates operator ratings and the frozen campaign runs.
+
+The first post-correction output still abstained because the prompt over-weighted the
+absence of completion evidence. The policy was narrowed again: fresh intent may support
+an explicitly labelled *apparent* focus, but it may never support an execution or
+completion claim. The next accepted cycle then identified the active XYZ-forge
+CI/runner-recovery thread from five recent CLIO records, retained the completion caveat,
+and cited every source ID. Its receipt reported 23,232 input tokens, 565 output tokens,
+44 reasoning-output tokens, 13.68 seconds, and a conservative $0.0538 list-price
+estimate. At that observed rate, a full 72-cycle active day projects to about $3.87
+($116 per 30-day month); those figures are extrapolated estimates, not billed cost or a
+quality verdict. The configured $4 daily ceiling and 72-call ceiling bound the canary.

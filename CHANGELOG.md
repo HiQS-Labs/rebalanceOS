@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.0] - 2026-09-12
+
+### Added
+- An opt-in Terra Low canary now turns the existing multi-source `/daily` evidence into a validated,
+  append-only 15-minute work synthesis. The model runs ephemerally with no tools or repository
+  access; unknown evidence IDs, malformed output, missing usage, token/call/cost ceilings, and
+  repeated failures all fail closed before the Daily log is written. Each accepted entry carries a
+  sanitized token, latency, estimated-list-price, confidence, and evidence receipt (#210).
+
 ## [0.87.2] - 2026-09-12
 
 ### Fixed

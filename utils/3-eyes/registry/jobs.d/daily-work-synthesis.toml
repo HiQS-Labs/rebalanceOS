@@ -1,0 +1,18 @@
+id = "daily-work-synthesis"
+command = "daily-work-synthesis"
+description = "Run the opt-in evidence-bound Terra /daily canary every 15 minutes."
+enabled = true
+routes = ["log-only"]
+supersedes = ["com.rebalance-os.daily-work-synthesis"]
+
+[schedule.launchd]
+StartInterval = 900
+
+[breakers]
+single_instance = true
+max_rss_gb = 1
+trip_after_failures = 3
+
+[relief]
+llm_daily_max = 72
+llm_per_run_max = 1

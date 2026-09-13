@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
 from rebalance.ingest.db import db_connection
+from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.lib.time_ops import now_iso
 
 if TYPE_CHECKING:
@@ -58,6 +59,20 @@ def filter_prompt_metadata(prompt: str) -> str:
     prompt = re.sub(r"^NEXT:.*\n", "", prompt, flags=re.MULTILINE)
     prompt = re.sub(r"^STATUS:.*\n", "", prompt, flags=re.MULTILINE)
     return prompt.strip()
+
+
+def load_recent_clio_prompts(database_path: Path, cutoff_iso: str, limit: int = 16) -> list[dict[str, Any]]:
+    """Return recent persisted CLIO prompts without refreshing or mutating the source."""
+    try:
+        with db_connection_readonly(database_path) as conn:
+            rows = conn.execute(
+                "SELECT id,timestamp,prompt,agent,repo FROM clio_prompts "
+                "WHERE julianday(timestamp) >= julianday(?) ORDER BY timestamp DESC LIMIT ?",
+                (cutoff_iso, int(limit)),
+            ).fetchall()
+    except Exception:  # noqa: BLE001 — absent/not-yet-migrated DB is an empty read surface
+        return []
+    return [dict(row) for row in rows]
 
 
 @dataclass(frozen=True)
