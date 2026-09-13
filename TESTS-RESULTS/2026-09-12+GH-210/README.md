@@ -82,7 +82,8 @@ not scored, because confidence calibration was not part of this capability case.
 
 Timed Muse Low receipt: session `01a09858-fa65-7da3-88ae-93556cac73a1`, request
 `15f3d44f-2732-4c70-9457-7913b02669f8`, response
-`resp_6aa5fa1dca1dd98602784cc7`.  
+`resp_6aa5fa1dca1dd98602784cc7`.
+
 Timed Muse Medium receipt: session `01a09859-6c93-74e2-adc7-a96fbac4e6e0`, request
 `123b6142-d46f-4156-891a-ecc4364541d2`, response
 `resp_6aa5fa39095070e744974cef`.
