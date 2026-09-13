@@ -7,6 +7,7 @@ use to surface "last auth failure" per integration).
 """
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -187,6 +188,35 @@ class AuthLogTests(unittest.TestCase):
         self.assertEqual(classify_github_token("github_pat_abc"), "fine-grained PAT")
         self.assertEqual(classify_github_token("gho_abc"), "gh OAuth (rotates)")
         self.assertEqual(classify_github_token("weird"), "unknown")
+
+    # -- GH-215: the outer scheduler guard owns the lifecycle pair ----------
+
+    def test_lifecycle_writers_emit_normally_without_the_guard_env(self) -> None:
+        auth_log.log_job_started("some-job")
+        auth_log.log_job_completed("some-job", 1.5)
+        auth_log.log_job_failed("some-job", 3, elapsed=2.0, reason="child_exit")
+        rows = self._read_raw()
+        self.assertEqual([r["event"] for r in rows], ["job_started", "job_completed", "job_failed"])
+        self.assertEqual(rows[2]["detail"]["reason"], "child_exit")
+
+    def test_lifecycle_writers_defer_to_the_guard_inside_its_child(self) -> None:
+        # The guard (utils/job_guard.py --lifecycle-job) sets this in the CHILD
+        # env only, so a library-backed self-reporter inside the guarded job
+        # (daily_synthesis.py, obsidian_daily_rollover.py) must go silent while
+        # the guard's own pair — written by the parent, env unset — still lands.
+        with patch.dict(os.environ, {auth_log.SCHEDULER_LIFECYCLE_CHILD_ENV: "1"}):
+            auth_log.log_job_started("daily-synthesis")
+            auth_log.log_job_completed("daily-synthesis", 2.0)
+            auth_log.log_job_failed("daily-synthesis", 124, reason="wall_clock_timeout")
+        self.assertEqual(self._read_raw(), [])
+
+    def test_non_lifecycle_events_are_not_suppressed_by_the_guard_env(self) -> None:
+        # Collectors inside a guarded job (calendar/sleuth/github) keep their
+        # own events; only the job_* lifecycle trio belongs to the guard.
+        with patch.dict(os.environ, {auth_log.SCHEDULER_LIFECYCLE_CHILD_ENV: "1"}):
+            auth_log.log_event("sleuth", "sync_succeeded", {"workspace": "w"})
+        rows = self._read_raw()
+        self.assertEqual([r["event"] for r in rows], ["sync_succeeded"])
 
 
 if __name__ == "__main__":

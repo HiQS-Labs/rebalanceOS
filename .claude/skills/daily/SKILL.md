@@ -114,6 +114,7 @@ Format the synthesis matching this exact Markdown template:
 - **Operational Horizon**: <Reconciled next 1–2 hours: upcoming calendar commitments + ranked Sleuth & Apple Reminders priorities>
 - **Unclosed Loops**: <N un-PRed branches, M open PRs, K unpushed commits> `[Details: temp/close-the-loop.md]`
 - **Coaching Nudge**: <1-2 sentences of actionable guidance> `[Trigger: <telemetry_metric>]`
+- **Model Receipt**: <model/effort, input/cached/output tokens, latency, dated list-price estimate, confidence and evidence IDs when an LLM canary produced the entry>
 ```
 
 ---
@@ -121,4 +122,3 @@ Format the synthesis matching this exact Markdown template:
 ### Step 6 — Append to Daily Log
 
 Append the formatted synthesis entry into `temp/daily-log/YYYY-MM-DD.log` (create file with `# Daily Activity Log — YYYY-MM-DD` header if starting a new day).
-

@@ -18,6 +18,12 @@
          rather than relying on a placeholder appearing somewhere in this file. -->
     <key>ProgramArguments</key>
     <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-hiqs-digest</string>
+        <string>--max-runtime-seconds</string><string>14400</string>
+        <string>--lifecycle-job</string><string>hiqs-digest</string>
+        <string>--</string>
         <string>{{REBALANCE_DIR}}/scripts/hiqs_digest.sh</string>
     </array>
 
@@ -76,7 +82,5 @@
     <key>KeepAlive</key>
     <false/>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>

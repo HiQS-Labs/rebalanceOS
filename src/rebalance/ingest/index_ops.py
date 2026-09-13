@@ -525,6 +525,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         return payload
 
     with db_connection(db_path, ensure_semantic_schema) as conn:
+        vault_meta = _safe_meta(conn, "embedding_meta")
         payload["sources"]["vault"] = {
             "files": _safe_count(conn, "vault_files"),
             "chunks": _safe_count(conn, "chunks"),
@@ -534,6 +535,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 conn, "vault_files", "julianday(last_modified) >= julianday('now', '-7 days')"
             )
             or 0,
+            "power_deferred": vault_meta.get("power_deferred") == "1",
         }
         # GH-166: how far the ingester is behind the vault writer, in minutes.
         # Positive means the newest edit on disk hasn't been ingested yet;
@@ -544,6 +546,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             payload["sources"]["vault"]["last_ingested_at"],
         )
 
+        gh_meta = _safe_meta(conn, "github_embedding_meta")
         payload["sources"]["github"] = {
             "items": _safe_count(conn, "github_items"),
             "documents": _safe_count(conn, "github_documents"),
@@ -555,6 +558,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
                 conn, "github_activity", "julianday(scanned_at) >= julianday('now', '-7 days')"
             )
             or 0,
+            "power_deferred": gh_meta.get("power_deferred") == "1",
         }
 
         payload["sources"]["calendar"] = {
@@ -692,6 +696,7 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             "embedding_dim": sem_meta.get("embedding_dim"),
             "embedder_version": sem_meta.get("embedder_version"),
             "last_embedded_at": sem_meta.get("last_embed_at"),
+            "power_deferred": sem_meta.get("power_deferred") == "1",
         }
 
         # Freshness drift checks: source rows that are NOT in semantic_documents
@@ -774,17 +779,21 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
             drift["semantic_documents_pending_embed_oldest_minutes"] = (
                 round(oldest_minutes, 1) if oldest_minutes is not None else None
             )
+            sem_power_deferred = sem_meta.get("power_deferred") == "1"
+            drift["semantic_documents_pending_embed_power_deferred"] = sem_power_deferred
             if stuck_count:
+                power_note = " (embeddings deferred on battery)" if sem_power_deferred else ""
                 drift["semantic_documents_pending_embed_reason"] = (
                     f"{stuck_count} of {pending_total} pending-embed row(s) unembedded "
                     f"for over {_PENDING_EMBED_STUCK_MINUTES}m (oldest "
                     f"{round(oldest_minutes, 1) if oldest_minutes is not None else '?'}m) "
-                    "— likely a stuck/failed embed run, not just an in-flight tail"
+                    f"— likely a stuck/failed embed run, not just an in-flight tail{power_note}"
                 )
         except Exception:
             drift["semantic_documents_pending_embed"] = None
             drift["semantic_documents_pending_embed_stuck"] = None
             drift["semantic_documents_pending_embed_oldest_minutes"] = None
+            drift["semantic_documents_pending_embed_power_deferred"] = False
 
         # GH-169 Phase 3: commit-corpus completeness, anchored on the remote.
         # Cheap (local git + one ls-remote per repo, no REST API) so it can run
@@ -809,6 +818,10 @@ def get_index_status(database_path: Path) -> dict[str, Any]:
         except Exception as exc:  # never let a coverage probe break status
             drift["commit_coverage"] = {"error": str(exc)}
 
+        vault_power_def = vault_meta.get("power_deferred") == "1"
+        sem_power_def = sem_meta.get("power_deferred") == "1"
+        gh_power_def = gh_meta.get("power_deferred") == "1"
+        drift["power_deferred"] = sem_power_def or gh_power_def or vault_power_def
         payload["freshness"] = {**drift, "signal_health": _derive_signal_health(payload["sources"])}
 
     return payload
@@ -819,6 +832,7 @@ def _refresh_vault(
     vault_path: Path,
     *,
     dry_run: bool,
+    power_defer: bool | None = None,
 ) -> dict[str, Any]:
     plan = {
         "steps": [
@@ -838,7 +852,7 @@ def _refresh_vault(
         exclude_patterns=[".obsidian/*", ".trash/*", "node_modules/*", ".git/*", ".venv/*", "*/.venv/*"],
         dry_run=False,
     )
-    embed_result = embed_chunks(database_path=database_path)
+    embed_result = embed_chunks(database_path=database_path, power_defer=power_defer)
 
     return {
         "scope": "vault",
@@ -857,6 +871,7 @@ def _refresh_vault(
             "embedded": embed_result.embedded_chunks,
             "skipped_unchanged": embed_result.skipped_unchanged,
             "elapsed_seconds": embed_result.elapsed_seconds,
+            "deferred_battery": embed_result.deferred_battery,
         },
     }
 
@@ -1047,6 +1062,8 @@ def _refresh_github(
     dry_run: bool,
     backfill_since: str | None = None,
     artifact_sync_days: int | None = None,
+    power_defer: bool | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     # GH-148: the per-item artifact fan-out (PR detail/comments/reviews/commits/
     # check-runs, per-issue comment walks) is the dominant API cost of a refresh —
@@ -1113,7 +1130,11 @@ def _refresh_github(
     # walk is the correctness backstop and runs after it — the ratchet in
     # upsert_direct_commit() means neither path can undo the other's work.
     # Zero API calls, so it adds no rate-limit pressure to the refresh.
-    backfill_results = backfill_repos(database_path, target_repos, since=backfill_since)
+    try:
+        backfill_results = backfill_repos(database_path, target_repos, since=backfill_since)
+    except Exception as exc:
+        logger.warning("Commit backfill encountered error, proceeding to authoritative metadata sync: %s", exc)
+        backfill_results = []
 
     repo_results: list[dict[str, Any]] = []
     for repo in target_repos:
@@ -1172,7 +1193,7 @@ def _refresh_github(
 
     from rebalance.ingest.github_knowledge import embed_github_documents
 
-    gh_embed = embed_github_documents(database_path=database_path)
+    gh_embed = embed_github_documents(database_path=database_path, power_defer=power_defer)
 
     # Coverage guard: snapshot the resolved watched set and alarm on a silent
     # reduction. Runs LAST, only on a clean sync (an earlier raise never reaches
@@ -1245,6 +1266,7 @@ def _refresh_github(
             "embedded": gh_embed.embedded_docs,
             "skipped_unchanged": gh_embed.skipped_unchanged,
             "elapsed_seconds": gh_embed.elapsed_seconds,
+            "deferred_battery": gh_embed.deferred_battery,
         },
     }
 
@@ -1517,7 +1539,13 @@ def _all_semantic_sources() -> list[str]:
     return _LADDER + registry_extra
 
 
-def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
+def _refresh_semantic_only(
+    database_path: Path,
+    *,
+    dry_run: bool,
+    power_defer: bool | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
     sources = _all_semantic_sources()
     if dry_run:
         return {
@@ -1538,7 +1566,7 @@ def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, A
         source_types=sources,
         use_registry_providers=True,
     )
-    sem_embed = embed_pending(database_path, source_types=sources)
+    sem_embed = embed_pending(database_path, source_types=sources, power_defer=power_defer)
     return {
         "scope": "semantic",
         "dry_run": False,
@@ -1555,6 +1583,7 @@ def _refresh_semantic_only(database_path: Path, *, dry_run: bool) -> dict[str, A
             "embedded": sem_embed.embedded_docs,
             "skipped_unchanged": sem_embed.skipped_unchanged,
             "elapsed_seconds": sem_embed.elapsed_seconds,
+            "deferred_battery": sem_embed.deferred_battery,
         },
     }
 
@@ -1566,6 +1595,7 @@ def _refresh_dashboard_note(
     since_days: int,
     dry_run: bool,
     note_path: str = "Dashboards/rebalanceOS Dashboard.md",
+    power_defer: bool | None = None,
 ) -> dict[str, Any]:
     output_path = (vault_path / note_path).resolve()
     plan = {
@@ -1597,7 +1627,7 @@ def _refresh_dashboard_note(
     )
     note_file = write_dashboard_note(output_path, markdown)
     ingest_result = ingest_vault(vault_path=vault_path, database_path=database_path)
-    embed_result = embed_chunks(database_path=database_path)
+    embed_result = embed_chunks(database_path=database_path, power_defer=power_defer)
 
     return {
         "scope": "dashboard",
@@ -1617,6 +1647,7 @@ def _refresh_dashboard_note(
             "embedded": embed_result.embedded_chunks,
             "skipped_unchanged": embed_result.skipped_unchanged,
             "elapsed_seconds": embed_result.elapsed_seconds,
+            "deferred_battery": embed_result.deferred_battery,
         },
     }
 
@@ -1708,6 +1739,10 @@ def refresh_index(
     if "figma" in requested_scopes:
         resolved_figma_token = (get_figma_token() or "").strip()
 
+    from rebalance.lib.power_ops import should_defer_embeddings
+
+    power_defer = should_defer_embeddings()
+
     # Per-collector kwargs bundle. Each collector ignores keys it doesn't need.
     collector_opts: dict[str, Any] = {
         "vault_path": resolved_vault,
@@ -1723,6 +1758,7 @@ def refresh_index(
         # watched-set resolution, events scan, watched-repo rollups — keeps
         # since_days, so no other consumer's semantics move.
         "artifact_sync_days": artifact_sync_days,
+        "power_defer": power_defer,
     }
 
     # Bring the database schema to the latest version before any collector
@@ -1848,6 +1884,7 @@ def refresh_index(
                         vault_path=resolved_vault,
                         since_days=since_days,
                         dry_run=dry_run,
+                        power_defer=power_defer,
                     )
                 )
             except Exception as e:
@@ -1899,7 +1936,9 @@ def _vault_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # Safe to retry: ingest_vault deletes then re-inserts per file (CASCADE covers
     # chunks/keywords/links), so a rerun replaces rather than duplicates, and
     # embed_chunks only embeds rows with no existing embedding.
-    return _retry_on_db_locked(lambda: _refresh_vault(db_path, vault_path, dry_run=opts["dry_run"]))
+    return _retry_on_db_locked(
+        lambda: _refresh_vault(db_path, vault_path, dry_run=opts["dry_run"], power_defer=opts.get("power_defer"))
+    )
 
 
 def _retry_on_db_locked(
@@ -1941,6 +1980,7 @@ def _github_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
             repos=opts.get("repos") or [],
             dry_run=opts["dry_run"],
             artifact_sync_days=opts.get("artifact_sync_days"),
+            power_defer=opts.get("power_defer"),
         )
     )
 
@@ -1994,7 +2034,13 @@ def _semantic_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
     # GH-131 (extended 2026-07-27) — see _vault_adapter. Safe to retry: the semantic
     # embed is content-hash keyed, so a rerun re-skips unchanged rows rather than
     # re-embedding them (2026-07-27 run: 29,099 of 29,956 skipped unchanged).
-    return _retry_on_db_locked(lambda: _refresh_semantic_only(db_path, dry_run=opts["dry_run"]))
+    return _retry_on_db_locked(
+        lambda: _refresh_semantic_only(
+            db_path,
+            dry_run=opts["dry_run"],
+            power_defer=opts.get("power_defer"),
+        )
+    )
 
 
 def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
@@ -2033,15 +2079,33 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         }
 
     import time
+    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock
 
     started = time.monotonic()
-    cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
-    email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
+    try:
+        with git_publish_lock(target_repo):
+            cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
+            email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
 
-    import json as _json
+            import json as _json
 
-    generated_at = _json.loads(cal_path.read_text(encoding="utf-8"))["generated_at"]
-    git_result = commit_and_push_sync(target_repo, sync_subdir, device_id=device_id, generated_at=generated_at)
+            generated_at = _json.loads(cal_path.read_text(encoding="utf-8"))["generated_at"]
+            git_result = commit_and_push_sync(
+                target_repo,
+                sync_subdir,
+                device_id=device_id,
+                generated_at=generated_at,
+                lock_acquired=True,
+            )
+    except GitPublishLockBusy as exc:
+        return {
+            "scope": "sync",
+            "dry_run": False,
+            "device_id": device_id,
+            "error": str(exc),
+            "deferred": True,
+            "elapsed_seconds": round(time.monotonic() - started, 2),
+        }
 
     return {
         "scope": "sync",

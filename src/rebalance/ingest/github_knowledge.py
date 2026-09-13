@@ -73,6 +73,7 @@ class GitHubEmbedResult:
     model_name: str
     embedding_dim: int
     elapsed_seconds: float
+    deferred_battery: bool = False
 
 
 @dataclass
@@ -881,6 +882,7 @@ def refresh_github_embeddings(
     min_chars: int = MIN_EMBED_CHARS,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> GitHubEmbedResult:
     """Source-owned 1:1 facade over :func:`embed_github_documents` so CLI
     `github-embed` doesn't import the leaf directly (forwards all flags + the
@@ -893,6 +895,7 @@ def refresh_github_embeddings(
         min_chars=min_chars,
         force_reembed=force_reembed,
         embed_texts=embed_texts,
+        power_defer=power_defer,
     )
 
 
@@ -904,8 +907,32 @@ def embed_github_documents(
     min_chars: int = MIN_EMBED_CHARS,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> GitHubEmbedResult:
     start = time.monotonic()
+
+    if power_defer is None:
+        from rebalance.lib.power_ops import should_defer_embeddings
+
+        defer_on_battery = should_defer_embeddings()
+    else:
+        defer_on_battery = power_defer
+
+    if defer_on_battery:
+        with db_connection(database_path, ensure_github_schema) as conn:
+            total_docs = gh.count_embeddable_github_documents(conn, min_chars)
+            gh.set_github_embedding_meta(conn, "power_deferred", "1")
+            conn.commit()
+        return GitHubEmbedResult(
+            total_docs=total_docs,
+            embedded_docs=0,
+            skipped_unchanged=total_docs,
+            model_name=model_name,
+            embedding_dim=EMBEDDING_DIM,
+            elapsed_seconds=round(time.monotonic() - start, 2),
+            deferred_battery=True,
+        )
+
     embed_fn = embed_texts or _default_embed_texts
 
     with db_connection(database_path, ensure_github_schema) as conn:
@@ -918,6 +945,8 @@ def embed_github_documents(
         total_docs = gh.count_embeddable_github_documents(conn, min_chars)
 
         if not rows:
+            gh.set_github_embedding_meta(conn, "power_deferred", "0")
+            conn.commit()
             return GitHubEmbedResult(
                 total_docs=total_docs,
                 embedded_docs=0,
@@ -925,6 +954,7 @@ def embed_github_documents(
                 model_name=model_name,
                 embedding_dim=EMBEDDING_DIM,
                 elapsed_seconds=round(time.monotonic() - start, 2),
+                deferred_battery=False,
             )
 
         embedded = 0
@@ -943,6 +973,7 @@ def embed_github_documents(
             ("model_name", model_name),
             ("embedding_dim", str(EMBEDDING_DIM)),
             ("last_embed_at", now_iso),
+            ("power_deferred", "0"),
         ]:
             gh.set_github_embedding_meta(conn, key, value)
         conn.commit()
@@ -954,4 +985,5 @@ def embed_github_documents(
         model_name=model_name,
         embedding_dim=EMBEDDING_DIM,
         elapsed_seconds=round(time.monotonic() - start, 2),
+        deferred_battery=False,
     )

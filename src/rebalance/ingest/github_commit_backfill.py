@@ -22,15 +22,59 @@ Two invariants this module exists to hold:
 
 from __future__ import annotations
 
+import json
+import sqlite3
 import subprocess
+import time
 from functools import lru_cache
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from rebalance.ingest.db import db_connection, ensure_github_schema
+from rebalance.ingest.config import get_enable_remote_peeking
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.local_repos import scan_local_repos
-from rebalance.lib.time_ops import _now
+from rebalance.lib.git_ops import (
+    canonical_github_url,
+    compute_origin_ref_digest,
+    peek_remote_refs,
+    run_git,
+)
+from rebalance.lib.time_ops import _now, now_utc, parse_utc_iso
+
+
+def is_shallow_clone(path: Path) -> bool:
+    """Return True if the repository clone is shallow (truncated commit history) or unverifiable.
+
+    Requires positive confirmation that the repository is complete and non-shallow.
+    Any nonzero exit code, unknown output, timeout, or shallow file in the common
+    git directory is treated as shallow (refusing unbounded coverage certification).
+    """
+    try:
+        proc = run_git(path, "rev-parse", "--is-shallow-repository", timeout=1.0)
+        if proc.returncode != 0:
+            return True
+        out = proc.stdout.strip().lower()
+        if out == "true":
+            return True
+        if out != "false":
+            return True
+
+        # Check git common directory for shallow file (supports linked worktrees)
+        common_proc = run_git(path, "rev-parse", "--git-common-dir", timeout=1.0)
+        if common_proc.returncode == 0 and common_proc.stdout.strip():
+            common_dir = Path(common_proc.stdout.strip())
+            if not common_dir.is_absolute():
+                common_dir = (path / common_dir).resolve()
+            if (common_dir / "shallow").exists():
+                return True
+        elif (path / ".git" / "shallow").exists():
+            return True
+
+        return False
+    except Exception:
+        return True
+
 
 # One ASCII unit separator between fields and a record separator between commits:
 # commit messages are multi-line and contain almost any printable character, so
@@ -67,10 +111,107 @@ class BackfillResult:
     fetched: bool = False
     api_calls_used: int = 0  # structurally always 0; asserted in tests
     capped: bool = False
+    skipped_cache: bool = False  # True when remote peek matched cached checkpoint (GH-201)
     warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+def is_commit_walk_cached(
+    conn: sqlite3.Connection,
+    canonical_remote_url: str,
+    current_remote_ref_map: dict[str, str],
+    requested_since_utc: str | None,
+) -> bool:
+    """Evaluate cache-hit equality across ALL origin branches and history window (GH-201).
+
+    Requires:
+    1. Table entry exists for canonical_remote_url.
+    2. ref_digest matches current digest across all origin branches (refs/heads/*).
+    3. Complete origin branch ref-name -> SHA mapping matches exactly.
+    4. Requested history window ('since') is within covered_since_utc.
+    Missing or unverified remote proof always returns False.
+    """
+    if not current_remote_ref_map:
+        return False
+
+    cur = conn.cursor()
+    row = cur.execute(
+        "SELECT ref_digest, sha_map_json, covered_since_utc FROM github_remote_peeks WHERE canonical_remote_url = ?",
+        (canonical_remote_url,),
+    ).fetchone()
+    if not row:
+        return False
+
+    cached_digest, cached_json, covered_since = row
+    current_digest = compute_origin_ref_digest(current_remote_ref_map)
+    if cached_digest != current_digest:
+        return False
+
+    try:
+        cached_map = json.loads(cached_json)
+        current_branches = {k: v for k, v in current_remote_ref_map.items() if k.startswith("refs/heads/")}
+        if cached_map != current_branches:
+            return False
+    except Exception:
+        return False
+
+    # History window evaluation (Codex R2):
+    if requested_since_utc is not None:
+        if covered_since is not None:
+            try:
+                req_dt = parse_utc_iso(requested_since_utc)
+                cov_dt = parse_utc_iso(covered_since)
+                if req_dt is None or cov_dt is None:
+                    raise ValueError("invalid checkpoint timestamp")
+                if req_dt < cov_dt:
+                    return False
+            except Exception:
+                if requested_since_utc < covered_since:
+                    return False
+    else:
+        # Unbounded history requested (since=None).
+        # A bounded checkpoint cannot satisfy an unbounded history request.
+        if covered_since is not None:
+            return False
+
+    return True
+
+
+def record_commit_coverage_checkpoint(
+    conn: sqlite3.Connection,
+    canonical_remote_url: str,
+    remote_ref_map: dict[str, str],
+    covered_since_utc: str | None,
+    verified_at_utc: str,
+    snapshot_time_utc: str,
+) -> bool:
+    """Publish an atomic commit coverage checkpoint with overlap protection (GH-201 / SCHEDULER.md:72).
+
+    Uses an atomic UPSERT with a conditional predicate on verified_at <= snapshot_time_utc
+    to prevent stale overlapping runs from overwriting newer proofs.
+    """
+    origin_branches = {k: v for k, v in remote_ref_map.items() if k.startswith("refs/heads/")}
+    ref_digest = compute_origin_ref_digest(remote_ref_map)
+    sha_map_json = json.dumps(origin_branches, sort_keys=True)
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO github_remote_peeks
+            (canonical_remote_url, ref_digest, sha_map_json, covered_since_utc, verified_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(canonical_remote_url) DO UPDATE SET
+            ref_digest = excluded.ref_digest,
+            sha_map_json = excluded.sha_map_json,
+            covered_since_utc = excluded.covered_since_utc,
+            verified_at = excluded.verified_at
+        WHERE (github_remote_peeks.verified_at <= ? OR github_remote_peeks.verified_at IS NULL)
+        """,
+        (canonical_remote_url, ref_digest, sha_map_json, covered_since_utc, verified_at_utc, snapshot_time_utc),
+    )
+    return cur.rowcount > 0
 
 
 def _git(repo_path: Path, *args: str) -> tuple[int, str, str]:
@@ -181,9 +322,14 @@ def _default_branch(repo_path: Path) -> str:
 
     Local HEAD is whatever branch happens to be checked out — in a worktree
     that is routinely a feature branch, which would silently narrow the walk.
+    Preserves slash-containing branch names (e.g. release/stable) (GH-201 / Codex R10).
     """
+    prefix = "refs/remotes/origin/"
     code, out, _ = _git(repo_path, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
     if code == 0 and out:
+        out = out.strip()
+        if out.startswith(prefix):
+            return out[len(prefix) :]
         return out.rsplit("/", 1)[-1]
     for candidate in ("development", "main", "master"):
         code, _, _ = _git(repo_path, "rev-parse", "--verify", f"origin/{candidate}")
@@ -215,16 +361,17 @@ def _parse_log(raw: str) -> list[dict]:
     return commits
 
 
-def _changed_paths(repo_path: Path, sha: str) -> list[str]:
+def _changed_paths(repo_path: Path, sha: str) -> list[str] | None:
     """Changed paths for one commit.
 
     ``-m --first-parent`` makes merge commits report the files the merge
     actually brought in; without it git prints nothing for a merge, which is
     how merge commits ended up invisible in the first place.
+    Returns None if git show failed, allowing caller to mark the row retryable (GH-201).
     """
     code, out, _ = _git(repo_path, "show", "--pretty=format:", "--name-only", "-m", "--first-parent", sha)
     if code != 0:
-        return []
+        return None
     seen: list[str] = []
     for line in out.splitlines():
         path = line.strip()
@@ -253,6 +400,9 @@ def _record_coverage(conn, repo: str, result: BackfillResult, now: str) -> None:
     )
 
 
+PROBE_BUDGET_SECONDS: float = 15.0
+
+
 def backfill_commits(
     database_path: Path,
     repo_full_name: str,
@@ -263,6 +413,8 @@ def backfill_commits(
     clone_path: Path | None = None,
     roots: list[str] | None = None,
     branch: str | None = None,
+    force_refresh: bool = False,
+    probe_deadline: float | None = None,
 ) -> BackfillResult:
     """Enumerate *repo_full_name* from its local clone into the commit corpus.
 
@@ -272,6 +424,7 @@ def backfill_commits(
     """
     result = BackfillResult(repo=repo_full_name)
     now = _now()
+    snapshot_time = now_utc().isoformat()
 
     path = clone_path or resolve_clone(repo_full_name, roots=roots)
     if path is None:
@@ -284,6 +437,67 @@ def backfill_commits(
         return result
     result.local_path = str(path)
 
+    # 0-API Remote Peeking Checkpoint Gating (GH-201)
+    canonical_url = canonical_github_url(repo_full_name)
+
+    # Probe budget enforcement and rollout stop-rule gate (Codex R9 & Round 3 Blocker):
+    can_probe = not force_refresh and get_enable_remote_peeking()
+    if probe_deadline is not None and time.monotonic() >= probe_deadline:
+        can_probe = False
+
+    peek_map: dict[str, str] | None = None
+    if can_probe:
+        rem_setup = min(1.0, probe_deadline - time.monotonic()) if probe_deadline else 1.0
+        if rem_setup > 0:
+            try:
+                proc = run_git(path, "remote", "get-url", "origin", timeout=rem_setup)
+                if proc.returncode == 0 and proc.stdout.strip():
+                    parsed = canonical_github_url(proc.stdout.strip())
+                    if parsed.startswith("https://github.com/"):
+                        canonical_url = parsed
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+        rem_timeout = min(2.0, probe_deadline - time.monotonic()) if probe_deadline else 2.0
+        if rem_timeout > 0:
+            try:
+                peek_map = peek_remote_refs(path, remote="origin", timeout=rem_timeout)
+            except Exception:
+                peek_map = None
+
+        if peek_map:
+            with db_connection(database_path, ensure_github_schema) as conn:
+                conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+                if is_commit_walk_cached(conn, canonical_url, peek_map, since):
+                    # Codex R10 / Round 3: Renew verified_at monotonically against the exact proof
+                    digest = compute_origin_ref_digest(peek_map)
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT verified_at FROM github_remote_peeks WHERE canonical_remote_url = ? AND ref_digest = ?",
+                        (canonical_url, digest),
+                    )
+                    existing = cur.fetchone()
+                    if existing is not None:
+                        existing_verified = existing[0]
+                        if existing_verified is None or snapshot_time >= existing_verified:
+                            cur.execute(
+                                """
+                                UPDATE github_remote_peeks
+                                SET verified_at = ?
+                                WHERE canonical_remote_url = ?
+                                  AND ref_digest = ?
+                                  AND (verified_at <= ? OR verified_at IS NULL)
+                                """,
+                                (snapshot_time, canonical_url, digest, snapshot_time),
+                            )
+                        result.skipped_cache = True
+                        result.default_branch = branch or _default_branch(path)
+                        result.state = "ok"
+                        result.reason = "remote refs unchanged (cached checkpoint)"
+                        _record_coverage(conn, repo_full_name, result, now)
+                        conn.commit()
+                        return result
+
     if fetch:
         code, _, err = _git(path, "fetch", "--quiet", "origin")
         result.fetched = code == 0
@@ -292,24 +506,39 @@ def backfill_commits(
             # read the result as authoritative coverage.
             result.warnings.append(f"fetch failed ({err or 'unknown error'}); clone may be stale")
 
-    # Scope: ALL remote branches by default, not just the default branch.
-    #
-    # Found by running this against the real clone: `origin/HEAD` here points at
-    # `main`, but this repo's actual trunk is `development` -- so a
-    # default-branch walk enumerated 515 commits of the wrong branch and missed
-    # the measured gap entirely. Deriving "where the work is" from origin/HEAD
-    # is an assumption the repo layout does not honour, and the same is true of
-    # any repo using a main/develop split.
-    #
-    # Walking `--remotes=origin` also closes a second hole: commits on branches
-    # that were never merged to any trunk. Dedup is by (repo, sha), so overlap
-    # between branches costs nothing.
     result.default_branch = branch or _default_branch(path)
+    is_shallow = is_shallow_clone(path)
+
+    # Codex R1: Capture and validate local origin ref map BEFORE walk
+    pre_walk_local_refs: dict[str, str] = {}
+    code, local_refs_out, _ = _git(path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin")
+    if code == 0:
+        for line in local_refs_out.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                ref_name, ref_sha = parts
+                if ref_name.endswith("/HEAD"):
+                    continue
+                head_ref = ref_name.replace("refs/remotes/origin/", "refs/heads/")
+                pre_walk_local_refs[head_ref] = ref_sha
+
+    pre_walk_ref_match = False
+    if peek_map is not None and pre_walk_local_refs:
+        remote_origin_branches = {k: v for k, v in peek_map.items() if k.startswith("refs/heads/")}
+        if pre_walk_local_refs == remote_origin_branches:
+            pre_walk_ref_match = True
+
     if branch:
         ref_args = [f"origin/{branch}"]
         code, _, _ = _git(path, "rev-parse", "--verify", f"origin/{branch}")
         if code != 0:
             ref_args = [branch]
+    elif pre_walk_local_refs:
+        # Codex R1: Walk validated immutable SHAs instead of mutable branch refs
+        ref_args = sorted(set(pre_walk_local_refs.values()))
     else:
         ref_args = ["--remotes=origin"]
 
@@ -333,6 +562,7 @@ def backfill_commits(
         result.warnings.append(f"walk capped at {cap} commits; older history not enumerated this run")
     result.commits_seen = len(commits)
 
+    any_file_read_failed = False
     with db_connection(database_path, ensure_github_schema) as conn:
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         pr_shas = {
@@ -360,6 +590,12 @@ def backfill_commits(
                 continue
 
             paths = _changed_paths(path, sha)
+            path_cov = "complete"
+            if paths is None:
+                path_cov = "failed"
+                paths = []
+                any_file_read_failed = True
+
             if _is_merge(path, sha):
                 result.merge_commits += 1
             is_new = sha not in existing
@@ -376,7 +612,7 @@ def backfill_commits(
                     commit["message"],
                     commit["committed_at"],
                     f"https://github.com/{repo_full_name}/commit/{sha}",
-                    "complete",
+                    path_cov,
                     now,
                     now,
                 ),
@@ -400,6 +636,59 @@ def backfill_commits(
             if written % _COMMIT_BATCH == 0:
                 conn.commit()
 
+        # Checkpoint Certification Contract (Codex R1 & R2):
+        # Only certify commit coverage checkpoint if:
+        # 1. Whole-repo walk (branch is None): NEVER publish all-branch checkpoint from branch-limited walk!
+        # 2. Pre-walk peek_map was captured successfully before fetch/enumeration.
+        # 3. git fetch succeeded.
+        # 4. History walk was NOT capped (all requested history was enumerated).
+        # 5. Zero commit file reads failed (all commit rows complete).
+        # 6. Complete origin ref-map equality matched BEFORE walk.
+        # 7. Clone is NOT shallow (shallow clone has truncated history, cannot certify complete coverage).
+        # 8. No concurrent ref changes during walk (re-verify local origin refs match pre-walk snapshot).
+        can_certify = (
+            branch is None
+            and peek_map is not None
+            and result.fetched
+            and not result.capped
+            and not any_file_read_failed
+            and pre_walk_ref_match
+            and not is_shallow
+            and bool(canonical_url)
+        )
+        if can_certify:
+            # Re-verify local origin refs did not change during walk
+            code, post_refs_out, _ = _git(
+                path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin"
+            )
+            if code == 0:
+                post_walk_local_refs: dict[str, str] = {}
+                for line in post_refs_out.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        ref_name, ref_sha = parts
+                        if ref_name.endswith("/HEAD"):
+                            continue
+                        head_ref = ref_name.replace("refs/remotes/origin/", "refs/heads/")
+                        post_walk_local_refs[head_ref] = ref_sha
+                if post_walk_local_refs != pre_walk_local_refs:
+                    can_certify = False
+            else:
+                can_certify = False
+
+        if can_certify and peek_map is not None:
+            record_commit_coverage_checkpoint(
+                conn,
+                canonical_url,
+                peek_map,
+                covered_since_utc=since,
+                verified_at_utc=now,
+                snapshot_time_utc=snapshot_time,
+            )
+
         _record_coverage(conn, repo_full_name, result, now)
         conn.commit()
 
@@ -415,17 +704,29 @@ def backfill_repos(
     fetch: bool = True,
     roots: list[str] | None = None,
     branch: str | None = None,
+    force_refresh: bool = False,
+    probe_budget_seconds: float = PROBE_BUDGET_SECONDS,
 ) -> list[BackfillResult]:
     """Backfill several repos, never letting one repo's failure hide the rest."""
-    return [
-        backfill_commits(
-            database_path,
-            repo,
-            since=since,
-            cap=cap,
-            fetch=fetch,
-            roots=roots,
-            branch=branch,
-        )
-        for repo in repos
-    ]
+    deadline = time.monotonic() + probe_budget_seconds
+    results: list[BackfillResult] = []
+    for repo in repos:
+        try:
+            res = backfill_commits(
+                database_path,
+                repo,
+                since=since,
+                cap=cap,
+                fetch=fetch,
+                roots=roots,
+                branch=branch,
+                force_refresh=force_refresh,
+                probe_deadline=deadline,
+            )
+            results.append(res)
+        except Exception as exc:
+            err_res = BackfillResult(repo=repo)
+            err_res.state = "uncoverable"
+            err_res.reason = f"backfill failed with unexpected error: {exc}"
+            results.append(err_res)
+    return results

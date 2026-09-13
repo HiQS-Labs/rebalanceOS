@@ -29,7 +29,5 @@
     <key>StandardErrorPath</key>
     <string>{{REBALANCE_DIR}}/temp/logs/pulse_server_stderr.log</string>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>

@@ -1,0 +1,326 @@
+{
+  "arms": {
+    "muse-low": {
+      "abstain_correct": 12,
+      "attempts": 12,
+      "cost_method": "not measured; no token or billed-cost receipt",
+      "counterfactual_cost_caveat": "Price-only comparison, not Muse cost: Muse did not expose its token counts.",
+      "counterfactual_same_terra_token_volume_usd": 0.106523,
+      "estimated_cost_usd": null,
+      "evidence_ids_exact": 12,
+      "exact": 10,
+      "exact_abstention_aware_posthoc": 11,
+      "latency_seconds": {
+        "max": 24.91,
+        "mean": 15.536,
+        "p50": 13.538,
+        "p95_inclusive": 24.581
+      },
+      "mismatches": [
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 0,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S12",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        },
+        {
+          "actual": {
+            "abstain": false,
+            "confidence": 0.85,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "verification",
+            "primary_repo": "example/harbor"
+          },
+          "case_id": "S07",
+          "expected": {
+            "abstain": false,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "blocked",
+            "primary_repo": "example/harbor"
+          }
+        }
+      ],
+      "phase_correct": 10,
+      "phase_correct_non_abstain": 8,
+      "phase_non_abstain_total": 9,
+      "primary_repo_correct": 12,
+      "schema_valid": 12,
+      "successes": 12,
+      "tokens": "not exposed by Muse CLI JSONL"
+    },
+    "muse-medium": {
+      "abstain_correct": 12,
+      "attempts": 12,
+      "cost_method": "not measured; no token or billed-cost receipt",
+      "counterfactual_cost_caveat": "Price-only comparison, not Muse cost: Muse did not expose its token counts.",
+      "counterfactual_same_terra_token_volume_usd": 0.08966,
+      "estimated_cost_usd": null,
+      "evidence_ids_exact": 12,
+      "exact": 10,
+      "exact_abstention_aware_posthoc": 11,
+      "latency_seconds": {
+        "max": 29.522,
+        "mean": 20.055,
+        "p50": 19.265,
+        "p95_inclusive": 27.655
+      },
+      "mismatches": [
+        {
+          "actual": {
+            "abstain": false,
+            "confidence": 0.85,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "verification",
+            "primary_repo": "example/harbor"
+          },
+          "case_id": "S07",
+          "expected": {
+            "abstain": false,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "blocked",
+            "primary_repo": "example/harbor"
+          }
+        },
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 0,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S12",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        }
+      ],
+      "phase_correct": 10,
+      "phase_correct_non_abstain": 8,
+      "phase_non_abstain_total": 9,
+      "primary_repo_correct": 12,
+      "schema_valid": 12,
+      "successes": 12,
+      "tokens": "not exposed by Muse CLI JSONL"
+    },
+    "terra-low": {
+      "abstain_correct": 12,
+      "attempts": 12,
+      "cost_method": "Official 2026-09-12 list prices; assumes input total includes cached input.",
+      "estimated_cost_upper_if_reasoning_additional_usd": 0.168574,
+      "estimated_cost_usd": 0.16729,
+      "evidence_ids_exact": 12,
+      "exact": 9,
+      "exact_abstention_aware_posthoc": 11,
+      "latency_seconds": {
+        "max": 7.016,
+        "mean": 4.75,
+        "p50": 4.465,
+        "p95_inclusive": 6.592
+      },
+      "mismatches": [
+        {
+          "actual": {
+            "abstain": false,
+            "confidence": 0.98,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "implementation",
+            "primary_repo": "example/harbor"
+          },
+          "case_id": "S07",
+          "expected": {
+            "abstain": false,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "blocked",
+            "primary_repo": "example/harbor"
+          }
+        },
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 0.99,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S12",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        },
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 1,
+            "evidence_ids": [
+              "synthetic-108"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S06",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-108"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        }
+      ],
+      "phase_correct": 9,
+      "phase_correct_non_abstain": 8,
+      "phase_non_abstain_total": 9,
+      "primary_repo_correct": 12,
+      "schema_valid": 12,
+      "successes": 12,
+      "tokens": {
+        "input_cached": 163840,
+        "input_total": 227171,
+        "output": 655,
+        "reasoning_output_reported": 107
+      }
+    },
+    "terra-medium": {
+      "abstain_correct": 12,
+      "attempts": 12,
+      "cost_method": "Official 2026-09-12 list prices; assumes input total includes cached input.",
+      "estimated_cost_upper_if_reasoning_additional_usd": 0.141391,
+      "estimated_cost_usd": 0.139855,
+      "evidence_ids_exact": 12,
+      "exact": 9,
+      "exact_abstention_aware_posthoc": 11,
+      "latency_seconds": {
+        "max": 5.28,
+        "mean": 4.424,
+        "p50": 4.407,
+        "p95_inclusive": 5.15
+      },
+      "mismatches": [
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 0.99,
+            "evidence_ids": [
+              "synthetic-108"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S06",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-108"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        },
+        {
+          "actual": {
+            "abstain": true,
+            "confidence": 0.99,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "blocked",
+            "primary_repo": "unknown"
+          },
+          "case_id": "S12",
+          "expected": {
+            "abstain": true,
+            "evidence_ids": [
+              "synthetic-117"
+            ],
+            "phase": "planning",
+            "primary_repo": "unknown"
+          }
+        },
+        {
+          "actual": {
+            "abstain": false,
+            "confidence": 0.98,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "implementation",
+            "primary_repo": "example/harbor"
+          },
+          "case_id": "S07",
+          "expected": {
+            "abstain": false,
+            "evidence_ids": [
+              "synthetic-109",
+              "synthetic-110"
+            ],
+            "phase": "blocked",
+            "primary_repo": "example/harbor"
+          }
+        }
+      ],
+      "phase_correct": 9,
+      "phase_correct_non_abstain": 8,
+      "phase_non_abstain_total": 9,
+      "primary_repo_correct": 12,
+      "schema_valid": 12,
+      "successes": 12,
+      "tokens": {
+        "input_cached": 178176,
+        "input_total": 226218,
+        "output": 678,
+        "reasoning_output_reported": 128
+      }
+    }
+  },
+  "battery_id": "gh210-synthetic-v1",
+  "rows": 48
+}

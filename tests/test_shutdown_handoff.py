@@ -16,7 +16,7 @@ from rebalance.ingest.shutdown_handoff import (
 )
 
 
-def create_fixture_db(db_path: Path) -> Path:
+def create_fixture_db(db_path: Path, committed_at: str | None = None) -> Path:
     """Create a fixture SQLite database mimicking Rebalance DB schema."""
     conn = sqlite3.connect(db_path)
     conn.execute(
@@ -105,7 +105,7 @@ def create_fixture_db(db_path: Path) -> Path:
         """
     )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    commit_iso = committed_at or "2026-09-05T12:00:00+00:00"
     conn.execute(
         """
         INSERT INTO github_commits VALUES (
@@ -119,7 +119,7 @@ def create_fixture_db(db_path: Path) -> Path:
             196
         )
         """,
-        (now_iso,),
+        (commit_iso,),
     )
     conn.commit()
     conn.close()

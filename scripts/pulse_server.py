@@ -24,7 +24,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time as datetime_time, timedelta, timezone, tzinfo
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -296,12 +296,36 @@ def health():
     if not PULSE_HTML.exists():
         return JSONResponse({"ok": False, "reason": "pulse.html missing"}, status_code=503)
     mtime = datetime.fromtimestamp(PULSE_HTML.stat().st_mtime, tz=timezone.utc)
-    age_s = (now_utc() - mtime).total_seconds()
-    return {
-        "ok": True,
+    now = now_utc()
+    age_s = (now - mtime).total_seconds()
+    fresh = _pulse_artifact_is_fresh(now, mtime)
+    body: dict[str, object] = {
+        "ok": fresh,
         "generated_at": mtime.isoformat(),
         "age_seconds": round(age_s, 1),
     }
+    if not fresh:
+        body["reason"] = "pulse.html stale"
+        return JSONResponse(body, status_code=503)
+    return body
+
+
+def _local_timezone() -> tzinfo:
+    """Device timezone used by the launchd calendar policy."""
+    local_now = datetime.now().astimezone()  # READ-LAYER-OK: scheduler timezone, not a data-query window (GH-211)
+    return local_now.tzinfo or timezone.utc
+
+
+def _pulse_artifact_is_fresh(now: datetime, generated: datetime) -> bool:
+    """Apply the scheduler-aware freshness contract from SCHEDULER.md."""
+    local_tz = _local_timezone()
+    local_now = now.astimezone(local_tz)
+    local_generated = generated.astimezone(local_tz)
+    if local_now.timetz().replace(tzinfo=None) <= datetime_time(6, 53):
+        previous_day = local_now.date() - timedelta(days=1)
+        final_scheduled = datetime.combine(previous_day, datetime_time(23, 38), tzinfo=local_tz)
+        return local_generated >= final_scheduled
+    return (now - generated).total_seconds() <= 90 * 60
 
 
 @app.post("/api/refresh")

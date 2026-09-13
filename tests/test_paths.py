@@ -17,6 +17,7 @@ from rebalance import paths as paths_module
 from rebalance.paths import (
     DatabaseNotFoundError,
     ExplicitDatabasePathNotFoundError,
+    resolve_clio_prompt_log_path,
     resolve_database_path,
 )
 
@@ -43,6 +44,15 @@ def test_explicit_valid_database_path_is_honored(tmp_path):
     resolved = resolve_database_path(db_file)
 
     assert resolved == db_file.resolve()
+
+
+def test_clio_prompt_log_resolver_honors_explicit_and_environment(tmp_path, monkeypatch):
+    explicit = tmp_path / "explicit.jsonl"
+    configured = tmp_path / "configured.jsonl"
+    monkeypatch.setenv("REBALANCE_CLIO_PROMPT_LOG", str(configured))
+
+    assert resolve_clio_prompt_log_path(explicit) == explicit.resolve()
+    assert resolve_clio_prompt_log_path() == configured.resolve()
 
 
 def test_explicit_nonexistent_database_path_raises(tmp_path, monkeypatch):

@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 import time
 from dataclasses import dataclass
@@ -8,7 +7,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
 from rebalance.ingest.db import db_connection
+from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.lib.time_ops import now_iso
+from rebalance.paths import resolve_clio_prompt_log_path
 
 if TYPE_CHECKING:
     # Import-time only: the runtime import lives inside clio_semantic_docs to
@@ -60,6 +61,20 @@ def filter_prompt_metadata(prompt: str) -> str:
     return prompt.strip()
 
 
+def load_recent_clio_prompts(database_path: Path, cutoff_iso: str, limit: int = 16) -> list[dict[str, Any]]:
+    """Return recent persisted CLIO prompts without refreshing or mutating the source."""
+    try:
+        with db_connection_readonly(database_path) as conn:
+            rows = conn.execute(
+                "SELECT id,timestamp,prompt,agent,repo FROM clio_prompts "
+                "WHERE julianday(timestamp) >= julianday(?) ORDER BY timestamp DESC LIMIT ?",
+                (cutoff_iso, int(limit)),
+            ).fetchall()
+    except Exception:  # noqa: BLE001 — absent/not-yet-migrated DB is an empty read surface
+        return []
+    return [dict(row) for row in rows]
+
+
 @dataclass(frozen=True)
 class ClioSyncResult:
     prompts_fetched: int
@@ -73,7 +88,7 @@ class ClioSyncResult:
 def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
     start = time.monotonic()
 
-    jsonl_path = Path(os.path.expanduser("~/.claude/prompt-log.jsonl"))
+    jsonl_path = resolve_clio_prompt_log_path()
     if not jsonl_path.exists():
         return ClioSyncResult(0, 0, 0, round(time.monotonic() - start, 2), skipped=True, reason="no prompt-log found")
 

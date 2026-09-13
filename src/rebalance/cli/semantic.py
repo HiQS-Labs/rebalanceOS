@@ -115,6 +115,40 @@ def semantic_embed_cmd(
     )
 
 
+@app.command("semantic-repair-orphans")
+def semantic_repair_orphans_cmd(
+    database: Path | None = DBOption(),
+    apply: bool = typer.Option(False, "--apply", help="Delete the reported orphan vectors"),
+    confirm: bool = typer.Option(False, "--confirm", help="Confirm this destructive repair"),
+    confirm_large: bool = typer.Option(
+        False,
+        "--confirm-large",
+        help="Additional confirmation when more than 1,000 vectors are affected",
+    ),
+) -> None:
+    """Inspect or repair semantic vectors whose document row is absent."""
+    from rebalance.ingest.semantic_index import repair_semantic_orphans
+
+    try:
+        db_path = resolve_database_path(database)
+        result = repair_semantic_orphans(
+            db_path,
+            apply=apply,
+            confirm=confirm,
+            confirm_large=confirm_large,
+        )
+    except DatabaseNotFoundError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(2) from exc
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    mode = "applied" if result.applied else "dry-run"
+    typer.echo(
+        f"Semantic orphan repair {mode}: found={result.orphan_count}, "
+        f"deleted={result.deleted_count}, sample_ids={list(result.sample_ids)}"
+    )
+
+
 @app.command("semantic-query")
 def semantic_query_cmd(
     text: str = typer.Argument(..., help="Natural language query"),

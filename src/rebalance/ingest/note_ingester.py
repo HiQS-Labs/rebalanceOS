@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from rebalance.lib import time_ops
+from rebalance.lib.redaction import redact_key_shaped_secrets
 from rebalance.ingest.db import db_connection, ensure_schema, ensure_semantic_schema
 from rebalance.ingest.md_parser import parse_note
 from rebalance.ingest.semantic_index import sync_vault_documents
@@ -59,23 +60,10 @@ _WORD_RE = re.compile(r"[a-zA-Z]{2,}")
 # Add new patterns here; they take effect on the next vault ingest.
 # ---------------------------------------------------------------------------
 
-_SECRET_PATTERNS = re.compile(
-    r"sk-ant-[A-Za-z0-9\-_]{20,}"  # Anthropic sk-ant-
-    r"|sk-[A-Za-z0-9]{20,}"  # OpenAI / generic sk-
-    r"|ghp_[A-Za-z0-9]{35,}"  # GitHub PAT (36 chars typical)
-    r"|gho_[A-Za-z0-9]{35,}"  # GitHub OAuth token
-    r"|github_pat_[A-Za-z0-9_]{20,}"  # GitHub fine-grained PAT
-    r"|AIza[A-Za-z0-9\-_]{35,}"  # Google API key (39 chars total)
-    r"|AKIA[A-Za-z0-9]{16}"  # AWS access key ID (exactly 20 chars)
-    r"|xoxb-[0-9]+-[A-Za-z0-9\-]+"  # Slack bot token
-    r"|xoxp-[0-9]+-[A-Za-z0-9\-]+"  # Slack user token
-    r"|ya29\.[A-Za-z0-9\-_]{20,}"  # Google OAuth access token
-)
-
 
 def _redact_secrets(text: str) -> str:
     """Replace known secret patterns with a placeholder before indexing."""
-    return _SECRET_PATTERNS.sub("[REDACTED]", text)
+    return redact_key_shaped_secrets(text)
 
 
 # ---------------------------------------------------------------------------

@@ -27,14 +27,16 @@ missing, so the gap is computed against ``complete`` rows only, with
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.db import db_connection, ensure_github_schema
+from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.ingest.github_commit_backfill import _git, resolve_clone
-from rebalance.lib.time_ops import _now
+from rebalance.lib.git_ops import canonical_github_url
+from rebalance.lib.time_ops import _now, now_utc, parse_utc_iso
 
 _LS_REMOTE_TIMEOUT_S = 30
 
@@ -119,25 +121,111 @@ def _fetch_age_hours(repo_path: Path) -> float | None:
     return (now_utc().timestamp() - mtime) / 3600.0
 
 
+def _peek_verified_age_hours(
+    database_path: Path,
+    repo_full_name: str,
+    clone_path: Path | None = None,
+) -> float | None:
+    """Check how recently github_remote_peeks recorded a verified remote peek for this repo.
+
+    Verifies canonical remote URL equivalence and, when clone_path is supplied, ensures
+    the examined clone's local origin tip matches the verified ref proof (preventing a divergent
+    second clone from claiming false freshness).
+    """
+    canonical_url = canonical_github_url(repo_full_name)
+    try:
+        with db_connection_readonly(database_path) as conn:
+            row = conn.execute(
+                "SELECT sha_map_json, verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?",
+                (canonical_url,),
+            ).fetchone()
+            if not row or not row[1]:
+                return None
+            sha_map_json, verified_at_str = row
+            if clone_path:
+                try:
+                    from rebalance.ingest.github_commit_backfill import is_shallow_clone
+
+                    if is_shallow_clone(clone_path):
+                        return None
+
+                    code, out, _ = _git(
+                        clone_path,
+                        "for-each-ref",
+                        "refs/remotes/origin/",
+                        "--format=%(refname) %(objectname)",
+                    )
+                    if code != 0 or not out.strip():
+                        return None
+
+                    clone_branches: dict[str, str] = {}
+                    for line in out.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split(None, 1)
+                        if len(parts) != 2:
+                            continue
+                        ref_name, sha = parts
+                        if ref_name == "refs/remotes/origin/HEAD":
+                            continue
+                        branch_name = ref_name.removeprefix("refs/remotes/origin/")
+                        clone_branches[f"refs/heads/{branch_name}"] = sha
+
+                    ref_map = json.loads(sha_map_json)
+                    expected_branches = {k: v for k, v in ref_map.items() if k.startswith("refs/heads/")}
+                    if not clone_branches or clone_branches != expected_branches:
+                        return None
+                except Exception:
+                    return None
+
+            verified_dt = parse_utc_iso(verified_at_str)
+            if verified_dt is None:
+                return None
+            return (now_utc() - verified_dt).total_seconds() / 3600.0
+    except Exception:
+        return None
+    return None
+
+
 def remote_tip(repo_full_name: str, branch: str = "HEAD") -> str:
     """Remote tip SHA via ``git ls-remote`` — one cheap call, no clone needed.
 
     This is the anchor that makes the check honest: without it, a stale clone
     and a stale DB agree with each other and report perfect coverage.
+    Hardened with non-interactive flags to prevent askpass/prompt hangs (GH-201).
+    Routes through rebalance.lib.git_ops.run_git for shared subprocess boundary.
     """
+    from rebalance.lib.git_ops import build_hardened_ssh_command, run_git
+
     url = f"https://github.com/{repo_full_name}.git"
+    ssh_cmd = build_hardened_ssh_command()
+    extra_env = {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+        "GIT_SSH_COMMAND": ssh_cmd,
+    }
     try:
-        result = subprocess.run(
-            ["git", "ls-remote", url, branch],
-            capture_output=True,
-            text=True,
+        result = run_git(
+            Path("."),
+            "ls-remote",
+            url,
+            branch,
             timeout=_LS_REMOTE_TIMEOUT_S,
+            extra_env=extra_env,
         )
     except (subprocess.TimeoutExpired, OSError):
         return ""
     if result.returncode != 0 or not result.stdout.strip():
         return ""
-    return result.stdout.split()[0].strip()
+    parts = result.stdout.split()
+    if not parts:
+        return ""
+    sha = parts[0].strip()
+    if len(sha) not in (40, 64) or not all(c in "0123456789abcdefABCDEF" for c in sha):
+        return ""
+    return sha
 
 
 def check_repo_coverage(
@@ -169,12 +257,15 @@ def check_repo_coverage(
     fetch_age_hours = _fetch_age_hours(path)
     coverage.fetch_age_hours = fetch_age_hours
     if not check_remote:
-        if fetch_age_hours is None or fetch_age_hours > STALE_FETCH_WARN_HOURS:
+        peek_verified_hours = _peek_verified_age_hours(database_path, repo_full_name, clone_path=path)
+        effective_ages = [a for a in (fetch_age_hours, peek_verified_hours) if a is not None]
+        effective_age = min(effective_ages) if effective_ages else None
+        if effective_age is None or effective_age > STALE_FETCH_WARN_HOURS:
             coverage.state = "stale"
             coverage.reason = (
                 "clone not fetched recently"
-                if fetch_age_hours is None
-                else f"clone last fetched {fetch_age_hours:.0f}h ago"
+                if effective_age is None
+                else f"clone last fetched/verified {effective_age:.0f}h ago"
             )
             return coverage
 

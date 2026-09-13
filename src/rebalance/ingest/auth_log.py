@@ -317,25 +317,51 @@ def log_gmail_scope_insufficient(error: str = "") -> None:
 # launchd job helpers
 # ---------------------------------------------------------------------------
 
+# Set by the outer scheduler guard (utils/job_guard.py --lifecycle-job) in the
+# CHILD process env only. The guard owns the one job_started/terminal pair for
+# a guarded job, so library-backed self-reporters running inside the guarded
+# child (daily_synthesis.py, obsidian_daily_rollover.py) defer to it (GH-215).
+# The guard's own calls run in the parent, where the variable is absent, so
+# they are unaffected — as are non-lifecycle collector events.
+SCHEDULER_LIFECYCLE_CHILD_ENV = "REBALANCE_SCHEDULER_LIFECYCLE_CHILD"
+
+
+def _lifecycle_suppressed() -> bool:
+    return os.environ.get(SCHEDULER_LIFECYCLE_CHILD_ENV) == "1"
+
 
 def log_job_started(job: str) -> None:
     """Emit a job_started event for a launchd background job."""
+    if _lifecycle_suppressed():
+        return
     _append("launchd", "job_started", {"job": job})
 
 
 def log_job_completed(job: str, elapsed: float | None = None) -> None:
     """Emit a job_completed event (exit 0)."""
+    if _lifecycle_suppressed():
+        return
     detail: dict[str, Any] = {"job": job}
     if elapsed is not None:
         detail["elapsed_seconds"] = round(elapsed, 2)
     _append("launchd", "job_completed", detail)
 
 
-def log_job_failed(job: str, exit_code: int, elapsed: float | None = None) -> None:
+def log_job_failed(
+    job: str,
+    exit_code: int,
+    elapsed: float | None = None,
+    *,
+    reason: str | None = None,
+) -> None:
     """Emit a job_failed event (non-zero exit)."""
+    if _lifecycle_suppressed():
+        return
     detail: dict[str, Any] = {"job": job, "exit_code": exit_code}
     if elapsed is not None:
         detail["elapsed_seconds"] = round(elapsed, 2)
+    if reason is not None:
+        detail["reason"] = reason
     _append("launchd", "job_failed", detail)
 
 

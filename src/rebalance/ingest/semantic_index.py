@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -53,6 +54,90 @@ class SemanticEmbedResult:
     model_name: str
     embedding_dim: int
     elapsed_seconds: float
+    deferred_battery: bool = False
+
+
+@dataclass(frozen=True)
+class SemanticOrphanRepairResult:
+    orphan_count: int
+    deleted_count: int
+    sample_ids: tuple[int, ...]
+    applied: bool
+
+
+def _delete_orphan_ids(conn, orphan_ids: list[int]) -> None:
+    conn.executemany(
+        "DELETE FROM semantic_embeddings WHERE rowid = ?",
+        [(doc_id,) for doc_id in orphan_ids],
+    )
+
+
+def repair_semantic_orphans(
+    database_path: Path,
+    *,
+    apply: bool = False,
+    confirm: bool = False,
+    confirm_large: bool = False,
+) -> SemanticOrphanRepairResult:
+    """Inspect or transactionally remove vectors without semantic documents."""
+    from rebalance.ingest import audit
+
+    operation_id: str | None = None
+    with db_connection(database_path) as conn:
+        if not apply:
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            return SemanticOrphanRepairResult(len(orphan_ids), 0, tuple(orphan_ids[:10]), False)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            orphan_ids = sem.orphaned_embedding_ids(conn)
+            count = len(orphan_ids)
+            result = SemanticOrphanRepairResult(count, 0, tuple(orphan_ids[:10]), False)
+            if count == 0:
+                conn.rollback()
+                return result
+            if not confirm:
+                raise ValueError("destructive repair requires --apply --confirm")
+            if count > 1000 and not confirm_large:
+                raise ValueError(f"repair affects {count} rows; add --confirm-large")
+            operation_id = uuid.uuid4().hex
+            audit.append_audit_entry(
+                "DELETE",
+                "semantic_embeddings orphan vectors",
+                operation_id=operation_id,
+                state="pending",
+                rows=count,
+                database=str(database_path),
+                confirmation="confirm-large" if count > 1000 else "confirm",
+            )
+            _delete_orphan_ids(conn, orphan_ids)
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            if operation_id is not None:
+                try:
+                    audit.append_audit_entry(
+                        "DELETE",
+                        "semantic_embeddings orphan vectors",
+                        operation_id=operation_id,
+                        state="failed",
+                        rows=count,
+                        database=str(database_path),
+                        error=type(exc).__name__,
+                    )
+                except OSError:
+                    pass
+            raise
+
+    audit.append_audit_entry(
+        "DELETE",
+        "semantic_embeddings orphan vectors",
+        operation_id=operation_id,
+        state="completed",
+        rows=count,
+        database=str(database_path),
+        confirmation="confirm-large" if count > 1000 else "confirm",
+    )
+    return SemanticOrphanRepairResult(count, count, tuple(orphan_ids[:10]), True)
 
 
 @dataclass
@@ -647,6 +732,7 @@ def embed_semantic_pending(
     min_chars: int = 1,
     force_reembed: bool = False,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> SemanticEmbedResult:
     """Source-owned facade over :func:`embed_pending` for the `semantic-embed`
     maintenance command, so the CLI doesn't import the leaf directly
@@ -659,6 +745,7 @@ def embed_semantic_pending(
         min_chars=min_chars,
         force_reembed=force_reembed,
         embed_texts=embed_texts,
+        power_defer=power_defer,
     )
 
 
@@ -672,6 +759,7 @@ def embed_pending(
     force_reembed: bool = False,
     source_types: Iterable[str] | None = None,
     embed_texts: EmbedTexts | None = None,
+    power_defer: bool | None = None,
 ) -> SemanticEmbedResult:
     """Embed pending semantic document rows via the shared local embedder.
 
@@ -684,8 +772,31 @@ def embed_pending(
 
     instrument_embedding_pass("embed_pending")
     start = time.monotonic()
-    embed_fn = embed_texts or _default_embed_texts
     selected_sources = _normalize_sources(source_types)
+
+    if power_defer is None:
+        from rebalance.lib.power_ops import should_defer_embeddings
+
+        defer_on_battery = should_defer_embeddings()
+    else:
+        defer_on_battery = power_defer
+
+    if defer_on_battery:
+        with db_connection(database_path, ensure_semantic_schema) as conn:
+            total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
+            sem.set_semantic_embedding_meta(conn, "power_deferred", "1")
+            conn.commit()
+        return SemanticEmbedResult(
+            total_docs=total_docs,
+            embedded_docs=0,
+            skipped_unchanged=total_docs,
+            model_name=model_name,
+            embedding_dim=EMBEDDING_DIM,
+            elapsed_seconds=round(time.monotonic() - start, 2),
+            deferred_battery=True,
+        )
+
+    embed_fn = embed_texts or _default_embed_texts
     current_model_version = f"{model_name}|{EMBEDDING_DIM}"
 
     with db_connection(database_path, ensure_semantic_schema) as conn:
@@ -703,6 +814,8 @@ def embed_pending(
         total_docs = sem.count_embeddable_semantic_documents(conn, selected_sources, min_chars)
 
         if not rows:
+            sem.set_semantic_embedding_meta(conn, "power_deferred", "0")
+            conn.commit()
             return SemanticEmbedResult(
                 total_docs=total_docs,
                 embedded_docs=0,
@@ -710,6 +823,7 @@ def embed_pending(
                 model_name=model_name,
                 embedding_dim=EMBEDDING_DIM,
                 elapsed_seconds=round(time.monotonic() - start, 2),
+                deferred_battery=False,
             )
 
         embedded = 0
@@ -731,6 +845,7 @@ def embed_pending(
             ("embedding_dim", str(EMBEDDING_DIM)),
             ("embedder_version", current_model_version),
             ("last_embed_at", now_iso),
+            ("power_deferred", "0"),
         ]:
             sem.set_semantic_embedding_meta(conn, key, value)
         conn.commit()
@@ -742,6 +857,7 @@ def embed_pending(
         model_name=model_name,
         embedding_dim=EMBEDDING_DIM,
         elapsed_seconds=round(time.monotonic() - start, 2),
+        deferred_battery=False,
     )
 
 

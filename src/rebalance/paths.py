@@ -43,6 +43,12 @@ resolve_secret_path(name) — find ``~/secrets/<name>``:
     2. ``secrets_dir`` field in the user-level config
     3. ``~/secrets`` (legacy default)
 
+resolve_clio_prompt_log_path(explicit) — find the live CLIO JSONL source:
+    1. explicit argument
+    2. ``REBALANCE_CLIO_PROMPT_LOG`` env var
+    3. ``clio_prompt_log_path`` in user-level config
+    4. ``~/.claude/prompt-log.jsonl`` (legacy default)
+
 Setting user-level defaults
 ---------------------------
 
@@ -90,6 +96,20 @@ def canonical_database_dir() -> Path:
 def canonical_database_path() -> Path:
     """Return the canonical full path to rebalance.db for this platform."""
     return canonical_database_dir() / "rebalance.db"
+
+
+def resolve_clio_prompt_log_path(explicit: Path | None = None) -> Path:
+    """Resolve the live CLIO JSONL source without embedding it in consumers."""
+    if explicit is not None:
+        return Path(explicit).expanduser().resolve()
+    env_value = os.environ.get("REBALANCE_CLIO_PROMPT_LOG")
+    if env_value:
+        return Path(env_value).expanduser().resolve()
+    user_cfg = _load_user_config()
+    configured = user_cfg.get("clio_prompt_log_path")
+    if isinstance(configured, str) and configured:
+        return Path(configured).expanduser().resolve()
+    return (Path.home() / ".claude" / "prompt-log.jsonl").resolve()
 
 
 # ---------------------------------------------------------------------------

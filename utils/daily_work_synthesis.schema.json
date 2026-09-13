@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "focus", "trajectory", "velocity", "operational_horizon",
+    "coaching_nudge", "coaching_trigger", "evidence_ids",
+    "confidence", "abstain", "yesterday_arc", "weekly_horizon"
+  ],
+  "properties": {
+    "focus": {"type": "string"},
+    "trajectory": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "string"}
+    },
+    "velocity": {"type": "string"},
+    "operational_horizon": {"type": "string"},
+    "coaching_nudge": {"type": "string"},
+    "coaching_trigger": {"type": "string"},
+    "evidence_ids": {"type": "array", "items": {"type": "string"}},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "abstain": {"type": "boolean"},
+    "yesterday_arc": {"type": ["string", "null"]},
+    "weekly_horizon": {"type": ["string", "null"]}
+  }
+}

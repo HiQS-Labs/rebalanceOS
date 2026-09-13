@@ -8,6 +8,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-health-check-triage</string>
+        <string>--max-runtime-seconds</string><string>1800</string>
+        <string>--lifecycle-job</string><string>health-check-triage</string>
+        <string>--</string>
+        <string>{{PYTHON}}</string>
         <string>{{REBALANCE_DIR}}/scripts/health_issue_reporter.py</string>
         <string>--warn</string>
         <string>--close</string>
@@ -58,7 +64,5 @@
     <key>KeepAlive</key>
     <false/>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>

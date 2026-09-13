@@ -63,8 +63,10 @@ rb_job_init() {
     RB_LOG_PREFIX="${RB_JOB_NAME//-/_}"
     LOG_FILE="$LOG_DIR/${RB_LOG_PREFIX}_$(date +%Y-%m-%d).log"
     _RB_JOB_START_TS=$(date +%s)
-    rb_job_mark_started "$RB_JOB_NAME"
-    trap _rb_job_exit EXIT
+    if [ "${REBALANCE_SCHEDULER_LIFECYCLE_CHILD:-0}" != "1" ]; then
+        rb_job_mark_started "$RB_JOB_NAME"
+        trap _rb_job_exit EXIT
+    fi
 }
 
 # Delete this job's daily logs older than the retention window.

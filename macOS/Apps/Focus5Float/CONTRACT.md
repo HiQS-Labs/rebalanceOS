@@ -18,6 +18,12 @@ single source of truth for the wire shape it decodes.
 > `rank_reason`. It is NOT a repo, so `summary.roster_size` is unchanged (still counts
 > only the real repo roster). The app renders it via the existing dynamic roster
 > `ForEach` — no client change required. Absent whenever 3-Eyes is inert/absent.
+>
+> **Amended 2026-09-10 (GH-204):** added optional `RepoCard.clones` (array of `RepoClone`
+> objects) and clone dirty flags (`clones_dirty_count`, `any_clone_dirty`). Full
+> clones sharing the same repo identity are grouped under their primary checkout so
+> clones do not crowd out other projects from the Focus 5 roster. Additive and
+> backward-compatible: absent or empty when a repo has no task clones.
 
 - **Endpoint:** `GET http://localhost:8787/focus-5.json`
 - **Query:** `?view=dirty` → re-rank to the "Dirty Five" board (read-only, in-memory).

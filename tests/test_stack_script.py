@@ -221,6 +221,25 @@ class StackScriptTests(unittest.TestCase):
             if fields[:1] == ["github-sync"]:
                 self.assertIn("ERROR (1)", line)
 
+    def test_live_finite_job_beyond_policy_is_overdue(self):
+        fixture = LAUNCHCTL_FIXTURE.replace(
+            f"-\t1\t{PREFIX}github-sync",
+            f"4343\t0\t{PREFIX}github-sync",
+        )
+        out = strip_ansi(
+            run_stack(
+                "status",
+                home=self.home,
+                extra_env={
+                    "STACK_LAUNCHCTL_OUTPUT": fixture,
+                    "STACK_PROCESS_ELAPSED_SECONDS": "7201",
+                },
+            ).stdout
+        )
+        row = next(line for line in out.splitlines() if line.startswith("github-sync "))
+        self.assertIn("OVERDUE", row)
+        self.assertIn("failing: 2", out)
+
     # -- 5. the target-root guard ------------------------------------------
 
     def test_status_reports_a_foreign_binding_on_the_owning_row(self):
@@ -360,10 +379,10 @@ class StackScriptTests(unittest.TestCase):
         now renders and lints the whole policy set first."""
         policy = self.home / "POLICY.md"
         policy.write_text(
-            "| Job (label suffix) | Cadence | Wrapper |\n"
-            "|---|---|---|\n"
-            "| `obsidian-vault-embeddings` | hourly | `scripts/vault_sync.sh` |\n"
-            "| `no-such-job` | hourly | — |\n",
+            "| Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs | Max runtime seconds |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| `obsidian-vault-embeddings` | hourly | `scripts/vault_sync.sh` | work | pre | out | 7200 |\n"
+            "| `no-such-job` | hourly | — | work | pre | out | 60 |\n",
             encoding="utf-8",
         )
         self.write_plist("obsidian-vault-embeddings")

@@ -321,7 +321,7 @@ struct ContentView: View {
                         }
                         RosterLayout(tiled: model.tileCards) {
                             ForEach(Array(model.roster.enumerated()), id: \.element.id) { index, card in
-                                RepoCardView(card: card, darker: !index.isMultiple(of: 2))
+                                RepoCardView(card: card, model: model, darker: !index.isMultiple(of: 2))
                             }
                         }
                         if !model.offRoster.isEmpty {
@@ -717,10 +717,63 @@ private struct SegmentedModeButton: View {
     }
 }
 
+// MARK: - Repo prompt snippet (latest CLIO prompt)
+
+struct RepoPromptSnippetView: View {
+    let entry: PromptLogEntry
+    let localPath: String
+    let vscodeURL: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                if let ide = entry.ide, !ide.isEmpty {
+                    Text(ide)
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.text)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                }
+                let age = RelTime.ago(entry.timestamp)
+                if !age.isEmpty {
+                    Text(age)
+                        .font(Theme.monoSmall)
+                        .foregroundStyle(Theme.text3)
+                }
+                Spacer(minLength: 4)
+                Button {
+                    IDELauncher.launch(ide: entry.ide, repoPath: localPath, fallbackURL: vscodeURL)
+                } label: {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Theme.accentSoft.opacity(0.5), in: RoundedRectangle(cornerRadius: 3))
+                }
+                .buttonStyle(.plain)
+                .help("Launch in \(entry.ide ?? "IDE") (\(localPath))")
+            }
+
+            Text(entry.prompt)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text2)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(6)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+    }
+}
+
 // MARK: - Repo card (collapsible)
 
 struct RepoCardView: View {
     let card: RepoCard
+    var model: Focus5Model? = nil
     var darker: Bool = false
     @State private var expanded = false
     @State private var hovered = false
@@ -731,7 +784,7 @@ struct RepoCardView: View {
                 KeyCap(text: "#\(card.position)", font: Theme.monoSmall, height: 24)
                 Spacer(minLength: Theme.Space.s)
                 OpenRepoButton(repoName: card.repoName, localPath: card.localPath, vscodeURL: card.vscodeUrl)
-                StatusDot(isDirty: card.isDirty, healthAvailable: card.healthAvailable)
+                StatusDot(isDirty: card.isDirty || card.isAnyCloneDirty, healthAvailable: card.healthAvailable)
                 Image(systemName: expanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Theme.text3)
@@ -750,10 +803,28 @@ struct RepoCardView: View {
                 .foregroundStyle(Theme.text3)
                 .padding(.top, 8)
 
+            if let prompt = model?.latestPrompt(for: card) {
+                RepoPromptSnippetView(
+                    entry: prompt,
+                    localPath: card.localPath,
+                    vscodeURL: card.vscodeUrl
+                )
+                .padding(.top, 6)
+            }
+
             HStack(spacing: Theme.Space.m) {
                 if let branch = card.branch { GroupTag(name: branch) }
                 Text("↑\(card.ahead) ↓\(card.behind)")
                 Text("\(card.modifiedCount)M \(card.untrackedCount)U")
+                if card.hasClones {
+                    Text("·")
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.on.square")
+                            .font(.system(size: 9))
+                        Text("\(card.activeClones.count) clone\(card.activeClones.count == 1 ? "" : "s")")
+                    }
+                    .foregroundStyle(card.isAnyCloneDirty ? Theme.attention : Theme.text2)
+                }
                 Spacer(minLength: 0)
             }
             .font(Theme.monoSmall)
@@ -798,6 +869,46 @@ struct RepoCardView: View {
             if let branch = card.branch {
                 Text("\(branch) · ↑\(card.ahead) ↓\(card.behind)")
                     .font(Theme.monoSmall).foregroundStyle(Theme.text3)
+            }
+            if card.hasClones {
+                let dirtyCount = card.activeClones.filter(\.isDirty).count
+                if dirtyCount > 0 {
+                    Text("\(dirtyCount) clone\(dirtyCount == 1 ? " has" : "s have") uncommitted changes")
+                        .font(Theme.monoSmall).foregroundStyle(Theme.attention)
+                }
+            }
+        }
+
+        if card.hasClones {
+            CardSection(label: "Full clones (\(card.activeClones.count))") {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(card.activeClones) { clone in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                StatusDot(isDirty: clone.isDirty, healthAvailable: true)
+                                Text(clone.repoName)
+                                    .font(.system(size: 12.5, weight: .medium))
+                                    .foregroundStyle(Theme.text)
+                                    .lineLimit(1)
+                                if let b = clone.branch {
+                                    GroupTag(name: b)
+                                }
+                                Spacer(minLength: Theme.Space.xs)
+                                Text("↑\(clone.ahead) ↓\(clone.behind) \(clone.modifiedCount)M \(clone.untrackedCount)U")
+                                    .font(Theme.monoSmall)
+                                    .foregroundStyle(Theme.text3)
+                                OpenRepoButton(repoName: clone.repoName, localPath: clone.localPath, vscodeURL: clone.vscodeUrl)
+                            }
+                            if let clonePrompt = model?.latestPrompt(for: clone, in: card) {
+                                RepoPromptSnippetView(
+                                    entry: clonePrompt,
+                                    localPath: clone.localPath,
+                                    vscodeURL: clone.vscodeUrl
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1053,6 +1164,7 @@ struct PromptLogRowView: View {
 
             HStack(spacing: Theme.Space.m) {
                 GroupTag(name: entry.repo)
+                if let ide = entry.ide, !ide.isEmpty { GroupTag(name: ide) }
                 if let branch = entry.branch { GroupTag(name: branch) }
                 if !entry.machine.isEmpty { Text(entry.machine) }
                 Spacer(minLength: 0)
