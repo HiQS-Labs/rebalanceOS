@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -47,10 +48,30 @@ def result(**overrides):
 def test_default_is_disabled_and_pins_terra_low():
     cfg = dws.default_config()
     assert cfg["enabled"] is False
+    assert cfg["codex_executable"] == "codex"
     assert cfg["model"] == "gpt-5.6-terra"
     assert cfg["reasoning_effort"] == "low"
     assert cfg["max_calls_per_day"] > 0
     assert cfg["max_estimated_cost_usd_per_day"] > 0
+
+
+def test_invoke_uses_configured_codex_executable(monkeypatch):
+    captured = {}
+
+    def fake_run(command, **_kwargs):
+        captured["command"] = command
+        stdout = "\n".join(
+            [
+                '{"type":"agent_message","text":"{}"}',
+                '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}',
+            ]
+        )
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(dws.subprocess, "run", fake_run)
+    cfg = dws.default_config() | {"codex_executable": "/configured/codex"}
+    dws.invoke_terra("prompt", cfg)
+    assert captured["command"][0] == "/configured/codex"
 
 
 def test_scrub_masks_labeled_bearer_bare_secret_values_and_emails():

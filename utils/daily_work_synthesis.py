@@ -49,6 +49,7 @@ class TerraCallError(RuntimeError):
 def default_config() -> dict[str, Any]:
     return {
         "enabled": False,
+        "codex_executable": "codex",
         "model": "gpt-5.6-terra",
         "reasoning_effort": "low",
         "timeout_seconds": 120,
@@ -278,7 +279,7 @@ def build_prompt(packet: dict[str, Any]) -> str:
 def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[str, dict[str, int], float]:
     with tempfile.TemporaryDirectory(prefix="rebalance-daily-terra-") as workspace:
         command = [
-            "codex",
+            str(cfg["codex_executable"]),
             "exec",
             "--ephemeral",
             "--skip-git-repo-check",
