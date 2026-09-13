@@ -15,15 +15,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from rebalance.paths import resolve_database_path
+from rebalance.lib.redaction import redact_key_shaped_secrets
+from rebalance.paths import resolve_clio_prompt_log_path, resolve_database_path, resolve_project_root
 from rebalance.lib.time_ops import now_utc, parse_iso, to_local
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = resolve_project_root(Path(__file__))
 SCHEMA = Path(__file__).with_suffix(".schema.json")
 DEFAULT_CONFIG = ROOT / "temp" / "daily-work-synthesis.json"
 REQUIRED_TEXT = ("focus", "velocity", "operational_horizon", "coaching_nudge", "coaching_trigger")
-SECRET_RE = re.compile(r"(?i)(api[_-]?key|token|secret|password|authorization)\s*[:=]\s*[^\s,;]+")
+AUTH_RE = re.compile(r"(?i)\bauthorization\s*[:=]\s*(?:(?:bearer|basic|token)\s+)?[^\s,;]+")
+LABELED_SECRET_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+")
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)
 ENTRY_RE = re.compile(r"^## \[(\d{4}-\d{2}-\d{2}) .*?\] — Synthesis \(Cycle (\d+)\)", re.M)
 
@@ -33,6 +35,15 @@ PRICE_SOURCE = "https://developers.openai.com/api/docs/models/gpt-5.6-terra"
 INPUT_PER_M = 2.00
 CACHED_INPUT_PER_M = 0.20
 OUTPUT_PER_M = 12.00
+
+
+class TerraCallError(RuntimeError):
+    """Invocation failure that preserves any provider usage already reported."""
+
+    def __init__(self, message: str, usage: dict[str, int] | None = None, elapsed: float = 0.0):
+        super().__init__(message)
+        self.usage = usage or {}
+        self.elapsed = elapsed
 
 
 def default_config() -> dict[str, Any]:
@@ -65,14 +76,16 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def scrub(value: Any, limit: int = 320) -> str:
     text = " ".join(str(value or "").split())
-    text = SECRET_RE.sub(r"\1=[REDACTED]", text)
+    text = AUTH_RE.sub("authorization=[REDACTED]", text)
+    text = LABELED_SECRET_RE.sub(r"\1=[REDACTED]", text)
+    text = redact_key_shaped_secrets(text)
     text = EMAIL_RE.sub("[EMAIL]", text)
     return text[:limit]
 
 
 def recent_prompt_rows(cutoff: datetime, limit: int = 16) -> list[dict[str, Any]]:
     """Read the live CLIO JSONL tail without mutating the persisted index."""
-    path = Path.home() / ".claude" / "prompt-log.jsonl"
+    path = resolve_clio_prompt_log_path()
     try:
         with path.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
@@ -262,7 +275,7 @@ def build_prompt(packet: dict[str, Any]) -> str:
     )
 
 
-def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int], float]:
+def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[str, dict[str, int], float]:
     with tempfile.TemporaryDirectory(prefix="rebalance-daily-terra-") as workspace:
         command = [
             "codex",
@@ -287,8 +300,6 @@ def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[dict[str, Any], dict
         started = time.monotonic()
         completed = subprocess.run(command, text=True, capture_output=True, timeout=int(cfg["timeout_seconds"]))
         elapsed = round(time.monotonic() - started, 3)
-    if completed.returncode:
-        raise RuntimeError(f"codex exit {completed.returncode}: {completed.stderr[-300:]}")
     output = ""
     usage: dict[str, int] = {}
     for line in completed.stdout.splitlines():
@@ -302,9 +313,13 @@ def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[dict[str, Any], dict
             output = event["item"].get("text", "")
         if event.get("type") == "turn.completed":
             usage = event.get("usage") or {}
+    if completed.returncode:
+        raise TerraCallError(f"codex exit {completed.returncode}: {completed.stderr[-300:]}", usage, elapsed)
     if not usage:
-        raise RuntimeError("missing usage receipt")
-    return json.loads(output), usage, elapsed
+        raise TerraCallError("missing usage receipt", elapsed=elapsed)
+    if not output:
+        raise TerraCallError("missing structured output", usage, elapsed)
+    return output, usage, elapsed
 
 
 def validate_result(result: dict[str, Any], packet: dict[str, Any]) -> None:
@@ -439,8 +454,11 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: d
         print(json.dumps({"evidence_count": len(packet["evidence"]), "packet_chars": len(encoded)}))
         return 0
 
+    usage: dict[str, int] = {}
+    elapsed = 0.0
     try:
-        result, usage, elapsed = invoke_terra(build_prompt(packet), cfg)
+        raw_output, usage, elapsed = invoke_terra(build_prompt(packet), cfg)
+        result = json.loads(raw_output)
         validate_result(result, packet)
         if int(usage.get("input_tokens", 0)) > int(cfg["max_input_tokens_per_call"]):
             raise ValueError("input token ceiling exceeded")
@@ -448,10 +466,6 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: d
             raise ValueError("output token ceiling exceeded")
         cost = estimated_cost(usage)
         daily_path = log_dir / f"{now:%Y-%m-%d}.log"
-        existing = _tail(daily_path, 2_000_000)
-        cycles = [int(n) for day, n in ENTRY_RE.findall(existing) if day == f"{now:%Y-%m-%d}"]
-        cycle = max(cycles, default=0) + 1
-        entry = render(result, packet, now, cycle, usage, cost, elapsed, cfg)
         daily_path.parent.mkdir(parents=True, exist_ok=True)
         with daily_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)
@@ -459,6 +473,9 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: d
             current = handle.read()
             if f"## [{now:%Y-%m-%d %H:%M %Z}]" in current:
                 raise ValueError("cycle already appended")
+            cycles = [int(n) for day, n in ENTRY_RE.findall(current) if day == f"{now:%Y-%m-%d}"]
+            cycle = max(cycles, default=0) + 1
+            entry = render(result, packet, now, cycle, usage, cost, elapsed, cfg)
             if not current:
                 handle.write(f"# Daily Activity Log — {now:%Y-%m-%d}\n\n")
             elif not current.endswith("\n\n"):
@@ -483,16 +500,27 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: d
         print(f"accepted cycle {cycle}; estimated ${cost:.4f}")
         return 0
     except Exception as exc:
-        append_jsonl(
-            receipt_path,
-            {
-                "at": now.isoformat(),
-                "status": "rejected",
-                "model": cfg["model"],
-                "reasoning_effort": cfg["reasoning_effort"],
-                "reason": scrub(exc, 500),
-            },
-        )
+        if isinstance(exc, TerraCallError):
+            usage = exc.usage
+            elapsed = exc.elapsed
+        rejected = {
+            "at": now.isoformat(),
+            "status": "rejected",
+            "model": cfg["model"],
+            "reasoning_effort": cfg["reasoning_effort"],
+            "reason": scrub(exc, 500),
+        }
+        if usage:
+            rejected.update(
+                {
+                    "usage": usage,
+                    "estimated_cost_usd": round(estimated_cost(usage), 8),
+                    "price_source": PRICE_SOURCE,
+                    "price_source_date": PRICE_SOURCE_DATE,
+                    "elapsed_seconds": elapsed,
+                }
+            )
+        append_jsonl(receipt_path, rejected)
         print(f"daily work synthesis rejected: {scrub(exc, 300)}")
         return 1
 

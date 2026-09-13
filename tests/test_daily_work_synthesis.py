@@ -53,9 +53,10 @@ def test_default_is_disabled_and_pins_terra_low():
     assert cfg["max_estimated_cost_usd_per_day"] > 0
 
 
-def test_scrub_masks_secret_values_and_emails():
-    text = dws.scrub("token=abc123 contact dev@example.com")
-    assert "abc123" not in text
+def test_scrub_masks_labeled_bearer_bare_secret_values_and_emails():
+    github_token = "ghp_" + "a" * 36
+    text = dws.scrub(f"token=abc123 Authorization: Bearer bearer-value {github_token} contact dev@example.com")
+    assert "abc123" not in text and "bearer-value" not in text and github_token not in text
     assert "dev@example.com" not in text
     assert "[REDACTED]" in text and "[EMAIL]" in text
 
@@ -72,7 +73,7 @@ def test_recent_prompt_rows_is_bounded_and_time_filtered(tmp_path, monkeypatch):
         )
         + "\n"
     )
-    monkeypatch.setattr(dws.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(dws, "resolve_clio_prompt_log_path", lambda: log)
     cutoff = datetime.fromisoformat("2026-09-13T00:00:00+00:00")
     rows = dws.recent_prompt_rows(cutoff, limit=1)
     assert [row["prompt"] for row in rows] == ["new"]
@@ -117,6 +118,22 @@ def test_prompt_allows_apparent_focus_without_claiming_completion():
     prompt = dws.build_prompt(packet())
     assert "may establish an apparent current focus" in prompt
     assert "not proof of execution or completion" in prompt
+
+
+def test_rejected_completed_call_records_usage_and_cost(tmp_path, monkeypatch):
+    now = datetime.fromisoformat("2026-09-12T12:12:00-07:00")
+    usage = {"input_tokens": 1000, "cached_input_tokens": 0, "output_tokens": 100}
+    bad = result(evidence_ids=["invented:9"])
+    monkeypatch.setattr(dws, "ROOT", tmp_path)
+    monkeypatch.setattr(dws, "resolve_database_path", lambda: tmp_path / "db")
+    monkeypatch.setattr(dws, "collect_packet", lambda *_args: packet())
+    monkeypatch.setattr(dws, "invoke_terra", lambda *_args: (dws.json.dumps(bad), usage, 1.5))
+
+    assert dws.run(tmp_path / "missing-config.json", force=True, now=now) == 1
+    receipts = dws.read_receipts(tmp_path / "temp/daily-log/terra-receipts/2026-09-12.jsonl")
+    assert receipts[0]["status"] == "rejected"
+    assert receipts[0]["usage"] == usage
+    assert receipts[0]["estimated_cost_usd"] > 0
 
 
 def test_renderer_preserves_daily_sections_and_adds_receipt():

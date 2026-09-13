@@ -64,11 +64,6 @@ exec = "utils/daily_synthesis.sh"
 args = []
 description = "Incumbent Rebalance daily vault synthesis wrapper (pulse + Git Pulse, GH-74)."
 
-[commands.daily-work-synthesis]
-exec = "scripts/daily_work_synthesis.sh"
-args = []
-description = "Opt-in evidence-bound Terra Daily work synthesis canary (GH-210)."
-
 [commands.obsidian-rollover]
 exec = "utils/obsidian_rollover.sh"
 args = []
