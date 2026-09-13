@@ -9,20 +9,21 @@ job.
 
 ## Job table
 
-| Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs |
-|---|---|---|---|---|---|
-| `daily-sync` | daily 06:30 + RunAtLoad (boot/login catch-up) | `scripts/daily_sync.sh` | `refresh_index(db_path)` — default recipe: all raw sources + code/semantic/sync | vault path, GitHub token, calendar/sleuth auth as configured | SQLite knowledge base fully refreshed; dashboard note write-back |
-| `obsidian-vault-embeddings` | hourly at :15, 06:15–23:15 | `scripts/obsidian_vault_embeddings.sh` | `refresh_index(db_path, scope=["vault", "semantic"])` | `vault_path` in temp/rbos.config | vault raw tables + semantic index fresh within the hour |
-| `github-sync` | hourly at :45, 06:45–23:45 | `scripts/github_sync.sh` | `refresh_index(db_path, scope=["github", "focus5"], artifact_sync_days=7)` | GitHub token (keyring/config) for github; Focus 5 needs none | github raw tables fresh (semantic backfill deferred to daily-sync); Focus 5 roster recomputed hourly. GH-148: the per-item artifact fan-out (issues/PRs/comments/check-runs) is narrowed to 7 days on this cadence — the 06:30 daily-sync keeps the full 30-day sweep, and watched-set resolution / events scan / rollups keep the wide window |
-| `pulse-sync` | hourly at :00, 06:00–23:00 | `scripts/pulse_sync.sh` | `publish_pulse(db_path, dry_run=False, push=True)` | pulse_* keys in temp/rbos.config; local clone at pulse_target_path | markdown status page pushed to private repo (only when changed) |
-| `pulse-web-sync` | every 30 min at :08/:38, 06:00–23:38 | `scripts/pulse_web_sync.sh` | `scripts/pulse_web.py` | `vault_path` in temp/rbos.config (locates "0. Goals.md") | `web/pulse.html` regenerated atomically (local only, no network) |
-| `pulse-server` | daemon: RunAtLoad + KeepAlive, ThrottleInterval 30s | `scripts/pulse_server.sh` | `scripts/pulse_server.py --port 8767` | port 8767 free | FastAPI server on 127.0.0.1:8767 (loopback only) |
-| `pulse-warning-watch` | every 15 min at :07/:22/:37/:52, around the clock + RunAtLoad | — (python direct) | `scripts/pulse_warning_watch.py --url http://127.0.0.1:8767/` | pulse-server running on 8767 | `temp/pulse-warning-watch.jsonl` (one record per check) |
-| `health-check` | hourly at :10, around the clock | — (python direct) | `scripts/health_issue_reporter.py --close` (FAIL-only, no LLM) | GitHub token for issue filing | GitHub issues opened/closed on failing doctor checks |
-| `health-check-triage` | 3×/day at 08:25, 14:25, 20:25 | — (python direct) | `scripts/health_issue_reporter.py --warn --close --llm-triage --llm-daily-limit 8 --llm-max-per-run 5` | ANTHROPIC_API_KEY in rendered plist or keyring | LLM-triaged GitHub issues; quota circuit breakers CB-1/2/3 |
-| `obsidian-rollover` | daily 00:40 (or next wake); RunAtLoad must stay **false** | `utils/obsidian_rollover.sh` | `utils/obsidian_daily_rollover.py` | Full Disk Access via bash wrapper (TCC) | daily note rolled over; log in `~/Library/Logs/rebalance-os/` |
-| `hiqs-digest` | 2×/day at 13:05, 17:05 (or next wake); RunAtLoad **false**; a catch-up before 17:05 takes the 13:05 slot, and a post-midnight catch-up skips itself | `scripts/hiqs_digest.sh` | `utils/hiqs_digest.py` — three deterministic collectors (today's github tables, `rebalance doctor --json`, date-bounded semantic query filtered to github sources), then one Gemini synthesis | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC, for the doctor vault reads); pulse_target_path clone | one markdown digest per slot pushed to `<pulse_target_path>/digests/hiqs-DATE-SLOT.md` (git-committed+pushed); AEGIS Sleuth's snapshot-relay posts it to Slack |
-| `daily-synthesis` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/daily_synthesis.sh` | `utils/daily_synthesis.py` — Gemini daily-activity summary from the structured pulse snapshot, then Gemini synthesis of `view.sh --today` multi-device git activity (GH-114), in that order, one process (GH-74) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block, then idempotent Git Pulse summary block, appended to `0. Today's Notes.md` (if vault configured) AND/OR the Git Pulse block upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` |
+| Job (label suffix) | Cadence | Wrapper | Work | Prerequisites | Outputs | Max runtime seconds |
+|---|---|---|---|---|---|---|
+| `daily-sync` | daily 06:30 + RunAtLoad (boot/login catch-up) | `scripts/daily_sync.sh` | `refresh_index(db_path)` — default recipe: all raw sources + code/semantic/sync | vault path, GitHub token, calendar/sleuth auth as configured | SQLite knowledge base fully refreshed; dashboard note write-back | 10800 |
+| `obsidian-vault-embeddings` | hourly at :15, 06:15–23:15 | `scripts/obsidian_vault_embeddings.sh` | `refresh_index(db_path, scope=["vault", "semantic"])` | `vault_path` in temp/rbos.config | vault raw tables + semantic index fresh within the hour | 7200 |
+| `github-sync` | hourly at :45, 06:45–23:45 | `scripts/github_sync.sh` | `refresh_index(db_path, scope=["github", "focus5"], artifact_sync_days=7)` | GitHub token (keyring/config) for github; Focus 5 needs none | github raw tables fresh (semantic backfill deferred to daily-sync); Focus 5 roster recomputed hourly. GH-148: the per-item artifact fan-out (issues/PRs/comments/check-runs) is narrowed to 7 days on this cadence — the 06:30 daily-sync keeps the full 30-day sweep, and watched-set resolution / events scan / rollups keep the wide window | 7200 |
+| `pulse-sync` | hourly at :00, 06:00–23:00 | `scripts/pulse_sync.sh` | `publish_pulse(db_path, dry_run=False, push=True)` | pulse_* keys in temp/rbos.config; local clone at pulse_target_path | markdown status page pushed to private repo (only when changed) | 1800 |
+| `pulse-web-sync` | every 30 min at :08/:38, 06:00–23:38 | `scripts/pulse_web_sync.sh` | `scripts/pulse_web.py` | `vault_path` in temp/rbos.config (locates "0. Goals.md") | `web/pulse.html` regenerated atomically (local only, no network) | 7200 |
+| `pulse-server` | daemon: RunAtLoad + KeepAlive, ThrottleInterval 30s | `scripts/pulse_server.sh` | `scripts/pulse_server.py --port 8767` | port 8767 free | FastAPI server on 127.0.0.1:8767 (loopback only) | none |
+| `pulse-warning-watch` | every 15 min at :07/:22/:37/:52, around the clock + RunAtLoad | — (python direct) | `scripts/pulse_warning_watch.py --url http://127.0.0.1:8767/` | pulse-server running on 8767 | `temp/pulse-warning-watch.jsonl` (one record per check) | 300 |
+| `daily-work-synthesis` | every 15 min while loaded; Terra calls only 06:00–23:59 and only while local config is enabled | `scripts/daily_work_synthesis.sh` | `utils/daily_work_synthesis.py` — minimized evidence packet, isolated Terra structured output, local validation and deterministic `/daily` render | Codex auth; explicit private-egress approval; `temp/daily-work-synthesis.json` with call, token, cost and failure ceilings | append-only `temp/daily-log/YYYY-MM-DD.log`; sanitized usage/cost receipts under `temp/daily-log/terra-receipts/` | 180 |
+| `health-check` | hourly at :10, around the clock | — (python direct) | `scripts/health_issue_reporter.py --close` (FAIL-only, no LLM) | GitHub token for issue filing | GitHub issues opened/closed on failing doctor checks | 900 |
+| `health-check-triage` | 3×/day at 08:25, 14:25, 20:25 | — (python direct) | `scripts/health_issue_reporter.py --warn --close --llm-triage --llm-daily-limit 8 --llm-max-per-run 5` | ANTHROPIC_API_KEY in rendered plist or keyring | LLM-triaged GitHub issues; quota circuit breakers CB-1/2/3 | 1800 |
+| `obsidian-rollover` | daily 00:40 (or next wake); RunAtLoad must stay **false** | `utils/obsidian_rollover.sh` | `utils/obsidian_daily_rollover.py` | Full Disk Access via bash wrapper (TCC) | daily note rolled over; log in `~/Library/Logs/rebalance-os/` | 300 |
+| `hiqs-digest` | 2×/day at 13:05, 17:05 (or next wake); RunAtLoad **false**; a catch-up before 17:05 takes the 13:05 slot, and a post-midnight catch-up skips itself | `scripts/hiqs_digest.sh` | `utils/hiqs_digest.py` — three deterministic collectors (today's github tables, `rebalance doctor --json`, date-bounded semantic query filtered to github sources), then one Gemini synthesis | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC, for the doctor vault reads); pulse_target_path clone | one markdown digest per slot pushed to `<pulse_target_path>/digests/hiqs-DATE-SLOT.md` (git-committed+pushed); AEGIS Sleuth's snapshot-relay posts it to Slack | 14400 |
+| `daily-synthesis` | daily 18:20 (or next wake); RunAtLoad **false**; a post-midnight catch-up skips itself | `utils/daily_synthesis.sh` | `utils/daily_synthesis.py` — Gemini daily-activity summary from the structured pulse snapshot, then Gemini synthesis of `view.sh --today` multi-device git activity (GH-114), in that order, one process (GH-74) | rebalance venv + Gemini API key; Full Disk Access via bash wrapper (TCC) | idempotent AI summary block, then idempotent Git Pulse summary block, appended to `0. Today's Notes.md` (if vault configured) AND/OR the Git Pulse block upserted into `<pulse_target_path>/CLIO/git-pulse-daily-log.md` (if `git_pulse_clio_enabled`, git-committed+pushed); log in `~/Library/Logs/rebalance-os/` | 900 |
 
 > **Do not put a literal `|` inside a cell of the table above, even escaped as
 > `\|`.** Two consumers split these rows on the pipe character —
@@ -44,6 +45,7 @@ since GH-175 **no two jobs share a minute**:
 ```
 :00 pulse-sync (reads)
 :07 pulse-warning-watch      :22      :37      :52
+:15m daily-work-synthesis (relative interval; model call is bounded and read-only)
 :08 pulse-web-sync (reads)   :38
 :10 health-check
 :15 obsidian-vault-embeddings (writes vault + semantic)
@@ -99,6 +101,17 @@ since GH-175 **no two jobs share a minute**:
   (`job_started`/`job_completed`/`job_failed`) appended to
   `temp/logs/auth_activity.jsonl`, and retention trimming (30 days for
   daily-sync, 14 for the rest).
+- Every finite plist runs its current command behind `utils/job_guard.py` with the final-column
+  wall-clock limit. The guard owns the one lifecycle start/terminal pair and exits 124 with
+  `reason=wall_clock_timeout` after reaping the child process group. `pulse-server` is the sole
+  `none` limit because launchd intentionally keeps it alive; its health is the generated artifact's
+  freshness. Missing, duplicate, non-positive, malformed, or misplaced `none` policy values are
+  configuration errors, not silent exemptions.
+- Managed jobs deliberately use launchd's standard process priority rather than `ProcessType`
+  `Background`. On the recovered Mac, background priority stalled both Python extension loading in
+  the persistent server and `fork()` in a finite wrapper; the same rendered jobs at standard
+  priority reached their work promptly. Staggered cadences and the finite-job guards bound resource
+  pressure without asking launchd to starve process startup.
 - Installers source `scripts/lib/install_common.sh`: chmod the wrapper,
   always-unload, render the template (`{{REBALANCE_DIR}}`, `{{PYTHON}}`,
   `{{HOME}}`), `plutil -lint`, load, poll-verify registration. Rendered plists
@@ -138,7 +151,7 @@ bound somewhere else unless you pass `--force`; `status` shows the current
 binding in its `BOUND TO` column. Running `up` from the wrong clone is
 otherwise a silent fleet-wide migration (GH-36, GH-59).
 
-The 12 per-job installers remain supported and are what `stack.sh` calls
+The per-job installers remain supported and are what `stack.sh` calls
 underneath. They stay until `stack.sh` has been proven on a second machine.
 
 Secrets: never put API keys in templates (tracked in git). The

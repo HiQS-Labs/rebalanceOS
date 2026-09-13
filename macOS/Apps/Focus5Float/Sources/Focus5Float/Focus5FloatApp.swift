@@ -101,6 +101,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Show the cached roster instantly (if any), then pull live and poll.
         model.loadCache()
         model.refreshTelemetry()   // restore previously-selected telemetry file on cold-start
+        if model.promptLogFileURL == nil {
+            let defaultLogURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Documents/Noel Saw/0. Claude Prompts.md")
+            if FileManager.default.fileExists(atPath: defaultLogURL.path) {
+                model.promptLogFileURL = defaultLogURL
+            }
+        }
         model.refreshPromptLog()   // restore previously-selected prompt log file on cold-start
         Task { await model.refresh(); updateModeMenuState() }
         startPolling()

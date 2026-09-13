@@ -165,6 +165,8 @@ ENV_MAX_COMPRESSOR_GB = "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB"
 EXIT_INSTANCE_CONFLICT = 3
 EXIT_CEILING_TRIPPED = 4
 EXIT_REFUSED_TO_START = 75  # EX_TEMPFAIL
+EXIT_WALL_CLOCK_TIMEOUT = 124  # conventional timeout(1) status
+SCHEDULER_LIFECYCLE_CHILD_ENV = "REBALANCE_SCHEDULER_LIFECYCLE_CHILD"
 
 #: The codes that mean "did not run; not the job's fault". Supervisors should
 #: leave their failure counters untouched for these.
@@ -977,9 +979,14 @@ def run_guarded(
     poll_seconds: float = DEFAULT_POLL_SECONDS,
     grace_seconds: float = DEFAULT_GRACE_SECONDS,
     max_rss_gb: float | None = None,
+    max_runtime_seconds: float | None = None,
+    lifecycle_job: str | None = None,
 ) -> int:
     """Run ``argv`` as a guarded child process. Returns the exit code."""
     log = lambda msg: print(f"[job-guard] {msg}", file=sys.stderr)  # noqa: E731
+
+    if max_runtime_seconds is not None and max_runtime_seconds <= 0:
+        raise ValueError("max_runtime_seconds must be positive")
 
     lock = SingleInstanceLock(name)
     try:
@@ -1012,9 +1019,24 @@ def run_guarded(
             f"available floor {_fmt_gb(ceiling.min_available or 0)}"
         )
 
+        child_env = None
+        if lifecycle_job:
+            from rebalance.ingest.auth_log import log_job_started
+
+            log_job_started(lifecycle_job)
+            child_env = os.environ.copy()
+            child_env[SCHEDULER_LIFECYCLE_CHILD_ENV] = "1"
+
         # Own process group, so the whole tree dies together — a pool's workers
         # outliving their parent is how 90 GB stayed resident in GH-172.
-        child = subprocess.Popen(argv, start_new_session=True)
+        try:
+            child = subprocess.Popen(argv, start_new_session=True, env=child_env)
+        except Exception:
+            if lifecycle_job:
+                from rebalance.ingest.auth_log import log_job_failed
+
+                log_job_failed(lifecycle_job, 1, time.monotonic() - started, reason="launch_failed")
+            raise
         lock.record_child_group(child.pid)  # new session => pgid == pid
         ceiling.pid = child.pid
         ceiling.on_trip = lambda reason: _reap_child_tree(child, grace_seconds, log)
@@ -1028,15 +1050,21 @@ def run_guarded(
 
         previous_term = signal.signal(signal.SIGTERM, _on_term)
 
+        timed_out = False
         try:
-            code = child.wait()
+            code = child.wait(timeout=max_runtime_seconds)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            log(f"wall_clock_timeout: {name!r} exceeded {max_runtime_seconds:g}s; tearing down child tree {child.pid}")
+            _reap_child_tree(child, grace_seconds, log)
+            code = EXIT_WALL_CLOCK_TIMEOUT
         except _Evicted:
             log("evicted by a replacing run; tearing down child tree")
             _reap_child_tree(child, grace_seconds, log)
-            return 143
+            code = 143
         except KeyboardInterrupt:
             _reap_child_tree(child, grace_seconds, log)
-            return 130
+            code = 130
         finally:
             ceiling.stop()
             try:
@@ -1044,9 +1072,28 @@ def run_guarded(
             except (ValueError, TypeError):
                 pass
 
-        log(f"{name!r} finished with exit {code}; peak tree footprint {_fmt_gb(ceiling.peak_footprint)}")
-        record_peak_footprint(name, ceiling, started=started, exit_code=code)
-        return EXIT_CEILING_TRIPPED if ceiling.tripped_reason else code
+        final_code = EXIT_WALL_CLOCK_TIMEOUT if timed_out else EXIT_CEILING_TRIPPED if ceiling.tripped_reason else code
+        log(f"{name!r} finished with exit {final_code}; peak tree footprint {_fmt_gb(ceiling.peak_footprint)}")
+        record_peak_footprint(name, ceiling, started=started, exit_code=final_code)
+        if lifecycle_job:
+            from rebalance.ingest.auth_log import log_job_completed, log_job_failed
+
+            elapsed = time.monotonic() - started
+            if final_code == 0:
+                log_job_completed(lifecycle_job, elapsed)
+            else:
+                if timed_out:
+                    reason = "wall_clock_timeout"
+                elif ceiling.tripped_reason:
+                    reason = "resource_ceiling"
+                elif final_code == 143:
+                    reason = "evicted"
+                elif final_code == 130:
+                    reason = "interrupted"
+                else:
+                    reason = "child_exit"
+                log_job_failed(lifecycle_job, final_code, elapsed, reason=reason)
+        return final_code
     finally:
         lock.release()
 
@@ -1126,6 +1173,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
     parser.add_argument("--grace-seconds", type=float, default=DEFAULT_GRACE_SECONDS)
     parser.add_argument(
+        "--max-runtime-seconds",
+        type=float,
+        default=None,
+        help="terminate the child tree after this positive wall-clock duration",
+    )
+    parser.add_argument(
+        "--lifecycle-job",
+        default=None,
+        help="record exactly one scheduler lifecycle for this job around the guarded child",
+    )
+    parser.add_argument(
         "--status",
         action="store_true",
         help="report memory and lock state for --name, then exit",
@@ -1164,6 +1222,8 @@ def main(argv: list[str] | None = None) -> int:
         on_conflict=args.on_conflict,
         poll_seconds=args.poll_seconds,
         grace_seconds=args.grace_seconds,
+        max_runtime_seconds=args.max_runtime_seconds,
+        lifecycle_job=args.lifecycle_job,
     )
 
 

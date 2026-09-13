@@ -457,7 +457,18 @@ def sync_to_clio(summary: str, now: datetime, dry_run: bool = False) -> dict:
         commit_message=f"git-pulse: {now:%Y-%m-%d} daily summary",
     )
     log(f"CLIO sync ({file_rel}): {result}")
-    return {"enabled": True, "ok": True, "file_rel": file_rel, **result}
+    unchanged = result.get("reason") == "no content change"
+    published = bool(result.get("pushed"))
+    if not (unchanged or published):
+        reason = result.get("git_error") or result.get("reason") or "unknown Git publication failure"
+        return {
+            **result,
+            "enabled": True,
+            "ok": False,
+            "reason": f"git publish failed: {reason}",
+            "file_rel": file_rel,
+        }
+    return {**result, "enabled": True, "ok": True, "file_rel": file_rel}
 
 
 # --- Orchestration -------------------------------------------------------------
@@ -493,6 +504,8 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
         # (content != original_content must see the repair, not just new synthesis).
         content = normalize_block_order(content)
 
+    clio_exit_code = 0
+
     # --- Step 1: pulse summary (must land FIRST — see module docstring) --------
     # Vault-only destination (unlike git-pulse below, it has no CLIO alternate) —
     # skip collecting and synthesizing entirely when there's nowhere to write it.
@@ -514,7 +527,10 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
         git_pulse_summary = synthesize_git_pulse(activity_tsv)
         if git_pulse_summary is not None:
             if clio_enabled:
-                sync_to_clio(git_pulse_summary, now, dry_run=dry_run)
+                clio_result = sync_to_clio(git_pulse_summary, now, dry_run=dry_run)
+                if not clio_result.get("ok"):
+                    clio_exit_code = 75 if clio_result.get("deferred") else 1
+                    log(f"CLIO sync did not publish: {clio_result.get('reason', clio_result)}")
 
             if vault_write_ready:
                 existing_block = _extract_block_text(content, GIT_PULSE_MARKER_START, GIT_PULSE_MARKER_END)
@@ -529,14 +545,14 @@ def run(dry_run: bool = False, now: datetime | None = None, force: bool = False)
                     content = upsert_git_pulse_block(content, git_pulse_summary, now)
 
     if not vault_write_ready or dry_run:
-        return 0
+        return clio_exit_code
 
     if content != original_content:
         TODAY_FILE.write_text(content, encoding="utf-8")
         log(f"wrote daily synthesis block(s) to {TODAY_FILE.name}")
     else:
         log("no block changes — no write needed.")
-    return 0
+    return clio_exit_code
 
 
 def show_status() -> int:

@@ -23,7 +23,6 @@ import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -46,25 +45,21 @@ from rebalance.ingest.db.schema import (
     ensure_schema,
     ensure_semantic_schema,
 )
-from rebalance.ingest.embedder import embed_chunks, embed_vault_chunks
+from rebalance.ingest.embedder import embed_chunks
 from rebalance.ingest.github_commit_backfill import (
     _clone_index,
     backfill_commits,
-    compute_origin_ref_digest,
     default_roots,
     is_commit_walk_cached,
     is_shallow_clone,
     record_commit_coverage_checkpoint,
 )
-from rebalance.ingest.github_coverage import remote_tip
 from rebalance.ingest.index_ops import refresh_index
 from rebalance.lib.git_ops import (
-    build_hardened_ssh_command,
     canonical_github_url,
     peek_remote_refs,
     run_git,
 )
-from rebalance.lib.power_ops import should_defer_embeddings
 from rebalance.paths import resolve_database_path
 
 
@@ -660,11 +655,11 @@ def generate_reports(
     max_latency = max(successful_latencies) if successful_latencies else 0.0
 
     markdown_content = f"""# Benchmark Protocol & Technical Spike Results: GH-201
-**Campaign**: `2026-09-08+GH-201`  
-**Tracking Issue**: [#201](https://github.com/HiQS-Labs/rebalanceOS/issues/201)  
-**Working Document**: [`PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md`](file://{repo_root}/PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md)  
-**Date**: 2026-09-08  
-**Operator**: noel  
+**Campaign**: `2026-09-08+GH-201`
+**Tracking Issue**: [#201](https://github.com/HiQS-Labs/rebalanceOS/issues/201)
+**Working Document**: `PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md`
+**Date**: 2026-09-08
+**Operator**: noel
 
 ---
 
@@ -733,7 +728,7 @@ def generate_reports(
     with open(deliv_path, "w", encoding="utf-8") as f:
         f.write(markdown_content)
 
-    print(f"\nSaved campaign report to:")
+    print("\nSaved campaign report to:")
     print(f"  - {summary_path}")
     print(f"  - {deliv_path}")
     print(f"  - {jsonl_path}")

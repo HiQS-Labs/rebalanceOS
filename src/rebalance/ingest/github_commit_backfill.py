@@ -26,7 +26,6 @@ import json
 import sqlite3
 import subprocess
 import time
-from datetime import datetime
 from functools import lru_cache
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -41,7 +40,7 @@ from rebalance.lib.git_ops import (
     peek_remote_refs,
     run_git,
 )
-from rebalance.lib.time_ops import _now, now_utc
+from rebalance.lib.time_ops import _now, now_utc, parse_utc_iso
 
 
 def is_shallow_clone(path: Path) -> bool:
@@ -162,8 +161,10 @@ def is_commit_walk_cached(
     if requested_since_utc is not None:
         if covered_since is not None:
             try:
-                req_dt = datetime.fromisoformat(requested_since_utc.replace("Z", "+00:00"))
-                cov_dt = datetime.fromisoformat(covered_since.replace("Z", "+00:00"))
+                req_dt = parse_utc_iso(requested_since_utc)
+                cov_dt = parse_utc_iso(covered_since)
+                if req_dt is None or cov_dt is None:
+                    raise ValueError("invalid checkpoint timestamp")
                 if req_dt < cov_dt:
                     return False
             except Exception:

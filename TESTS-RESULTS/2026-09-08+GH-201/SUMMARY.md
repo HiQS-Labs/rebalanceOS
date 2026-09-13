@@ -1,9 +1,9 @@
 # Benchmark Protocol & Technical Spike Results: GH-201
-**Campaign**: `2026-09-08+GH-201`  
-**Tracking Issue**: [#201](https://github.com/HiQS-Labs/rebalanceOS/issues/201)  
-**Working Document**: [`PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md`](file:///Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md)  
-**Date**: 2026-09-08  
-**Operator**: noel  
+**Campaign**: `2026-09-08+GH-201`
+**Tracking Issue**: [#201](https://github.com/HiQS-Labs/rebalanceOS/issues/201)
+**Working Document**: [`PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md`](../../PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md)
+**Date**: 2026-09-08
+**Operator**: noel
 
 ---
 

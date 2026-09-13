@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
@@ -408,11 +409,99 @@ def resolve_ranking_strategy(mode: str) -> RankingStrategy:
         raise ValueError(f"unknown focus5 ranking mode {mode!r}; valid modes: {valid}") from None
 
 
+# ---------------------------------------------------------------------------
+# Clone detection & grouping (GH-204)
+# ---------------------------------------------------------------------------
+
+_CLONE_SUFFIX_RE = re.compile(
+    r"-(?:gh\d+|task[a-zA-Z0-9_-]*|qual\d*|clone\d*|\d{8}|prs-backfill[a-zA-Z0-9_-]*)$",
+    re.IGNORECASE,
+)
+
+
+def detect_repo_parent_key(s: RepoSignals) -> str:
+    """Return a clustering key for a repo checkout.
+
+    If the repo has a remote/canonical identity (``repo_full_name``),
+    that identity is the primary clustering key (e.g. 'hypercart-dev-tools/xyz-forge').
+    If ``repo_full_name`` is absent, we strip common task-clone suffixes
+    from the repo folder name (e.g. 'xyz-forge-gh365' -> 'xyz-forge') as a local fallback.
+    """
+    if s.repo_full_name:
+        return s.repo_full_name.lower()
+    base_name = _CLONE_SUFFIX_RE.sub("", s.repo_name)
+    return base_name.lower() if base_name.lower() != s.repo_name.lower() else s.local_path
+
+
+def pick_parent_checkout(cluster: list[RepoSignals]) -> RepoSignals:
+    """Select the primary/parent checkout among a cluster of clones.
+
+    Preference rules:
+    1. If a repo's ``repo_name.lower()`` exactly matches the repository name from
+       ``repo_full_name`` (e.g. 'xyz-forge' for 'Hypercart-Dev-Tools/XYZ-forge'),
+       it is the canonical checkout.
+    2. A checkout whose name does NOT match clone suffix patterns (-gh<num>, -task, etc.)
+       beats one with a clone suffix.
+    3. A checkout on an integration branch ('development', 'main', 'master') beats
+       a feature branch.
+    4. Shortest directory path / name (tiebreak).
+    """
+    if len(cluster) == 1:
+        return cluster[0]
+
+    def score(s: RepoSignals) -> tuple[int, int, int, int]:
+        target_name = s.repo_full_name.split("/")[1].lower() if s.repo_full_name and "/" in s.repo_full_name else ""
+        exact_match = 1 if target_name and s.repo_name.lower() == target_name else 0
+        has_suffix = 1 if _CLONE_SUFFIX_RE.search(s.repo_name) else 0
+        no_suffix = 1 - has_suffix
+        is_main_branch = 1 if (s.branch or "").lower() in ("development", "main", "master") else 0
+        path_len = -len(s.local_path)
+        return (exact_match, no_suffix, is_main_branch, path_len)
+
+    return max(cluster, key=score)
+
+
+def roll_up_parent_signals(parent: RepoSignals, clones: list[RepoSignals]) -> RepoSignals:
+    """Produce an updated RepoSignals for the parent that rolls up clone activity.
+
+    The parent retains its identity and path, but reflects the newest commit across
+    itself and all its clones, and reflects if any clone has uncommitted work.
+    """
+    if not clones:
+        return parent
+
+    all_checkouts = [parent, *clones]
+    best_local_commit_ts = max(
+        (s.my_local_commit_ts for s in all_checkouts if s.my_local_commit_ts is not None),
+        default=parent.my_local_commit_ts,
+    )
+    best_last_commit_ts = max(
+        (s.last_commit_ts for s in all_checkouts if s.last_commit_ts is not None),
+        default=parent.last_commit_ts,
+    )
+    best_my_last_commit_ts = max(
+        (s.my_last_commit_ts for s in all_checkouts if s.my_last_commit_ts is not None),
+        default=parent.my_last_commit_ts,
+    )
+    any_dirty = any(s.is_dirty for s in all_checkouts)
+
+    winner = next((s for s in all_checkouts if s.my_local_commit_ts == best_local_commit_ts), parent)
+
+    d = asdict(parent)
+    d["my_local_commit_ts"] = best_local_commit_ts
+    d["last_commit_ts"] = best_last_commit_ts
+    d["my_last_commit_ts"] = best_my_last_commit_ts
+    d["recency_basis"] = winner.recency_basis
+    d["is_dirty"] = any_dirty
+    return RepoSignals(**d)
+
+
 @dataclass(frozen=True)
 class RankedRepo:
     signals: RepoSignals
     position: int
     reason: str
+    clones: tuple[RepoSignals, ...] = ()
 
 
 def rank_repos(
@@ -422,25 +511,54 @@ def rank_repos(
     now_ts: int,
     limit: int = DEFAULT_ROSTER_SIZE,
     hidden: Iterable[str] = (),
+    group_clones: bool = True,
 ) -> list[RankedRepo]:
     """Apply *mode* to *signals* and return the top *limit* eligible repos.
 
     Repos whose identity (:func:`focus5_repo_identity`) is in *hidden* are dropped
     before ranking — so a hidden repo never claims a roster slot and the next
     eligible candidate is promoted into its place.
+
+    When *group_clones* is True (default), checkouts sharing the same repository
+    identity are grouped under the primary checkout, rolling up clone activity to
+    the parent so clones do not consume multiple roster slots.
     """
     strategy = resolve_ranking_strategy(mode)
     hidden_set = set(hidden)
-    scored: list[tuple[tuple, RepoSignals, RankVerdict]] = []
+
+    if not group_clones:
+        scored_solo: list[tuple[tuple, RepoSignals, RankVerdict, tuple[RepoSignals, ...]]] = []
+        for s in signals:
+            if focus5_repo_identity(s) in hidden_set:
+                continue
+            v = strategy(s, now_ts)
+            if v.eligible:
+                scored_solo.append((v.sort_key, s, v, ()))
+        scored_solo.sort(key=lambda t: (t[0], t[1].local_path), reverse=True)
+        return [RankedRepo(s, i, v.reason, clones=cl) for i, (_k, s, v, cl) in enumerate(scored_solo[:limit], 1)]
+
+    # Group signals into clusters by parent key
+    clusters: dict[str, list[RepoSignals]] = {}
     for s in signals:
         if focus5_repo_identity(s) in hidden_set:
             continue
-        v = strategy(s, now_ts)
+        key = detect_repo_parent_key(s)
+        clusters.setdefault(key, []).append(s)
+
+    scored: list[tuple[tuple, RepoSignals, RankVerdict, tuple[RepoSignals, ...]]] = []
+    for _key, cluster in clusters.items():
+        parent = pick_parent_checkout(cluster)
+        clones = tuple(s for s in cluster if s.local_path != parent.local_path)
+        effective = roll_up_parent_signals(parent, list(clones))
+        v = strategy(effective, now_ts)
         if v.eligible:
-            scored.append((v.sort_key, s, v))
+            scored.append((v.sort_key, parent, v, clones))
+
     # Sort by score desc, then local_path for a stable tiebreak across runs.
     scored.sort(key=lambda t: (t[0], t[1].local_path), reverse=True)
-    return [RankedRepo(s, i, v.reason) for i, (_k, s, v) in enumerate(scored[:limit], 1)]
+    return [
+        RankedRepo(parent, i, v.reason, clones=clones) for i, (_k, parent, v, clones) in enumerate(scored[:limit], 1)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1017,12 +1135,47 @@ def _repo_path_live(local_path: Any) -> bool:
         return False
 
 
+def _build_clone_cards(
+    clones: Iterable[Any],
+    *,
+    with_live_health: bool = True,
+) -> list[dict[str, Any]]:
+    """Build lightweight clone dictionaries for the parent card (GH-204)."""
+    cards = []
+    for c in clones:
+        cd = asdict(c) if isinstance(c, RepoSignals) else dict(c)
+        local_path = cd.get("local_path", "")
+        clone_card = {
+            "repo_name": cd.get("repo_name", ""),
+            "local_path": local_path,
+            "branch": cd.get("branch"),
+            "ahead": cd.get("ahead", 0),
+            "behind": cd.get("behind", 0),
+            "modified_count": cd.get("modified_count", 0),
+            "untracked_count": cd.get("untracked_count", 0),
+            "is_dirty": bool(cd.get("is_dirty", False)),
+            "last_commit_at": cd.get("last_commit_at"),
+            "my_last_commit_ts": cd.get("my_last_commit_ts"),
+            "vscode_url": vscode_url(local_path),
+        }
+        if with_live_health and _repo_path_live(local_path):
+            lh = live_health(local_path)
+            if lh.get("health_available"):
+                for k in _LIVE_HEALTH_FIELDS:
+                    if k in lh:
+                        clone_card[k] = lh[k]
+                clone_card["is_dirty"] = clone_card["modified_count"] > 0 or clone_card["untracked_count"] > 0
+        cards.append(clone_card)
+    return cards
+
+
 def _build_roster_card(
     conn: Any,
     base: dict[str, Any],
     *,
     with_activity: bool,
     with_live_health: bool,
+    clones: list[RepoSignals] | list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Finish one roster card: coerce flags, attach the open/PR/activity enrichments.
 
@@ -1037,6 +1190,12 @@ def _build_roster_card(
     card["vscode_url"] = vscode_url(card["local_path"])
     card["newest_pr"] = _newest_pr(conn, card.get("repo_full_name"))
     card["recent_activity"] = recent_activity(card["local_path"]) if with_activity else []
+    # Attach active full clones (GH-204)
+    clone_candidates = clones if clones is not None else base.get("clones", [])
+    card["clones"] = _build_clone_cards(clone_candidates, with_live_health=with_live_health)
+    dirty_clones = sum(1 for c in card["clones"] if c.get("is_dirty"))
+    card["clones_dirty_count"] = dirty_clones
+    card["any_clone_dirty"] = dirty_clones > 0
     # Overlay live working-tree health on top of the stored snapshot so "did I
     # forget to commit/push?" is answered against now.
     if with_live_health:
@@ -1107,6 +1266,62 @@ def summarize_focus5(
                     (dev,),
                 ).fetchall()
                 bases = [{k: row[k] for k in row.keys()} for row in rows]
+                all_signals = [
+                    _row_to_signals(r)
+                    for r in conn.execute("SELECT * FROM focus5_repo_signals WHERE device_id=?", (dev,)).fetchall()
+                ]
+                seen_keys: set[str] = set()
+                clustered_bases: list[dict[str, Any]] = []
+                for b in bases:
+                    b_sig = _row_to_signals(b)
+                    b_key = detect_repo_parent_key(b_sig)
+                    if b_key in seen_keys:
+                        continue
+                    seen_keys.add(b_key)
+                    cluster = [s for s in all_signals if detect_repo_parent_key(s) == b_key]
+                    parent = pick_parent_checkout(cluster)
+                    clones = [s for s in cluster if s.local_path != parent.local_path]
+                    effective = roll_up_parent_signals(parent, clones)
+                    card = {
+                        **asdict(effective),
+                        "position": len(clustered_bases) + 1,
+                        "rank_reason": b["rank_reason"],
+                        "ranking_mode": b["ranking_mode"],
+                        "computed_at": b["computed_at"],
+                        "clones": clones,
+                    }
+                    clustered_bases.append(card)
+
+                target_roster_size = len(bases)
+                if len(clustered_bases) < target_roster_size:
+                    from rebalance.ingest.config import get_focus5_hidden_repos
+
+                    hidden_set = set(get_focus5_hidden_repos())
+                    now_ts = int(now_utc().timestamp())
+                    ranked = rank_repos(
+                        all_signals,
+                        mode="recent_activity",
+                        now_ts=now_ts,
+                        hidden=hidden_set,
+                        limit=target_roster_size * 2,
+                    )
+                    for r in ranked:
+                        k = detect_repo_parent_key(r.signals)
+                        if k not in seen_keys and focus5_repo_identity(r.signals) not in hidden_set:
+                            seen_keys.add(k)
+                            card = {
+                                **asdict(r.signals),
+                                "position": len(clustered_bases) + 1,
+                                "rank_reason": r.reason,
+                                "ranking_mode": "recent_activity",
+                                "computed_at": clustered_bases[0]["computed_at"] if clustered_bases else None,
+                                "clones": list(r.clones),
+                            }
+                            clustered_bases.append(card)
+                            if len(clustered_bases) == target_roster_size:
+                                break
+
+                bases = clustered_bases
             else:
                 # Transient view (Dirty Five): re-rank the cached signals in memory
                 # under *mode* — never writes focus5_roster, so the default snapshot
@@ -1127,6 +1342,7 @@ def summarize_focus5(
                         "rank_reason": r.reason,
                         "ranking_mode": mode,
                         "computed_at": computed_at,
+                        "clones": list(r.clones),
                     }
                     for r in ranked
                 ]
@@ -1136,12 +1352,18 @@ def summarize_focus5(
             # pure-ranking unit tests that seed synthetic (non-on-disk) signal rows.
             if drop_missing_paths:
                 bases = [b for b in bases if _repo_path_live(b.get("local_path"))]
+            for idx, b in enumerate(bases, 1):
+                b["position"] = idx
             roster = [
                 _build_roster_card(conn, b, with_activity=with_activity, with_live_health=with_live_health)
                 for b in bases
             ]
 
             roster_paths = {c["local_path"] for c in roster}
+            for c in roster:
+                for clone in c.get("clones", []):
+                    if clone.get("local_path"):
+                        roster_paths.add(clone["local_path"])
             # Hidden repos are suppressed from the off-roster attention strip too —
             # otherwise hiding a *dirty* repo would just relocate it from a card
             # into the nag strip, the opposite of what the ✕ promises.

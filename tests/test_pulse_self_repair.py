@@ -15,7 +15,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from rebalance.ingest.pulse import _commit_and_push_if_changed
+from rebalance.ingest.pulse import _commit_and_push_if_changed, _verify_remote_content
+from rebalance.lib.git_ops import git_publish_lock
 
 
 def _git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -69,6 +70,22 @@ def _push_competing_commit(remote: Path, tmp: Path) -> None:
 
 
 class TestPulseSelfRepair:
+    def test_concurrent_publisher_defers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            _remote, local = _make_repos(tmp)
+            before = (local / "pulse.md").read_text(encoding="utf-8")
+            with git_publish_lock(local):
+                result = _commit_and_push_if_changed(
+                    local,
+                    "pulse.md",
+                    "# must not be written\n",
+                    push=True,
+                    commit_message="blocked",
+                )
+            assert result["deferred"] is True
+            assert (local / "pulse.md").read_text(encoding="utf-8") == before
+
     def test_clean_push_succeeds_without_repair(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -121,6 +138,56 @@ class TestPulseSelfRepair:
 
         assert result["pushed"] is False
         assert result.get("reason") == "no content change"
+
+    def test_matching_dirty_content_is_committed_and_pushed(self) -> None:
+        """A prior index-lock failure must not turn the retry falsely green."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            _remote, local = _make_repos(tmp)
+            expected = "# stranded after failed git add\n"
+            (local / "pulse.md").write_text(expected, encoding="utf-8")
+
+            result = _commit_and_push_if_changed(
+                local,
+                "pulse.md",
+                expected,
+                push=True,
+                commit_message="test: recover dirty identical content",
+            )
+
+            assert result["committed"] is True
+            assert result["pushed"] is True
+            remote_content = _git(["show", "@{u}:pulse.md"], cwd=local).stdout
+            assert remote_content == expected
+
+    def test_matching_committed_content_pushes_unpushed_head(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            _remote, local = _make_repos(tmp)
+            expected = "# committed but not pushed\n"
+            (local / "pulse.md").write_text(expected, encoding="utf-8")
+            _git(["add", "pulse.md"], cwd=local)
+            _git(["commit", "-m", "local only"], cwd=local)
+
+            result = _commit_and_push_if_changed(
+                local,
+                "pulse.md",
+                expected,
+                push=True,
+                commit_message="unused",
+            )
+
+            assert result["pushed"] is True
+            assert _git(["show", "@{u}:pulse.md"], cwd=local).stdout == expected
+
+    def test_remote_verification_requires_exact_whitespace(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            _remote, local = _make_repos(tmp)
+
+            assert _verify_remote_content(local, "pulse.md", "# initial\n") is True
+            assert _verify_remote_content(local, "pulse.md", "# initial\n\n") is False
+            assert _verify_remote_content(local, "pulse.md", "  # initial\n") is False
 
     def test_repair_failure_propagates_error(self) -> None:
         """If pull --rebase itself fails, repair_error is returned and pushed stays False."""
@@ -190,7 +257,7 @@ class TestPulseSelfRepair:
                 text=True,
                 check=True,
             ).stdout
-            assert remote_content.strip() == expected_content.strip(), (
+            assert remote_content == expected_content, (
                 f"remote content does not match rendered output:\n"
                 f"expected: {expected_content!r}\n"
                 f"actual:   {remote_content!r}"
@@ -198,8 +265,9 @@ class TestPulseSelfRepair:
 
     def test_reset_hard_not_in_autonomous_menu(self) -> None:
         """reset_hard must not be in the bounded action menu exposed to autonomous repair."""
-        from rebalance.ingest.pulse import _push_repair_actions
         from pathlib import Path
+
+        from rebalance.ingest.pulse import _push_repair_actions
 
         actions = _push_repair_actions(Path("/tmp"))
         assert "reset_hard" not in actions, (

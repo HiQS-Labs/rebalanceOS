@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
+import json
 import os
 import subprocess
 import sys
@@ -103,6 +104,64 @@ def test_over_ceiling_trips_and_child_is_reaped(isolated_guard, monkeypatch):
     while _pid_alive(captured["pid"]) and time.monotonic() < deadline:
         time.sleep(0.1)
     assert not _pid_alive(captured["pid"]), "child survived the ceiling trip"
+
+
+def test_wall_clock_timeout_has_distinct_exit_and_reaps_child(isolated_guard, monkeypatch):
+    """GH-211: a deadline expires with 124 and leaves no child behind."""
+    script = isolated_guard / "sleep_forever.py"
+    script.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+
+    captured: dict[str, int] = {}
+    real_popen = subprocess.Popen
+
+    def capturing_popen(*args, **kwargs):
+        proc = real_popen(*args, **kwargs)
+        captured["pid"] = proc.pid
+        return proc
+
+    monkeypatch.setattr(subprocess, "Popen", capturing_popen)
+
+    code = job_guard.run_guarded(
+        name="test-wall-clock-timeout",
+        argv=[sys.executable, str(script)],
+        max_footprint_gb=8.0,
+        max_runtime_seconds=0.2,
+        poll_seconds=0.05,
+        grace_seconds=0.2,
+    )
+
+    assert code == job_guard.EXIT_WALL_CLOCK_TIMEOUT == 124
+    assert "pid" in captured
+    deadline = time.monotonic() + 5
+    while _pid_alive(captured["pid"]) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _pid_alive(captured["pid"]), "timed-out child survived its guard"
+
+
+def test_scheduled_timeout_records_one_start_and_one_failure(isolated_guard, monkeypatch):
+    """The outer guard owns lifecycle for wrapper and Python-direct jobs."""
+    script = isolated_guard / "assert_child_env_then_sleep.py"
+    script.write_text(
+        "import os, time\nassert os.environ['REBALANCE_SCHEDULER_LIFECYCLE_CHILD'] == '1'\ntime.sleep(60)\n",
+        encoding="utf-8",
+    )
+    log_dir = isolated_guard / "auth"
+    monkeypatch.setenv("REBALANCE_AUTH_LOG_DIR", str(log_dir))
+
+    code = job_guard.run_guarded(
+        name="test-scheduled-timeout",
+        argv=[sys.executable, str(script)],
+        max_footprint_gb=8.0,
+        max_runtime_seconds=0.2,
+        grace_seconds=0.2,
+        lifecycle_job="fake-scheduled-job",
+    )
+
+    rows = [json.loads(line) for line in (log_dir / "auth_activity.jsonl").read_text().splitlines()]
+    assert code == 124
+    assert [row["event"] for row in rows] == ["job_started", "job_failed"]
+    assert rows[1]["detail"]["exit_code"] == 124
+    assert rows[1]["detail"]["reason"] == "wall_clock_timeout"
 
 
 def test_preflight_refusal_has_its_own_exit_code(isolated_guard, monkeypatch):

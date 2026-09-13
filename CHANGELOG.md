@@ -10,6 +10,39 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.0] - 2026-09-12
+
+### Added
+- An opt-in Terra Low canary now turns the existing multi-source `/daily` evidence into a validated,
+  append-only 15-minute work synthesis. The model runs ephemerally with no tools or repository
+  access; unknown evidence IDs, malformed output, missing usage, token/call/cost ceilings, and
+  repeated failures all fail closed before the Daily log is written. Each accepted entry carries a
+  sanitized token, latency, estimated-list-price, confidence, and evidence receipt (#210).
+
+## [0.87.2] - 2026-09-12
+
+### Fixed
+- Managed jobs now run at launchd standard priority so Python module loading and wrapper `fork()`
+  reach guarded work promptly instead of stalling under background-process throttling (#213).
+
+## [0.87.1] - 2026-09-12
+
+### Fixed
+- Scheduled batch jobs now have policy-specific wall-clock limits enforced around their complete
+  process trees, with one lifecycle result and truthful overdue reporting instead of an indefinitely
+  live PID appearing healthy (#211).
+- Local pulse health now fails when its generated artifact is stale, while respecting the planned
+  overnight schedule gap (#211).
+- Shared status publishers serialize Git writes and recover stranded dirty or committed content
+  instead of calling it unchanged before it reaches the remote (#211).
+- Semantic orphan vectors have a dry-run-first, explicitly confirmed, transactionally audited repair
+  command, including an additional confirmation gate for large deletions (#211).
+
+## [0.87.0] - 2026-09-10
+
+### Added
+- Full clone detection and parent checkout grouping in Focus 5: secondary task checkouts and temporary clones are now detected and clustered under their primary parent repository card rather than occupying individual top-five slots. Parent cards roll up the most recent activity across all clones, display active clone counts and dirty status indicators, and allow quick opening of individual clone checkouts (#204).
+
 ## [0.86.0] - 2026-09-08
 
 ### Added

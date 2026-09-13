@@ -50,7 +50,7 @@ Per Codex QA findings, existing RebalanceOS subsystems are reused directly with 
 * **Hardened Subprocess Boundary**: `src/rebalance/lib/git_ops.py:88` (`run_git`) is extended with an optional `extra_env: dict[str, str] | None = None` parameter for per-call environment isolation without mutating process-wide environment.
 * **`ls-remote` Reference Implementation**: `src/rebalance/ingest/github_coverage.py:122` (`remote_tip()`) is consolidated to use the hardened `run_git` boundary with non-interactive and child-cleanup protections.
 * **Workspace Worktree Inventory**: `iter_git_repos` at `src/rebalance/ingest/focus5_scan.py:456` and clone resolution at `src/rebalance/ingest/github_commit_backfill.py:151, 166` are reused to resolve and deduplicate clone paths by canonical remote URL.
-* **Document Projection vs. Vector Embedding**: 
+* **Document Projection vs. Vector Embedding**:
   - `backfill_semantic_documents` in `src/rebalance/ingest/semantic_index.py:533` and `index_ops.py:1160` are **document projection functions**. They MUST continue running on battery.
   - Only `embed_pending` / `embed_semantic_pending` and `embed_github_documents` are gated when on battery power. Deferred rows remain in `pending` state in `semantic_documents`.
 

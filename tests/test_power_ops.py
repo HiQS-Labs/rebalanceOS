@@ -50,6 +50,11 @@ from rebalance.lib.power_ops import (
 )
 
 
+def _fake_embed_texts(texts: list[str], model_name: str) -> list[list[float]]:
+    del model_name
+    return [[0.1] * EMBEDDING_DIM for _ in texts]
+
+
 class PowerOpsUnitTests(unittest.TestCase):
     def setUp(self) -> None:
         self._orig_env = os.environ.copy()
@@ -629,6 +634,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
              patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
              patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
              patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
              patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
@@ -668,6 +675,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
              patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
              patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
              patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
              patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
@@ -695,6 +704,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
                  patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
                  patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
                  patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
                  patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
                  patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
@@ -720,6 +731,8 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
              patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
              patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
              patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
              patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
              patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
@@ -755,15 +768,24 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 rebalance.ingest.index_ops.COLLECTORS["sleuth"],
                 refresh=lambda db, **kw: {"scope": "sleuth", "reminders": 0},
             )
+            email_collector = dataclasses.replace(
+                rebalance.ingest.index_ops.COLLECTORS["email"],
+                refresh=lambda db, **kw: {"scope": "email", "messages": 0},
+            )
             with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
                  patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
                  patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
                  patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
                  patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
                  patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
                  patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
                  patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
-                 patch.dict(rebalance.ingest.index_ops.COLLECTORS, {"sleuth": sleuth_collector}), \
+                 patch.dict(
+                     rebalance.ingest.index_ops.COLLECTORS,
+                     {"sleuth": sleuth_collector, "email": email_collector},
+                 ), \
                  patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
                  patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
                  patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \
@@ -797,12 +819,17 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
                  patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
                  patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
+                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
+                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
                  patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
                  patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
                  patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
                  patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
                  patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
-                 patch.dict(rebalance.ingest.index_ops.COLLECTORS, {"sleuth": sleuth_collector}), \
+                 patch.dict(
+                     rebalance.ingest.index_ops.COLLECTORS,
+                     {"sleuth": sleuth_collector, "email": email_collector},
+                 ), \
                  patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
                  patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
                  patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \

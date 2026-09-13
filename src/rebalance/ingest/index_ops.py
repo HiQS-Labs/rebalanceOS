@@ -2079,15 +2079,33 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         }
 
     import time
+    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock
 
     started = time.monotonic()
-    cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
-    email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
+    try:
+        with git_publish_lock(target_repo):
+            cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
+            email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
 
-    import json as _json
+            import json as _json
 
-    generated_at = _json.loads(cal_path.read_text(encoding="utf-8"))["generated_at"]
-    git_result = commit_and_push_sync(target_repo, sync_subdir, device_id=device_id, generated_at=generated_at)
+            generated_at = _json.loads(cal_path.read_text(encoding="utf-8"))["generated_at"]
+            git_result = commit_and_push_sync(
+                target_repo,
+                sync_subdir,
+                device_id=device_id,
+                generated_at=generated_at,
+                lock_acquired=True,
+            )
+    except GitPublishLockBusy as exc:
+        return {
+            "scope": "sync",
+            "dry_run": False,
+            "device_id": device_id,
+            "error": str(exc),
+            "deferred": True,
+            "elapsed_seconds": round(time.monotonic() - started, 2),
+        }
 
     return {
         "scope": "sync",

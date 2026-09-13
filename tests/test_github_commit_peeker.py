@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import subprocess
@@ -11,14 +10,13 @@ import threading
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from rebalance.ingest.config import get_enable_remote_peeking, set_enable_remote_peeking
 from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_schema
 from rebalance.ingest.github_commit_backfill import (
     BackfillResult,
     backfill_commits,
-    is_commit_walk_cached,
     is_shallow_clone,
     record_commit_coverage_checkpoint,
 )

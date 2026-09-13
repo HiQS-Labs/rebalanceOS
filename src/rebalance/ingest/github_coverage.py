@@ -28,18 +28,15 @@ missing, so the gap is computed against ``complete`` rows only, with
 from __future__ import annotations
 
 import json
-import os
-import sqlite3
 import subprocess
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-from rebalance.lib.git_ops import canonical_github_url
-from rebalance.lib.time_ops import now_utc
 from rebalance.ingest.db import db_connection, ensure_github_schema
+from rebalance.ingest.db.connection import db_connection_readonly
 from rebalance.ingest.github_commit_backfill import _git, resolve_clone
-from rebalance.lib.time_ops import _now
+from rebalance.lib.git_ops import canonical_github_url
+from rebalance.lib.time_ops import _now, now_utc, parse_utc_iso
 
 _LS_REMOTE_TIMEOUT_S = 30
 
@@ -137,7 +134,7 @@ def _peek_verified_age_hours(
     """
     canonical_url = canonical_github_url(repo_full_name)
     try:
-        with sqlite3.connect(f"file:{database_path}?mode=ro", uri=True) as conn:
+        with db_connection_readonly(database_path) as conn:
             row = conn.execute(
                 "SELECT sha_map_json, verified_at FROM github_remote_peeks WHERE canonical_remote_url = ?",
                 (canonical_url,),
@@ -183,7 +180,9 @@ def _peek_verified_age_hours(
                 except Exception:
                     return None
 
-            verified_dt = datetime.fromisoformat(verified_at_str.replace("Z", "+00:00"))
+            verified_dt = parse_utc_iso(verified_at_str)
+            if verified_dt is None:
+                return None
             return (now_utc() - verified_dt).total_seconds() / 3600.0
     except Exception:
         return None
