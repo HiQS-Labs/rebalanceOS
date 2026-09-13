@@ -167,10 +167,24 @@ struct ContentView: View {
 
     private var rosterStatus: some View {
         HStack(spacing: 6) {
-            Text("\(model.roster.count) repos")
+            Text("\(model.visibleRoster.count) repos")
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .fixedSize()
+            if model.hasHiddenRepos {
+                Button("(\(model.hiddenRosterCount) hidden · restore)") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        model.unhideAllRepos()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
+                .help("Restore hidden repos to the roster")
+                .onHover { inside in
+                    if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
             if !model.lastUpdatedAgo.isEmpty {
                 Text("·")
                     .font(.system(size: 12.5))
@@ -211,7 +225,7 @@ struct ContentView: View {
     }
 
     private var rosterAttentionBadge: some View {
-        let attentionCount = model.offRoster.count
+        let attentionCount = model.visibleOffRoster.count
         return statusBadge(
             count: attentionCount,
             tint: attentionCount == 0 ? Theme.diffAdd : Theme.attention,
@@ -319,13 +333,31 @@ struct ContentView: View {
                         if let banner = model.dirtyBanner {
                             DirtyBannerView(warning: banner)
                         }
-                        RosterLayout(tiled: model.tileCards) {
-                            ForEach(Array(model.roster.enumerated()), id: \.element.id) { index, card in
-                                RepoCardView(card: card, model: model, darker: !index.isMultiple(of: 2))
+                        if model.visibleRoster.isEmpty && !model.roster.isEmpty {
+                            emptyState(
+                                icon: "eye.slash",
+                                title: "All repos hidden",
+                                detail: "\(model.roster.count) repos hidden by operator."
+                            )
+                            .frame(minHeight: 140)
+                            Button("Restore Hidden Repos") {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    model.unhideAllRepos()
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.accent)
+                            .padding(.top, Theme.Space.xs)
+                        } else {
+                            RosterLayout(tiled: model.tileCards) {
+                                ForEach(Array(model.visibleRoster.enumerated()), id: \.element.id) { index, card in
+                                    RepoCardView(card: card, displayPosition: index + 1, model: model, darker: !index.isMultiple(of: 2))
+                                }
                             }
                         }
-                        if !model.offRoster.isEmpty {
-                            OffRosterFooter(warnings: model.offRoster)
+                        if !model.visibleOffRoster.isEmpty {
+                            OffRosterFooter(warnings: model.visibleOffRoster)
                         }
                         bottomSections
                     }
@@ -769,10 +801,34 @@ struct RepoPromptSnippetView: View {
     }
 }
 
+// MARK: - Repo trash button (hides repo from roster)
+
+private struct RepoTrashButton: View {
+    let repoName: String
+    let onHide: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onHide) {
+            Image(systemName: "trash")
+                .font(.system(size: 11.5))
+                .foregroundStyle(isHovered ? Theme.text2 : Theme.text3.opacity(0.4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Hide \(repoName) from roster")
+        .onHover { inside in
+            isHovered = inside
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+}
+
 // MARK: - Repo card (collapsible)
 
 struct RepoCardView: View {
     let card: RepoCard
+    var displayPosition: Int? = nil
     var model: Focus5Model? = nil
     var darker: Bool = false
     @State private var expanded = false
@@ -781,7 +837,8 @@ struct RepoCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Theme.Space.s) {
-                KeyCap(text: "#\(card.position)", font: Theme.monoSmall, height: 24)
+                KeyCap(text: "#\(displayPosition ?? card.position)", font: Theme.monoSmall, height: 24)
+                    .help(displayPosition != nil && displayPosition != card.position ? "Ranked #\(card.position) from server" : "")
                 Spacer(minLength: Theme.Space.s)
                 OpenRepoButton(repoName: card.repoName, localPath: card.localPath, vscodeURL: card.vscodeUrl)
                 StatusDot(isDirty: card.isDirty || card.isAnyCloneDirty, healthAvailable: card.healthAvailable)
@@ -790,25 +847,91 @@ struct RepoCardView: View {
                     .foregroundStyle(Theme.text3)
             }
 
-            Text(card.repoName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.text)
-                .lineSpacing(1)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: Theme.Space.m) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 6) {
+                        Text(card.repoName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.text)
+                            .lineSpacing(1)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        RepoTrashButton(repoName: card.repoName) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                model?.hideRepo(card.repoName)
+                            }
+                        }
+                    }
+
+                    Text(commitLine)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.text3)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 9)
 
-            Text(commitLine)
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.text3)
-                .padding(.top, 8)
+                if card.hasRecentGitHubItems {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if !card.issues.isEmpty {
+                            HStack(spacing: 3) {
+                                ForEach(Array(card.issues.enumerated()), id: \.element.id) { index, issue in
+                                    Button("#\(issue.number)") {
+                                        open(issue.htmlUrl)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.accent)
+                                    .onHover { inside in
+                                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                                    }
+                                    if index < card.issues.count - 1 {
+                                        Text(",")
+                                            .font(.system(size: 11.5))
+                                            .foregroundStyle(Theme.text3)
+                                    }
+                                }
+                            }
+                        }
 
-            if let prompt = model?.latestPrompt(for: card) {
-                RepoPromptSnippetView(
-                    entry: prompt,
-                    localPath: card.localPath,
-                    vscodeURL: card.vscodeUrl
-                )
+                        if !card.prs.isEmpty {
+                            HStack(spacing: 3) {
+                                Text("PRs:")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(Theme.text3)
+                                ForEach(Array(card.prs.enumerated()), id: \.element.id) { index, pr in
+                                    Button("#\(pr.number)") {
+                                        open(pr.htmlUrl)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.accent)
+                                    .onHover { inside in
+                                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                                    }
+                                    if index < card.prs.count - 1 {
+                                        Text(",")
+                                            .font(.system(size: 11.5))
+                                            .foregroundStyle(Theme.text3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            .padding(.top, 9)
+
+            if let prompts = model?.latestPrompts(for: card, limit: 2), !prompts.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(prompts) { prompt in
+                        let info = model?.promptOpenInfo(for: prompt, in: card) ?? (localPath: card.localPath, vscodeURL: card.vscodeUrl)
+                        RepoPromptSnippetView(
+                            entry: prompt,
+                            localPath: info.localPath,
+                            vscodeURL: info.vscodeURL
+                        )
+                    }
+                }
                 .padding(.top, 6)
             }
 

@@ -12,8 +12,13 @@
 
 ## [0.88.2] - 2026-09-13
 
+### Added
+- Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
+
 ### Fixed
 - CLIO now captures the first prompt of a new Codex root session when it arrives between polling ticks. A persisted capture boundary excludes prior history, while first-file provenance excludes inherited subagent prompts even after parent metadata appears. Existing writer retry, deduplication, and resumed-session context are preserved; legacy pending records remain eligible until file replacement or truncation (#199).
+- The CLIO uninstall recipe now removes the prompt-log projection launchd job alongside the two
+  tail jobs, preventing the projection service from surviving an uninstall.
 
 ## [0.88.1] - 2026-09-12
 

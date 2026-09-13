@@ -67,10 +67,12 @@ nulls — HTTP 200, never a 404/500. The app decodes one shape always.
 `ahead, behind, branch, computed_at, device_id, has_upstream, head_reflog_ts,
 health_available, health_probed_at, index_mtime_ts, is_dirty, last_commit_at,
 last_commit_ts, local_path, modified_count, my_last_commit_ts, newest_pr, position,
-probed_at, rank_reason, ranking_mode, recent_activity, remote_url, repo_full_name,
-repo_name, untracked_count, upstream, vscode_url`
+probed_at, rank_reason, ranking_mode, recent_activity, recent_issues, recent_prs,
+remote_url, repo_full_name, repo_name, untracked_count, upstream, vscode_url`
 
 - `newest_pr`: object or **null** — `{number, title, state, html_url, is_draft, is_merged}`
+- `recent_issues`: array (possibly empty) of `{number, html_url, title}` — up to 3 open issues (24h prioritized, descending ID fallback)
+- `recent_prs`: array (possibly empty) of `{number, html_url, title}` — up to 2 open PRs (24h prioritized, descending ID fallback)
 - `recent_activity`: array (possibly empty) of `{sha, subject, committed_at, author_email}`
 
 ## Field classification — local-only/sensitive vs portable

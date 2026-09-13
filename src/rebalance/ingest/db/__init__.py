@@ -33,6 +33,7 @@ from rebalance.ingest.db.queries import (
     fetch_open_prs,
     fetch_org_activity,
     fetch_recent_github,
+    fetch_recent_open_github_items,
     fetch_release_readiness_data,
     fetch_repo_activity_counts,
     fetch_repo_diagnostics,
@@ -75,6 +76,7 @@ __all__ = [
     "fetch_repo_diagnostics",
     "fetch_release_readiness_data",
     "fetch_recent_github",
+    "fetch_recent_open_github_items",
     "fetch_repo_activity_counts",
     "fetch_open_prs",
 ]

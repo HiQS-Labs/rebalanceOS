@@ -122,4 +122,115 @@ final class PureLogicTests: XCTestCase {
         XCTAssertFalse(RelTime.isOlderThan(iso, hours: 48, now: now))
         XCTAssertFalse(RelTime.isOlderThan(nil, hours: 24, now: now))
     }
+
+    @MainActor
+    func testHiddenReposExcludesFromVisibleRosterAndPushesUpList() {
+        let key = "hiddenRepoNames"
+        UserDefaults.standard.removeObject(forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+
+        let model = Focus5Model()
+
+        func makeCard(name: String, pos: Int) -> RepoCard {
+            let json = """
+            {"position":\(pos),"repo_name":"\(name)","local_path":"/repos/\(name)","vscode_url":"vscode://file/repos/\(name)",
+             "rank_reason":"r","ranking_mode":"recent_activity","computed_at":"2026-01-01T00:00:00Z",
+             "ahead":0,"behind":0,"modified_count":0,"untracked_count":0,"is_dirty":false,
+             "health_available":true,"recent_activity":[]}
+            """
+            return try! Focus5JSON.decoder().decode(RepoCard.self, from: Data(json.utf8))
+        }
+
+        model.roster = [
+            makeCard(name: "repo-A", pos: 1),
+            makeCard(name: "repo-B", pos: 2),
+            makeCard(name: "repo-C", pos: 3),
+        ]
+
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-A", "repo-B", "repo-C"])
+        XCTAssertEqual(model.hiddenRosterCount, 0)
+        XCTAssertFalse(model.hasHiddenRepos)
+
+        // Hide repo-A: repo-B and repo-C must push up
+        model.hideRepo("repo-A")
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-B", "repo-C"])
+        XCTAssertEqual(model.hiddenRosterCount, 1)
+        XCTAssertTrue(model.hasHiddenRepos)
+
+        // Test persistence across model reload
+        let model2 = Focus5Model()
+        model2.roster = model.roster
+        XCTAssertEqual(model2.visibleRoster.map(\.repoName), ["repo-B", "repo-C"])
+        XCTAssertTrue(model2.isRepoHidden("repo-a")) // case-insensitive canonical key match
+
+        // Restore all repos
+        model2.unhideAllRepos()
+        XCTAssertEqual(model2.visibleRoster.map(\.repoName), ["repo-A", "repo-B", "repo-C"])
+        XCTAssertEqual(model2.hiddenRosterCount, 0)
+        XCTAssertFalse(model2.hasHiddenRepos)
+    }
+
+    @MainActor
+    func testCandidatePromotionWhenRepoIsHidden() {
+        let key = "hiddenRepoNames"
+        UserDefaults.standard.removeObject(forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+
+        let model = Focus5Model()
+
+        func makeCard(name: String, pos: Int) -> RepoCard {
+            let json = """
+            {"position":\(pos),"repo_name":"\(name)","local_path":"/repos/\(name)","vscode_url":"vscode://file/repos/\(name)",
+             "rank_reason":"r","ranking_mode":"recent_activity","computed_at":"2026-01-01T00:00:00Z",
+             "ahead":0,"behind":0,"modified_count":0,"untracked_count":0,"is_dirty":false,
+             "health_available":true,"recent_activity":[]}
+            """
+            return try! Focus5JSON.decoder().decode(RepoCard.self, from: Data(json.utf8))
+        }
+
+        func makeWarning(name: String) -> OffRosterWarning {
+            let json = """
+            {"repo_name":"\(name)","local_path":"/repos/\(name)","ahead":1,"modified_count":2,"untracked_count":0,"is_dirty":true,"warning_reason":"ahead"}
+            """
+            return try! Focus5JSON.decoder().decode(OffRosterWarning.self, from: Data(json.utf8))
+        }
+
+        model.roster = [
+            makeCard(name: "repo-1", pos: 1),
+            makeCard(name: "repo-2", pos: 2),
+            makeCard(name: "repo-3", pos: 3),
+            makeCard(name: "repo-4", pos: 4),
+            makeCard(name: "repo-5", pos: 5),
+        ]
+        model.offRoster = [
+            makeWarning(name: "off-6"),
+            makeWarning(name: "off-7"),
+        ]
+
+        // Initial state: full roster of 5, 2 off-roster warnings
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-1", "repo-2", "repo-3", "repo-4", "repo-5"])
+        XCTAssertEqual(model.visibleOffRoster.map(\.repoName), ["off-6", "off-7"])
+        XCTAssertTrue(model.promotedCards.isEmpty)
+
+        // Hide repo-2: repo-3, repo-4, repo-5 push up, and off-6 is promoted to 5th position
+        model.hideRepo("repo-2")
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-1", "repo-3", "repo-4", "repo-5", "off-6"])
+        XCTAssertEqual(model.visibleRoster.last?.position, 5)
+        XCTAssertEqual(model.visibleOffRoster.map(\.repoName), ["off-7"])
+
+        // Hide repo-4: off-7 is now promoted as well
+        model.hideRepo("repo-4")
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-1", "repo-3", "repo-5", "off-6", "off-7"])
+        XCTAssertTrue(model.visibleOffRoster.isEmpty)
+
+        // Hide promoted off-6: off-roster is exhausted, visible roster drops to 4
+        model.hideRepo("off-6")
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-1", "repo-3", "repo-5", "off-7"])
+
+        // Unhide all: restores original 5, puts off-roster items back in off-roster
+        model.unhideAllRepos()
+        XCTAssertEqual(model.visibleRoster.map(\.repoName), ["repo-1", "repo-2", "repo-3", "repo-4", "repo-5"])
+        XCTAssertEqual(model.visibleOffRoster.map(\.repoName), ["off-6", "off-7"])
+        XCTAssertTrue(model.promotedCards.isEmpty)
+    }
 }

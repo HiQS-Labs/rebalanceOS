@@ -1906,7 +1906,7 @@ wheels = [
 
 [[package]]
 name = "rebalance-os"
-version = "0.88.0"
+version = "0.88.2"
 source = { editable = "." }
 dependencies = [
     { name = "keyring" },

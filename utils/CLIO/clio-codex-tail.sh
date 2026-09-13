@@ -46,7 +46,18 @@ command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is requir
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+# Stale lock detection: reap any lock held longer than 300s so dead processes cannot deadlock tailing.
+if ! mkdir "$TAIL_LOCK" 2>/dev/null; then
+  now=$(date +%s)
+  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "$now")
+  if [ -n "$born" ] && [ "$born" -gt 0 ] 2>/dev/null && [ $((now - born)) -gt 300 ]; then
+    diag "reaped stale tail lock born at $born ($((now - born))s old)"
+    rm -rf "$TAIL_LOCK"
+    mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+  else
+    exit 0
+  fi
+fi
 trap 'rm -rf "$TAIL_LOCK"' EXIT
 date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
 
@@ -154,13 +165,18 @@ if cut != -1 and cut >= (offset - scan_start):
         if obj.get("type") != "event_msg" or payload.get("type") != "user_message":
             continue
         text = payload.get("message")
-        if not isinstance(text, str) or not text.strip() or not session_id:
-            continue
         instant = parse_ts(obj.get("timestamp"))
         if instant is None:
             malformed += 1
             continue
         if since is not None and instant < since:
+            continue
+        if "# Context from my IDE setup:" in text and "## My request:" in text:
+            text = text.split("## My request:", 1)[-1].strip()
+        elif "## My request:" in text:
+            text = text.split("## My request:", 1)[-1].strip()
+        if not text:
+            continue
             continue
         repo = cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else ""
         print(json.dumps({
@@ -202,11 +218,7 @@ while IFS= read -r -d '' file; do
 
   offset=""
   if cached=$(state_lookup "$file"); then
-    cached_inode=$(printf '%s' "$cached" | awk -F'\t' '{print $1}')
-    cached_offset=$(printf '%s' "$cached" | awk -F'\t' '{print $2}')
-    cached_sid=$(printf '%s' "$cached" | awk -F'\t' '{print $3}')
-    cached_cwd=$(printf '%s' "$cached" | awk -F'\t' '{print $4}')
-    cached_since=$(printf '%s' "$cached" | awk -F'\t' '{print $5}')
+    IFS=$'\t' read -r cached_inode cached_offset cached_sid cached_cwd cached_since <<< "$cached"
     cached_since=${cached_since:-legacy}
     case "$cached_offset" in ''|*[!0-9]*) cached_offset=0 ;; esac
     if [ "$cached_inode" != "$inode" ] || [ "$size" -lt "$cached_offset" ]; then
@@ -223,7 +235,12 @@ while IFS= read -r -d '' file; do
     [ "$BACKFILL" != 1 ] || cached_since=0
   fi
 
-  [ "$offset" -ge "$size" ] && { state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"; continue; }
+  if [ "$offset" -ge "$size" ]; then
+    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ] || [ "${cached_since:-}" != "$cached_since" ]; then
+      state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"
+    fi
+    continue
+  fi
 
   rows_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-rows.XXXXXX")
   err_file=$(mktemp "${TMPDIR:-/tmp}/clio-codex-err.XXXXXX")

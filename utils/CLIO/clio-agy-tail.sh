@@ -37,7 +37,18 @@ else
 fi
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+# Stale lock detection: reap any lock held longer than 300s so dead processes cannot deadlock tailing.
+if ! mkdir "$TAIL_LOCK" 2>/dev/null; then
+  now=$(date +%s)
+  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "$now")
+  if [ -n "$born" ] && [ "$born" -gt 0 ] 2>/dev/null && [ $((now - born)) -gt 300 ]; then
+    diag "reaped stale tail lock born at $born ($((now - born))s old)"
+    rm -rf "$TAIL_LOCK"
+    mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
+  else
+    exit 0
+  fi
+fi
 trap 'rm -rf "$TAIL_LOCK"' EXIT
 date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
 
@@ -176,7 +187,12 @@ while IFS= read -r file; do
     continue
   fi
 
-  [ "$offset" -ge "$size" ] && { state_update "$file" "$inode" "$offset"; continue; }
+  if [ "$offset" -ge "$size" ]; then
+    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ]; then
+      state_update "$file" "$inode" "$offset"
+    fi
+    continue
+  fi
 
   rows_file=$(mktemp "${TMPDIR:-/tmp}/clio-agy-rows.XXXXXX")
   err_file=$(mktemp "${TMPDIR:-/tmp}/clio-agy-err.XXXXXX")
