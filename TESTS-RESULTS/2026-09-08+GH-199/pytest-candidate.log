@@ -1,0 +1,317 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.1.1, pluggy-1.6.0
+rootdir: <gate-fixture>/repo
+configfile: pyproject.toml
+plugins: hypothesis-6.167.1, anyio-4.13.0
+collected 2517 items
+
+tests/test_alias_dedup_invariant.py ........                             [  0%]
+tests/test_apple_reminders.py ...............................            [  1%]
+tests/test_apple_reminders_write.py ..................                   [  2%]
+tests/test_apple_reminders_write_cli.py ........                         [  2%]
+tests/test_ask_self_scan.py ..........                                   [  2%]
+tests/test_auth_log.py ..............                                    [  3%]
+tests/test_auth_sidecar_persistence.py ...                               [  3%]
+tests/test_auto_promote.py xx.x.x..x.x..xxx                              [  4%]
+tests/test_banned_imports_ratchet.py .......                             [  4%]
+tests/test_calendar_aggregator.py .....                                  [  4%]
+tests/test_calendar_composite_pk_migration.py ...                        [  4%]
+tests/test_calendar_config.py ......                                     [  5%]
+tests/test_calendar_config_reject_primary_team.py .....                  [  5%]
+tests/test_calendar_config_signal_weights.py ..........                  [  5%]
+tests/test_calendar_config_team_calendars.py .........                   [  6%]
+tests/test_calendar_create_event_cli.py .....                            [  6%]
+tests/test_calendar_helpers.py .......................                   [  7%]
+tests/test_calendar_keyring.py ...                                       [  7%]
+tests/test_calendar_person_attribution.py ...                            [  7%]
+tests/test_calendar_read_nonprimary_config.py ....                       [  7%]
+tests/test_calendar_reader_scope.py .............                        [  8%]
+tests/test_calendar_reports.py ............................              [  9%]
+tests/test_calendar_snap.py ....................                         [ 10%]
+tests/test_calendar_sync_explicit_override.py ......                     [ 10%]
+tests/test_calendar_sync_migrates.py ...                                 [ 10%]
+tests/test_calendar_team_loop_isolation.py ..                            [ 10%]
+tests/test_calendar_weekly_report_cli.py ..                              [ 10%]
+tests/test_capabilities_manifest.py ...                                  [ 10%]
+tests/test_chat.py .......                                               [ 10%]
+tests/test_check_severity.py .....                                       [ 11%]
+tests/test_claude_cloud.py ........                                      [ 11%]
+tests/test_cli_embedding_model.py ....                                   [ 11%]
+tests/test_client_buckets.py ...                                         [ 11%]
+tests/test_client_gapfill.py .....                                       [ 11%]
+tests/test_clio.py ..                                                    [ 11%]
+tests/test_code_collector.py ......                                      [ 12%]
+tests/test_collector_contracts.py .........                              [ 12%]
+tests/test_collector_health_predicate.py .....                           [ 12%]
+tests/test_collector_registry.py ........                                [ 13%]
+tests/test_config_github_token.py .........................              [ 14%]
+tests/test_config_read_shape_guard.py ...................                [ 14%]
+tests/test_config_secret_store_wiring.py ...........                     [ 15%]
+tests/test_consumer_catalog.py .....                                     [ 15%]
+tests/test_credential_dedup.py ..........                                [ 15%]
+tests/test_daily_sync_exit.py ....                                       [ 16%]
+tests/test_daily_synthesis.py .......................................... [ 17%]
+..............                                                           [ 18%]
+tests/test_dashboard_cli.py ..                                           [ 18%]
+tests/test_dashboard_refresh_integration.py ..                           [ 18%]
+tests/test_dashboard_terminal_theme.py ......                            [ 18%]
+tests/test_db_github.py .........                                        [ 19%]
+tests/test_db_migrations.py .......                                      [ 19%]
+tests/test_diagnose.py ..........                                        [ 19%]
+tests/test_doc_links.py .........                                        [ 20%]
+tests/test_doctor.py ...........................                         [ 21%]
+tests/test_doctor_deep_work_tz.py ....                                   [ 21%]
+tests/test_doctor_device_scope.py ......                                 [ 21%]
+tests/test_doctor_exit_pins.py .................                         [ 22%]
+tests/test_doctor_google_oauth_client.py ....                            [ 22%]
+tests/test_doctor_json.py ...........                                    [ 22%]
+tests/test_doctor_launchd.py .........                                   [ 23%]
+tests/test_doctor_pulse_severity.py .............                        [ 23%]
+tests/test_doctor_rebalance_shim.py ..........                           [ 24%]
+tests/test_doctor_scheduled_stack.py ....F.                              [ 24%]
+tests/test_doctor_secret_permissions.py ....                             [ 24%]
+tests/test_doctor_three_eyes_supervision.py .................            [ 25%]
+tests/test_email_ingest.py ..........................                    [ 26%]
+tests/test_embedder.py ....                                              [ 26%]
+tests/test_embedder_metal_unavailable.py ....                            [ 26%]
+tests/test_event_filtering.py ...............                            [ 27%]
+tests/test_experimental_gh_close_candidates_action.py ..                 [ 27%]
+tests/test_external_watch.py .....                                       [ 27%]
+tests/test_figma_gating.py ...                                           [ 27%]
+tests/test_figma_ingest.py ....                                          [ 27%]
+tests/test_figma_source_module.py .                                      [ 27%]
+tests/test_focus5_scan.py .............................................. [ 29%]
+...........................................................              [ 31%]
+tests/test_focus5_three_eyes.py ........                                 [ 32%]
+tests/test_gemini_key_resolution.py .................                    [ 32%]
+tests/test_gh250_fencing.py .........                                    [ 33%]
+tests/test_gh250_reclaim.py .............                                [ 33%]
+tests/test_gh59_failure_grading.py .............                         [ 34%]
+tests/test_git_pulse_collect_cli.py .....                                [ 34%]
+tests/test_git_pulse_health_check.py .......                             [ 34%]
+tests/test_git_pulse_install_cli.py ...                                  [ 34%]
+tests/test_git_pulse_pulse_common.py ......                              [ 35%]
+tests/test_git_pulse_recap_cli.py ....                                   [ 35%]
+tests/test_git_pulse_scope.py ......                                     [ 35%]
+tests/test_git_pulse_team_collect.py ...........                         [ 35%]
+tests/test_git_pulse_team_recap_cli.py ...                               [ 36%]
+tests/test_git_pulse_validators.py ......................                [ 36%]
+tests/test_git_pulse_view_cli.py ....                                    [ 37%]
+tests/test_github_commit_backfill.py ..................                  [ 37%]
+tests/test_github_coverage.py ..............                             [ 38%]
+tests/test_github_direct_commits.py ........                             [ 38%]
+tests/test_github_ignore_cli.py ......                                   [ 38%]
+tests/test_github_knowledge.py .......                                   [ 39%]
+tests/test_github_org_aliases.py .......                                 [ 39%]
+tests/test_github_push_event_accounting.py ........                      [ 39%]
+tests/test_github_rate_limit_grading.py ........                         [ 40%]
+tests/test_github_readiness.py ..                                        [ 40%]
+tests/test_github_reconciliation.py ...                                  [ 40%]
+tests/test_github_scan.py .........                                      [ 40%]
+tests/test_github_vector_invariants.py ........                          [ 40%]
+tests/test_gmail_keyring.py ......                                       [ 41%]
+tests/test_google_oauth_client.py ................                       [ 41%]
+tests/test_health.py ...............                                     [ 42%]
+tests/test_health_banner_collapse.py .........                           [ 42%]
+tests/test_health_buckets.py .........                                   [ 43%]
+tests/test_health_issue_reporter.py .................................... [ 44%]
+...................................................                      [ 46%]
+tests/test_health_log.py ..................                              [ 47%]
+tests/test_health_policy_drift.py .....                                  [ 47%]
+tests/test_hiqs_digest.py .............................................. [ 49%]
+............................                                             [ 50%]
+tests/test_hiqs_pipeline.py ..............                               [ 51%]
+tests/test_http_client.py ...................                            [ 51%]
+tests/test_http_contract.py .                                            [ 51%]
+tests/test_http_latency_attribution.py ..........                        [ 52%]
+tests/test_index_ops.py .................................                [ 53%]
+tests/test_index_ops_migration_gate.py ..                                [ 53%]
+tests/test_job_guard_footprint.py .....................                  [ 54%]
+tests/test_job_guard_wiring.py ................                          [ 55%]
+tests/test_json_ops.py ..................                                [ 55%]
+tests/test_launchd_predicate.py .......                                  [ 56%]
+tests/test_lifecycle_contract.py .........................               [ 57%]
+tests/test_local_repos.py .......                                        [ 57%]
+tests/test_mcp_probe.py ....                                             [ 57%]
+tests/test_md_parser_property.py .............                           [ 58%]
+tests/test_migrate_keyring.py ....                                       [ 58%]
+tests/test_mlx_cache_cap.py sssssssss                                    [ 58%]
+tests/test_mlx_instrumentation.py sssssss                                [ 58%]
+tests/test_model_constants_guard.py ......                               [ 59%]
+tests/test_next_actions.py ......................................        [ 60%]
+tests/test_next_actions_parity.py ..                                     [ 60%]
+tests/test_next_actions_precompute.py ......                             [ 60%]
+tests/test_next_actions_privacy.py ..                                    [ 60%]
+tests/test_oauth_json_fallback.py .......                                [ 61%]
+tests/test_obsidian_daily_rollover.py ......                             [ 61%]
+tests/test_onboarding_e2e.py .....                                       [ 61%]
+tests/test_paths.py ....                                                 [ 61%]
+tests/test_paths_permissions.py ..                                       [ 61%]
+tests/test_phase2_migration.py .........                                 [ 62%]
+tests/test_phase5_collector_smoke.py .............                       [ 62%]
+tests/test_preflight_roundtrip.py .............                          [ 63%]
+tests/test_priority_downweight.py ....                                   [ 63%]
+tests/test_profile_sync.py ...                                           [ 63%]
+tests/test_project_inference.py x..                                      [ 63%]
+tests/test_project_priority.py ..                                        [ 63%]
+tests/test_prune_dirs_consolidation.py ........                          [ 64%]
+tests/test_pulse_assigned_issues.py ....                                 [ 64%]
+tests/test_pulse_calendar_scope.py ..                                    [ 64%]
+tests/test_pulse_health.py ...........                                   [ 64%]
+tests/test_pulse_reconcile.py .....                                      [ 64%]
+tests/test_pulse_self_repair.py ......                                   [ 65%]
+tests/test_pulse_server_apple_reminders.py .....                         [ 65%]
+tests/test_pulse_server_figma.py .....                                   [ 65%]
+tests/test_pulse_sleuth_scope.py .                                       [ 65%]
+tests/test_pulse_warning_watch.py ......                                 [ 65%]
+tests/test_pulse_web_calendar.py ............                            [ 66%]
+tests/test_pulse_web_goals.py .............                              [ 66%]
+tests/test_pulse_web_timestamp_disambiguation.py ............            [ 67%]
+tests/test_pulse_web_worknext.py ....                                    [ 67%]
+tests/test_pytest_rootdir_pinned.py ..                                   [ 67%]
+tests/test_querier.py ..................                                 [ 68%]
+tests/test_querier_gemini_parse.py ..............                        [ 68%]
+tests/test_querier_local_llm.py ....                                     [ 69%]
+tests/test_querier_vacation_scope.py ..                                  [ 69%]
+tests/test_queries_mirror_invariance.py ...............................  [ 70%]
+tests/test_query_cli_rendering.py ........                               [ 70%]
+tests/test_read_layer_ratchet.py ........                                [ 70%]
+tests/test_recovery_copy_commands.py ...                                 [ 71%]
+tests/test_registry_property.py ....                                     [ 71%]
+tests/test_repair_fsm.py .................                               [ 71%]
+tests/test_repo_claim_guard.py .................                         [ 72%]
+tests/test_repo_local_secret_leak.py ..                                  [ 72%]
+tests/test_repo_pie_auto_promote.py ...                                  [ 72%]
+tests/test_retrieval_contracts.py ........................               [ 73%]
+tests/test_runtime_drift.py .                                            [ 73%]
+tests/test_scan_runaway_cpu.py ..............................            [ 74%]
+tests/test_scheduler_liveness.py ..                                      [ 75%]
+tests/test_scheduler_policy.py ..................                        [ 75%]
+tests/test_schema_dim_migration.py ........                              [ 76%]
+tests/test_secret_store.py ...........                                   [ 76%]
+tests/test_semantic_hybrid.py ........                                   [ 76%]
+tests/test_semantic_index.py ...                                         [ 76%]
+tests/test_semantic_query_prefix.py ....                                 [ 77%]
+tests/test_semantic_source_contract.py ...                               [ 77%]
+tests/test_shutdown_handoff.py ........                                  [ 77%]
+tests/test_shutdown_scanner.py ...........                               [ 77%]
+tests/test_slack_users.py ......                                         [ 78%]
+tests/test_sleuth_graph_security.py .                                    [ 78%]
+tests/test_sleuth_grouping.py .......................................... [ 79%]
+.....                                                                    [ 80%]
+tests/test_sleuth_keyring.py ....                                        [ 80%]
+tests/test_sleuth_reminders.py ......................                    [ 81%]
+tests/test_sqlite_gateway_ratchet.py .........                           [ 81%]
+tests/test_stack_script.py ..................                            [ 82%]
+tests/test_stickies2obsidian_cli.py ...                                  [ 82%]
+tests/test_sync_snapshot.py ....................                         [ 83%]
+tests/test_system_log.py .............                                   [ 83%]
+tests/test_time_ops_consolidation.py ............                        [ 84%]
+tests/test_time_ops_migration.py ...                                     [ 84%]
+tests/test_time_ops_property.py ...                                      [ 84%]
+tests/test_time_ops_relative_options.py .............                    [ 84%]
+tests/test_token_meta.py .....                                           [ 85%]
+tests/test_triage_related_repos.py .                                     [ 85%]
+tests/test_unified_refresh_remediation.py ........                       [ 85%]
+tests/test_unified_retrieval_call_sites.py ...                           [ 85%]
+tests/test_uninstall_rebalance.py ...................................... [ 87%]
+...............                                                          [ 87%]
+tests/test_version_sync.py .                                             [ 87%]
+tests/test_watched_repos.py .....                                        [ 87%]
+tests/test_watchlist_guard.py .............                              [ 88%]
+tests/test_web_auth_log.py ...                                           [ 88%]
+tests/test_web_badges.py .....                                           [ 88%]
+tests/test_web_components.py ..................                          [ 89%]
+tests/test_web_error_handler.py ..                                       [ 89%]
+tests/test_web_focus5.py ............................................... [ 91%]
+.........                                                                [ 91%]
+tests/test_web_surface.py .............ssss                              [ 92%]
+tests/test_web_whatsnext.py ..........                                   [ 92%]
+tests/test_welcome_walkthrough.py .                                      [ 92%]
+tests/test_xyz_pin.py ......                                             [ 93%]
+tests/test_zapier_webhook.py ........                                    [ 93%]
+HiQS/tests/test_affinity.py ....s                                        [ 93%]
+HiQS/tests/test_chunking.py ........                                     [ 93%]
+HiQS/tests/test_clean_room.py ....                                       [ 94%]
+HiQS/tests/test_cli.py .......                                           [ 94%]
+HiQS/tests/test_config.py .......                                        [ 94%]
+HiQS/tests/test_contract.py .........x                                   [ 95%]
+HiQS/tests/test_db.py .....                                              [ 95%]
+HiQS/tests/test_docs_index.py ..............................             [ 96%]
+HiQS/tests/test_eval_retrieval.py ...............                        [ 97%]
+HiQS/tests/test_events.py .........                                      [ 97%]
+HiQS/tests/test_github.py ...                                            [ 97%]
+HiQS/tests/test_github_candidates.py ..                                  [ 97%]
+HiQS/tests/test_github_docs.py ..                                        [ 97%]
+HiQS/tests/test_judge_pairwise.py ..................                     [ 98%]
+HiQS/tests/test_plugins.py .......                                       [ 98%]
+HiQS/tests/test_refresh_walk.py .......                                  [ 98%]
+HiQS/tests/test_search.py ...........                                    [ 99%]
+HiQS/tests/test_vault.py ...............                                 [100%]
+
+=================================== FAILURES ===================================
+____ DeclaredRuntimeRootTests.test_declared_root_overrides_running_checkout ____
+
+self = <test_doctor_scheduled_stack.DeclaredRuntimeRootTests testMethod=test_declared_root_overrides_running_checkout>
+
+    def test_declared_root_overrides_running_checkout(self) -> None:
+        from unittest.mock import patch
+    
+        from rebalance import doctor
+    
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp) / "rebalance-runtime"
+            (runtime / "scripts").mkdir(parents=True)
+            root_file = Path(tmp) / "runtime-root"
+            root_file.write_text(str(runtime) + "\n", encoding="utf-8")
+    
+            agents = Path(tmp) / "agents"
+            agents.mkdir()
+            # Job in the declared runtime clone: OK even though it is not in
+            # the checkout running this test.
+            _write(agents, "pulse-server", str(runtime / "scripts" / "pulse_server.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+            self.assertEqual(checks[0].status, OK)
+            self.assertIn("declared runtime root", checks[0].detail)
+    
+            # Job in THIS checkout now counts as drift — the declaration wins.
+            _write(agents, "obsidian-vault-embeddings", str(REPO_ROOT / "scripts" / "obsidian_vault_embeddings.sh"))
+            with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+                checks = _check_scheduled_stack_checkout(agents)
+>           self.assertEqual(checks[0].status, WARN)
+E           AssertionError: 'ok' != 'warning'
+E           - ok
+E           + warning
+
+tests/test_doctor_scheduled_stack.py:115: AssertionError
+=============================== warnings summary ===============================
+../../../../../../../..<shared-venv-repo>/.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+  <shared-venv-repo>/.venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] HiQS/tests/test_affinity.py:123: UNKNOWN, not pass: private_names.txt absent, so no name check ran. Create it (one lowercase name per line, gitignored) to enforce locally; the Phase 6 pre-extraction history scan remains the blocking gate.
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+FAILED tests/test_doctor_scheduled_stack.py::DeclaredRuntimeRootTests::test_declared_root_overrides_running_checkout
+= 1 failed, 2484 passed, 21 skipped, 11 xfailed, 1 warning in 158.56s (0:02:38) =

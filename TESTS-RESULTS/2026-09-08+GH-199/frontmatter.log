@@ -1,0 +1,7 @@
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:1 missing YAML frontmatter
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md:1 missing YAML frontmatter
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing required frontmatter key 'updated'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing required frontmatter key 'owner'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing required frontmatter key 'updated'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing required frontmatter key 'owner'
+SUMMARY [pdda-check-frontmatter] errors=6 warns=0 info=0

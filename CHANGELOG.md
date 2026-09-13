@@ -10,12 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.88.2] - 2026-09-12
+## [0.88.2] - 2026-09-13
 
 ### Added
 - Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
 
 ### Fixed
+- CLIO now captures the first prompt of a new Codex root session when it arrives between polling ticks. A persisted capture boundary excludes prior history, while first-file provenance excludes inherited subagent prompts even after parent metadata appears. Existing writer retry, deduplication, and resumed-session context are preserved; legacy pending records remain eligible until file replacement or truncation (#199).
 - The CLIO uninstall recipe now removes the prompt-log projection launchd job alongside the two
   tail jobs, preventing the projection service from surviving an uninstall.
 
@@ -58,6 +59,7 @@
 
 ### Added
 - Full clone detection and parent checkout grouping in Focus 5: secondary task checkouts and temporary clones are now detected and clustered under their primary parent repository card rather than occupying individual top-five slots. Parent cards roll up the most recent activity across all clones, display active clone counts and dirty status indicators, and allow quick opening of individual clone checkouts (#204).
+>>>>>>> origin/development
 
 ## [0.86.0] - 2026-09-08
 

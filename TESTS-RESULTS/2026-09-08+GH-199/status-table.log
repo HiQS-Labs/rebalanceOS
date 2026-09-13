@@ -1,0 +1,7 @@
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/RUNBOOK-signal-integrity.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:20 status-table header must be exactly 'What was just completed|What's next' (got 'Item|State')
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing usable '## Status' table
+SUMMARY [pdda-check-status-table] errors=6 warns=0 info=0
