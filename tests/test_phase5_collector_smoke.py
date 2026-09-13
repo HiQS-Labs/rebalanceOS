@@ -159,8 +159,20 @@ class CollectorIdempotencyTests(unittest.TestCase):
         vault.mkdir()
         (vault / "note.md").write_text("# Hello\nThis is a test note.")
 
-        fake_embed_r1 = SimpleNamespace(total_chunks=1, embedded_chunks=1, skipped_unchanged=0, elapsed_seconds=0.01)
-        fake_embed_r2 = SimpleNamespace(total_chunks=1, embedded_chunks=0, skipped_unchanged=1, elapsed_seconds=0.01)
+        fake_embed_r1 = SimpleNamespace(
+            total_chunks=1,
+            embedded_chunks=1,
+            skipped_unchanged=0,
+            elapsed_seconds=0.01,
+            deferred_battery=False,
+        )
+        fake_embed_r2 = SimpleNamespace(
+            total_chunks=1,
+            embedded_chunks=0,
+            skipped_unchanged=1,
+            elapsed_seconds=0.01,
+            deferred_battery=False,
+        )
         with (
             patch("rebalance.ingest.index_ops.get_vault_path", return_value=str(vault)),
             patch("rebalance.ingest.embedder.embed_chunks") as mock_embed,

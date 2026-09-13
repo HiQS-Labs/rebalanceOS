@@ -717,6 +717,19 @@ def _ensure_github_direct_commit_schema(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _ensure_github_remote_peeks_schema(conn: sqlite3.Connection) -> None:
+    """Remote branch peek cache table for short-circuiting commit walks (GH-201)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS github_remote_peeks (
+            canonical_remote_url TEXT PRIMARY KEY,
+            ref_digest           TEXT NOT NULL,
+            sha_map_json         TEXT NOT NULL,
+            covered_since_utc    TEXT,
+            verified_at          TEXT NOT NULL
+        )
+    """)
+
+
 def ensure_github_schema(conn: sqlite3.Connection) -> None:
     """Create GitHub activity and local knowledge tables if they don't exist.
 
@@ -728,6 +741,7 @@ def ensure_github_schema(conn: sqlite3.Connection) -> None:
     _ensure_github_artifact_schema(conn)
     _ensure_github_knowledge_schema(conn)
     _ensure_github_direct_commit_schema(conn)
+    _ensure_github_remote_peeks_schema(conn)
     conn.commit()
 
 

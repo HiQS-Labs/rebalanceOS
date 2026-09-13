@@ -130,6 +130,18 @@ POLICY = {
         ],
         "doc_tokens": ["every 15 min", "pulse_warning_watch.py"],
     },
+    "daily-work-synthesis": {
+        "calendar": None,
+        "interval": 900,
+        "run_at_load": False,
+        "keep_alive": False,
+        "wrapper": "scripts/daily_work_synthesis.sh",
+        "wrapper_must_contain": [
+            'rb_job_init "daily-work-synthesis" 14',
+            "utils/daily_work_synthesis.py",
+        ],
+        "doc_tokens": ["every 15 min", "daily_work_synthesis.py"],
+    },
     "health-check": {
         # :10, not :00 (GH-175) — pulse-sync owns :00.
         "calendar": [{"Minute": 10}],
@@ -211,6 +223,7 @@ MAX_RUNTIME_SECONDS = {
     "pulse-web-sync": 7200,
     "pulse-server": None,
     "pulse-warning-watch": 300,
+    "daily-work-synthesis": 180,
     "health-check": 900,
     "health-check-triage": 1800,
     "obsidian-rollover": 300,
@@ -226,6 +239,7 @@ INSTALLERS = {
     "pulse-web-sync": "install_pulse_web_scheduler.sh",
     "pulse-server": "install_pulse_server_scheduler.sh",
     "pulse-warning-watch": "install_pulse_warning_watch_scheduler.sh",
+    "daily-work-synthesis": "install_daily_work_synthesis_scheduler.sh",
     "health-check": "install_health_check_scheduler.sh",
     "health-check-triage": "install_health_check_triage_scheduler.sh",
     "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
@@ -281,6 +295,11 @@ class TestPlistTemplates(unittest.TestCase):
                 got,
                 spec["calendar"],
                 f"{job}: StartCalendarInterval diverged from SCHEDULER.md policy",
+            )
+            self.assertEqual(
+                _parse(job).get("StartInterval"),
+                spec.get("interval"),
+                f"{job}: StartInterval diverged from SCHEDULER.md policy",
             )
 
     def test_run_at_load_and_keep_alive(self):
