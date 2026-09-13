@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.1] - 2026-09-12
+
+### Fixed
+- Library-backed self-reporters inside a guarded scheduled job (the daily synthesis and daily
+  rollover scripts) now defer their lifecycle events to the outer guard, so every guarded job
+  records exactly one start/terminal pair again instead of two (#215).
+
 ## [0.88.0] - 2026-09-12
 
 ### Added

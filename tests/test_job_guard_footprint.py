@@ -13,8 +13,10 @@ import ctypes
 import ctypes.util
 import json
 import os
+import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -162,6 +164,93 @@ def test_scheduled_timeout_records_one_start_and_one_failure(isolated_guard, mon
     assert [row["event"] for row in rows] == ["job_started", "job_failed"]
     assert rows[1]["detail"]["exit_code"] == 124
     assert rows[1]["detail"]["reason"] == "wall_clock_timeout"
+
+
+def test_guarded_child_self_report_defers_to_the_guard(isolated_guard, monkeypatch):
+    """GH-215: a library-backed self-reporter inside the guarded child must not
+    duplicate the pair the guard owns (observed live on daily-synthesis)."""
+    script = isolated_guard / "self_report_then_exit.py"
+    script.write_text(
+        "from rebalance.ingest.auth_log import log_job_completed, log_job_started\n"
+        "log_job_started('self-reporting-job')\n"
+        "log_job_completed('self-reporting-job', 0.5)\n",
+        encoding="utf-8",
+    )
+    log_dir = isolated_guard / "auth"
+    monkeypatch.setenv("REBALANCE_AUTH_LOG_DIR", str(log_dir))
+    # The child is a fresh interpreter: point it at this checkout's src even
+    # when the host venv has some other rebalance installed.
+    monkeypatch.setenv("PYTHONPATH", str(_REPO_ROOT / "src"))
+
+    code = job_guard.run_guarded(
+        name="test-self-report-suppressed",
+        argv=[sys.executable, str(script)],
+        max_footprint_gb=8.0,
+        lifecycle_job="fake-scheduled-job",
+    )
+
+    rows = [json.loads(line) for line in (log_dir / "auth_activity.jsonl").read_text().splitlines()]
+    assert code == 0
+    # Exactly the guard's pair — the child's self-report never lands.
+    assert [row["event"] for row in rows] == ["job_started", "job_completed"]
+    assert all(row["detail"]["job"] == "fake-scheduled-job" for row in rows)
+
+
+def test_ceiling_trip_records_resource_ceiling_lifecycle(isolated_guard, monkeypatch):
+    """GH-215: a resource-ceiling trip records the guard's failed pair, not a silent run."""
+    script = isolated_guard / "spin.py"
+    script.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+    log_dir = isolated_guard / "auth"
+    monkeypatch.setenv("REBALANCE_AUTH_LOG_DIR", str(log_dir))
+    monkeypatch.setenv("PYTHONPATH", str(_REPO_ROOT / "src"))
+    # Force the ceiling branch specifically, independent of what the child does.
+    monkeypatch.setattr(job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0))
+
+    code = job_guard.run_guarded(
+        name="test-ceiling-lifecycle",
+        argv=[sys.executable, str(script)],
+        max_footprint_gb=1.0,
+        poll_seconds=0.1,
+        grace_seconds=0.2,
+        lifecycle_job="fake-scheduled-job",
+    )
+
+    rows = [json.loads(line) for line in (log_dir / "auth_activity.jsonl").read_text().splitlines()]
+    assert code == job_guard.EXIT_CEILING_TRIPPED == 4
+    assert [row["event"] for row in rows] == ["job_started", "job_failed"]
+    assert rows[1]["detail"]["reason"] == "resource_ceiling"
+
+
+def test_eviction_records_evicted_lifecycle(isolated_guard, monkeypatch):
+    """GH-215: a replacing run's SIGTERM (eviction) records reason=evicted."""
+    script = isolated_guard / "sleep_forever.py"
+    script.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+    log_dir = isolated_guard / "auth"
+    monkeypatch.setenv("REBALANCE_AUTH_LOG_DIR", str(log_dir))
+    monkeypatch.setenv("PYTHONPATH", str(_REPO_ROOT / "src"))
+
+    # The guard installs its own SIGTERM handler before waiting on the child,
+    # so a SIGTERM delivered inside that window raises _Evicted there. Fire it
+    # well after spawn (handler installed) and well before the child could
+    # exit on its own; cancel() is a no-op once fired.
+    timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+
+    try:
+        code = job_guard.run_guarded(
+            name="test-eviction-lifecycle",
+            argv=[sys.executable, str(script)],
+            max_footprint_gb=8.0,
+            grace_seconds=0.2,
+            lifecycle_job="fake-scheduled-job",
+        )
+    finally:
+        timer.cancel()
+
+    rows = [json.loads(line) for line in (log_dir / "auth_activity.jsonl").read_text().splitlines()]
+    assert code == 143
+    assert [row["event"] for row in rows] == ["job_started", "job_failed"]
+    assert rows[1]["detail"]["reason"] == "evicted"
 
 
 def test_preflight_refusal_has_its_own_exit_code(isolated_guard, monkeypatch):
