@@ -329,7 +329,7 @@ def _default_branch(repo_path: Path) -> str:
     if code == 0 and out:
         out = out.strip()
         if out.startswith(prefix):
-            return out[len(prefix):]
+            return out[len(prefix) :]
         return out.rsplit("/", 1)[-1]
     for candidate in ("development", "main", "master"):
         code, _, _ = _git(repo_path, "rev-parse", "--verify", f"origin/{candidate}")
@@ -511,9 +511,7 @@ def backfill_commits(
 
     # Codex R1: Capture and validate local origin ref map BEFORE walk
     pre_walk_local_refs: dict[str, str] = {}
-    code, local_refs_out, _ = _git(
-        path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin"
-    )
+    code, local_refs_out, _ = _git(path, "for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin")
     if code == 0:
         for line in local_refs_out.splitlines():
             line = line.strip()
@@ -529,9 +527,7 @@ def backfill_commits(
 
     pre_walk_ref_match = False
     if peek_map is not None and pre_walk_local_refs:
-        remote_origin_branches = {
-            k: v for k, v in peek_map.items() if k.startswith("refs/heads/")
-        }
+        remote_origin_branches = {k: v for k, v in peek_map.items() if k.startswith("refs/heads/")}
         if pre_walk_local_refs == remote_origin_branches:
             pre_walk_ref_match = True
 

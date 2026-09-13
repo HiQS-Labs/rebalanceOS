@@ -145,6 +145,7 @@ def _peek_verified_age_hours(
             if clone_path:
                 try:
                     from rebalance.ingest.github_commit_backfill import is_shallow_clone
+
                     if is_shallow_clone(clone_path):
                         return None
 
@@ -172,9 +173,7 @@ def _peek_verified_age_hours(
                         clone_branches[f"refs/heads/{branch_name}"] = sha
 
                     ref_map = json.loads(sha_map_json)
-                    expected_branches = {
-                        k: v for k, v in ref_map.items() if k.startswith("refs/heads/")
-                    }
+                    expected_branches = {k: v for k, v in ref_map.items() if k.startswith("refs/heads/")}
                     if not clone_branches or clone_branches != expected_branches:
                         return None
                 except Exception:

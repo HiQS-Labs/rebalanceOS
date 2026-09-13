@@ -80,6 +80,7 @@ class ProbeMeasurement:
 # Stage 0A: Live Read-Only Compatibility Sweep & Safety Matrix
 # ---------------------------------------------------------------------------
 
+
 def run_stage_0a_safety_matrix() -> dict[str, Any]:
     """Execute the 7 subprocess safety test cases calling production modules."""
     print("\n" + "=" * 60)
@@ -179,7 +180,7 @@ def run_stage_0a_safety_matrix() -> dict[str, Any]:
         subprocess.run(["git", "-C", str(hang_repo), "init", "-q"], check=True)
         pid_file = hang_repo / "descendant.pid"
         helper_sh = hang_repo / "helper.sh"
-        helper_sh.write_text(f"#!/bin/sh\nsleep 30 &\necho $! > \"{pid_file}\"\nsleep 30\n")
+        helper_sh.write_text(f'#!/bin/sh\nsleep 30 &\necho $! > "{pid_file}"\nsleep 30\n')
         helper_sh.chmod(0o755)
         subprocess.run(["git", "-C", str(hang_repo), "config", "alias.hang", f"!{helper_sh}"], check=True)
 
@@ -298,7 +299,7 @@ def run_stage_0a_live_sweep() -> list[ProbeMeasurement]:
 
         div_match = False
         if remote_sha and stored_sha:
-            div_match = (remote_sha == stored_sha)
+            div_match = remote_sha == stored_sha
 
         measurement = ProbeMeasurement(
             repo_name=full_name,
@@ -312,7 +313,9 @@ def run_stage_0a_live_sweep() -> list[ProbeMeasurement]:
             error=None if ref_map is not None else "probe failed or timed out",
         )
         measurements.append(measurement)
-        print(f"  [{measurement.status}] {full_name} ({measurement.branch}): peek={measurement.remote_peek_sha} in {latency_ms:.1f}ms")
+        print(
+            f"  [{measurement.status}] {full_name} ({measurement.branch}): peek={measurement.remote_peek_sha} in {latency_ms:.1f}ms"
+        )
 
     conn.close()
     total_elapsed = time.perf_counter() - total_start
@@ -324,6 +327,7 @@ def run_stage_0a_live_sweep() -> list[ProbeMeasurement]:
 # ---------------------------------------------------------------------------
 # Stage 0B: Isolated Sandboxed Read/Write Contract Test (Zero Production Risk)
 # ---------------------------------------------------------------------------
+
 
 def run_stage_0b_sandbox_tests() -> dict[str, Any]:
     """Execute Stage 0B isolated read/write contract tests calling production modules."""
@@ -366,7 +370,10 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
         assert ok, "Initial checkpoint publication must succeed"
         hit = is_commit_walk_cached(conn, canonical_url, base_ref_map, "2026-08-15T00:00:00Z")
         assert hit, "Identical ref map within covered since must be a cache-hit"
-        test_results["test_b2_checkpoint_hit"] = {"status": "PASS", "note": "Checkpoint written and matches exact ref map"}
+        test_results["test_b2_checkpoint_hit"] = {
+            "status": "PASS",
+            "note": "Checkpoint written and matches exact ref map",
+        }
         print("  ✓ Test B2 Passed: Checkpoint published and verified cache-hit")
 
         # Test B3: Failed-File-Read -> Retry Control
@@ -384,9 +391,13 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
                 res_b3 = backfill_commits(temp_db_path, "test/b3", clone_path=b3_path, branch="development")
                 assert res_b3.state == "ok"
                 with db_connection(temp_db_path) as c_b3:
-                    cov_row = c_b3.execute("SELECT path_coverage FROM github_direct_commits WHERE repo_full_name = 'test/b3'").fetchone()
+                    cov_row = c_b3.execute(
+                        "SELECT path_coverage FROM github_direct_commits WHERE repo_full_name = 'test/b3'"
+                    ).fetchone()
                     assert cov_row and cov_row[0] == "failed", "Commit row must be marked failed on file read failure"
-                    chk_b3 = c_b3.execute("SELECT * FROM github_remote_peeks WHERE canonical_remote_url LIKE '%test/b3%'").fetchone()
+                    chk_b3 = c_b3.execute(
+                        "SELECT * FROM github_remote_peeks WHERE canonical_remote_url LIKE '%test/b3%'"
+                    ).fetchone()
                     assert chk_b3 is None, "Checkpoint publication must be refused when commit files fail"
 
         test_results["test_b3_failed_file_retry"] = {
@@ -431,7 +442,12 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
         t_snapshot_stale = "2026-09-08T12:00:00Z"
         t_finish_now = "2026-09-08T12:45:00Z"
         stale_ok = record_commit_coverage_checkpoint(
-            conn, canonical_url, base_ref_map, "2026-08-01T00:00:00Z", verified_at_utc=t_finish_now, snapshot_time_utc=t_snapshot_stale
+            conn,
+            canonical_url,
+            base_ref_map,
+            "2026-08-01T00:00:00Z",
+            verified_at_utc=t_finish_now,
+            snapshot_time_utc=t_snapshot_stale,
         )
         conn.commit()
         assert not stale_ok, "Stale overlapping run must be REJECTED by conditional UPSERT"
@@ -471,6 +487,7 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
         print("\n[Two-Store Battery Recovery Contract Tests (Production Entry Point)]")
 
         from rebalance.ingest.clio import ensure_clio_schema
+
         ensure_clio_schema(conn)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS figma_comments (
@@ -537,18 +554,26 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
             model_calls += 1
             return [[0.2] * 384 for _ in texts]
 
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
@@ -557,7 +582,9 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
             assert model_calls == 0, "Zero model calls allowed on battery"
 
             with db_connection(temp_db_path) as c:
-                sem_pend = c.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
+                sem_pend = c.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[
+                    0
+                ]
                 gh_pend = c.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
                 assert sem_pend > 0, "Pending semantic documents must remain pending on battery"
                 assert gh_pend > 0, "Pending github documents must remain pending on battery"
@@ -572,8 +599,12 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
             assert model_calls > 0, "Model calls must occur to drain pending backlog on AC"
 
             with db_connection(temp_db_path) as c:
-                sem_pend_ac = c.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
-                gh_pend_ac = c.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
+                sem_pend_ac = c.execute(
+                    "SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL"
+                ).fetchone()[0]
+                gh_pend_ac = c.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[
+                    0
+                ]
                 assert sem_pend_ac == 0, "All pending items drained in Store 1"
                 assert gh_pend_ac == 0, "All pending items drained in Store 2"
             print("  ✓ Test B9c Passed: AC transition cleanly drains pending backlog in BOTH stores")
@@ -605,6 +636,7 @@ def run_stage_0b_sandbox_tests() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Stop-Rule Evaluation & Report Generation
 # ---------------------------------------------------------------------------
+
 
 def evaluate_stop_rules(safety_results: dict[str, Any], sweep_measurements: list[ProbeMeasurement]) -> tuple[bool, str]:
     """Evaluate Phase 0 Go / No-Go Stop Rules."""
@@ -687,13 +719,13 @@ def generate_reports(
 
 | Test Case | Description | Result | Latency / Metric | Notes |
 |---|---|---|---|---|
-| Case 1 | HTTPS credential-helper / askpass hang prevention | {safety_results['case_1_https_askpass']['status']} | {safety_results['case_1_https_askpass']['latency_ms']}ms | {safety_results['case_1_https_askpass']['note']} |
-| Case 2 | Conflicting SSH command options isolation | {safety_results['case_2_conflicting_ssh']['status']} | {safety_results['case_2_conflicting_ssh']['latency_ms']}ms | {safety_results['case_2_conflicting_ssh']['note']} |
-| Case 3 | Offline network (exit 128 / unreachable host) | {safety_results['case_3_offline_exit_128']['status']} | {safety_results['case_3_offline_exit_128']['latency_ms']}ms | {safety_results['case_3_offline_exit_128']['note']} |
-| Case 4 | Absent git executable simulation | {safety_results['case_4_absent_git']['status']} | N/A | {safety_results['case_4_absent_git']['note']} |
-| Case 5 | Detached / unborn HEAD repo handling | {safety_results['case_5_unborn_head']['status']} | N/A | {safety_results['case_5_unborn_head']['note']} |
-| Case 6 | Subprocess timeout & descendant cleanup | {safety_results['case_6_timeout_cleanup']['status']} | {safety_results['case_6_timeout_cleanup']['timeout_ms']}ms | {safety_results['case_6_timeout_cleanup']['note']} |
-| Case 7 | Empty / malformed output parsing | {safety_results['case_7_malformed_output']['status']} | N/A | {safety_results['case_7_malformed_output']['note']} |
+| Case 1 | HTTPS credential-helper / askpass hang prevention | {safety_results["case_1_https_askpass"]["status"]} | {safety_results["case_1_https_askpass"]["latency_ms"]}ms | {safety_results["case_1_https_askpass"]["note"]} |
+| Case 2 | Conflicting SSH command options isolation | {safety_results["case_2_conflicting_ssh"]["status"]} | {safety_results["case_2_conflicting_ssh"]["latency_ms"]}ms | {safety_results["case_2_conflicting_ssh"]["note"]} |
+| Case 3 | Offline network (exit 128 / unreachable host) | {safety_results["case_3_offline_exit_128"]["status"]} | {safety_results["case_3_offline_exit_128"]["latency_ms"]}ms | {safety_results["case_3_offline_exit_128"]["note"]} |
+| Case 4 | Absent git executable simulation | {safety_results["case_4_absent_git"]["status"]} | N/A | {safety_results["case_4_absent_git"]["note"]} |
+| Case 5 | Detached / unborn HEAD repo handling | {safety_results["case_5_unborn_head"]["status"]} | N/A | {safety_results["case_5_unborn_head"]["note"]} |
+| Case 6 | Subprocess timeout & descendant cleanup | {safety_results["case_6_timeout_cleanup"]["status"]} | {safety_results["case_6_timeout_cleanup"]["timeout_ms"]}ms | {safety_results["case_6_timeout_cleanup"]["note"]} |
+| Case 7 | Empty / malformed output parsing | {safety_results["case_7_malformed_output"]["status"]} | N/A | {safety_results["case_7_malformed_output"]["note"]} |
 
 ---
 
@@ -701,15 +733,15 @@ def generate_reports(
 
 | Test Suite | Assertion & Scenario | Status | Contract Finding |
 |---|---|---|---|
-| Test B1 | First-run on empty database | {sandbox_results['test_b1_first_run_miss']['status']} | {sandbox_results['test_b1_first_run_miss']['note']} |
-| Test B2 | Checkpoint publication & cache-hit equality | {sandbox_results['test_b2_checkpoint_hit']['status']} | {sandbox_results['test_b2_checkpoint_hit']['note']} |
-| Test B3 | Failed-file-read retry control (Codex R2) | {sandbox_results['test_b3_failed_file_retry']['status']} | {sandbox_results['test_b3_failed_file_retry']['note']} |
-| Test B4 | Unchanged-default-tip / changed-other-branch (Codex R2) | {sandbox_results['test_b4_secondary_branch_move']['status']} | {sandbox_results['test_b4_secondary_branch_move']['note']} |
-| Test B5 | Branch addition and deletion invalidation (Codex R2) | {sandbox_results['test_b5_ref_addition_deletion']['status']} | {sandbox_results['test_b5_ref_addition_deletion']['note']} |
-| Test B6 | Stale scheduler overlap rejection (SCHEDULER.md:72) | {sandbox_results['test_b6_stale_overlap_rejected']['status']} | {sandbox_results['test_b6_stale_overlap_rejected']['note']} |
-| Test B7 | Negative broken checkpoint control | {sandbox_results['test_b7_negative_broken_control']['status']} | {sandbox_results['test_b7_negative_broken_control']['note']} |
-| Test B8 | Widened lookback window invalidation | {sandbox_results['test_b8_widened_window_invalidation']['status']} | {sandbox_results['test_b8_widened_window_invalidation']['note']} |
-| Test B9 | Two-store battery recovery & red control (Codex R3/R5/R6) | {sandbox_results['test_b9_two_store_recovery_red_control']['status']} | {sandbox_results['test_b9_two_store_recovery_red_control']['note']} |
+| Test B1 | First-run on empty database | {sandbox_results["test_b1_first_run_miss"]["status"]} | {sandbox_results["test_b1_first_run_miss"]["note"]} |
+| Test B2 | Checkpoint publication & cache-hit equality | {sandbox_results["test_b2_checkpoint_hit"]["status"]} | {sandbox_results["test_b2_checkpoint_hit"]["note"]} |
+| Test B3 | Failed-file-read retry control (Codex R2) | {sandbox_results["test_b3_failed_file_retry"]["status"]} | {sandbox_results["test_b3_failed_file_retry"]["note"]} |
+| Test B4 | Unchanged-default-tip / changed-other-branch (Codex R2) | {sandbox_results["test_b4_secondary_branch_move"]["status"]} | {sandbox_results["test_b4_secondary_branch_move"]["note"]} |
+| Test B5 | Branch addition and deletion invalidation (Codex R2) | {sandbox_results["test_b5_ref_addition_deletion"]["status"]} | {sandbox_results["test_b5_ref_addition_deletion"]["note"]} |
+| Test B6 | Stale scheduler overlap rejection (SCHEDULER.md:72) | {sandbox_results["test_b6_stale_overlap_rejected"]["status"]} | {sandbox_results["test_b6_stale_overlap_rejected"]["note"]} |
+| Test B7 | Negative broken checkpoint control | {sandbox_results["test_b7_negative_broken_control"]["status"]} | {sandbox_results["test_b7_negative_broken_control"]["note"]} |
+| Test B8 | Widened lookback window invalidation | {sandbox_results["test_b8_widened_window_invalidation"]["status"]} | {sandbox_results["test_b8_widened_window_invalidation"]["note"]} |
+| Test B9 | Two-store battery recovery & red control (Codex R3/R5/R6) | {sandbox_results["test_b9_two_store_recovery_red_control"]["status"]} | {sandbox_results["test_b9_two_store_recovery_red_control"]["note"]} |
 
 ---
 

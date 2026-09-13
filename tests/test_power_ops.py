@@ -210,6 +210,7 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             ensure_github_schema(conn)
             ensure_semantic_schema(conn)
             from rebalance.ingest.clio import ensure_clio_schema
+
             ensure_clio_schema(conn)
             conn.execute(
                 """
@@ -280,7 +281,9 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 """
             )
             # Insert existing vector in github_embeddings
-            existing_gh_id = conn.execute("SELECT id FROM github_documents WHERE source_key = 'issue:101'").fetchone()[0]
+            existing_gh_id = conn.execute("SELECT id FROM github_documents WHERE source_key = 'issue:101'").fetchone()[
+                0
+            ]
             conn.execute(
                 "INSERT INTO github_embeddings (doc_id, embedding) VALUES (?, ?)",
                 (existing_gh_id, b"\x00" * (EMBEDDING_DIM * 4)),
@@ -329,7 +332,9 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             self.assertEqual(gh_emb_count, 1, "Existing GitHub embedding vector must be preserved")
 
             # Verify pending rows are still pending (embedded_hash IS NULL)
-            sem_pending = conn.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
+            sem_pending = conn.execute(
+                "SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL"
+            ).fetchone()[0]
             gh_pending = conn.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
             self.assertEqual(sem_pending, 1, "Semantic document must remain pending")
             self.assertEqual(gh_pending, 1, "GitHub document must remain pending")
@@ -397,7 +402,9 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
         # Step 3: Verify all documents across both stores are embedded
         with db_connection(self.db_path) as conn:
-            sem_pending = conn.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
+            sem_pending = conn.execute(
+                "SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL"
+            ).fetchone()[0]
             gh_pending = conn.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
             self.assertEqual(sem_pending, 0, "Zero pending documents in Store 1 after AC drain")
             self.assertEqual(gh_pending, 0, "Zero pending documents in Store 2 after AC drain")
@@ -430,23 +437,33 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
         # 1. Run on battery via refresh_index entry point
         os.environ["REBALANCE_FORCE_BATTERY"] = "1"
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
             res_battery = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
-            self.assertEqual(res_battery["errors"], [], f"Expected 0 errors on battery refresh, got: {res_battery['errors']}")
+            self.assertEqual(
+                res_battery["errors"], [], f"Expected 0 errors on battery refresh, got: {res_battery['errors']}"
+            )
             battery_scopes = [r["scope"] for r in res_battery["results"]]
             self.assertIn("github", battery_scopes)
             self.assertIn("semantic", battery_scopes)
@@ -462,8 +479,12 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 self.assertEqual(gh_vec, orig_gh_vec)
 
                 # Documents remain pending
-                sem_pending = conn.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
-                gh_pending = conn.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
+                sem_pending = conn.execute(
+                    "SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL"
+                ).fetchone()[0]
+                gh_pending = conn.execute(
+                    "SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL"
+                ).fetchone()[0]
                 self.assertGreater(sem_pending, 0)
                 self.assertGreater(gh_pending, 0)
 
@@ -471,18 +492,26 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         os.environ.pop("REBALANCE_FORCE_BATTERY", None)
         os.environ["REBALANCE_FORCE_AC"] = "1"
 
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
@@ -497,30 +526,44 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
             # Backlog drained across both stores without duplicate rows
             with db_connection(self.db_path) as conn:
-                sem_pending = conn.execute("SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL").fetchone()[0]
-                gh_pending = conn.execute("SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL").fetchone()[0]
+                sem_pending = conn.execute(
+                    "SELECT count(*) FROM semantic_documents WHERE embedded_hash IS NULL"
+                ).fetchone()[0]
+                gh_pending = conn.execute(
+                    "SELECT count(*) FROM github_documents WHERE embedded_hash IS NULL"
+                ).fetchone()[0]
                 self.assertEqual(sem_pending, 0, "Store 1 pending backlog must be 0 after AC refresh")
                 self.assertEqual(gh_pending, 0, "Store 2 pending backlog must be 0 after AC refresh")
 
                 sem_tot = conn.execute("SELECT count(*) FROM semantic_embeddings").fetchone()[0]
                 gh_tot = conn.execute("SELECT count(*) FROM github_embeddings").fetchone()[0]
-                self.assertEqual(sem_tot, 4, "Store 1 must have exactly 4 vectors (2 vault + 2 projected github, no duplicates)")
+                self.assertEqual(
+                    sem_tot, 4, "Store 1 must have exactly 4 vectors (2 vault + 2 projected github, no duplicates)"
+                )
                 self.assertEqual(gh_tot, 2, "Store 2 must have exactly 2 vectors (no duplicates)")
 
         # 3. Subsequent AC refresh on unchanged repos: zero new model calls
         calls_before = model_calls
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=tracked_embed),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
@@ -631,18 +674,26 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         """Startup decision captured in refresh_index is honored across all stages (Codex R8)."""
         os.environ["REBALANCE_FORCE_BATTERY"] = "1"
 
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
@@ -672,26 +723,37 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 return False  # Startup check in refresh_index -> AC
             return True  # Later checks -> Unplugged (Battery)
 
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
-             patch("rebalance.lib.power_ops.should_defer_embeddings", side_effect=transitioning_power):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+            patch("rebalance.lib.power_ops.should_defer_embeddings", side_effect=transitioning_power),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
             res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
             self.assertEqual(res["errors"], [])
             sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
-            self.assertFalse(sem_res["semantic_embed"]["deferred_battery"], "Startup AC decision must execute embeddings without deferral")
+            self.assertFalse(
+                sem_res["semantic_embed"]["deferred_battery"],
+                "Startup AC decision must execute embeddings without deferral",
+            )
 
     def test_power_deferral_disabled_by_config(self) -> None:
         """When defer_embeddings_on_battery is False, refresh_index executes embeddings on battery (Codex R6)."""
@@ -701,18 +763,26 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         with patch("rebalance.ingest.config.get_defer_embeddings_on_battery", return_value=False):
             self.assertFalse(should_defer_embeddings(), "Disabled config must allow embeddings on battery")
 
-            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-                 patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+            with (
+                patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+                patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+                patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+                patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+                patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+                patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+                patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+            ):
                 mock_sync_gh.return_value = MagicMock(
-                    branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                    commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                    branches_synced=0,
+                    issues_synced=0,
+                    prs_synced=0,
+                    comments_synced=0,
+                    commits_synced=0,
+                    checks_synced=0,
+                    docs_built=0,
+                    elapsed_seconds=0.1,
                 )
                 mock_scan.return_value = MagicMock(events=[])
 
@@ -728,25 +798,35 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
         self.assertFalse(is_on_battery())
         self.assertFalse(should_defer_embeddings())
 
-        with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]), \
-             patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-             patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-             patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh, \
-             patch("rebalance.ingest.github_scan.scan_github") as mock_scan, \
-             patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-             patch("rebalance.ingest.github_commit_backfill.backfill_repos"):
+        with (
+            patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault", "github"]),
+            patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+            patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+            patch("rebalance.ingest.github_knowledge.sync_github_repo") as mock_sync_gh,
+            patch("rebalance.ingest.github_scan.scan_github") as mock_scan,
+            patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+            patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+        ):
             mock_sync_gh.return_value = MagicMock(
-                branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0,
-                commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1
+                branches_synced=0,
+                issues_synced=0,
+                prs_synced=0,
+                comments_synced=0,
+                commits_synced=0,
+                checks_synced=0,
+                docs_built=0,
+                elapsed_seconds=0.1,
             )
             mock_scan.return_value = MagicMock(events=[])
 
             res = refresh_index(self.db_path, scope=["github", "semantic"], repos=["HiQS-Labs/rebalanceOS"])
             self.assertEqual(res["errors"], [])
             sem_res = next(r for r in res["results"] if r["scope"] == "semantic")
-            self.assertFalse(sem_res["semantic_embed"]["deferred_battery"], "Unknown power must default to AC embeddings")
+            self.assertFalse(
+                sem_res["semantic_embed"]["deferred_battery"], "Unknown power must default to AC embeddings"
+            )
 
     def test_default_refresh_recipe_vault_chunks_power_deferral(self) -> None:
         """Default refresh recipe defers vault chunks embedding on battery and drains on AC (Codex Whole-File)."""
@@ -756,6 +836,7 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
 
             # 1. Ingest vault files
             from rebalance.ingest.note_ingester import ingest_vault
+
             ingest_vault(vault_path=v_path, database_path=self.db_path)
 
             with db_connection(self.db_path) as conn:
@@ -772,27 +853,49 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
                 rebalance.ingest.index_ops.COLLECTORS["email"],
                 refresh=lambda db, **kw: {"scope": "email", "messages": 0},
             )
-            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
-                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
-                 patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
-                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
-                 patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
-                 patch.dict(
-                     rebalance.ingest.index_ops.COLLECTORS,
-                     {"sleuth": sleuth_collector, "email": email_collector},
-                 ), \
-                 patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}), \
-                 patch("rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"), \
-                 patch("rebalance.ingest.embedder._load_model") as mock_load, \
-                 patch("rebalance.ingest.embedder._embed_batch", side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts]):
+            with (
+                patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]),
+                patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+                patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+                patch(
+                    "rebalance.ingest.github_knowledge.sync_github_repo",
+                    return_value=MagicMock(
+                        branches_synced=0,
+                        issues_synced=0,
+                        prs_synced=0,
+                        comments_synced=0,
+                        commits_synced=0,
+                        checks_synced=0,
+                        docs_built=0,
+                        elapsed_seconds=0.1,
+                    ),
+                ),
+                patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])),
+                patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+                patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+                patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}),
+                patch.dict(
+                    rebalance.ingest.index_ops.COLLECTORS,
+                    {"sleuth": sleuth_collector, "email": email_collector},
+                ),
+                patch(
+                    "rebalance.ingest.index_ops._refresh_apple_reminders",
+                    return_value={"scope": "apple_reminders", "reminders": 0},
+                ),
+                patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}),
+                patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}),
+                patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}),
+                patch(
+                    "rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"
+                ),
+                patch("rebalance.ingest.embedder._load_model") as mock_load,
+                patch(
+                    "rebalance.ingest.embedder._embed_batch",
+                    side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts],
+                ),
+            ):
                 res_battery = refresh_index(self.db_path, vault_path=str(v_path))
                 self.assertEqual(res_battery["errors"], [])
                 v_res = next(r for r in res_battery["results"] if r["scope"] == "vault")
@@ -816,27 +919,49 @@ class TwoStoreBatteryRecoveryTests(unittest.TestCase):
             # 3. Drain on AC with default recipe
             os.environ.pop("REBALANCE_FORCE_BATTERY", None)
             os.environ["REBALANCE_FORCE_AC"] = "1"
-            with patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]), \
-                 patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"), \
-                 patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts), \
-                 patch("rebalance.ingest.github_knowledge.sync_github_repo", return_value=MagicMock(branches_synced=0, issues_synced=0, prs_synced=0, comments_synced=0, commits_synced=0, checks_synced=0, docs_built=0, elapsed_seconds=0.1)), \
-                 patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])), \
-                 patch("rebalance.ingest.github_scan.sync_pushed_repos"), \
-                 patch("rebalance.ingest.github_commit_backfill.backfill_repos"), \
-                 patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}), \
-                 patch.dict(
-                     rebalance.ingest.index_ops.COLLECTORS,
-                     {"sleuth": sleuth_collector, "email": email_collector},
-                 ), \
-                 patch("rebalance.ingest.index_ops._refresh_apple_reminders", return_value={"scope": "apple_reminders", "reminders": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}), \
-                 patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}), \
-                 patch("rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"), \
-                 patch("rebalance.ingest.embedder._load_model", return_value=(MagicMock(), MagicMock())), \
-                 patch("rebalance.ingest.embedder._embed_batch", side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts]):
+            with (
+                patch("rebalance.ingest.index_ops._all_semantic_sources", return_value=["vault"]),
+                patch("rebalance.ingest.index_ops.get_github_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_scan.resolve_working_token", return_value="ghp_test"),
+                patch("rebalance.ingest.github_knowledge._default_embed_texts", side_effect=_fake_embed_texts),
+                patch("rebalance.ingest.semantic_index._default_embed_texts", side_effect=_fake_embed_texts),
+                patch(
+                    "rebalance.ingest.github_knowledge.sync_github_repo",
+                    return_value=MagicMock(
+                        branches_synced=0,
+                        issues_synced=0,
+                        prs_synced=0,
+                        comments_synced=0,
+                        commits_synced=0,
+                        checks_synced=0,
+                        docs_built=0,
+                        elapsed_seconds=0.1,
+                    ),
+                ),
+                patch("rebalance.ingest.github_scan.scan_github", return_value=MagicMock(events=[])),
+                patch("rebalance.ingest.github_scan.sync_pushed_repos"),
+                patch("rebalance.ingest.github_commit_backfill.backfill_repos"),
+                patch("rebalance.ingest.index_ops._refresh_calendar", return_value={"scope": "calendar", "events": 0}),
+                patch.dict(
+                    rebalance.ingest.index_ops.COLLECTORS,
+                    {"sleuth": sleuth_collector, "email": email_collector},
+                ),
+                patch(
+                    "rebalance.ingest.index_ops._refresh_apple_reminders",
+                    return_value={"scope": "apple_reminders", "reminders": 0},
+                ),
+                patch("rebalance.ingest.index_ops._refresh_email", return_value={"scope": "email", "messages": 0}),
+                patch("rebalance.ingest.index_ops._refresh_clio", return_value={"scope": "clio", "prompts": 0}),
+                patch("rebalance.ingest.index_ops._refresh_figma", return_value={"scope": "figma", "comments": 0}),
+                patch(
+                    "rebalance.ingest.note_builder.build_dashboard_note_content", return_value="# Dashboard\n\nContent"
+                ),
+                patch("rebalance.ingest.embedder._load_model", return_value=(MagicMock(), MagicMock())),
+                patch(
+                    "rebalance.ingest.embedder._embed_batch",
+                    side_effect=lambda m, t, texts: [[0.1] * 384 for _ in texts],
+                ),
+            ):
                 res_ac = refresh_index(self.db_path, vault_path=str(v_path))
                 self.assertEqual(res_ac["errors"], [])
                 v_res_ac = next(r for r in res_ac["results"] if r["scope"] == "vault")

@@ -860,4 +860,3 @@ def config_set_defer_embeddings_on_battery(
 
     set_defer_embeddings_on_battery(enabled)
     typer.echo(f"[+] set defer_embeddings_on_battery={enabled}")
-

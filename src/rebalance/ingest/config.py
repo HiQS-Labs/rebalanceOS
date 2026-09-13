@@ -1939,4 +1939,3 @@ def set_enable_remote_peeking(enabled: bool = False) -> None:
     config = _read_config()
     config["enable_remote_peeking"] = bool(enabled)
     _write_config(config)
-

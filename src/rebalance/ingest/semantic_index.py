@@ -57,7 +57,6 @@ class SemanticEmbedResult:
     deferred_battery: bool = False
 
 
-
 @dataclass(frozen=True)
 class SemanticOrphanRepairResult:
     orphan_count: int

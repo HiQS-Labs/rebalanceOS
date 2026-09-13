@@ -76,7 +76,6 @@ class GitHubEmbedResult:
     deferred_battery: bool = False
 
 
-
 @dataclass
 class GitHubRepoPurgeResult:
     repo_full_name: str

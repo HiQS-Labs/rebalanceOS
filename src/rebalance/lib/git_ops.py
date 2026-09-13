@@ -85,13 +85,13 @@ def canonical_github_url(url_or_name: str) -> str:
     if s.endswith(".git"):
         s = s[:-4]
     if s.startswith("git@github.com:"):
-        s = s[len("git@github.com:"):]
+        s = s[len("git@github.com:") :]
     elif s.startswith("https://github.com/"):
-        s = s[len("https://github.com/"):]
+        s = s[len("https://github.com/") :]
     elif s.startswith("http://github.com/"):
-        s = s[len("http://github.com/"):]
+        s = s[len("http://github.com/") :]
     elif s.startswith("ssh://git@github.com/"):
-        s = s[len("ssh://git@github.com/"):]
+        s = s[len("ssh://git@github.com/") :]
     parts = s.strip("/").split("/")
     if len(parts) == 2:
         return f"https://github.com/{parts[0].lower()}/{parts[1].lower()}.git"
@@ -324,9 +324,7 @@ def peek_remote_refs(
 
 def compute_origin_ref_digest(ref_map: dict[str, str]) -> str:
     """Compute canonical hash of all origin branch heads (refs/heads/*)."""
-    origin_branches = {
-        ref: sha for ref, sha in ref_map.items() if ref.startswith("refs/heads/")
-    }
+    origin_branches = {ref: sha for ref, sha in ref_map.items() if ref.startswith("refs/heads/")}
     encoded = json.dumps(sorted(origin_branches.items())).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
