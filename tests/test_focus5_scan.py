@@ -922,6 +922,137 @@ class SyncSummarizeTests(unittest.TestCase):
             self.assertEqual(pr["number"], 42)
             self.assertEqual(pr["title"], "Add thing")
 
+    def test_recent_open_items_enrichment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repos"
+            root.mkdir()
+            repo = _make_git_repo(root, "widget", dirty=True)
+            _run(repo, "git", "remote", "add", "origin", "https://github.com/Acme/widget.git")
+            db = _db(Path(tmp))
+            sync_focus5(db, roots=[root], device_id="dev", mode="dirty_first")
+
+            conn = sqlite3.connect(str(db))
+            conn.row_factory = sqlite3.Row
+            from rebalance.ingest.db import run_migrations
+
+            run_migrations(conn)
+
+            from datetime import timedelta
+
+            now_dt = datetime.now(timezone.utc)
+            now_iso_str = now_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            old_iso_str = (now_dt - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            # Seed 4 issues: 2 recent open, 1 old open, 1 recent closed
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "issue",
+                    101,
+                    "Recent 1",
+                    "open",
+                    now_iso_str,
+                    "https://github.com/Acme/widget/issues/101",
+                    now_iso_str,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "issue",
+                    102,
+                    "Recent 2",
+                    "open",
+                    now_iso_str,
+                    "https://github.com/Acme/widget/issues/102",
+                    now_iso_str,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "issue",
+                    99,
+                    "Old Open",
+                    "open",
+                    old_iso_str,
+                    "https://github.com/Acme/widget/issues/99",
+                    now_iso_str,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "issue",
+                    103,
+                    "Recent Closed",
+                    "closed",
+                    now_iso_str,
+                    "https://github.com/Acme/widget/issues/103",
+                    now_iso_str,
+                ),
+            )
+
+            # Seed 3 PRs: all older than 24h (tests descending ID fallback and closed exclusion)
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "pull_request",
+                    20,
+                    "Old PR 1",
+                    "open",
+                    old_iso_str,
+                    "https://github.com/Acme/widget/pull/20",
+                    now_iso_str,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "pull_request",
+                    25,
+                    "Old PR 2",
+                    "open",
+                    old_iso_str,
+                    "https://github.com/Acme/widget/pull/25",
+                    now_iso_str,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO github_items (repo_full_name, item_type, number, title, state, created_at, html_url, fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    "Acme/widget",
+                    "pull_request",
+                    30,
+                    "Old Closed PR",
+                    "closed",
+                    old_iso_str,
+                    "https://github.com/Acme/widget/pull/30",
+                    now_iso_str,
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            out = summarize_focus5(db, device_id="dev")
+            card = out["roster"][0]
+
+            # Issues had items within 24h (101, 102); closed 103 is excluded
+            issues = card["recent_issues"]
+            self.assertEqual(len(issues), 2)
+            self.assertEqual([i["number"] for i in issues], [102, 101])
+
+            # PRs had none within 24h, so falls back to descending IDs of open PRs (capped at 2)
+            prs = card["recent_prs"]
+            self.assertEqual(len(prs), 2)
+            self.assertEqual([p["number"] for p in prs], [25, 20])
+
     def test_summarize_empty_db_is_safe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db = _db(Path(tmp))

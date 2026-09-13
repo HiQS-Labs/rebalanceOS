@@ -304,6 +304,12 @@ def test_query_function_mirror_invariance(db_pair, org_alias, fn_name):
         "fetch_recent_github": {
             "limit": 10,
         },
+        "fetch_recent_open_github_items": {
+            "repo_full_name": "HiQS-Labs/xyz-forge",
+            "item_type": "issue",
+            "cutoff": "2026-09-01T00:00:00Z",
+            "limit": 3,
+        },
         "fetch_repo_activity_counts": {
             "days": 14,
             "limit": 10,

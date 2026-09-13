@@ -37,11 +37,11 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from time import perf_counter
+from time import gmtime, perf_counter, strftime
 from typing import Any, Callable, Iterable, Iterator
 
 from rebalance.lib.time_ops import now_iso, now_utc
-from rebalance.ingest.db import db_connection, run_migrations
+from rebalance.ingest.db import db_connection, fetch_recent_open_github_items, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
 
 # Reuse the prune discipline and the (already tested) remote-URL → owner/repo
@@ -1020,6 +1020,7 @@ def recent_activity(local_path: str, *, limit: int = 3) -> list[dict[str, Any]]:
         "log",
         f"-{limit}",
         "--format=%h%x1f%s%x1f%cI%x1f%ce",
+        timeout=GIT_TIMEOUT,
     )
     items: list[dict[str, Any]] = []
     for line in (out or "").splitlines():
@@ -1057,7 +1058,7 @@ def live_health(local_path: str) -> dict[str, Any]:
     that can't be read yields ``health_available=False`` (never raises).
     """
     probed_at = now_iso()
-    out = _git(Path(local_path), "status", "--porcelain=v2", "--branch")
+    out = _git(Path(local_path), "status", "--porcelain=v2", "--branch", timeout=GIT_TIMEOUT)
     if out is None:
         return {"health_available": False, "health_probed_at": probed_at}
     h = _parse_status(out)
@@ -1117,6 +1118,39 @@ def _newest_pr(conn: Any, repo_full_name: str | None) -> dict[str, Any] | None:
         "is_draft": bool(row["is_draft"]),
         "is_merged": bool(row["is_merged"]),
     }
+
+
+def _recent_open_items(
+    conn: Any,
+    repo_full_name: str | None,
+    item_type: str,
+    limit: int,
+    window_hours: int = 24,
+) -> list[dict[str, Any]]:
+    """Return up to *limit* open items for *repo_full_name* and *item_type*.
+
+    If any open items were created within the last *window_hours*, return the newest
+    such items (up to *limit*). Otherwise, fall back to the most recent open items in
+    descending order of ID (number). Closed items are strictly excluded.
+    """
+    if not repo_full_name:
+        return []
+    try:
+        cutoff = strftime(
+            "%Y-%m-%dT%H:%M:%SZ",
+            gmtime(now_utc().timestamp() - window_hours * 60 * 60),
+        )
+        rows = fetch_recent_open_github_items(conn, repo_full_name, item_type, cutoff, limit)
+    except Exception:  # noqa: BLE001 — corpus table may not exist yet
+        return []
+    return [
+        {
+            "number": row["number"],
+            "html_url": row["html_url"],
+            "title": row["title"],
+        }
+        for row in rows
+    ]
 
 
 def _repo_path_live(local_path: Any) -> bool:
@@ -1189,6 +1223,8 @@ def _build_roster_card(
     card["has_upstream"] = bool(card["has_upstream"])
     card["vscode_url"] = vscode_url(card["local_path"])
     card["newest_pr"] = _newest_pr(conn, card.get("repo_full_name"))
+    card["recent_issues"] = _recent_open_items(conn, card.get("repo_full_name"), "issue", 3)
+    card["recent_prs"] = _recent_open_items(conn, card.get("repo_full_name"), "pull_request", 2)
     card["recent_activity"] = recent_activity(card["local_path"]) if with_activity else []
     # Attach active full clones (GH-204)
     clone_candidates = clones if clones is not None else base.get("clones", [])

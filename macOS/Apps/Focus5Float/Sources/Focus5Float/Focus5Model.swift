@@ -86,8 +86,95 @@ final class Focus5Model {
         }
     }
 
+    /// User-hidden repositories excluded from the active roster view.
+    /// Normalized with `canonicalRepoKey` and persisted across relaunches.
+    var hiddenRepoNames: Set<String> = [] {
+        didSet {
+            UserDefaults.standard.set(Array(hiddenRepoNames), forKey: "hiddenRepoNames")
+        }
+    }
+
+    /// Candidate off-roster items promoted into the visible roster to maintain up to 5 cards.
+    var promotedCards: [RepoCard] {
+        let unhiddenRoster = roster.filter { !isRepoHidden($0.repoName) }
+        let targetCount = roster.count
+        let deficit = targetCount - unhiddenRoster.count
+        guard deficit > 0 else { return [] }
+
+        let existingPaths = Set(unhiddenRoster.map(\.localPath))
+        var promoted: [RepoCard] = []
+        for warning in offRoster {
+            if isRepoHidden(warning.repoName) || existingPaths.contains(warning.localPath) {
+                continue
+            }
+            promoted.append(warning.asRepoCard(position: unhiddenRoster.count + promoted.count + 1))
+            if promoted.count >= deficit {
+                break
+            }
+        }
+        return promoted
+    }
+
+    /// Active roster filtered to exclude hidden repositories and backfilled by promoting
+    /// the highest-ranked unhidden off-roster candidates up into the empty slots.
+    var visibleRoster: [RepoCard] {
+        let unhidden = roster.filter { !isRepoHidden($0.repoName) }
+        return unhidden + promotedCards
+    }
+
+    /// Off-roster warnings excluding hidden repos and any items promoted into the visible roster.
+    var visibleOffRoster: [OffRosterWarning] {
+        let promotedPaths = Set(promotedCards.map(\.localPath))
+        return offRoster.filter { !isRepoHidden($0.repoName) && !promotedPaths.contains($0.localPath) }
+    }
+
+    /// Number of repositories currently in `roster` that are hidden.
+    var hiddenRosterCount: Int {
+        roster.filter { isRepoHidden($0.repoName) }.count
+    }
+
+    var hasHiddenRepos: Bool {
+        hiddenRosterCount > 0
+    }
+
+    func isRepoHidden(_ name: String) -> Bool {
+        hiddenRepoNames.contains(Self.canonicalRepoKey(name))
+    }
+
+    func hideRepo(_ name: String) {
+        hiddenRepoNames.insert(Self.canonicalRepoKey(name))
+        let identity = roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? offRoster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? offRoster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? name
+        Task {
+            await client.hideRepo(identity: identity)
+        }
+    }
+
+    func unhideRepo(_ name: String) {
+        hiddenRepoNames.remove(Self.canonicalRepoKey(name))
+        let identity = roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.repoFullName
+            ?? roster.first(where: { Self.canonicalRepoKey($0.repoName) == Self.canonicalRepoKey(name) })?.localPath
+            ?? name
+        Task {
+            await client.unhideRepo(identity: identity)
+        }
+    }
+
+    func unhideAllRepos() {
+        let previous = hiddenRepoNames
+        hiddenRepoNames.removeAll()
+        Task {
+            for name in previous {
+                await client.unhideRepo(identity: name)
+            }
+        }
+    }
+
     var pinnedPromptLogEntries: [PromptLogEntry] {
-        let byID = Dictionary(uniqueKeysWithValues: promptLogEntries.map { ($0.id, $0) })
+        let byID = Dictionary(promptLogEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return pinnedPromptLogIDs.compactMap { byID[$0] }
     }
 
@@ -180,6 +267,9 @@ final class Focus5Model {
         pinnedPromptLogIDs = UserDefaults.standard.stringArray(forKey: "pinnedPromptLogIDs") ?? []
         if let path = UserDefaults.standard.string(forKey: "promptLogFilePath") {
             promptLogFileURL = URL(fileURLWithPath: path)
+        }
+        if let hidden = UserDefaults.standard.stringArray(forKey: "hiddenRepoNames") {
+            hiddenRepoNames = Set(hidden)
         }
         // Tiling defaults ON, so an absent key must NOT collapse to bool(forKey:)'s
         // false. object(forKey:) distinguishes "never set" from "set to false",
@@ -397,37 +487,67 @@ final class Focus5Model {
             .replacingOccurrences(of: " ", with: "")
     }
 
+    /// Finds the newest prompts relevant to `card`, checking both the parent repository name
+    /// and any of its full clones. Returns up to `limit` entries.
+    func latestPrompts(for card: RepoCard, limit: Int = 2) -> [PromptLogEntry] {
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+        let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
+
+        var results: [PromptLogEntry] = []
+        for entry in promptLogEntries {
+            let entryKey = Self.canonicalRepoKey(entry.repo)
+            if entryKey == parentKey || cloneKeys.contains(entryKey) {
+                results.append(entry)
+                if results.count >= limit {
+                    break
+                }
+            }
+        }
+        return results
+    }
+
     /// Finds the latest prompt relevant to `card`, checking both the parent repository name
     /// and any of its full clones. Since `promptLogEntries` is newest-first, the first match wins.
     func latestPrompt(for card: RepoCard) -> PromptLogEntry? {
-        let parentKey = Self.canonicalRepoKey(card.repoName)
-        let cloneKeys = Set(card.activeClones.map { Self.canonicalRepoKey($0.repoName) })
-        let cloneBranches = Set(card.activeClones.compactMap(\.branch))
-
-        return promptLogEntries.first { entry in
-            let entryKey = Self.canonicalRepoKey(entry.repo)
-            if entryKey == parentKey { return true }
-            if cloneKeys.contains(entryKey) { return true }
-            if let b = entry.branch, cloneBranches.contains(b) { return true }
-            return false
-        }
+        latestPrompts(for: card, limit: 1).first
     }
 
-    /// Finds the latest prompt specifically associated with `clone`. Matches if the prompt's
+    /// Finds the newest prompts specifically associated with `clone`. Matches if the prompt's
     /// repo matches `clone.repoName`, or if the prompt's repo matches `card.repoName` and the
     /// prompt's branch matches `clone.branch`.
-    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+    func latestPrompts(for clone: RepoClone, in card: RepoCard, limit: Int = 1) -> [PromptLogEntry] {
         let cloneKey = Self.canonicalRepoKey(clone.repoName)
         let parentKey = Self.canonicalRepoKey(card.repoName)
 
-        return promptLogEntries.first { entry in
+        var results: [PromptLogEntry] = []
+        for entry in promptLogEntries {
             let entryKey = Self.canonicalRepoKey(entry.repo)
-            if entryKey == cloneKey { return true }
-            if entryKey == parentKey, let eb = entry.branch, let cb = clone.branch, eb == cb {
-                return true
+            if entryKey == cloneKey || (entryKey == parentKey && entry.branch != nil && entry.branch == clone.branch) {
+                results.append(entry)
+                if results.count >= limit {
+                    break
+                }
             }
-            return false
         }
+        return results
+    }
+
+    func latestPrompt(for clone: RepoClone, in card: RepoCard) -> PromptLogEntry? {
+        latestPrompts(for: clone, in: card, limit: 1).first
+    }
+
+    /// Resolves the best local path and vscode URL to open for a given prompt entry on a card.
+    /// If the prompt matches one of the card's active clones, points at the clone; otherwise card root.
+    func promptOpenInfo(for prompt: PromptLogEntry, in card: RepoCard) -> (localPath: String, vscodeURL: String) {
+        let promptKey = Self.canonicalRepoKey(prompt.repo)
+        let parentKey = Self.canonicalRepoKey(card.repoName)
+        if let clone = card.activeClones.first(where: {
+            Self.canonicalRepoKey($0.repoName) == promptKey ||
+            (promptKey == parentKey && prompt.branch != nil && $0.branch == prompt.branch)
+        }) {
+            return (clone.localPath, clone.vscodeUrl)
+        }
+        return (card.localPath, card.vscodeUrl)
     }
 
     /// Max telemetry rows held in memory / rendered (newest-first after sort).
@@ -660,6 +780,8 @@ final class Focus5Model {
                     myLastCommitTs: bestCard.myLastCommitTs ?? bw.myLocalCommitTs,
                     probedAt: bw.probedAt,
                     newestPr: bestCard.newestPr,
+                    recentIssues: bestCard.recentIssues,
+                    recentPrs: bestCard.recentPrs,
                     recentActivity: bestCard.recentActivity,
                     clones: nil,
                     clonesDirtyCount: nil,

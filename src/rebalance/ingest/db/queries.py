@@ -1165,6 +1165,39 @@ def fetch_recent_github(
     return out
 
 
+def fetch_recent_open_github_items(
+    conn: sqlite3.Connection,
+    repo_full_name: str,
+    item_type: str,
+    cutoff: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Return recent canonical open items, falling back to the highest item numbers."""
+    alias_map = _get_alias_map()
+    target_repo = _canonical_lower(repo_full_name, alias_map)
+    rows = conn.execute(
+        "SELECT repo_full_name, item_type, number, html_url, title, state, "
+        "created_at, updated_at, fetched_at FROM github_items"
+    ).fetchall()
+    open_items = [
+        record
+        for (canonical_repo, resolved_type, _number), record in _resolve_newest_items(rows, alias_map).items()
+        if canonical_repo == target_repo
+        and resolved_type == item_type
+        and (record.get("state") or "").lower() == "open"
+    ]
+    recent = [record for record in open_items if (record.get("created_at") or "") >= cutoff]
+    selected = sorted(recent or open_items, key=lambda record: int(record.get("number") or 0), reverse=True)[:limit]
+    return [
+        {
+            "number": record["number"],
+            "html_url": record["html_url"],
+            "title": record["title"],
+        }
+        for record in selected
+    ]
+
+
 def fetch_repo_activity_counts(
     conn: sqlite3.Connection,
     days: int = 7,
@@ -1268,6 +1301,7 @@ __all__ = [
     "fetch_repo_diagnostics",
     "fetch_release_readiness_data",
     "fetch_recent_github",
+    "fetch_recent_open_github_items",
     "fetch_repo_activity_counts",
     "fetch_open_prs",
 ]

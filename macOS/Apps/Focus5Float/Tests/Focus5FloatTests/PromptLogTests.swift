@@ -208,6 +208,28 @@ final class PromptLogTests: XCTestCase {
         XCTAssertEqual(entries[0].prompt, "real prompt about the checkout flow")
     }
 
+    func testUnwrapsMyRequestInPreamble() {
+        let fixture = """
+        <!-- CLIO:ENTRIES -->
+
+        ## AI-DDTK
+        2026-09-10 16:23:28 PDT
+        noels-Mac-Studio · development · codex
+
+        > "# Context from my IDE setup:
+        >
+        > ## Active file: foo.md
+        >
+        > ## My request:
+        > Please check this work on disk."
+        """
+        let entries = PromptLogReader.parse(fixture)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0].repo, "AI-DDTK")
+        XCTAssertEqual(entries[0].ide, "codex")
+        XCTAssertEqual(entries[0].prompt, "Please check this work on disk.")
+    }
+
     func testPromptStartingWithBracketedRealTextIsNotFilteredIfNotMachineWrapper() {
         // Only the specific `<...>` / `[...]` wrapper shapes are noise; a
         // genuine prompt happening to start with a bracket-like character is
@@ -514,5 +536,90 @@ final class PromptLogTests: XCTestCase {
 
         let clonePrompt = model.latestPrompt(for: clone, in: card)
         XCTAssertEqual(clonePrompt?.prompt, "branch-matched prompt")
+    }
+
+    func testLatestPromptsForCardReturnsUpToLimitInOrder() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "rebalanceOS-gh204", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "prompt 1 (clone)"),
+            PromptLogEntry(repo: "OTHER-REPO", timestamp: "2026-09-10 15:30:00 PDT", machine: "M", branch: "main", ide: "codex", prompt: "other repo prompt"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "prompt 2 (parent)"),
+            PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 14:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "prompt 3 (older)")
+        ]
+
+        let prompts = model.latestPrompts(for: card, limit: 2)
+        XCTAssertEqual(prompts.count, 2)
+        XCTAssertEqual(prompts[0].prompt, "prompt 1 (clone)")
+        XCTAssertEqual(prompts[1].prompt, "prompt 2 (parent)")
+    }
+
+    func testPromptOpenInfoResolvesClonePathWhenMatched() {
+        let model = Focus5Model()
+        let card = makeRepoCardWithClones(
+            repoName: "rebalanceOS",
+            localPath: "/repos/rebalanceOS",
+            activeClones: [(repoName: "rebalanceOS-gh204", localPath: "/repos/rebalanceOS-gh204", branch: "feat/gh204")]
+        )
+
+        let clonePrompt = PromptLogEntry(repo: "rebalanceOS-gh204", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "feat/gh204", ide: "claude-code", prompt: "clone prompt")
+        let parentPrompt = PromptLogEntry(repo: "REBALANCEOS", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "development", ide: "agy", prompt: "parent prompt")
+
+        let cloneInfo = model.promptOpenInfo(for: clonePrompt, in: card)
+        XCTAssertEqual(cloneInfo.localPath, "/repos/rebalanceOS-gh204")
+
+        let parentInfo = model.promptOpenInfo(for: parentPrompt, in: card)
+        XCTAssertEqual(parentInfo.localPath, "/repos/rebalanceOS")
+    }
+
+    func testPinnedPromptLogEntriesHandlesDuplicateIDsWithoutCrashing() {
+        let model = Focus5Model()
+        // Simulate duplicate entries with identical repo and timestamp (e.g. batch parallel prompt dispatch)
+        let dup1 = PromptLogEntry(repo: "LTVERA-PANDAS", timestamp: "2026-08-31 19:08:36 PDT", machine: "M", branch: nil, prompt: "chunk 1")
+        let dup2 = PromptLogEntry(repo: "LTVERA-PANDAS", timestamp: "2026-08-31 19:08:36 PDT", machine: "M", branch: nil, prompt: "chunk 2")
+        model.promptLogEntries = [dup1, dup2]
+        model.togglePin(dup1)
+
+        // Must not trap / fatalError with Duplicate keys in Dictionary:
+        let pinned = model.pinnedPromptLogEntries
+        XCTAssertEqual(pinned.count, 1)
+        XCTAssertEqual(pinned.first?.prompt, "chunk 1")
+    }
+
+    func testLatestPromptsDoesNotLeakPromptsAcrossReposSharingCommonBranchNames() {
+        let model = Focus5Model()
+        let ltveraCard = makeRepoCardWithClones(
+            repoName: "LTVera-Pandas",
+            localPath: "/repos/LTVera-Pandas",
+            activeClones: [
+                (repoName: "LTVera-Pandas-wt1", localPath: "/repos/LTVera-Pandas-wt1", branch: "development"),
+                (repoName: "LTVera-Pandas-wt2", localPath: "/repos/LTVera-Pandas-wt2", branch: "main")
+            ]
+        )
+        let xyzCard = makeRepoCardWithClones(
+            repoName: "XYZ-forge",
+            localPath: "/repos/XYZ-forge",
+            activeClones: [
+                (repoName: "XYZ-forge-wt1", localPath: "/repos/XYZ-forge-wt1", branch: "development")
+            ]
+        )
+
+        model.promptLogEntries = [
+            PromptLogEntry(repo: "XYZ-forge", timestamp: "2026-09-10 16:00:00 PDT", machine: "M", branch: "development", ide: "zcode", prompt: "XYZ-forge prompt on dev branch"),
+            PromptLogEntry(repo: "LTVera-Pandas", timestamp: "2026-09-10 15:00:00 PDT", machine: "M", branch: "main", ide: "agy", prompt: "LTVera prompt on main branch")
+        ]
+
+        let ltveraPrompts = model.latestPrompts(for: ltveraCard, limit: 2)
+        XCTAssertEqual(ltveraPrompts.count, 1)
+        XCTAssertEqual(ltveraPrompts[0].prompt, "LTVera prompt on main branch")
+
+        let xyzPrompts = model.latestPrompts(for: xyzCard, limit: 2)
+        XCTAssertEqual(xyzPrompts.count, 1)
+        XCTAssertEqual(xyzPrompts[0].prompt, "XYZ-forge prompt on dev branch")
     }
 }

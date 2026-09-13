@@ -87,6 +87,14 @@ enum PromptLogReader {
             if prompt.hasPrefix("\"") { prompt.removeFirst() }
             if prompt.hasSuffix("\"") { prompt.removeLast() }
 
+            if let reqRange = prompt.range(of: "## My request:\n") {
+                prompt = String(prompt[reqRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if let reqRange = prompt.range(of: "## My request:") {
+                prompt = String(prompt[reqRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if prompt.hasSuffix("\"") { prompt.removeLast() }
+            prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+
             if !timestamp.isEmpty, !isMachineNoise(prompt) {
                 entries.append(PromptLogEntry(repo: repo, timestamp: timestamp, machine: machine, branch: branch, ide: ide, prompt: prompt))
             }

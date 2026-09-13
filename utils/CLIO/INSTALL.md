@@ -446,7 +446,7 @@ if [ -f ~/.zcode/cli/config.json ]; then
 fi
 
 # launchd jobs (only if installed)
-for label in com.claude.clio-codex-tail com.claude.clio-agy-tail; do
+for label in com.claude.clio-codex-tail com.claude.clio-agy-tail com.claude.prompt-log-to-md; do
   plist=~/Library/LaunchAgents/$label.plist
   [ -f "$plist" ] && { launchctl unload "$plist" 2>/dev/null; rm "$plist"; }
 done
