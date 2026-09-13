@@ -1,0 +1,104 @@
+20:14:58 WARNING rebalance.ingest.embedder: Embedding pass started: run_id=8a8c14df-fa38-45fc-a0f6-be50290718fd entry_point=embed_pending pid=22353 caller=launchd job (0)
+20:14:58 WARNING rebalance.ingest.embedder: Embedding pass started: run_id=e12f4b5f-fe40-4a4a-af2e-af887b8f14d0 entry_point=embed_pending pid=22353 caller=launchd job (0)
+20:14:58 WARNING rebalance.ingest.embedder: Embedding pass started: run_id=9e43fa95-8b1c-4258-8828-1df1f0bb5abd entry_point=embed_chunks pid=22353 caller=launchd job (0)
+============================================================
+GH-201 TECHNICAL SPIKE: TWO-STAGE COMPATIBILITY HARNESS
+============================================================
+
+============================================================
+STAGE 0A: SUBPROCESS SAFETY MATRIX & EDGE CASES
+============================================================
+[Case 1] HTTPS credential-helper / askpass non-interactive test...
+  ✓ Passed in 489.7ms (Clean exit, zero hang)
+[Case 2] Conflicting SSH command options...
+  ✓ Passed in 44.8ms: Handled conflicting SSH option cleanly
+[Case 3] Offline / unreachable network simulation...
+  ✓ Passed in 64.2ms: Offline target returned None gracefully
+[Case 4] Absent git binary fallback...
+  ✓ Passed: Gracefully catches missing git executable
+[Case 5] Detached / unborn HEAD handling...
+  ✓ Passed: Unborn / detached HEAD handles missing remote safely
+[Case 6] Subprocess timeout & process-group descendant termination...
+  ✓ Passed: Timeout fired in 504.3ms; child descendant 23266 terminated cleanly
+[Case 7] Empty, malformed or missing-ref parsing...
+  ✓ Passed: Malformed output safely rejected
+
+============================================================
+STAGE 0A: LIVE READ-ONLY REPOSITORY PROBE SWEEP
+============================================================
+Opening production database read-only: /Users/noelsaw/Library/Application Support/rebalance-os/rebalance.db
+  ✓ Read-only guarantee confirmed: attempt to write a readonly database
+Discovered 38 local clones on machine.
+  [OK] hiqs-labs/rebalanceos (development): peek=0bffc4dab7 in 481.6ms
+  [OK] hiqs-labs/gitcanary-fork (development): peek=14da205413 in 424.0ms
+  [OK] hypercart-dev-tools/ask-self (main): peek=461574f545 in 741.0ms
+  [OK] deusdata/codebase-memory-mcp (main): peek=b5185d10c4 in 482.0ms
+  [OK] aider-ai/aider (development): peek=5dc9490bb3 in 523.3ms
+  [OK] hypercart-dev-tools/ai-ddtk-fix-iterate-loop (main): peek=61d608df8d in 495.4ms
+  [OK] hiqs-labs/aegis-sleuth-slackbot (development): peek=5d04348b7f in 474.5ms
+  [OK] hiqs-labs/agentchorus-skill (main): peek=2b1353d1bf in 419.1ms
+
+Completed sweep of 8 repos in 4.04s (Budget: 15.0s)
+
+============================================================
+STAGE 0B: SANDBOXED READ/WRITE & RECOVERY CONTRACT TESTS
+============================================================
+  ✓ Sandboxed database initialized with all production schemas
+  ✓ Test B1 Passed: First-run clean cache-miss
+  ✓ Test B2 Passed: Checkpoint published and verified cache-hit
+  ✓ Test B3 Passed: Failed file-read refuses checkpoint advance (Retryable)
+  ✓ Test B4 Passed: Secondary branch movement cleanly invalidates cache
+  ✓ Test B5 Passed: Branch addition/deletion invalidates cache
+  ✓ Test B6 Passed: Stale overlapping scheduler run rejected
+  ✓ Test B7 Passed: Negative control verified (Empty/broken proof rejected)
+  ✓ Test B8 Passed: Widened lookback window invalidates cache
+
+[Two-Store Battery Recovery Contract Tests (Production Entry Point)]
+  ✓ Test B9a Passed: Production embed_chunks defers on battery without model calls
+  ✓ Test B9b Passed: Production refresh_index preserves vectors in BOTH stores with 0 model calls
+  ✓ Test B9c Passed: AC transition cleanly drains pending backlog in BOTH stores
+  ✓ Test B9d Passed: Grounded red control witnessed power gate bypass failure
+  ✓ Disposable sandbox database cleanly purged
+
+============================================================
+STOP-RULE EVALUATION
+============================================================
+Verdict: NO-GO
+Reason:  Average probe latency 505.1ms exceeds 500ms threshold
+
+Saved campaign report to:
+  - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08+GH-201/SUMMARY.md
+  - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08-gh201-remote-peeker-spike.md
+  - /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201/TESTS-RESULTS/2026-09-08+GH-201/measurements.jsonl
+
+============================================================
+STAGE 0C: FULL PRODUCTION REGRESSION SUITE (193 TESTS)
+============================================================
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh201
+configfile: pyproject.toml
+plugins: hypothesis-6.167.1, anyio-4.13.0
+collected 193 items
+
+tests/test_github_commit_backfill.py ..................                  [  9%]
+tests/test_github_commit_peeker.py ......................                [ 20%]
+tests/test_github_coverage.py ..............                             [ 27%]
+tests/test_github_direct_commits.py ........                             [ 32%]
+tests/test_github_ignore_cli.py ......                                   [ 35%]
+tests/test_github_knowledge.py .......                                   [ 38%]
+tests/test_github_org_aliases.py .......                                 [ 42%]
+tests/test_github_push_event_accounting.py ........                      [ 46%]
+tests/test_github_rate_limit_grading.py ........                         [ 50%]
+tests/test_github_readiness.py ..                                        [ 51%]
+tests/test_github_reconciliation.py ...                                  [ 53%]
+tests/test_github_scan.py .........                                      [ 58%]
+tests/test_github_vector_invariants.py ........                          [ 62%]
+tests/test_index_ops.py .................................                [ 79%]
+tests/test_power_ops.py ......................                           [ 90%]
+tests/test_semantic_hybrid.py ........                                   [ 94%]
+tests/test_semantic_index.py ...                                         [ 96%]
+tests/test_semantic_query_prefix.py ....                                 [ 98%]
+tests/test_semantic_source_contract.py ...                               [100%]
+
+============================= 193 passed in 40.16s =============================

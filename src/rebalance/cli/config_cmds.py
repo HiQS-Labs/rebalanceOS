@@ -432,6 +432,18 @@ def config_doctor() -> None:
             failed = event in auth_log.FAILURE_EVENTS
             row(f"{src}", not failed, f"last: {event} at {ts} UTC")
 
+    typer.echo("\n── Power source & hardware ──────────────────")
+    from rebalance.lib.power_ops import power_source_name
+    from rebalance.ingest.config import get_defer_embeddings_on_battery
+
+    p_source = power_source_name()
+    defer_bat = get_defer_embeddings_on_battery()
+    row(
+        "Power source",
+        True,
+        f"{p_source} (defer_embeddings_on_battery={defer_bat})",
+    )
+
     typer.echo("")
 
 
@@ -828,3 +840,23 @@ def config_show_defaults() -> None:
     summary = get_user_config_summary()
     for k, v in summary.items():
         typer.echo(f"  {k}: {v}")
+
+
+@config_app.command("get-defer-embeddings-on-battery")
+def config_get_defer_embeddings_on_battery() -> None:
+    """Print whether ML embeddings are deferred when running on battery power."""
+    from rebalance.ingest.config import get_defer_embeddings_on_battery
+
+    val = get_defer_embeddings_on_battery()
+    typer.echo(f"defer_embeddings_on_battery: {val}")
+
+
+@config_app.command("set-defer-embeddings-on-battery")
+def config_set_defer_embeddings_on_battery(
+    enabled: bool = typer.Argument(..., help="True to defer embeddings on battery, False to allow"),
+) -> None:
+    """Configure whether ML embeddings are deferred when running on battery power."""
+    from rebalance.ingest.config import set_defer_embeddings_on_battery
+
+    set_defer_embeddings_on_battery(enabled)
+    typer.echo(f"[+] set defer_embeddings_on_battery={enabled}")
