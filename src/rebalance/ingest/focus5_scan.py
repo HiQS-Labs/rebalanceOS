@@ -37,12 +37,11 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from datetime import timedelta
-from time import perf_counter
+from time import gmtime, perf_counter, strftime
 from typing import Any, Callable, Iterable, Iterator
 
 from rebalance.lib.time_ops import now_iso, now_utc
-from rebalance.ingest.db import db_connection, run_migrations
+from rebalance.ingest.db import db_connection, fetch_recent_open_github_items, run_migrations
 from rebalance.ingest.sync_snapshot import get_device_id
 
 # Reuse the prune discipline and the (already tested) remote-URL → owner/repo
@@ -1137,22 +1136,11 @@ def _recent_open_items(
     if not repo_full_name:
         return []
     try:
-        cutoff = (now_utc() - timedelta(hours=window_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        rows = conn.execute(
-            "SELECT number, html_url, title "
-            "FROM github_items "
-            "WHERE repo_full_name=? AND item_type=? AND state='open' AND created_at >= ? "
-            "ORDER BY number DESC LIMIT ?",
-            (repo_full_name, item_type, cutoff, limit),
-        ).fetchall()
-        if not rows:
-            rows = conn.execute(
-                "SELECT number, html_url, title "
-                "FROM github_items "
-                "WHERE repo_full_name=? AND item_type=? AND state='open' "
-                "ORDER BY number DESC LIMIT ?",
-                (repo_full_name, item_type, limit),
-            ).fetchall()
+        cutoff = strftime(
+            "%Y-%m-%dT%H:%M:%SZ",
+            gmtime(now_utc().timestamp() - window_hours * 60 * 60),
+        )
+        rows = fetch_recent_open_github_items(conn, repo_full_name, item_type, cutoff, limit)
     except Exception:  # noqa: BLE001 — corpus table may not exist yet
         return []
     return [

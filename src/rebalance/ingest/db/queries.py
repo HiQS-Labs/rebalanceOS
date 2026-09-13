@@ -1165,6 +1165,30 @@ def fetch_recent_github(
     return out
 
 
+def fetch_recent_open_github_items(
+    conn: sqlite3.Connection,
+    repo_full_name: str,
+    item_type: str,
+    cutoff: str,
+    limit: int,
+) -> list[sqlite3.Row]:
+    """Return recent open items, falling back to the highest open item numbers."""
+    rows = conn.execute(
+        "SELECT number, html_url, title FROM github_items "
+        "WHERE repo_full_name=? AND item_type=? AND state='open' AND created_at >= ? "
+        "ORDER BY number DESC LIMIT ?",
+        (repo_full_name, item_type, cutoff, limit),
+    ).fetchall()
+    if rows:
+        return rows
+    return conn.execute(
+        "SELECT number, html_url, title FROM github_items "
+        "WHERE repo_full_name=? AND item_type=? AND state='open' "
+        "ORDER BY number DESC LIMIT ?",
+        (repo_full_name, item_type, limit),
+    ).fetchall()
+
+
 def fetch_repo_activity_counts(
     conn: sqlite3.Connection,
     days: int = 7,
@@ -1268,6 +1292,7 @@ __all__ = [
     "fetch_repo_diagnostics",
     "fetch_release_readiness_data",
     "fetch_recent_github",
+    "fetch_recent_open_github_items",
     "fetch_repo_activity_counts",
     "fetch_open_prs",
 ]
