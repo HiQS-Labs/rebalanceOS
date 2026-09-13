@@ -10,10 +10,49 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.88.0] - 2026-09-10
+## [0.88.2] - 2026-09-12
 
 ### Added
 - Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
+
+### Fixed
+- The CLIO uninstall recipe now removes the prompt-log projection launchd job alongside the two
+  tail jobs, preventing the projection service from surviving an uninstall.
+
+## [0.88.1] - 2026-09-12
+
+### Fixed
+- Library-backed self-reporters inside a guarded scheduled job (the daily synthesis and daily
+  rollover scripts) now defer their lifecycle events to the outer guard, so every guarded job
+  records exactly one start/terminal pair again instead of two (#215).
+
+## [0.88.0] - 2026-09-12
+
+### Added
+- An opt-in Terra Low canary now turns the existing multi-source `/daily` evidence into a validated,
+  append-only 15-minute work synthesis. The model runs ephemerally with no tools or repository
+  access; unknown evidence IDs, malformed output, missing usage, token/call/cost ceilings, and
+  repeated failures all fail closed before the Daily log is written. Each accepted entry carries a
+  sanitized token, latency, estimated-list-price, confidence, and evidence receipt (#210).
+
+## [0.87.2] - 2026-09-12
+
+### Fixed
+- Managed jobs now run at launchd standard priority so Python module loading and wrapper `fork()`
+  reach guarded work promptly instead of stalling under background-process throttling (#213).
+
+## [0.87.1] - 2026-09-12
+
+### Fixed
+- Scheduled batch jobs now have policy-specific wall-clock limits enforced around their complete
+  process trees, with one lifecycle result and truthful overdue reporting instead of an indefinitely
+  live PID appearing healthy (#211).
+- Local pulse health now fails when its generated artifact is stale, while respecting the planned
+  overnight schedule gap (#211).
+- Shared status publishers serialize Git writes and recover stranded dirty or committed content
+  instead of calling it unchanged before it reaches the remote (#211).
+- Semantic orphan vectors have a dry-run-first, explicitly confirmed, transactionally audited repair
+  command, including an additional confirmation gate for large deletions (#211).
 
 ## [0.87.0] - 2026-09-10
 

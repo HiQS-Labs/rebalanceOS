@@ -1,14 +1,56 @@
+import fcntl
+import hashlib
+import json
+import os
 import re
+import shlex
+import signal
 import subprocess
+import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator, TextIO
 
 __all__ = [
     "DEFAULT_PRUNE_DIRS",
+    "build_hardened_ssh_command",
+    "canonical_github_url",
+    "compute_origin_ref_digest",
     "git_pull_rebase_safe",
+    "git_publish_lock",
+    "GitPublishLockBusy",
     "parse_github_remote_url",
+    "peek_remote_refs",
     "run_git",
     "should_descend",
 ]
+
+
+class GitPublishLockBusy(RuntimeError):
+    """Another Rebalance publisher owns the target checkout."""
+
+
+@contextmanager
+def git_publish_lock(repo_path: Path) -> Iterator[TextIO]:
+    """Hold the one non-blocking advisory lock shared by Rebalance publishers."""
+    result = run_git(repo_path, "rev-parse", "--absolute-git-dir")
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(result.stderr.strip() or "cannot resolve git directory")
+    lock_path = Path(result.stdout.strip()) / "rebalance-publish.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise GitPublishLockBusy(f"publisher busy for {repo_path}") from exc
+        yield handle
+    finally:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+
 
 # remote_url forms mapped to owner/repo:
 #   https://github.com/Owner/Repo.git
@@ -35,6 +77,25 @@ def parse_github_remote_url(remote_url: str | None) -> str | None:
     if not match:
         return None
     return f"{match.group('owner')}/{match.group('repo')}"
+
+
+def canonical_github_url(url_or_name: str) -> str:
+    """Normalize any GitHub URL or owner/repo shorthand to standard canonical https URL."""
+    s = (url_or_name or "").strip()
+    if s.endswith(".git"):
+        s = s[:-4]
+    if s.startswith("git@github.com:"):
+        s = s[len("git@github.com:") :]
+    elif s.startswith("https://github.com/"):
+        s = s[len("https://github.com/") :]
+    elif s.startswith("http://github.com/"):
+        s = s[len("http://github.com/") :]
+    elif s.startswith("ssh://git@github.com/"):
+        s = s[len("ssh://git@github.com/") :]
+    parts = s.strip("/").split("/")
+    if len(parts) == 2:
+        return f"https://github.com/{parts[0].lower()}/{parts[1].lower()}.git"
+    return url_or_name.strip()
 
 
 # Directories never worth descending into when walking for git checkouts or
@@ -89,6 +150,7 @@ def run_git(
     repo_path: Path,
     *args: str,
     timeout: float = 30.0,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``git`` in *repo_path* without raising for a non-zero exit code.
 
@@ -96,14 +158,175 @@ def run_git(
     Callers retain ownership of command-specific error handling by inspecting
     the returned completed process; timeouts and executable failures still
     raise their standard ``subprocess`` exceptions.
+    Spawns in a new session (dedicated process group) so timeouts cleanly kill
+    the entire descendant process tree (SSH helpers, credential helpers).
     """
-    return subprocess.run(
-        ["git", "-C", str(repo_path), *args],
-        capture_output=True,
+    env = None
+    if extra_env:
+        env = os.environ.copy()
+        env.update(extra_env)
+
+    cmd = ["git", "-C", str(repo_path), *args]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        check=False,
-        timeout=timeout,
+        env=env,
+        start_new_session=True,
     )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=proc.returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    except subprocess.TimeoutExpired as exc:
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGKILL)
+        except OSError:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        proc.communicate()
+        raise exc
+    except Exception:
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGKILL)
+        except OSError:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        raise
+
+
+def build_hardened_ssh_command(
+    repo_path: Path | None = None,
+    extra_ssh_opts: str = "",
+    timeout: float = 1.0,
+) -> str:
+    """Build a hardened, non-interactive SSH command honoring user configuration.
+
+    Reads GIT_SSH_COMMAND or core.sshCommand, neutralizes conflicting prompt options
+    (e.g. BatchMode=no), and enforces BatchMode=yes and ConnectTimeout=5.
+    """
+    ssh_base = os.environ.get("GIT_SSH_COMMAND")
+    if not ssh_base and repo_path:
+        try:
+            cfg = run_git(repo_path, "config", "--get", "core.sshCommand", timeout=timeout)
+            if cfg.returncode == 0 and cfg.stdout.strip():
+                ssh_base = cfg.stdout.strip()
+        except Exception:
+            pass
+    if not ssh_base:
+        ssh_base = "ssh"
+
+    try:
+        tokens = shlex.split(ssh_base)
+    except ValueError:
+        tokens = ["ssh"]
+    if not tokens:
+        tokens = ["ssh"]
+
+    binary = tokens[0]
+    user_tokens = tokens[1:]
+
+    filtered_tokens: list[str] = []
+    skip_next = False
+    for i, tok in enumerate(user_tokens):
+        if skip_next:
+            skip_next = False
+            continue
+        tok_lower = tok.lower()
+        if tok == "-o" and i + 1 < len(user_tokens):
+            val = user_tokens[i + 1].lower()
+            if val.startswith("batchmode=") or val.startswith("connecttimeout="):
+                skip_next = True
+                continue
+        elif tok_lower.startswith("-obatchmode=") or tok_lower.startswith("-oconnecttimeout="):
+            continue
+        filtered_tokens.append(tok)
+
+    enforced = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5"]
+    if extra_ssh_opts:
+        try:
+            enforced.extend(shlex.split(extra_ssh_opts))
+        except ValueError:
+            enforced.append(extra_ssh_opts)
+
+    return shlex.join([binary] + enforced + filtered_tokens)
+
+
+def peek_remote_refs(
+    repo_path: Path,
+    remote: str = "origin",
+    *,
+    timeout: float = 2.0,
+    extra_ssh_opts: str = "",
+) -> dict[str, str] | None:
+    """Peek remote refs via git ls-remote in a hardened, non-interactive environment.
+
+    Enforces a strict shared deadline through SSH config lookup, remote execution, and cleanup.
+    Returns mapping of ref_name -> sha, or None if probe failed, timed out, or unverified.
+    """
+    start_time = time.monotonic()
+    config_timeout = min(0.5, max(0.01, timeout * 0.25))
+    ssh_cmd = build_hardened_ssh_command(repo_path, extra_ssh_opts, timeout=config_timeout)
+
+    rem_timeout = timeout - (time.monotonic() - start_time)
+    if rem_timeout <= 0:
+        return None
+
+    extra_env = {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+        "GIT_SSH_COMMAND": ssh_cmd,
+    }
+
+    try:
+        proc = run_git(
+            repo_path,
+            "ls-remote",
+            remote,
+            timeout=rem_timeout,
+            extra_env=extra_env,
+        )
+        if proc.returncode != 0:
+            return None
+
+        ref_map: dict[str, str] = {}
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                return None
+            sha, ref_name = parts
+            if len(sha) not in (40, 64) or not all(c in "0123456789abcdefABCDEF" for c in sha):
+                return None
+            ref_map[ref_name] = sha
+
+        if not ref_map or not any(k.startswith("refs/heads/") for k in ref_map):
+            return None
+
+        return ref_map
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def compute_origin_ref_digest(ref_map: dict[str, str]) -> str:
+    """Compute canonical hash of all origin branch heads (refs/heads/*)."""
+    origin_branches = {ref: sha for ref, sha in ref_map.items() if ref.startswith("refs/heads/")}
+    encoded = json.dumps(sorted(origin_branches.items())).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def git_pull_rebase_safe(

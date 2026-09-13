@@ -14,6 +14,7 @@ Everything runs hermetically: templates are rendered with dummy paths and
 parsed with ``plistlib`` — no ``launchctl``, no live LaunchAgents, no network.
 """
 
+import os
 import plistlib
 import subprocess
 import unittest
@@ -129,6 +130,18 @@ POLICY = {
         ],
         "doc_tokens": ["every 15 min", "pulse_warning_watch.py"],
     },
+    "daily-work-synthesis": {
+        "calendar": None,
+        "interval": 900,
+        "run_at_load": False,
+        "keep_alive": False,
+        "wrapper": "scripts/daily_work_synthesis.sh",
+        "wrapper_must_contain": [
+            'rb_job_init "daily-work-synthesis" 14',
+            "utils/daily_work_synthesis.py",
+        ],
+        "doc_tokens": ["every 15 min", "daily_work_synthesis.py"],
+    },
     "health-check": {
         # :10, not :00 (GH-175) — pulse-sync owns :00.
         "calendar": [{"Minute": 10}],
@@ -202,6 +215,22 @@ POLICY = {
     },
 }
 
+MAX_RUNTIME_SECONDS = {
+    "daily-sync": 10800,
+    "obsidian-vault-embeddings": 7200,
+    "github-sync": 7200,
+    "pulse-sync": 1800,
+    "pulse-web-sync": 7200,
+    "pulse-server": None,
+    "pulse-warning-watch": 300,
+    "daily-work-synthesis": 180,
+    "health-check": 900,
+    "health-check-triage": 1800,
+    "obsidian-rollover": 300,
+    "hiqs-digest": 14400,
+    "daily-synthesis": 900,
+}
+
 INSTALLERS = {
     "daily-sync": "install_scheduler.sh",
     "obsidian-vault-embeddings": "install_obsidian_vault_embeddings_scheduler.sh",
@@ -210,6 +239,7 @@ INSTALLERS = {
     "pulse-web-sync": "install_pulse_web_scheduler.sh",
     "pulse-server": "install_pulse_server_scheduler.sh",
     "pulse-warning-watch": "install_pulse_warning_watch_scheduler.sh",
+    "daily-work-synthesis": "install_daily_work_synthesis_scheduler.sh",
     "health-check": "install_health_check_scheduler.sh",
     "health-check-triage": "install_health_check_triage_scheduler.sh",
     "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
@@ -266,6 +296,11 @@ class TestPlistTemplates(unittest.TestCase):
                 spec["calendar"],
                 f"{job}: StartCalendarInterval diverged from SCHEDULER.md policy",
             )
+            self.assertEqual(
+                _parse(job).get("StartInterval"),
+                spec.get("interval"),
+                f"{job}: StartInterval diverged from SCHEDULER.md policy",
+            )
 
     def test_run_at_load_and_keep_alive(self):
         for job, spec in POLICY.items():
@@ -279,6 +314,14 @@ class TestPlistTemplates(unittest.TestCase):
                 bool(plist.get("KeepAlive", False)),
                 spec["keep_alive"],
                 f"{job}: KeepAlive",
+            )
+
+    def test_managed_jobs_use_standard_launch_priority(self):
+        for job in POLICY:
+            self.assertNotIn(
+                "ProcessType",
+                _parse(job),
+                f"{job}: launchd background priority can starve startup before guarded work begins",
             )
 
     def test_program_arguments_reference_real_files(self):
@@ -304,6 +347,32 @@ class TestPlistTemplates(unittest.TestCase):
                 self.assertIn(token, args, f"{job}: missing arg {token!r}")
             for token in spec.get("args_must_not_contain", []):
                 self.assertNotIn(token, args, f"{job}: forbidden arg {token!r}")
+
+    def test_every_finite_job_is_outer_guarded_at_its_policy_limit(self):
+        for job, seconds in MAX_RUNTIME_SECONDS.items():
+            args = _parse(job)["ProgramArguments"]
+            if seconds is None:
+                self.assertNotIn("utils/job_guard.py", " ".join(args))
+                continue
+            self.assertGreaterEqual(len(args), 10, job)
+            self.assertTrue(args[1].endswith("utils/job_guard.py"), job)
+            self.assertEqual(args[args.index("--name") + 1], f"scheduler-{job}")
+            self.assertEqual(args[args.index("--max-runtime-seconds") + 1], str(seconds))
+            self.assertEqual(args[args.index("--lifecycle-job") + 1], job)
+            self.assertIn("--", args)
+
+    def test_documented_runtime_policy_is_complete_and_strict(self):
+        rows = {}
+        for line in SCHEDULER_MD.read_text().splitlines():
+            cells = [cell.strip() for cell in line.split("|")[1:-1]]
+            if len(cells) != 7 or not cells[0].startswith("`"):
+                continue
+            job = cells[0].strip("`")
+            self.assertNotIn(job, rows, f"duplicate scheduler policy row: {job}")
+            raw = cells[6]
+            rows[job] = None if raw == "none" else int(raw)
+        self.assertEqual(rows, MAX_RUNTIME_SECONDS)
+        self.assertTrue(all(value is None or value > 0 for value in rows.values()))
 
     def test_no_secrets_in_templates(self):
         for job in POLICY:
@@ -390,6 +459,20 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
             _, wrapper = self._make_tree(tmp, 'rb_job_init "fake-job" 14\nexit 3\n')
             proc = subprocess.run([str(wrapper)], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 3)
+
+    def test_outer_guard_child_suppresses_inner_lifecycle_events(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, wrapper = self._make_tree(tmp, 'rb_job_init "fake-job" 14\nexit 3\n')
+            env = os.environ.copy()
+            env["REBALANCE_SCHEDULER_LIFECYCLE_CHILD"] = "1"
+            proc = subprocess.run([str(wrapper)], capture_output=True, text=True, env=env)
+            self.assertEqual(proc.returncode, 3)
+            self.assertFalse(
+                (repo / "temp" / "logs" / "auth_activity.jsonl").exists(),
+                "guarded child duplicated its outer lifecycle events",
+            )
 
 
 class TestInstallers(unittest.TestCase):

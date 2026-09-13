@@ -7,6 +7,12 @@
 
     <key>ProgramArguments</key>
     <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-github-sync</string>
+        <string>--max-runtime-seconds</string><string>7200</string>
+        <string>--lifecycle-job</string><string>github-sync</string>
+        <string>--</string>
         <string>{{REBALANCE_DIR}}/scripts/github_sync.sh</string>
     </array>
 
@@ -51,7 +57,5 @@
     <key>Nice</key>
     <integer>5</integer>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>

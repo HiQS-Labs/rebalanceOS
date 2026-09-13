@@ -50,6 +50,7 @@ log_error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 # ------------------------------------------------------------------------------
 JOB_NAMES=()
 JOB_WRAPPERS=()
+JOB_MAX_RUNTIMES=()
 
 load_policy() {
     if [ ! -f "$POLICY_DOC" ]; then
@@ -57,30 +58,67 @@ load_policy() {
         exit 1
     fi
 
-    # Column 1 is the backticked label suffix, column 3 the backticked wrapper
-    # path ("— (python direct)" for jobs launchd invokes without one).
+    # Column 1 is the label suffix, column 3 the wrapper, and column 7 the
+    # positive max-runtime seconds (or "none" for the one daemon).
     local parsed
     parsed=$(/usr/bin/sed -n '/^| Job (label suffix) |/,/^$/p' "$POLICY_DOC" \
         | /usr/bin/sed '1,2d' \
         | /usr/bin/awk -F'|' 'NF>3 {
-              lbl=$2; wrp=$4;
-              gsub(/^[ \t]+|[ \t]+$/,"",lbl); gsub(/^[ \t]+|[ \t]+$/,"",wrp);
+              lbl=$2; wrp=$4; max=$8;
+              gsub(/^[ \t]+|[ \t]+$/,"",lbl); gsub(/^[ \t]+|[ \t]+$/,"",wrp); gsub(/^[ \t]+|[ \t]+$/,"",max);
               if (lbl !~ /^`[a-z0-9-]+`$/) next;
+              if (seen[lbl]++) { print "duplicate scheduler policy row: " lbl > "/dev/stderr"; bad=1; next }
+              if (max != "none" && max !~ /^[1-9][0-9]*$/) { print "invalid max runtime for " lbl ": " max > "/dev/stderr"; bad=1; next }
+              if ((max == "none") != (lbl == "`pulse-server`")) { print "only pulse-server may use max runtime none" > "/dev/stderr"; bad=1; next }
               gsub(/`/,"",lbl);
               if (wrp ~ /^`[^`]+`$/) { gsub(/`/,"",wrp) } else { wrp="" }
-              print lbl "|" wrp;
-          }')
+              print lbl "|" wrp "|" max;
+          } END { if (bad) exit 2 }')
 
     if [ -z "$parsed" ]; then
         log_error "could not read the job policy table from $POLICY_DOC"
         exit 1
     fi
 
-    local line
+    local line name wrapper max_runtime
     while IFS= read -r line; do
-        JOB_NAMES+=("${line%%|*}")
-        JOB_WRAPPERS+=("${line#*|}")
+        IFS='|' read -r name wrapper max_runtime <<< "$line"
+        JOB_NAMES+=("$name")
+        JOB_WRAPPERS+=("$wrapper")
+        JOB_MAX_RUNTIMES+=("$max_runtime")
     done <<< "$parsed"
+}
+
+job_max_runtime() {
+    local needle="$1" i
+    for i in "${!JOB_NAMES[@]}"; do
+        [ "${JOB_NAMES[$i]}" = "$needle" ] && { echo "${JOB_MAX_RUNTIMES[$i]}"; return 0; }
+    done
+    return 1
+}
+
+process_elapsed_seconds() {
+    local pid="$1" raw days=0 hours=0 minutes=0 seconds=0
+    local -a parts
+    if [ -n "${STACK_PROCESS_ELAPSED_SECONDS:-}" ]; then
+        echo "$STACK_PROCESS_ELAPSED_SECONDS"
+        return 0
+    fi
+    raw=$(/bin/ps -p "$pid" -o etime= 2>/dev/null | /usr/bin/tr -d ' ')
+    [ -n "$raw" ] || return 1
+    if [[ "$raw" == *-* ]]; then
+        days="${raw%%-*}"
+        raw="${raw#*-}"
+    fi
+    IFS=':' read -r -a parts <<< "$raw"
+    if [ "${#parts[@]}" -eq 3 ]; then
+        hours="${parts[0]}"; minutes="${parts[1]}"; seconds="${parts[2]}"
+    elif [ "${#parts[@]}" -eq 2 ]; then
+        minutes="${parts[0]}"; seconds="${parts[1]}"
+    else
+        return 1
+    fi
+    echo $((10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds))
 }
 
 is_managed() {
@@ -426,7 +464,7 @@ stack_status() {
 
     local unloaded=0 broken=0 name
     for name in "${JOB_NAMES[@]}"; do
-        local dest row pid status state color root note
+        local dest row pid status state color root note max_runtime elapsed
         dest=$(plist_path "$name")
         row=$(launchctl_row "$name")
         root=$(bound_root "$dest")
@@ -446,7 +484,13 @@ stack_status() {
         pid=$(echo "$row" | /usr/bin/awk -F'\t' '{print $1}')
         status=$(echo "$row" | /usr/bin/awk -F'\t' '{print $2}')
         if [ "$pid" != "-" ]; then
-            state="RUNNING"; color="\033[1;32m"
+            max_runtime=$(job_max_runtime "$name")
+            elapsed=$(process_elapsed_seconds "$pid" 2>/dev/null || true)
+            if [ "$max_runtime" != "none" ] && [ -n "$elapsed" ] && [ "$elapsed" -gt "$max_runtime" ]; then
+                state="OVERDUE"; color="\033[1;31m"; broken=$((broken + 1))
+            else
+                state="RUNNING"; color="\033[1;32m"
+            fi
         elif [ "$status" != "0" ] && [ "$status" != "-" ]; then
             state="ERROR ($status)"; color="\033[1;31m"; broken=$((broken + 1))
         else

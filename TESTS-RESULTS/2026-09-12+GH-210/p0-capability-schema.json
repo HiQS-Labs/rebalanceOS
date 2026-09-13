@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["primary_repo", "phase", "confidence", "evidence_ids", "abstain"],
+  "properties": {
+    "primary_repo": {"type": "string"},
+    "phase": {"enum": ["planning", "implementation", "verification", "blocked"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^synthetic-[0-9]+$"},
+      "minItems": 1
+    },
+    "abstain": {"type": "boolean"}
+  }
+}

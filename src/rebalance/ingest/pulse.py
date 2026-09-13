@@ -43,7 +43,7 @@ from rebalance.ingest.db import (
 from rebalance.ingest.slack_users import compact_sleuth_reminder
 from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
-from rebalance.lib.git_ops import git_pull_rebase_safe, run_git
+from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock, git_pull_rebase_safe, run_git
 
 
 # Author logins of known cloud-agent bots. Mirrors agent_tags.py — kept here
@@ -802,20 +802,83 @@ def _commit_and_push_if_changed(
     push: bool,
     commit_message: str,
 ) -> dict[str, Any]:
+    """Serialize the full content-write-through-push transaction."""
+    try:
+        with git_publish_lock(target_repo):
+            return _commit_and_push_if_changed_locked(
+                target_repo,
+                file_rel,
+                new_content,
+                push=push,
+                commit_message=commit_message,
+            )
+    except GitPublishLockBusy as exc:
+        return {
+            "wrote_file": False,
+            "committed": False,
+            "pushed": False,
+            "deferred": True,
+            "git_error": str(exc),
+        }
+
+
+def _commit_and_push_if_changed_locked(
+    target_repo: Path,
+    file_rel: str,
+    new_content: str,
+    *,
+    push: bool,
+    commit_message: str,
+) -> dict[str, Any]:
     """Write *new_content* to file_rel inside *target_repo*; commit+push only if changed."""
     target_file = target_repo / file_rel
     target_file.parent.mkdir(parents=True, exist_ok=True)
 
     existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
     if existing == new_content:
-        return {
-            "wrote_file": False,
-            "committed": False,
-            "pushed": False,
-            "reason": "no content change",
-        }
-
-    target_file.write_text(new_content, encoding="utf-8")
+        status = run_git(target_repo, "status", "--porcelain", "--", file_rel)
+        if status.returncode != 0:
+            return {
+                "wrote_file": False,
+                "committed": False,
+                "pushed": False,
+                "git_error": status.stderr.strip() or status.stdout.strip(),
+            }
+        if not status.stdout.strip():
+            if not push or _verify_remote_content(target_repo, file_rel, new_content):
+                return {
+                    "wrote_file": False,
+                    "committed": False,
+                    "pushed": False,
+                    "reason": "no content change",
+                }
+            # The worktree is clean but HEAD has content its upstream does not.
+            # This is the other half of recovery from a prior publish failure:
+            # push the existing commit rather than claiming an identical file
+            # means there is nothing to do.
+            pushed = run_git(target_repo, "push")
+            if pushed.returncode != 0:
+                return {
+                    "wrote_file": False,
+                    "committed": False,
+                    "pushed": False,
+                    "git_error": pushed.stderr.strip() or pushed.stdout.strip(),
+                }
+            if not _verify_remote_content(target_repo, file_rel, new_content):
+                return {
+                    "wrote_file": False,
+                    "committed": False,
+                    "pushed": False,
+                    "git_error": "push succeeded but remote content does not match",
+                }
+            return {
+                "wrote_file": False,
+                "committed": False,
+                "pushed": True,
+                "reason": "pushed existing local commit",
+            }
+    else:
+        target_file.write_text(new_content, encoding="utf-8")
 
     proc = run_git(target_repo, "add", file_rel)
     if proc.returncode != 0:
@@ -938,7 +1001,7 @@ def _verify_remote_content(target_repo: Path, file_rel: str, expected: str) -> b
     if proc.returncode != 0 or not upstream:
         return False
     proc = run_git(target_repo, "show", f"{upstream}:{file_rel}")
-    return proc.returncode == 0 and proc.stdout.strip() == expected.strip()
+    return proc.returncode == 0 and proc.stdout == expected
 
 
 # ---------------------------------------------------------------------------

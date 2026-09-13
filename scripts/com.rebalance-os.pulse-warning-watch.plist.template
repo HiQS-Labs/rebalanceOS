@@ -8,6 +8,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>{{PYTHON}}</string>
+        <string>{{REBALANCE_DIR}}/utils/job_guard.py</string>
+        <string>--name</string><string>scheduler-pulse-warning-watch</string>
+        <string>--max-runtime-seconds</string><string>300</string>
+        <string>--lifecycle-job</string><string>pulse-warning-watch</string>
+        <string>--</string>
+        <string>{{PYTHON}}</string>
         <string>{{REBALANCE_DIR}}/scripts/pulse_warning_watch.py</string>
         <string>--url</string>
         <string>http://127.0.0.1:8767/</string>
@@ -45,7 +51,5 @@
     <key>KeepAlive</key>
     <false/>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>
