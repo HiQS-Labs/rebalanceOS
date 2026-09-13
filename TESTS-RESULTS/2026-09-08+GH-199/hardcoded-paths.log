@@ -1,0 +1,6 @@
+ERROR [pdda-check-hardcoded-paths] PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:53 hardcoded path detected (/Users/)
+ERROR [pdda-check-hardcoded-paths] PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:54 hardcoded path detected (/Users/)
+ERROR [pdda-check-hardcoded-paths] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:97 hardcoded path detected (/Users/)
+ERROR [pdda-check-hardcoded-paths] PROJECT/2-WORKING/GH-59-LAUNCHD-STACK-CONSOLIDATION.md:53 hardcoded path detected (/Users/)
+ERROR [pdda-check-hardcoded-paths] PROJECT/2-WORKING/GH-59-LAUNCHD-STACK-CONSOLIDATION.md:119 hardcoded path detected (/Users/)
+SUMMARY [pdda-check-hardcoded-paths] errors=5 warns=0 info=0

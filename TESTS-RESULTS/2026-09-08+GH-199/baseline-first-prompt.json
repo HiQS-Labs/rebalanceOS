@@ -1,0 +1,11 @@
+{
+  "case": "completed first prompt between empty initial poll and discovery",
+  "tailer_sha256": "9ae347043f9890b0a01c7f0f6f5c4e1a9e93c72a42fb526b381faff8b9349b96",
+  "nonempty_source_bytes": 430,
+  "expected_rows": 1,
+  "actual_rows": 0,
+  "first_poll": "clio-codex-tail: delivered=0 deferred_files=0",
+  "second_poll": "clio-codex-tail: delivered=0 deferred_files=0",
+  "source_unchanged": true,
+  "regression_detected": true
+}

@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.2] - 2026-09-13
+
+### Fixed
+- CLIO now captures the first prompt of a new Codex root session when it arrives between polling ticks. A persisted capture boundary excludes prior history, while first-file provenance excludes inherited subagent prompts even after parent metadata appears. Existing writer retry, deduplication, and resumed-session context are preserved; legacy pending records remain eligible until file replacement or truncation (#199).
+
 ## [0.88.1] - 2026-09-12
 
 ### Fixed
@@ -49,6 +54,7 @@
 
 ### Added
 - Full clone detection and parent checkout grouping in Focus 5: secondary task checkouts and temporary clones are now detected and clustered under their primary parent repository card rather than occupying individual top-five slots. Parent cards roll up the most recent activity across all clones, display active clone counts and dirty status indicators, and allow quick opening of individual clone checkouts (#204).
+>>>>>>> origin/development
 
 ## [0.86.0] - 2026-09-08
 

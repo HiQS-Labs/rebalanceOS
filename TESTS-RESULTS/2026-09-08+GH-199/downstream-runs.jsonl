@@ -1,0 +1,4 @@
+{"schema_version": 1, "run_id": "gh199-downstream-clio-capture", "returncode": 0, "seconds": 15.06, "log": "clio-capture.log"}
+{"schema_version": 1, "run_id": "gh199-downstream-clio-exporter", "returncode": 0, "seconds": 5.63, "log": "clio-exporter.log"}
+{"schema_version": 1, "run_id": "gh199-downstream-clio-codex-tail", "returncode": 0, "seconds": 21.67, "log": "clio-codex-tail.log"}
+{"schema_version": 1, "run_id": "gh199-downstream-clio-agy-tail", "returncode": 0, "seconds": 13.51, "log": "clio-agy-tail.log"}
