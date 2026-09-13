@@ -166,7 +166,8 @@ EXIT_INSTANCE_CONFLICT = 3
 EXIT_CEILING_TRIPPED = 4
 EXIT_REFUSED_TO_START = 75  # EX_TEMPFAIL
 EXIT_WALL_CLOCK_TIMEOUT = 124  # conventional timeout(1) status
-SCHEDULER_LIFECYCLE_CHILD_ENV = "REBALANCE_SCHEDULER_LIFECYCLE_CHILD"
+# The child-env flag lives in auth_log (GH-215): the lifecycle writers there
+# defer to the guard when it is set. Imported lazily alongside log_job_started.
 
 #: The codes that mean "did not run; not the job's fault". Supervisors should
 #: leave their failure counters untouched for these.
@@ -1021,7 +1022,7 @@ def run_guarded(
 
         child_env = None
         if lifecycle_job:
-            from rebalance.ingest.auth_log import log_job_started
+            from rebalance.ingest.auth_log import SCHEDULER_LIFECYCLE_CHILD_ENV, log_job_started
 
             log_job_started(lifecycle_job)
             child_env = os.environ.copy()

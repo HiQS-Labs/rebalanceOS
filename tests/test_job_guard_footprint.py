@@ -164,6 +164,36 @@ def test_scheduled_timeout_records_one_start_and_one_failure(isolated_guard, mon
     assert rows[1]["detail"]["reason"] == "wall_clock_timeout"
 
 
+def test_guarded_child_self_report_defers_to_the_guard(isolated_guard, monkeypatch):
+    """GH-215: a library-backed self-reporter inside the guarded child must not
+    duplicate the pair the guard owns (observed live on daily-synthesis)."""
+    script = isolated_guard / "self_report_then_exit.py"
+    script.write_text(
+        "from rebalance.ingest.auth_log import log_job_completed, log_job_started\n"
+        "log_job_started('self-reporting-job')\n"
+        "log_job_completed('self-reporting-job', 0.5)\n",
+        encoding="utf-8",
+    )
+    log_dir = isolated_guard / "auth"
+    monkeypatch.setenv("REBALANCE_AUTH_LOG_DIR", str(log_dir))
+    # The child is a fresh interpreter: point it at this checkout's src even
+    # when the host venv has some other rebalance installed.
+    monkeypatch.setenv("PYTHONPATH", str(_REPO_ROOT / "src"))
+
+    code = job_guard.run_guarded(
+        name="test-self-report-suppressed",
+        argv=[sys.executable, str(script)],
+        max_footprint_gb=8.0,
+        lifecycle_job="fake-scheduled-job",
+    )
+
+    rows = [json.loads(line) for line in (log_dir / "auth_activity.jsonl").read_text().splitlines()]
+    assert code == 0
+    # Exactly the guard's pair — the child's self-report never lands.
+    assert [row["event"] for row in rows] == ["job_started", "job_completed"]
+    assert all(row["detail"]["job"] == "fake-scheduled-job" for row in rows)
+
+
 def test_preflight_refusal_has_its_own_exit_code(isolated_guard, monkeypatch):
     """1b. "Refused to start" and "tripped mid-run" must be distinguishable.
 
