@@ -88,6 +88,97 @@ Timed Muse Medium receipt: session `01a09859-6c93-74e2-adc7-a96fbac4e6e0`, reque
 `123b6142-d46f-4156-891a-ecc4364541d2`, response
 `resp_6aa5fa39095070e744974cef`.
 
+## Ad-hoc non-Contributor Muse synthetic battery
+
+The operator next requested `muse-spark-1.3` (the non-Contributor tier) against a
+full battery and Terra Low/Medium. No prior full #210 battery existed: the planned
+12–20 historical-window campaign was still unfrozen and private-data egress remained
+unapproved. This pivot therefore froze a separate 12-case **synthetic preliminary
+battery** before inference. It is not the planned historical battery or a product
+grade.
+
+Artifacts:
+
+- [`synthetic-battery.json`](synthetic-battery.json) — frozen cases and expected labels
+- [`run_synthetic_battery.py`](run_synthetic_battery.py) — isolated, randomized runner
+- [`synthetic-results.jsonl`](synthetic-results.jsonl) — 48 per-attempt receipts
+- [`score_synthetic_battery.py`](score_synthetic_battery.py) — deterministic scorer
+- [`synthetic-summary.json`](synthetic-summary.json) — aggregate metrics and mismatches
+- [`muse-cost-samples.json`](muse-cost-samples.json) — post-battery native usage samples
+
+The matrix used 12 cases for each of Terra Low, Terra Medium, Muse Low, and Muse
+Medium. Order was randomized with seed 210. Each call used an empty temporary
+workspace, no tools, and a 60-second timeout. Terra used provider-enforced Structured
+Output. Muse Code 1.1.1 has no equivalent CLI option; its JSON was validated locally
+against the same schema. All 48 recorded attempts completed without retry or process
+failure.
+
+| Arm | Strict exact | Abstention-aware exact* | Repo | Non-abstain phase | Abstain | Evidence IDs | Schema | p50 / p95 / max |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Terra Low | 9/12 | 11/12 | 12/12 | 8/9 | 12/12 | 12/12 | 12/12 | 4.47 / 6.59 / 7.02 s |
+| Terra Medium | 9/12 | 11/12 | 12/12 | 8/9 | 12/12 | 12/12 | 12/12 | 4.41 / 5.15 / 5.28 s |
+| Muse non-Contributor Low | 10/12 | 11/12 | 12/12 | 8/9 | 12/12 | 12/12 | 12/12 | 13.54 / 24.58 / 24.91 s |
+| Muse non-Contributor Medium | 10/12 | 11/12 | 12/12 | 8/9 | 12/12 | 12/12 | 12/12 | 19.27 / 27.66 / 29.52 s |
+
+\* The abstention-aware score was added after viewing results and is therefore
+supplementary, not a replacement for the frozen strict score. The schema requires a
+phase even when `abstain=true`; this supplementary score ignores that placeholder
+phase. It makes explicit that Muse's one-point strict advantage comes only from filler
+phase choices on abstained cases. On substantive fields, all four arms tie at 11/12.
+
+Every arm made the same substantive miss on S07, where a new function caused tests to
+fail. The frozen expectation was `blocked`; Terra returned `implementation`, while
+Muse returned `verification`. This may be a taxonomy ambiguity rather than evidence of
+a model-quality difference and should be resolved before a historical campaign.
+Neither Medium arm improved classification accuracy over its Low counterpart.
+
+### Token and cost comparison
+
+Official OpenAI documentation checked 2026-09-12 lists Terra at $2.00/M uncached
+input, $0.20/M cached input, and $12.00/M output. The recorded battery replay yielded:
+
+| Terra arm | Input total | Cached input | Output | Reported reasoning output | Estimated recorded cost |
+|---|---:|---:|---:|---:|---:|
+| Low | 227,171 | 163,840 | 655 | 107 | $0.167290–$0.168574 |
+| Medium | 226,218 | 178,176 | 678 | 128 | $0.139855–$0.141391 |
+| Combined | 453,389 | 342,016 | 1,333 | 235 | $0.307145–$0.309965 |
+
+The lower estimate treats reported reasoning tokens as a subset of output tokens; the
+upper estimate conservatively charges them again. These are dated list-price
+estimates, not a provider bill. The first attempted matrix issued the same 24 Terra
+calls but lost its in-memory receipts when the final writer encountered byte-valued
+timeout output. Therefore total Terra spend for this request is not exactly measured;
+it is likely roughly twice the recorded replay, about $0.61–$0.62. The runner now
+normalizes timeout bytes and checkpoints each row immediately; a direct red/green
+probe witnessed the original serialization failure and the correction.
+
+The local model catalog records non-Contributor Muse at $1.25/M input, $0.15/M cached
+input, and $4.25/M output. The battery's no-session-log JSONL receipts exposed request
+and response IDs but not token counts or billed cost. After the battery, two identical
+S03 probes with local session tracing enabled exposed the native provider usage:
+
+| Muse sample | Input | Cached | Output | Reasoning | Estimated sample cost | Projected 12-call arm |
+|---|---:|---:|---:|---:|---:|---:|
+| Low | 29,824 | 0 | 356 | 276 | $0.038793–$0.039966 | $0.465516–$0.479592 |
+| Medium | 29,827 | 0 | 546 | 470 | $0.039604–$0.041602 | $0.475248–$0.499224 |
+| Projected combined battery | — | — | — | — | — | $0.940764–$0.978816 |
+
+The same lower/upper reasoning-token convention is used. These are projections from
+one representative case per effort, not actual battery usage or a provider bill; the
+other cases may tokenize differently. They are more defensible than applying Muse's
+prices to Terra's envelope because the samples capture Muse's roughly 29.8K-token
+native request and its lack of cache reuse. The first failed-receipt matrix also issued
+24 Muse calls, and the two tracing probes added one call per effort. Including those,
+total Muse spend for this request is estimated around $1.96–$2.04. Actual billed cost
+remains unavailable.
+
+For the single recorded battery replay, projected Muse cost is about 3.0–3.2 times
+Terra's estimated cost while Muse is also materially slower and shows no
+abstention-aware accuracy gain. That gives Terra the operational advantage in this
+synthetic probe, but it is not a promotion decision: the cases are synthetic, the
+sample is small, Muse cost is projected, and the historical-window evaluation remains
+unrun.
+
 ## Initial findings and next gate
 
 1. Model entitlement and noninteractive authentication work on this device for both
