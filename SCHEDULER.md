@@ -18,6 +18,7 @@ job.
 | `pulse-web-sync` | every 30 min at :08/:38, 06:00–23:38 | `scripts/pulse_web_sync.sh` | `scripts/pulse_web.py` | `vault_path` in temp/rbos.config (locates "0. Goals.md") | `web/pulse.html` regenerated atomically (local only, no network) | 7200 |
 | `pulse-server` | daemon: RunAtLoad + KeepAlive, ThrottleInterval 30s | `scripts/pulse_server.sh` | `scripts/pulse_server.py --port 8767` | port 8767 free | FastAPI server on 127.0.0.1:8767 (loopback only) | none |
 | `pulse-warning-watch` | every 15 min at :07/:22/:37/:52, around the clock + RunAtLoad | — (python direct) | `scripts/pulse_warning_watch.py --url http://127.0.0.1:8767/` | pulse-server running on 8767 | `temp/pulse-warning-watch.jsonl` (one record per check) | 300 |
+| `daily-work-synthesis` | every 15 min while loaded; Terra calls only 06:00–23:59 and only while local config is enabled | `scripts/daily_work_synthesis.sh` | `utils/daily_work_synthesis.py` — minimized evidence packet, isolated Terra structured output, local validation and deterministic `/daily` render | Codex auth; explicit private-egress approval; `temp/daily-work-synthesis.json` with call, token, cost and failure ceilings | append-only `temp/daily-log/YYYY-MM-DD.log`; sanitized usage/cost receipts under `temp/daily-log/terra-receipts/` | 180 |
 | `health-check` | hourly at :10, around the clock | — (python direct) | `scripts/health_issue_reporter.py --close` (FAIL-only, no LLM) | GitHub token for issue filing | GitHub issues opened/closed on failing doctor checks | 900 |
 | `health-check-triage` | 3×/day at 08:25, 14:25, 20:25 | — (python direct) | `scripts/health_issue_reporter.py --warn --close --llm-triage --llm-daily-limit 8 --llm-max-per-run 5` | ANTHROPIC_API_KEY in rendered plist or keyring | LLM-triaged GitHub issues; quota circuit breakers CB-1/2/3 | 1800 |
 | `obsidian-rollover` | daily 00:40 (or next wake); RunAtLoad must stay **false** | `utils/obsidian_rollover.sh` | `utils/obsidian_daily_rollover.py` | Full Disk Access via bash wrapper (TCC) | daily note rolled over; log in `~/Library/Logs/rebalance-os/` | 300 |
@@ -44,6 +45,7 @@ since GH-175 **no two jobs share a minute**:
 ```
 :00 pulse-sync (reads)
 :07 pulse-warning-watch      :22      :37      :52
+:15m daily-work-synthesis (relative interval; model call is bounded and read-only)
 :08 pulse-web-sync (reads)   :38
 :10 health-check
 :15 obsidian-vault-embeddings (writes vault + semantic)
@@ -149,7 +151,7 @@ bound somewhere else unless you pass `--force`; `status` shows the current
 binding in its `BOUND TO` column. Running `up` from the wrong clone is
 otherwise a silent fleet-wide migration (GH-36, GH-59).
 
-The 12 per-job installers remain supported and are what `stack.sh` calls
+The per-job installers remain supported and are what `stack.sh` calls
 underneath. They stay until `stack.sh` has been proven on a second machine.
 
 Secrets: never put API keys in templates (tracked in git). The

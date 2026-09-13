@@ -1,0 +1,96 @@
+{
+  "battery_id": "gh210-synthetic-v1",
+  "created": "2026-09-12",
+  "scope": "Synthetic preliminary classifier battery; not the planned historical-window evaluation.",
+  "cases": [
+    {
+      "id": "S01",
+      "evidence": [
+        {"id": "synthetic-101", "text": "An issue was opened in example/atlas with an implementation plan and no code changes."}
+      ],
+      "expected": {"primary_repo": "example/atlas", "phase": "planning", "evidence_ids": ["synthetic-101"], "abstain": false}
+    },
+    {
+      "id": "S02",
+      "evidence": [
+        {"id": "synthetic-102", "text": "Source files were edited in example/beacon; no test command has run yet."}
+      ],
+      "expected": {"primary_repo": "example/beacon", "phase": "implementation", "evidence_ids": ["synthetic-102"], "abstain": false}
+    },
+    {
+      "id": "S03",
+      "evidence": [
+        {"id": "synthetic-103", "text": "Tests were edited in example/cascade."},
+        {"id": "synthetic-104", "text": "The updated example/cascade test suite completed successfully."}
+      ],
+      "expected": {"primary_repo": "example/cascade", "phase": "verification", "evidence_ids": ["synthetic-103", "synthetic-104"], "abstain": false}
+    },
+    {
+      "id": "S04",
+      "evidence": [
+        {"id": "synthetic-105", "text": "A build in example/delta stopped because a required private package was unavailable."}
+      ],
+      "expected": {"primary_repo": "example/delta", "phase": "blocked", "evidence_ids": ["synthetic-105"], "abstain": false}
+    },
+    {
+      "id": "S05",
+      "evidence": [
+        {"id": "synthetic-106", "text": "A planning note was opened in example/ember."},
+        {"id": "synthetic-107", "text": "At the same time, a planning note was opened in example/fjord; no evidence distinguishes the primary focus."}
+      ],
+      "expected": {"primary_repo": "unknown", "phase": "planning", "evidence_ids": ["synthetic-106", "synthetic-107"], "abstain": true}
+    },
+    {
+      "id": "S06",
+      "evidence": [
+        {"id": "synthetic-108", "text": "A user prompt says they intend to fix example/grove, but there is no attested repository activity."}
+      ],
+      "expected": {"primary_repo": "unknown", "phase": "planning", "evidence_ids": ["synthetic-108"], "abstain": true}
+    },
+    {
+      "id": "S07",
+      "evidence": [
+        {"id": "synthetic-109", "text": "Source changes were made in example/harbor."},
+        {"id": "synthetic-110", "text": "The example/harbor tests failed because the new function returned the wrong value."}
+      ],
+      "expected": {"primary_repo": "example/harbor", "phase": "blocked", "evidence_ids": ["synthetic-109", "synthetic-110"], "abstain": false}
+    },
+    {
+      "id": "S08",
+      "evidence": [
+        {"id": "synthetic-111", "text": "Three implementation commits were created in example/iris; verification has not run."}
+      ],
+      "expected": {"primary_repo": "example/iris", "phase": "implementation", "evidence_ids": ["synthetic-111"], "abstain": false}
+    },
+    {
+      "id": "S09",
+      "evidence": [
+        {"id": "synthetic-112", "text": "The example/juniper pull request passed required checks."},
+        {"id": "synthetic-113", "text": "That same example/juniper pull request was merged."}
+      ],
+      "expected": {"primary_repo": "example/juniper", "phase": "verification", "evidence_ids": ["synthetic-112", "synthetic-113"], "abstain": false}
+    },
+    {
+      "id": "S10",
+      "evidence": [
+        {"id": "synthetic-114", "text": "One typo was corrected in example/kite."},
+        {"id": "synthetic-115", "text": "Five source files and two tests were actively edited in example/lumen; tests have not run."}
+      ],
+      "expected": {"primary_repo": "example/lumen", "phase": "implementation", "evidence_ids": ["synthetic-115"], "abstain": false}
+    },
+    {
+      "id": "S11",
+      "evidence": [
+        {"id": "synthetic-116", "text": "An architecture decision and phased checklist were drafted for example/mesa; implementation is explicitly deferred."}
+      ],
+      "expected": {"primary_repo": "example/mesa", "phase": "planning", "evidence_ids": ["synthetic-116"], "abstain": false}
+    },
+    {
+      "id": "S12",
+      "evidence": [
+        {"id": "synthetic-117", "text": "The only repository event is a month-old commit in example/nova, outside the current work window."}
+      ],
+      "expected": {"primary_repo": "unknown", "phase": "planning", "evidence_ids": ["synthetic-117"], "abstain": true}
+    }
+  ]
+}

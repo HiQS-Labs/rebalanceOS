@@ -247,6 +247,7 @@ baseline references become violations.
 | Pulse web render | scripts/pulse_web_sync.sh, scripts/pulse_web.py | 30 min | pulse renderer (same snapshot) | none | web/pulse.html | Pulse page |
 | Pulse server | scripts/pulse_server.sh, scripts/pulse_server.py | daemon | DB read layer + pulse renderer | none | localhost:8767 | — |
 | Pulse warning watch | scripts/pulse_warning_watch.py | 15 min | HTTP probe of pulse-server | none | temp JSONL | — |
+| Daily work synthesis canary | scripts/daily_work_synthesis.sh, utils/daily_work_synthesis.py | 15 min, opt-in | existing CLIO/calendar/reminder read APIs + Daily repository/CPU scanners | own (R2-baseline: utils/daily_work_synthesis.py) | append-only temp Daily log + sanitized receipt JSONL | — |
 | Health issue reporter | scripts/health_issue_reporter.py | hourly :10 + 3×/day triage | doctor subprocess + GitHub API | own (R2-baseline: scripts/health_issue_reporter.py) | GitHub issues | — |
 | Daily note rollover | utils/obsidian_rollover.sh, utils/obsidian_daily_rollover.py | daily 00:40 | vault filesystem | none | Obsidian daily note | — |
 | Progress digest | scripts/hiqs_digest.sh, utils/hiqs_digest.py | 2×/day 13:05/17:05 | own SQL (R1-baseline: utils/hiqs_digest.py) + doctor + semantic | querier | pulse repo digests/ → Slack relay | — |

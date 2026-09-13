@@ -33,6 +33,7 @@ goal: >
 ## Ledger
 
 ### In progress
+- **Terra Low evidence-bound actual-work synthesis** ([#210](https://github.com/HiQS-Labs/rebalanceOS/issues/210)) — synthetic capability receipt complete; opt-in Mac Studio canary now being promoted with bounded private egress, deterministic validation/rendering, per-cycle token/cost receipts, and the historical blinded comparison still explicitly pending. Branch `feat/gh210-terra-work-synthesis`.
 - **Mac Studio bounded runtime recovery before Terra work synthesis** ([#211](https://github.com/HiQS-Labs/rebalanceOS/issues/211)) — bounded scheduler, truthful health, preserved DB/Git recovery, PR, and declared-runtime deployment before GH-210 begins. 3-Eyes remains stood down. rated 95/90/50/30 → [GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md](PROJECT/2-WORKING/GH-211-MAC-STUDIO-RUNTIME-RECOVERY.md)
 - **Focus 5 full clone detection & parent grouping** ([#204](https://github.com/HiQS-Labs/rebalanceOS/issues/204)) — in progress (Phase 1). Detect full clones sharing repo_full_name, group under parent checkout in Focus 5 macOS app and python scan, roll up recency to parent. rated 75/65/50/60 → [GH-204-FOCUS5-CLONE-DETECTION.md](PROJECT/2-WORKING/GH-204-FOCUS5-CLONE-DETECTION.md)
 - **Shutdown — end-of-day triage and next-session continuity** ([#196](https://github.com/HiQS-Labs/rebalanceOS/issues/196)) — in progress (Phase 0). Extend daily; report before approved merge-cleanup delegation. rated 70/55/50/55 → [GH-196-SHUTDOWN-HANDOFF.md](PROJECT/2-WORKING/GH-196-SHUTDOWN-HANDOFF.md)
