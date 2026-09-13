@@ -41,19 +41,48 @@ def run(case: dict, engine: str, effort: str) -> dict:
     with tempfile.TemporaryDirectory(prefix=f"gh210-{engine}-{effort}-") as workspace:
         if engine == "terra":
             command = [
-                "codex", "exec", "--ephemeral", "--skip-git-repo-check",
-                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
-                "--cd", workspace, "--model", "gpt-5.6-terra", "-c",
-                f'model_reasoning_effort="{effort}"', "--output-schema", str(SCHEMA),
-                "--json", prompt,
+                "codex",
+                "exec",
+                "--ephemeral",
+                "--skip-git-repo-check",
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--sandbox",
+                "read-only",
+                "--cd",
+                workspace,
+                "--model",
+                "gpt-5.6-terra",
+                "-c",
+                f'model_reasoning_effort="{effort}"',
+                "--output-schema",
+                str(SCHEMA),
+                "--json",
+                prompt,
             ]
         else:
             command = [
-                str(MUSE), "exec", "--json", "--no-session-log", "--disable-web-tools",
-                "--no-foreign-personal-context", "--approval-mode", "never",
-                "--approval-judge", "off", "--disable-write", "--disable-shell",
-                "--no-parallel-tool-calls", "--max-model-steps", "1", "--workspace",
-                workspace, "--model", "muse-spark-1.3", "--reasoning-effort", effort,
+                str(MUSE),
+                "exec",
+                "--json",
+                "--no-session-log",
+                "--disable-web-tools",
+                "--no-foreign-personal-context",
+                "--approval-mode",
+                "never",
+                "--approval-judge",
+                "off",
+                "--disable-write",
+                "--disable-shell",
+                "--no-parallel-tool-calls",
+                "--max-model-steps",
+                "1",
+                "--workspace",
+                workspace,
+                "--model",
+                "muse-spark-1.3",
+                "--reasoning-effort",
+                effort,
                 prompt,
             ]
         started = time.monotonic()
@@ -61,13 +90,22 @@ def run(case: dict, engine: str, effort: str) -> dict:
             completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
             elapsed = time.monotonic() - started
         except subprocess.TimeoutExpired as exc:
-            return {"case_id": case["id"], "engine": engine, "effort": effort,
-                    "elapsed_seconds": 60.0, "exit_code": 124, "error": "timeout",
-                    "stdout_tail": tail_text(exc.stdout)}
+            return {
+                "case_id": case["id"],
+                "engine": engine,
+                "effort": effort,
+                "elapsed_seconds": 60.0,
+                "exit_code": 124,
+                "error": "timeout",
+                "stdout_tail": tail_text(exc.stdout),
+            }
 
     result = {
-        "case_id": case["id"], "engine": engine, "effort": effort,
-        "elapsed_seconds": round(elapsed, 3), "exit_code": completed.returncode,
+        "case_id": case["id"],
+        "engine": engine,
+        "effort": effort,
+        "elapsed_seconds": round(elapsed, 3),
+        "exit_code": completed.returncode,
     }
     text_parts: list[str] = []
     for line in completed.stdout.splitlines():
@@ -109,8 +147,12 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     battery = json.loads((ROOT / "synthetic-battery.json").read_text())
-    jobs = [(case, engine, effort) for engine in ("terra", "muse")
-            for effort in ("low", "medium") for case in battery["cases"]]
+    jobs = [
+        (case, engine, effort)
+        for engine in ("terra", "muse")
+        for effort in ("low", "medium")
+        for case in battery["cases"]
+    ]
     random.Random(210).shuffle(jobs)
     args.output.write_text("")
     succeeded = True
@@ -118,9 +160,9 @@ def main() -> int:
         row = run(case, engine, effort)
         with args.output.open("a") as stream:
             stream.write(json.dumps(row, sort_keys=True) + "\n")
-        print(json.dumps({key: row.get(key) for key in
-                          ("case_id", "engine", "effort", "exit_code", "error")}),
-              flush=True)
+        print(
+            json.dumps({key: row.get(key) for key in ("case_id", "engine", "effort", "exit_code", "error")}), flush=True
+        )
         succeeded &= row.get("exit_code") == 0 and "output" in row
     return 0 if succeeded else 1
 

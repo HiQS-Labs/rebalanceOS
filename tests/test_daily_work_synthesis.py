@@ -64,10 +64,13 @@ def test_recent_prompt_rows_is_bounded_and_time_filtered(tmp_path, monkeypatch):
     log = tmp_path / ".claude" / "prompt-log.jsonl"
     log.parent.mkdir()
     log.write_text(
-        '\n'.join([
-            '{"timestamp":"2026-09-12T16:00:00Z","prompt":"old","agent":"agy","repo":"x"}',
-            '{"timestamp":"2026-09-13T01:30:00Z","prompt":"new","agent":"codex","repo":"y"}',
-        ]) + '\n'
+        "\n".join(
+            [
+                '{"timestamp":"2026-09-12T16:00:00Z","prompt":"old","agent":"agy","repo":"x"}',
+                '{"timestamp":"2026-09-13T01:30:00Z","prompt":"new","agent":"codex","repo":"y"}',
+            ]
+        )
+        + "\n"
     )
     monkeypatch.setattr(dws.Path, "home", classmethod(lambda cls: tmp_path))
     cutoff = datetime.fromisoformat("2026-09-13T00:00:00+00:00")
@@ -121,8 +124,14 @@ def test_renderer_preserves_daily_sections_and_adds_receipt():
     now = datetime.fromisoformat("2026-09-12T12:12:00-07:00")
     text = dws.render(result(), packet(), now, 3, {"input_tokens": 10, "output_tokens": 2}, 0.001, 1.2, cfg)
     for heading in (
-        "Synthesis (Cycle 3)", "**Focus**", "**Trajectory", "**Velocity**",
-        "**Operational Horizon**", "**Unclosed Loops**", "**Machine CPU Health**",
-        "**Coaching Nudge**", "**Model Receipt**",
+        "Synthesis (Cycle 3)",
+        "**Focus**",
+        "**Trajectory",
+        "**Velocity**",
+        "**Operational Horizon**",
+        "**Unclosed Loops**",
+        "**Machine CPU Health**",
+        "**Coaching Nudge**",
+        "**Model Receipt**",
     ):
         assert heading in text

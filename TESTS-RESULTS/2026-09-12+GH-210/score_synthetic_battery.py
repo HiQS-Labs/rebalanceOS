@@ -52,8 +52,7 @@ def main() -> int:
                 counts[dimension] += output.get(dimension) == exp[dimension]
             evidence_match = set(output.get("evidence_ids", [])) == set(exp["evidence_ids"])
             counts["evidence_ids"] += evidence_match
-            exact = evidence_match and all(output.get(dimension) == exp[dimension]
-                                           for dimension in dimensions)
+            exact = evidence_match and all(output.get(dimension) == exp[dimension] for dimension in dimensions)
             counts["exact"] += exact
             abstention_aware = evidence_match and output.get("abstain") == exp["abstain"]
             if exp["abstain"]:
@@ -61,9 +60,11 @@ def main() -> int:
             else:
                 counts["phase_non_abstain_total"] += 1
                 counts["phase_non_abstain"] += output.get("phase") == exp["phase"]
-                abstention_aware = (abstention_aware
-                                    and output.get("primary_repo") == exp["primary_repo"]
-                                    and output.get("phase") == exp["phase"])
+                abstention_aware = (
+                    abstention_aware
+                    and output.get("primary_repo") == exp["primary_repo"]
+                    and output.get("phase") == exp["phase"]
+                )
             counts["exact_abstention_aware"] += abstention_aware
             if not exact:
                 mismatches.append({"case_id": row["case_id"], "expected": exp, "actual": output})
@@ -94,8 +95,9 @@ def main() -> int:
             cached_tokens = sum(item.get("cached_input_tokens", 0) for item in usage)
             output_tokens = sum(item.get("output_tokens", 0) for item in usage)
             reasoning_tokens = sum(item.get("reasoning_output_tokens", 0) for item in usage)
-            estimated_cost = ((input_tokens - cached_tokens) * 2.00
-                              + cached_tokens * 0.20 + output_tokens * 12.00) / 1_000_000
+            estimated_cost = (
+                (input_tokens - cached_tokens) * 2.00 + cached_tokens * 0.20 + output_tokens * 12.00
+            ) / 1_000_000
             arm["tokens"] = {
                 "input_total": input_tokens,
                 "input_cached": cached_tokens,
@@ -104,7 +106,8 @@ def main() -> int:
             }
             arm["estimated_cost_usd"] = round(estimated_cost, 6)
             arm["estimated_cost_upper_if_reasoning_additional_usd"] = round(
-                estimated_cost + reasoning_tokens * 12.00 / 1_000_000, 6)
+                estimated_cost + reasoning_tokens * 12.00 / 1_000_000, 6
+            )
             arm["cost_method"] = "Official 2026-09-12 list prices; assumes input total includes cached input."
         else:
             arm["tokens"] = "not exposed by Muse CLI JSONL"
@@ -114,9 +117,11 @@ def main() -> int:
 
     for effort in ("low", "medium"):
         terra = report["arms"][f"terra-{effort}"]["tokens"]
-        hypothetical_cost = ((terra["input_total"] - terra["input_cached"]) * 1.25
-                             + terra["input_cached"] * 0.15
-                             + terra["output"] * 4.25) / 1_000_000
+        hypothetical_cost = (
+            (terra["input_total"] - terra["input_cached"]) * 1.25
+            + terra["input_cached"] * 0.15
+            + terra["output"] * 4.25
+        ) / 1_000_000
         muse = report["arms"][f"muse-{effort}"]
         muse["counterfactual_same_terra_token_volume_usd"] = round(hypothetical_cost, 6)
         muse["counterfactual_cost_caveat"] = (

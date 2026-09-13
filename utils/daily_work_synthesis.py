@@ -22,12 +22,8 @@ from rebalance.lib.time_ops import now_utc, parse_iso, to_local
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = Path(__file__).with_suffix(".schema.json")
 DEFAULT_CONFIG = ROOT / "temp" / "daily-work-synthesis.json"
-REQUIRED_TEXT = (
-    "focus", "velocity", "operational_horizon", "coaching_nudge", "coaching_trigger"
-)
-SECRET_RE = re.compile(
-    r"(?i)(api[_-]?key|token|secret|password|authorization)\s*[:=]\s*[^\s,;]+"
-)
+REQUIRED_TEXT = ("focus", "velocity", "operational_horizon", "coaching_nudge", "coaching_trigger")
+SECRET_RE = re.compile(r"(?i)(api[_-]?key|token|secret|password|authorization)\s*[:=]\s*[^\s,;]+")
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)
 ENTRY_RE = re.compile(r"^## \[(\d{4}-\d{2}-\d{2}) .*?\] — Synthesis \(Cycle (\d+)\)", re.M)
 
@@ -119,11 +115,17 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path) -> dict[str, Any
     for index, row in enumerate(rows):
         try:
             row_id = row.get("id") if isinstance(row, dict) else row["id"]
-            evidence.append({
-                "id": f"clio:{row_id or index}", "kind": "intent", "attested": False,
-                "observed_at": row["timestamp"], "agent": scrub(row["agent"], 40),
-                "repo": scrub(row["repo"], 100), "text": scrub(row["prompt"]),
-            })
+            evidence.append(
+                {
+                    "id": f"clio:{row_id or index}",
+                    "kind": "intent",
+                    "attested": False,
+                    "observed_at": row["timestamp"],
+                    "agent": scrub(row["agent"], 40),
+                    "repo": scrub(row["repo"], 100),
+                    "text": scrub(row["prompt"]),
+                }
+            )
         except (KeyError, TypeError):
             continue
 
@@ -131,12 +133,17 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path) -> dict[str, Any
         from rebalance.ingest.next_actions import load_ranked_next_actions
 
         ranked = load_ranked_next_actions(db_path)
-        for action in (ranked.ranked[:6] if ranked else []):
-            evidence.append({
-                "id": f"next:{action.rank}", "kind": "ranked_next_action", "attested": False,
-                "observed_at": ranked.computed_at, "repo": scrub(action.project, 100),
-                "text": scrub(f"{action.title} — {action.why}"),
-            })
+        for action in ranked.ranked[:6] if ranked else []:
+            evidence.append(
+                {
+                    "id": f"next:{action.rank}",
+                    "kind": "ranked_next_action",
+                    "attested": False,
+                    "observed_at": ranked.computed_at,
+                    "repo": scrub(action.project, 100),
+                    "text": scrub(f"{action.title} — {action.why}"),
+                }
+            )
     except Exception:
         pass
 
@@ -144,11 +151,15 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path) -> dict[str, Any
         from rebalance.ingest.calendar import get_upcoming_events
 
         for event in get_upcoming_events(db_path, days_forward=1)[:8]:
-            evidence.append({
-                "id": f"calendar:{event.get('id', len(evidence))}", "kind": "calendar",
-                "attested": True, "observed_at": event.get("start_time"),
-                "text": scrub(event.get("summary")),
-            })
+            evidence.append(
+                {
+                    "id": f"calendar:{event.get('id', len(evidence))}",
+                    "kind": "calendar",
+                    "attested": True,
+                    "observed_at": event.get("start_time"),
+                    "text": scrub(event.get("summary")),
+                }
+            )
     except Exception:
         pass
 
@@ -157,11 +168,15 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path) -> dict[str, Any
 
         reminders = [r for group in grouped_reminders_from_db(db_path) for r in group.reminders]
         for reminder in reminders[:8]:
-            evidence.append({
-                "id": f"sleuth:{reminder.get('reminder_id')}", "kind": "reminder",
-                "attested": True, "observed_at": reminder.get("should_post_on"),
-                "text": scrub(reminder.get("task_text")),
-            })
+            evidence.append(
+                {
+                    "id": f"sleuth:{reminder.get('reminder_id')}",
+                    "kind": "reminder",
+                    "attested": True,
+                    "observed_at": reminder.get("should_post_on"),
+                    "text": scrub(reminder.get("task_text")),
+                }
+            )
     except Exception:
         pass
 
@@ -169,11 +184,15 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path) -> dict[str, Any
         from rebalance.ingest.apple_reminders import list_apple_reminders
 
         for reminder in list_apple_reminders(db_path, limit=8):
-            evidence.append({
-                "id": f"apple:{reminder.get('reminder_id')}", "kind": "reminder",
-                "attested": True, "observed_at": reminder.get("due_at"),
-                "text": scrub(reminder.get("title")),
-            })
+            evidence.append(
+                {
+                    "id": f"apple:{reminder.get('reminder_id')}",
+                    "kind": "reminder",
+                    "attested": True,
+                    "observed_at": reminder.get("due_at"),
+                    "text": scrub(reminder.get("title")),
+                }
+            )
     except Exception:
         pass
 
@@ -211,7 +230,10 @@ def _scanner_json(name: str, args: list[str]) -> dict[str, Any]:
     try:
         completed = subprocess.run(
             [os.environ.get("PYTHON", "python3"), str(script), *args],
-            text=True, capture_output=True, timeout=45, cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=45,
+            cwd=ROOT,
         )
         return json.loads(completed.stdout) if completed.returncode == 0 else {}
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
@@ -243,16 +265,27 @@ def build_prompt(packet: dict[str, Any]) -> str:
 def invoke_terra(prompt: str, cfg: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int], float]:
     with tempfile.TemporaryDirectory(prefix="rebalance-daily-terra-") as workspace:
         command = [
-            "codex", "exec", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config",
-            "--ignore-rules", "--sandbox", "read-only", "--cd", workspace,
-            "--model", str(cfg["model"]), "-c",
+            "codex",
+            "exec",
+            "--ephemeral",
+            "--skip-git-repo-check",
+            "--ignore-user-config",
+            "--ignore-rules",
+            "--sandbox",
+            "read-only",
+            "--cd",
+            workspace,
+            "--model",
+            str(cfg["model"]),
+            "-c",
             f'model_reasoning_effort="{cfg["reasoning_effort"]}"',
-            "--output-schema", str(SCHEMA), "--json", prompt,
+            "--output-schema",
+            str(SCHEMA),
+            "--json",
+            prompt,
         ]
         started = time.monotonic()
-        completed = subprocess.run(
-            command, text=True, capture_output=True, timeout=int(cfg["timeout_seconds"])
-        )
+        completed = subprocess.run(command, text=True, capture_output=True, timeout=int(cfg["timeout_seconds"]))
         elapsed = round(time.monotonic() - started, 3)
     if completed.returncode:
         raise RuntimeError(f"codex exit {completed.returncode}: {completed.stderr[-300:]}")
@@ -306,8 +339,16 @@ def estimated_cost(usage: dict[str, int]) -> float:
     return (uncached * INPUT_PER_M + cached * CACHED_INPUT_PER_M + output * OUTPUT_PER_M) / 1_000_000
 
 
-def render(result: dict[str, Any], packet: dict[str, Any], now: datetime, cycle: int,
-           usage: dict[str, int], cost: float, elapsed: float, cfg: dict[str, Any]) -> str:
+def render(
+    result: dict[str, Any],
+    packet: dict[str, Any],
+    now: datetime,
+    cycle: int,
+    usage: dict[str, int],
+    cost: float,
+    elapsed: float,
+    cfg: dict[str, Any],
+) -> str:
     start = now - timedelta(hours=2)
     loops = packet["unclosed_loops"].get("summary_line", "- **Unclosed Loops**: scanner unavailable")
     cpu = packet["cpu_health"].get("summary_line", "- **Machine CPU Health**: scanner unavailable")
@@ -316,19 +357,24 @@ def render(result: dict[str, Any], packet: dict[str, Any], now: datetime, cycle:
         lines.append(f"- **🌅 Yesterday's Arc**: {result['yesterday_arc']}")
     if result.get("weekly_horizon"):
         lines.append(f"- **📅 Weekly Operational Horizon**: {result['weekly_horizon']}")
-    lines.extend([
-        f"- **Focus**: {result['focus']}",
-        f"- **Trajectory (2-Hour Window: {start:%H:%M} – {now:%H:%M %Z})**:",
-        f"  - {result['trajectory'][0]}", f"  - {result['trajectory'][1]}",
-        f"- **Velocity**: {result['velocity']}",
-        f"- **Operational Horizon**: {result['operational_horizon']}", loops, cpu,
-        f"- **Coaching Nudge**: {result['coaching_nudge']} `[Trigger: {result['coaching_trigger']}]`",
-        f"- **Model Receipt**: `{cfg['model']}` / `{cfg['reasoning_effort']}`; "
-        f"{usage.get('input_tokens', 0):,} input ({usage.get('cached_input_tokens', 0):,} cached), "
-        f"{usage.get('output_tokens', 0):,} output; {elapsed:.2f}s; "
-        f"estimated ${cost:.4f} at {PRICE_SOURCE_DATE} list price (not billed cost); "
-        f"confidence {float(result.get('confidence', 0)):.2f}; evidence {', '.join(result.get('evidence_ids') or ['none'])}",
-    ])
+    lines.extend(
+        [
+            f"- **Focus**: {result['focus']}",
+            f"- **Trajectory (2-Hour Window: {start:%H:%M} – {now:%H:%M %Z})**:",
+            f"  - {result['trajectory'][0]}",
+            f"  - {result['trajectory'][1]}",
+            f"- **Velocity**: {result['velocity']}",
+            f"- **Operational Horizon**: {result['operational_horizon']}",
+            loops,
+            cpu,
+            f"- **Coaching Nudge**: {result['coaching_nudge']} `[Trigger: {result['coaching_trigger']}]`",
+            f"- **Model Receipt**: `{cfg['model']}` / `{cfg['reasoning_effort']}`; "
+            f"{usage.get('input_tokens', 0):,} input ({usage.get('cached_input_tokens', 0):,} cached), "
+            f"{usage.get('output_tokens', 0):,} output; {elapsed:.2f}s; "
+            f"estimated ${cost:.4f} at {PRICE_SOURCE_DATE} list price (not billed cost); "
+            f"confidence {float(result.get('confidence', 0)):.2f}; evidence {', '.join(result.get('evidence_ids') or ['none'])}",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -351,8 +397,7 @@ def append_jsonl(path: Path, row: dict[str, Any]) -> None:
         handle.write(json.dumps(row, sort_keys=True) + "\n")
 
 
-def run(config_path: Path, *, force: bool = False, dry_run: bool = False,
-        now: datetime | None = None) -> int:
+def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: datetime | None = None) -> int:
     now = now or to_local(now_utc())
     cfg = load_config(config_path)
     if not cfg["enabled"] and not force:
@@ -419,20 +464,35 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False,
             elif not current.endswith("\n\n"):
                 handle.write("\n")
             handle.write(entry + "\n")
-        append_jsonl(receipt_path, {
-            "at": now.isoformat(), "status": "accepted", "model": cfg["model"],
-            "reasoning_effort": cfg["reasoning_effort"], "usage": usage,
-            "estimated_cost_usd": round(cost, 8), "price_source": PRICE_SOURCE,
-            "price_source_date": PRICE_SOURCE_DATE, "elapsed_seconds": elapsed,
-            "evidence_count": len(packet["evidence"]), "cycle": cycle,
-        })
+        append_jsonl(
+            receipt_path,
+            {
+                "at": now.isoformat(),
+                "status": "accepted",
+                "model": cfg["model"],
+                "reasoning_effort": cfg["reasoning_effort"],
+                "usage": usage,
+                "estimated_cost_usd": round(cost, 8),
+                "price_source": PRICE_SOURCE,
+                "price_source_date": PRICE_SOURCE_DATE,
+                "elapsed_seconds": elapsed,
+                "evidence_count": len(packet["evidence"]),
+                "cycle": cycle,
+            },
+        )
         print(f"accepted cycle {cycle}; estimated ${cost:.4f}")
         return 0
     except Exception as exc:
-        append_jsonl(receipt_path, {
-            "at": now.isoformat(), "status": "rejected", "model": cfg["model"],
-            "reasoning_effort": cfg["reasoning_effort"], "reason": scrub(exc, 500),
-        })
+        append_jsonl(
+            receipt_path,
+            {
+                "at": now.isoformat(),
+                "status": "rejected",
+                "model": cfg["model"],
+                "reasoning_effort": cfg["reasoning_effort"],
+                "reason": scrub(exc, 500),
+            },
+        )
         print(f"daily work synthesis rejected: {scrub(exc, 300)}")
         return 1
 
