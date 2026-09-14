@@ -901,7 +901,7 @@ def main() -> int:
             }
         )
 
-    should_update_ledger = args.update_ledger and not args.no_ledger_write
+    should_update_ledger = not args.no_ledger_write
     ledger_file = Path(find_repo_root() or Path.cwd()) / "temp" / "close-the-loop.md"
     if should_update_ledger:
         update_close_the_loop_ledger(ledger_file, local_issues, open_prs)

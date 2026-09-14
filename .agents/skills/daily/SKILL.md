@@ -14,12 +14,20 @@ description: >
 
 Continuously answers: **"What is the operator actually working on right now across all agents, repos, and systems, what is the trajectory/velocity of their work, and what actionable coaching maintains forward momentum?"**
 
-Combines multi-source operational telemetry with temporal trajectory analysis, deterministic cadence gates, and data-grounded adaptive coaching:
-1. **Multi-Agent Prompt Log** — `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (and `~/.claude/prompt-log.jsonl` / `clio_prompts` table in SQLite), capturing real-time human intent, instructions to Claude/Agy/Codex/ZCode, and agent turn handoffs.
-2. **Rebalance Work Activity Signal & Git State** — Ranked next actions (`get_next_actions`), upcoming calendar events (`calendar_events`), Sleuth task reminders (`sleuth_reminders`), macOS Apple Reminders read-only snapshots (`src/rebalance/ingest/apple_reminders.py`), and device-wide git activity (`.claude/skills/rebalance/collect.sh`).
-3. **Daily Log & Trajectory Analysis** — Maintains deterministic daily logs in `temp/daily-log/YYYY-MM-DD.log`. Inspects the preceding **2-hour window** to derive **velocity** (rate of completions/commits) and **trajectory** (shifts in focus, momentum, bottlenecks).
-4. **Adaptive Coaching & Guidance** — Generates falsifiable, signal-grounded coaching nudges citing specific triggering metrics (flow reinforcement, context-switching alerts, pacing/break reminders, and friction escape hatches).
-5. **Cadenced Horizons (Exactly-Once Morning Retro & Monday Outlook)** — Produces a 2–3 sentence retrospective on yesterday's achievements on the day's first synthesis entry, and a 5-day horizon forecast on Monday's first synthesis entry.
+---
+
+## Recite this — verbatim, as the first thing in your first response
+
+> **Daily Discipline:**
+> 1. **Extract multi-agent intent signal (Step 1).** Read recent operator prompts from `0. Claude Prompts.md` / `clio_prompts` over the rolling 2-hour window across Claude, Agy, Codex, and ZCode to anchor active human directives.
+> 2. **Collect live operational work signals (Step 2).** Query `get_next_actions()`, `calendar_events`, `sleuth_reminders`, and read-only Apple Reminders snapshots from the local database without external side effects.
+> 3. **Scan device-wide git state & CPU health (Step 3).** Run unclosed loop and runaway CPU scanners read-only; synchronize `temp/close-the-loop.md` with in-flight worktrees, unmerged branches, open PRs, and process health.
+> 4. **Evaluate 2-hour trajectory & trigger-grounded coaching (Step 4).** Assess velocity, momentum, and time-gated horizons (exactly-once Morning Retro / Monday Horizon); emit falsifiable coaching nudges strictly citing their telemetry triggers (`[Trigger: ...]`).
+> 5. **Format deterministic schema & append log (Steps 5–6).** Render the standard Markdown synthesis block (Focus, Trajectory, Velocity, Horizon, Unclosed Loops, CPU Health, Coaching Nudge) and append atomically to `temp/daily-log/YYYY-MM-DD.log`.
+>
+> **Overall Goal:** 15-minute multi-agent work synthesis delivered with zero external mutations — fusing prompt intent, operational state, device git activity, and temporal trajectory into deterministic daily logs and trigger-cited adaptive coaching.
+
+Then begin work.
 
 ---
 
@@ -28,6 +36,7 @@ Combines multi-source operational telemetry with temporal trajectory analysis, d
 - **Reuse Existing Subsystems**: Do not create parallel pipelines or bespoke ad-hoc trackers. Query the resolved SQLite database (`src/rebalance/paths.py:resolve_db()`), `get_next_actions()`, `clio_prompts`, `calendar_events`, `sleuth_reminders`, Apple Reminders snapshots, and `.claude/skills/rebalance/collect.sh`.
 - **Read-Only Against Repositories & External Stores**: Synthesis inspects files and SQLite tables; it never mutates git state, resets branches, alters worktrees, or writes to external stores. Apple Reminders access uses the read-only Core Data snapshot extractor with graceful degradation.
 - **Deterministic Daily Logging**: Output records append to `temp/daily-log/YYYY-MM-DD.log` (gitignored under `temp/`) matching the fixed log-entry schema.
+- **Debug Mantra Ground-Truth Calibration**: Never report unclosed loops, open PRs, or stalled branches from unverified memory, stale logs, or un-refreshed ledgers. Always verify against live GitHub/git state (`state == 'OPEN'`). A merged or closed PR is not an open loop. Inspect the fresh output of `scan_unclosed_loops.py` before citing telemetry.
 
 ---
 
