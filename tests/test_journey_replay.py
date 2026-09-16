@@ -81,6 +81,28 @@ def test_formatting_and_chat_ids(text, expected):
     assert jr.references(text, True) == expected
 
 
+@pytest.mark.parametrize('text', [
+    'Join XYZ AgentChorus **#123456** to discuss PR #519',
+    'Join XYZ agent2agent `#123456` to discuss PR #519',
+])
+def test_formatted_chat_ids_are_not_issues(text):
+    assert jr.references(text, True) == [(jr.REPO, 'pr', 519)]
+
+
+@pytest.mark.parametrize('url', [
+    'https://github.com/HiQS-Labs/XYZ-forge/issues/123.5',
+    'https://github.com/HiQS-Labs/XYZ-forge/pull/123-invalid',
+])
+def test_invalid_artifact_url_is_not_a_prefix_match(url):
+    assert jr.references(url, False) == []
+
+
+@pytest.mark.parametrize('ending', ['#issuecomment-123', '?view=1', ')', '.'])
+def test_valid_artifact_url_delimiters(ending):
+    assert jr.references('https://github.com/HiQS-Labs/XYZ-forge/issues/123' + ending, False) == [
+        (jr.REPO, 'issue', 123)]
+
+
 def test_explicit_links_mode_keeps_uncertainty_out_of_joins():
     raw = (json.dumps(row('/start-task #10; Catalog PR 8; Other/project#25; '
                           'https://github.com/HiQS-Labs/XYZ-forge/pull/520')).encode() + b'\n')
