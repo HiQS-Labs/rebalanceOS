@@ -274,6 +274,41 @@ def render(bundle):
     lines += ["", f"Unassigned prompts: {len(bundle['orphans'])}", "", "## Review sample — first ten non-starts"]
     lines += [f"- {r['id']}: {redact_key_shaped_secrets(r['text']).replace(chr(10), ' ')[:320]}"
               for r in bundle["prompts"] if not r["start"]][:10]
+    if bundle.get('issue_evidence'):
+        if not rows:
+            raise ValueError('issue evidence requires nonempty prompts')
+        linked, chats = {}, {}
+        membership = {pid: journey['id'] for journey in bundle['journeys'] for pid in journey['prompts']}
+        for row in bundle['prompts']:
+            issues = [ref for ref in qualified_references(row['text'])
+                      if ref[0] == REPO and ref[1] == 'issue']
+            for ref in issues:
+                linked.setdefault(ref, []).append((row, issues))
+            if issues and row['session']:
+                key = (row['device'], row['agent'], row['session'])
+                chats.setdefault(key, len(chats) + 1)
+        unique = {row['id'] for mentions in linked.values() for row, _ in mentions}
+        lines += ['', '## D — Explicit issue evidence',
+                  'Qualified issue URLs only; separate chat attempts are not one continuous task.',
+                  f'Unique linked prompts: {len(unique)}; issue appearances: {sum(map(len, linked.values()))}',
+                  'Missing evidence stays missing; deployment unknown.']
+        for ref, mentions in sorted(linked.items()):
+            lines += ['', f'### {ref[0]}#{ref[2]}']
+            for row, issues in mentions:
+                chat = (f"Chat attempt {chats[(row['device'], row['agent'], row['session'])]}"
+                        if row['session'] else 'Chat unknown')
+                gap = ('Assigned to original journey ' + membership[row['id']] if row['id'] in membership
+                       else 'Unassigned — session unknown' if not row['session']
+                       else 'Unassigned — no detected prior start in this window')
+                others = [f'{repo}#{number}' for repo, _, number in issues if (repo, 'issue', number) != ref]
+                also = '; also mentions ' + ', '.join(others) if others else ''
+                intent = redact_key_shaped_secrets(row['text']).replace('\n', ' ')[:500]
+                lines += [f"- {row['timestamp']} — intent [{row['id']}] ({chat}; {gap}{also}): {intent}"]
+            facts = [event for event in bundle['events'] if tuple(event['ref']) == ref]
+            lines += [f"- {event['timestamp']} — recorded event [{event['id']}]: {event['event']} "
+                      f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}" for event in facts]
+            if not facts:
+                lines += ['- No recorded issue events available in this preview.']
     return "\n".join(lines) + "\n"
 
 
@@ -308,6 +343,8 @@ def main():
                         help='Use only typed qualified GitHub URLs for joins; retain other mentions as unresolved.')
     parser.add_argument('--qualified-transitions', action='store_true',
                         help='Add a candidate view for exact qualified Next task requests; preserve original grouping.')
+    parser.add_argument('--issue-evidence', action='store_true',
+                        help='Append all qualified trial-issue mentions, including unassigned prompts, without regrouping.')
     args = parser.parse_args()
     as_of = parse_iso(args.as_of)
     if as_of is None:
@@ -338,6 +375,8 @@ def main():
         candidate_journeys, candidate_parents, candidate_orphans = group(rows, qualified_transitions=True)
         bundle['candidate_view'] = dict(journeys=candidate_journeys, parents=candidate_parents,
                                         orphans=candidate_orphans)
+    if args.issue_evidence:
+        bundle['issue_evidence'] = True
     publish(args.output, raw, bundle, source, meta)
     print(_json_dumps(coverage))  # no prompt text, session IDs, or private paths
 

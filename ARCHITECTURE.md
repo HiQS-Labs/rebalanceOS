@@ -22,6 +22,10 @@ requests naming a different qualified issue. Its grouping and event joins use qu
 regardless of legacy reference settings. Original views and start hints remain unchanged; a split
 is not completion. The GH-232 retained-metadata composition recipe is campaign-only, not a new
 runtime adapter or collector.
+The independent `--issue-evidence` flag appends all qualified trial-issue mentions, including
+unassigned prompts, with separate chat labels and visible coverage gaps. It does not alter original
+grouping, start hints or evidence membership. Pull-request/foreign/bare-number mentions cannot
+supply trial-issue identity; direct issue facts retain event and retrieval times separately.
 
 **INVARIANT**: **Compose, don't mutate**. No new query surfaces (like `semantic_query` vs `ask`) or UI renderers (web server vs static HTML) may be introduced without a plan to deprecate and replace the old one. If extending an existing pipeline, build reusable primitives in `src/rebalance/lib/` instead of duplicating logic in the caller.
 

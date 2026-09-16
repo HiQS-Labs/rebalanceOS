@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 194, in _run_module_as_main
+  File "<frozen runpy>", line 151, in _get_module_details
+  File "<frozen runpy>", line 114, in _get_module_details
+  File "<checkout>/src/rebalance/cli/__init__.py", line 9, in <module>
+    import typer
+ModuleNotFoundError: No module named 'typer'

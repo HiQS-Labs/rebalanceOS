@@ -12,6 +12,72 @@ SPEC.loader.exec_module(jr)
 AS_OF = jr.parse_iso("2026-09-16T00:00:00Z")
 
 
+def test_issue_evidence_preserves_gaps_attempts_and_identity():
+    from copy import deepcopy
+    url = 'https://github.com/HiQS-Labs/XYZ-forge/issues/568'
+    rows, _ = load(row('Earlier ' + url),
+                   row('/start-task ' + url, timestamp='2026-09-15T11:00:00Z'),
+                   row('Another attempt ' + url, session_id='chat-b'),
+                   row('Unknown chat ' + url, session_id=None),
+                   row('Two issues ' + url + ' https://github.com/HiQS-Labs/XYZ-forge/issues/623'),
+                   row('Other https://github.com/Other/repo/issues/568'),
+                   row('Bare issue #568 and PR 568'),
+                   row('PR https://github.com/HiQS-Labs/XYZ-forge/pull/568'))
+    journeys, parents, orphans = jr.group(rows)
+    bundle = dict(prompts=rows, journeys=journeys, parents=parents, orphans=orphans,
+                  coverage={}, events=[])
+    before = deepcopy(bundle)
+    original = jr.render(bundle)
+    enabled = bundle | dict(issue_evidence=True)
+    saved = deepcopy(enabled)
+    preview = jr.render(enabled)
+    assert enabled == saved and bundle == before
+    assert preview.startswith(original)
+    section = preview.split('## D — Explicit issue evidence')[1]
+    assert 'Unique linked prompts: 5; issue appearances: 6' in section
+    assert '### hiqs-labs/xyz-forge#568' in section
+    assert '### hiqs-labs/xyz-forge#623' in section
+    for r in rows:
+        if r['ordinal'] > 5:
+            continue
+        assert r['id'] in section
+    for r in rows:
+        if r['ordinal'] <= 5:
+            continue
+        assert r['id'] not in section
+    assert 'Unassigned — no detected prior start in this window' in section
+    assert 'Unassigned — session unknown' in section
+    assert 'Chat attempt 1' in section and 'Chat attempt 2' in section
+    assert 'also mentions hiqs-labs/xyz-forge#623' in section
+    assert 'deployment unknown' in section
+    assert jr.group(rows) == (journeys, parents, orphans)
+    # The guard demonstrably rejects the omitted feature, rather than passing on nothing.
+    with pytest.raises(AssertionError):
+        assert '## D — Explicit issue evidence' in original
+
+
+def test_issue_evidence_empty_prompts_rejected():
+    with pytest.raises(ValueError, match='nonempty'):
+        jr.render(dict(prompts=[], journeys=[], parents={}, orphans=[], coverage={},
+                       events=[], issue_evidence=True))
+
+
+def test_issue_evidence_events_are_typed_and_intent_is_redacted():
+    secret = 'sk-' + 'A' * 24  # Synthetic, not a credential.
+    rows, _ = load(row('https://github.com/HiQS-Labs/XYZ-forge/issues/568 ' + secret))
+    journeys, parents, orphans = jr.group(rows)
+    event = dict(id='synthetic-issue-event', timestamp='2026-09-15T11:00:00Z',
+                 ref=(jr.REPO, 'issue', 568), event='closed_at',
+                 fetched_at='2026-09-16T01:00:00Z', url='synthetic-issue-url')
+    bundle = dict(prompts=rows, journeys=journeys, parents=parents, orphans=orphans,
+                  coverage={}, events=[event, event | dict(ref=(jr.REPO, 'pr', 568),
+                                                          url='wrong-pr-url')], issue_evidence=True)
+    section = jr.render(bundle).split('## D — Explicit issue evidence')[1]
+    assert secret not in section and '[REDACTED]' in section
+    assert 'synthetic-issue-event' in section and 'wrong-pr-url' not in section
+    assert '2026-09-15T11:00:00Z' in section and 'retrieved 2026-09-16T01:00:00Z' in section
+
+
 def row(prompt="/start-task #10", **extra):
     return dict(timestamp="2026-09-15T10:00:00Z", repo="verified-clone", agent="codex",
                 machine="device-a", session_id="chat-a", prompt=prompt) | extra
