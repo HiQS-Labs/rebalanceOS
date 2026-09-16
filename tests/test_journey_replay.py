@@ -142,3 +142,25 @@ def test_caps_explicit(tmp_path, monkeypatch):
     source = tmp_path / "source"
     source.write_bytes(b'{}\n{}\n')
     assert jr.snapshot(source)[1]["byte_cap_hit"]
+
+
+def test_canonical_markdown_contract():
+    raw = b'''Personal notes are not input.
+<!-- clio:id:chat-one:2026-09-15T10:00:00Z -->
+## XYZ-FORGE
+2026-09-15 03:00 PDT
+device-a \xc2\xb7 branch \xc2\xb7 codex
+
+> "/start-task #10
+> keep the source intact"
+
+## Personal heading
+Do not ingest me
+'''
+    decoded = jr.markdown_rows(raw)
+    rows, _ = jr.load_prompts(decoded, "fixture", AS_OF, {"xyz-forge"})
+    assert len(rows) == 1 and rows[0]["start"]
+    assert rows[0]["text"] == "/start-task #10\nkeep the source intact"
+    assert rows[0]["device"] == "device-a" and rows[0]["agent"] == "codex"
+    assert rows[0]["timestamp"] == "2026-09-15T10:00:00+00:00"
+    assert b'Personal heading' not in decoded

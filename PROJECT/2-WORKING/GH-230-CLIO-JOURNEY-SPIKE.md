@@ -22,7 +22,7 @@ reversibility: Easy — read-only replay and disposable private projections; no 
 
 | What was just completed | What's next |
 |---|---|
-| Agy approved the plan; scoped document checks passed | Implement Phase 1 bounded replay, then inspect private previews |
+| Deterministic replay built; private seven-day preview generated | Agy implementation QA; inspect preview before expanding sources |
 
 Parent: https://github.com/HiQS-Labs/rebalanceOS/issues/210.
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/230.
@@ -62,7 +62,7 @@ The graph/MCP tools are unavailable here; source recon used file reads, not priv
 
 **Goal:** Reconstruct a private, source-linked timeline from nonempty existing CLIO history.
 Timebox: two hours of implementation/replay after plan approval; stop and report gaps at the cap.
-The current delivery is plan/QA only; this checklist defines subsequent implementation.
+Implementation is an opt-in private spike, not a deployed service.
 
 One ordered execution sequence:
 
@@ -164,6 +164,42 @@ One ordered execution sequence:
 - [ ] Mark implementation/merge/deployment separately; never close #210 as a consequence of this spike.
 
 ## Scope, risk and review
+
+### Spike observations — 2026-09-16 UTC
+
+The configured local JSONL source produced no eligible seven-day XYZ Forge prompts. Read-only
+metadata checks confirmed it is behind the consolidated Markdown export documented in machine-local
+CLIO operating notes. The local SQLite source has no `clio_prompts` table and no XYZ Forge GitHub
+artifact rows. This does not establish that fleet-wide data is missing.
+
+**Bounded adaptation:** the replay accepts `--source-format md` using only the existing exporter's
+`<!-- clio:id:session:UTC-timestamp -->` blocks (`prompt-log-to-md.sh:500`). Personal/unmarked legacy
+text is excluded; UTC comes from the marker, not display time. This is a read-side adapter, not a new
+capture path. Unknown block shapes are counted malformed. This change needs Agy QA before readiness.
+
+Frozen window: `[2026-09-09T04:25:38Z, 2026-09-16T04:25:38Z)`. The earlier JSONL attempt used
+04:00Z as its endpoint and was rejected; it is not combined with the accepted run.
+The consolidated export yielded 288 eligible prompts, nine candidate journeys containing 76 prompts,
+212 unassigned prompts, and nine parent groups. No groups combined multiple child journeys; only one
+device is represented. Source coverage: 4,033 marker blocks, 21 malformed, 3,439 outside window,
+285 other/unresolved repository records. No cap was hit. These are coverage counts, not accuracy.
+Two runs on the frozen capture produced byte-identical evidence and Markdown. Existing output is
+never overwritten; each invocation requires a new private run directory. Source-prefix mutation
+refuses publication. Private artifacts remain ignored; public receipts contain no raw prompts.
+
+Terra is **not called**: `daily_work_synthesis.run()` owns fixed daily-log output and per-root receipts;
+the only exposed invocation helper bypasses those guards. Separating output while keeping one shared
+budget/lock owner is beyond this bounded replay. No new config, force flag or scratch budget used.
+GitHub outcome attachment is tested synthetically but has zero real events because the local snapshot
+lacks this repository. Relay/marathon/branch/check adapters and cross-device claims remain untested.
+
+Verification: targeted tests passed (see retained campaign console). Full app test collection is blocked
+by missing dependencies in the isolated test environment; doctor cannot import `typer`. These are not
+green app gates, so implementation PR remains draft. No runtime repair or broad dependency download.
+Human review has not occurred; neither grouping method is declared superior. Next work should fill
+the relevant artifact-source gap, not train a model or widen the journey heuristic blindly.
+
+Receipts: [campaign](../../TESTS-RESULTS/2026-09-16+GH-230/SUMMARY.md).
 
 Ponytail: one stdlib-oriented replay script plus focused tests, target <=300 new production lines for
 the spike; no generic event platform. If existing boundary reuse needs broader refactoring, stop and

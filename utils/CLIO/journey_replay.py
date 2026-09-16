@@ -66,6 +66,32 @@ def verify_prefix(path, meta):
         raise ValueError("source prefix changed; refusing publication")
 
 
+def markdown_rows(raw):
+    """Decode only canonical exporter blocks, never free-form personal notes.
+
+    Contract: utils/CLIO/prompt-log-to-md.sh:500. UTC is taken from the source
+    marker, not the localized display timestamp. Unmarked legacy entries omitted.
+    """
+    text = raw.decode("utf-8")
+    blocks = re.split(r"(?m)^<!-- clio:id:", text)[1:]
+    rows = []
+    for block in blocks:
+        match = re.match(r"([^\n]+?):(\d{4}-\d{2}-\d{2}T[^\n ]+) -->\n## ([^\n]+)\n[^\n]*\n([^\n]*)\n\n(> .*?)(?=\n[^>]|\Z)", block, re.S)
+        if not match:
+            rows.append(b"null")  # counted as malformed, not silently accepted
+            continue
+        session, stamp, repo, metadata, quoted = match.groups()
+        parts = metadata.split(" · ")
+        prompt = "\n".join(line[2:] for line in quoted.splitlines())
+        if not (prompt.startswith('"') and prompt.endswith('"')):
+            rows.append(b"null")
+            continue
+        rows.append(_json_dumps(dict(session_id=session, timestamp=stamp, repo=repo,
+                                    machine=parts[0] or None, agent=parts[-1] if len(parts) > 1 else None,
+                                    prompt=prompt[1:-1])).encode())
+    return b"\n".join(rows) + b"\n"
+
+
 def load_prompts(raw, fingerprint, as_of, aliases):
     counts = Counter()
     rows, seen = [], set()
@@ -200,7 +226,7 @@ def publish(output, raw, bundle, source, meta):
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix=".journey-", dir=output.parent) as stage:
         stage = Path(stage)
-        for name, data in (("capture.jsonl", raw), ("evidence.json", _json_dumps(bundle).encode()),
+        for name, data in (("capture." + bundle.get("source_format", "jsonl"), raw), ("evidence.json", _json_dumps(bundle).encode()),
                            ("preview.md", markdown.encode())):
             with (stage / name).open("xb") as handle:
                 os.fchmod(handle.fileno(), 0o600)
@@ -214,6 +240,7 @@ def publish(output, raw, bundle, source, meta):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path)
+    parser.add_argument("--source-format", choices=("jsonl", "md"), default="jsonl")
     parser.add_argument("--database", type=Path)
     parser.add_argument("--checkout", type=Path, action="append", default=[])
     parser.add_argument("--as-of", default=now_utc().isoformat())
@@ -230,7 +257,8 @@ def main():
         aliases.add(checkout.name.casefold())
     source = resolve_clio_prompt_log_path(args.source)
     raw, meta = snapshot(source)
-    rows, counts = load_prompts(raw, meta["sha256"], as_of, aliases)
+    replay_input = markdown_rows(raw) if args.source_format == "md" else raw
+    rows, counts = load_prompts(replay_input, meta["sha256"], as_of, aliases)
     journeys, parents, orphans = group(rows)
     events, status = github_events(resolve_database_path(args.database), as_of)
     coverage = counts | {"eligible_prompts": len(rows), "starts": sum(r["start"] for r in rows),
@@ -239,7 +267,7 @@ def main():
                         "devices": len({r['device'] for r in rows if r['device']}),
                         "terra": "not called: guarded runner has no independent output seam",
                         "relay_marathon": "not attested", "byte_cap_hit": meta["byte_cap_hit"]}
-    bundle = {"as_of_utc": as_of.isoformat(), "source": meta, "coverage": coverage,
+    bundle = {"as_of_utc": as_of.isoformat(), "source": meta, "source_format": args.source_format, "coverage": coverage,
               "prompts": rows, "journeys": journeys, "parents": parents, "orphans": orphans, "events": events}
     publish(args.output, raw, bundle, source, meta)
     print(_json_dumps(coverage))  # no prompt text, session IDs, or private paths
