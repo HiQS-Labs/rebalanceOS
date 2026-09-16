@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.89.3] - 2026-09-16
+
+### Fixed
+- Invalid artifact URL suffixes no longer become links to a different issue or pull request.
+  Formatted discussion IDs are excluded while valid issue numbers and URL delimiters are retained.
+  Independent review reproduced the defects and verified the focused corrections.
+
 ## [0.89.2] - 2026-09-16
 
 ### Added

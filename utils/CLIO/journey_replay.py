@@ -23,12 +23,12 @@ from rebalance.paths import resolve_clio_prompt_log_path, resolve_database_path
 REPO = "hiqs-labs/xyz-forge"
 MAX_BYTES = 100_000_000
 MAX_ROWS = 10_000
-REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/(\d+)\b|(?<![\w/])([\w.-]+/[\w.-]+)#(\d+)\b", re.I)
+REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/([1-9]\d*)(?![\w-]|\.\d)\b|(?<![\w/])([\w.-]+/[\w.-]+)#([1-9]\d*)(?![\w-]|\.\d)\b", re.I)
 
 
 def references(text, context):
-    text = re.sub(r"\b(issue|pr|pull\s+request)\s+(?:\*\*|`)(#?[1-9]\d*)(?:\*\*|`)",
-                  r"\1 \2", text, flags=re.I)
+    text = re.sub(r"\b(issue|pr|pull\s+request|AgentChorus|agent2agent)\s+(\*\*|`)(#?[1-9]\d*)\2",
+                  r"\1 \3", text, flags=re.I)
     text = re.sub(r"\b(?:AgentChorus|agent2agent)\s+#\d+\b", " ", text, flags=re.I)
     refs = {(a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else
             (d.lower(), "issue", int(e)) for a, b, c, d, e in REF.findall(text)}
