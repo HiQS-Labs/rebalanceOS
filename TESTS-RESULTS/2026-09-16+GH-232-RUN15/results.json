@@ -12,6 +12,7 @@
   "index_target_events": 0,
   "retained_events": 47,
   "explicitly_referenced_events": 12,
+  "unique_events_attached_to_original_journeys": 8,
   "focused_checks_passed": 77,
   "doctor_exit": 1,
   "full_tests_exit": 2,
