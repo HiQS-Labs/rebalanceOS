@@ -12,6 +12,10 @@
 
 ## [0.89.2] - 2026-09-16
 
+### Added
+- An optional replay mode uses qualified issue and pull-request URLs for timeline connections.
+  Other mentions remain visible as unresolved candidates and cannot attach completion events.
+
 ### Fixed
 - Formatted pull-request numbers retain their type, and explicitly labeled discussion IDs no
   longer become issue references. Regression checks include valid closed pull requests and large
