@@ -1,0 +1,38 @@
+....................................FFFF...........                      [100%]
+=================================== FAILURES ===================================
+_ test_formatted_chat_ids_are_not_issues[Join XYZ AgentChorus **#123456** to discuss PR #519] _
+tests/test_journey_replay.py:89: in test_formatted_chat_ids_are_not_issues
+    assert jr.references(text, True) == [(jr.REPO, 'pr', 519)]
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 519)] == [('hiqs-labs/...', 'pr', 519)]
+E
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 123456) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_formatted_chat_ids_are_not_issues[Join XYZ agent2agent `#123456` to discuss PR #519] _
+tests/test_journey_replay.py:89: in test_formatted_chat_ids_are_not_issues
+    assert jr.references(text, True) == [(jr.REPO, 'pr', 519)]
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 519)] == [('hiqs-labs/...', 'pr', 519)]
+E
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 123456) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_invalid_artifact_url_is_not_a_prefix_match[https://github.com/HiQS-Labs/XYZ-forge/issues/123.5] _
+tests/test_journey_replay.py:97: in test_invalid_artifact_url_is_not_a_prefix_match
+    assert jr.references(url, False) == []
+E   AssertionError: assert [('hiqs-labs/...'issue', 123)] == []
+E
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'issue', 123)
+E     Use -v to get more diff
+_ test_invalid_artifact_url_is_not_a_prefix_match[https://github.com/HiQS-Labs/XYZ-forge/pull/123-invalid] _
+tests/test_journey_replay.py:97: in test_invalid_artifact_url_is_not_a_prefix_match
+    assert jr.references(url, False) == []
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 123)] == []
+E
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 123)
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_journey_replay.py::test_formatted_chat_ids_are_not_issues[Join XYZ AgentChorus **#123456** to discuss PR #519]
+FAILED tests/test_journey_replay.py::test_formatted_chat_ids_are_not_issues[Join XYZ agent2agent `#123456` to discuss PR #519]
+FAILED tests/test_journey_replay.py::test_invalid_artifact_url_is_not_a_prefix_match[https://github.com/HiQS-Labs/XYZ-forge/issues/123.5]
+FAILED tests/test_journey_replay.py::test_invalid_artifact_url_is_not_a_prefix_match[https://github.com/HiQS-Labs/XYZ-forge/pull/123-invalid]
+4 failed, 47 passed in 0.16s

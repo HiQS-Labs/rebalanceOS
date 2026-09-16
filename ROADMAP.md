@@ -32,6 +32,10 @@ goal: >
 
 ## Ledger
 
+- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — explicit mentions and confirmed delivery links built; bounded implementation review PASS; three history/list comparisons await operator feedback; automated relay/app gates incomplete; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
+
+- **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed, full app gates and human review pending in draft #231; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
+
 ### In progress
 - **CLIO first-prompt capture** ([#199](https://github.com/HiQS-Labs/rebalanceOS/issues/199)) — preserve initial no-history setup while capturing new root sessions before their first poll; exclude inherited child prompts. rated 85/80/50/70 → [GH-199-CLIO-FIRST-PROMPT.md](PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md)
 - **Guarded jobs that self-report lifecycle events log a second start/terminal pair** ([#215](https://github.com/HiQS-Labs/rebalanceOS/issues/215)) — opened 2026-09-12 from the PR #212 post-merge review. `daily-synthesis` (and, from its next fire, `obsidian-rollover`) records two lifecycle pairs under the outer guard because `REBALANCE_SCHEDULER_LIFECYCLE_CHILD` suppression only covers bash wrappers; the fix centralizes suppression in `auth_log` so the guard's single-pair contract holds for every entry point. rated 50/40/50/85 → [GH-215-GUARDED-LIFECYCLE-DOUBLE-LOG.md](PROJECT/1-INBOX/GH-215-GUARDED-LIFECYCLE-DOUBLE-LOG.md)

@@ -11,6 +11,27 @@
 
 ## Core Pipeline
 
+**Opt-in historical projection (GH-230):** `utils/CLIO/journey_replay.py` reads a frozen CLIO JSONL
+prefix or canonical marker-backed Markdown export and existing GitHub snapshots via the read-only
+DB gateway. It emits a new private run directory with two journey views, source evidence and coverage.
+It is not an `all` collector, never updates the index, and does not call a model or publish into a vault.
+Its opt-in `--explicit-links-only` policy joins outcomes only through typed qualified GitHub URLs;
+other mentions are retained under `unresolved_refs` and excluded from grouping/event attachment.
+The independent `--qualified-transitions` option adds a third candidate view for exact new-task
+requests naming a different qualified issue. Its grouping and event joins use qualified URLs
+regardless of legacy reference settings. Original views and start hints remain unchanged; a split
+is not completion. The GH-232 retained-metadata composition recipe is campaign-only, not a new
+runtime adapter or collector.
+The independent `--issue-evidence` flag appends all qualified trial-issue mentions, including
+unassigned prompts, with separate chat labels and visible coverage gaps. It does not alter original
+grouping, start hints or evidence membership. Pull-request/foreign/bare-number mentions cannot
+supply trial-issue identity; direct issue facts retain event and retrieval times separately.
+The campaign-only retained-facts recipe can compose `closingIssuesReferences` via `--delivery-links`
+and append three fixed A/B comparisons via `--review-cases`. Whole artifact URLs, typed identities,
+merge state/window, retrieval chronology and conflicting records are checked before publication.
+This is not the production `github_links` text-matching store or reconciliation scorer. Optional
+renderer metadata adds observed relationship receipts, never chat causation or deployment proof.
+
 **INVARIANT**: **Compose, don't mutate**. No new query surfaces (like `semantic_query` vs `ask`) or UI renderers (web server vs static HTML) may be introduced without a plan to deprecate and replace the old one. If extending an existing pipeline, build reusable primitives in `src/rebalance/lib/` instead of duplicating logic in the caller.
 
 ```

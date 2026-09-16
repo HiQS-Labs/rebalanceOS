@@ -1,0 +1,44 @@
+...............................................FFFFF........             [100%]
+=================================== FAILURES ===================================
+_ test_reference_guard_does_not_confuse_work_words_with_projects[Land PR 520 first and continue-expected0] _
+tests/test_journey_replay.py:114: in test_reference_guard_does_not_confuse_work_words_with_projects
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [] == [('hiqs-labs/...', 'pr', 520)]
+E     
+E     Right contains one more item: ('hiqs-labs/xyz-forge', 'pr', 520)
+E     Use -v to get more diff
+_ test_reference_guard_does_not_confuse_work_words_with_projects[In your GH issue 567 add a test-expected1] _
+tests/test_journey_replay.py:114: in test_reference_guard_does_not_confuse_work_words_with_projects
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [] == [('hiqs-labs/...'issue', 567)]
+E     
+E     Right contains one more item: ('hiqs-labs/xyz-forge', 'issue', 567)
+E     Use -v to get more diff
+_ test_reference_guard_does_not_confuse_work_words_with_projects[PR **#519** in XYZ-forge. Work on GH-516, in relay-automation, on ROADMAP-DASHBOARD.md.-expected2] _
+tests/test_journey_replay.py:114: in test_reference_guard_does_not_confuse_work_words_with_projects
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [] == [('hiqs-labs/...', 'pr', 519)]
+E     
+E     Right contains one more item: ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_reference_guard_does_not_confuse_work_words_with_projects[Work in HiQS-Labs/XYZ-forge on 2026-09-12. The project tracks issue 591.-expected3] _
+tests/test_journey_replay.py:114: in test_reference_guard_does_not_confuse_work_words_with_projects
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [] == [('hiqs-labs/...'issue', 591)]
+E     
+E     Right contains one more item: ('hiqs-labs/xyz-forge', 'issue', 591)
+E     Use -v to get more diff
+_ test_reference_guard_does_not_confuse_work_words_with_projects[Work on GH-609. PR #441 is merged.-expected4] _
+tests/test_journey_replay.py:114: in test_reference_guard_does_not_confuse_work_words_with_projects
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [] == [('hiqs-labs/...', 'pr', 441)]
+E     
+E     Right contains one more item: ('hiqs-labs/xyz-forge', 'pr', 441)
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_journey_replay.py::test_reference_guard_does_not_confuse_work_words_with_projects[Land PR 520 first and continue-expected0]
+FAILED tests/test_journey_replay.py::test_reference_guard_does_not_confuse_work_words_with_projects[In your GH issue 567 add a test-expected1]
+FAILED tests/test_journey_replay.py::test_reference_guard_does_not_confuse_work_words_with_projects[PR **#519** in XYZ-forge. Work on GH-516, in relay-automation, on ROADMAP-DASHBOARD.md.-expected2]
+FAILED tests/test_journey_replay.py::test_reference_guard_does_not_confuse_work_words_with_projects[Work in HiQS-Labs/XYZ-forge on 2026-09-12. The project tracks issue 591.-expected3]
+FAILED tests/test_journey_replay.py::test_reference_guard_does_not_confuse_work_words_with_projects[Work on GH-609. PR #441 is merged.-expected4]
+5 failed, 55 passed in 0.20s

@@ -1,0 +1,4 @@
+{"timestamp":"2026-09-15T10:00:00Z","repo":"hiqs-labs/xyz-forge","agent":"fixture-agent","machine":"fixture-device","session_id":"fixture-chat","prompt":"/start-task https://github.com/HiQS-Labs/XYZ-forge/issues/10"}
+{"timestamp":"2026-09-15T10:30:00Z","repo":"hiqs-labs/xyz-forge","agent":"fixture-agent","machine":"fixture-device","session_id":"fixture-chat","prompt":"Continue the first task"}
+{"timestamp":"2026-09-15T11:00:00Z","repo":"hiqs-labs/xyz-forge","agent":"fixture-agent","machine":"fixture-device","session_id":"fixture-chat","prompt":"Next task: start https://github.com/HiQS-Labs/XYZ-forge/issues/20"}
+{"timestamp":"2026-09-15T11:30:00Z","repo":"hiqs-labs/xyz-forge","agent":"fixture-agent","machine":"fixture-device","session_id":"fixture-chat","prompt":"Continue the second task"}

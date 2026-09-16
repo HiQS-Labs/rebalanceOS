@@ -1,0 +1,198 @@
+temp/gh232/pdda-frontmatter.log:SUMMARY [pdda-check-frontmatter] errors=6 warns=0 info=0
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'mcp'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'questionary'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'questionary'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'questionary'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'rich'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'hypothesis'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'typer'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'yaml'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'questionary'
+temp/gh232/full-tests.log:E   ModuleNotFoundError: No module named 'fastapi'
+temp/gh232/full-tests.log:ERROR tests/test_apple_reminders_write_cli.py
+temp/gh232/full-tests.log:ERROR tests/test_auto_promote.py
+temp/gh232/full-tests.log:ERROR tests/test_calendar_aggregator.py
+temp/gh232/full-tests.log:ERROR tests/test_calendar_create_event_cli.py
+temp/gh232/full-tests.log:ERROR tests/test_calendar_team_loop_isolation.py
+temp/gh232/full-tests.log:ERROR tests/test_calendar_weekly_report_cli.py
+temp/gh232/full-tests.log:ERROR tests/test_capabilities_manifest.py
+temp/gh232/full-tests.log:ERROR tests/test_client_buckets.py
+temp/gh232/full-tests.log:ERROR tests/test_client_gapfill.py
+temp/gh232/full-tests.log:ERROR tests/test_collector_registry.py
+temp/gh232/full-tests.log:ERROR tests/test_dashboard_cli.py
+temp/gh232/full-tests.log:ERROR tests/test_dashboard_refresh_integration.py
+temp/gh232/full-tests.log:ERROR tests/test_diagnose.py
+temp/gh232/full-tests.log:ERROR tests/test_doctor.py
+temp/gh232/full-tests.log:ERROR tests/test_doctor_json.py
+temp/gh232/full-tests.log:ERROR tests/test_email_ingest.py
+temp/gh232/full-tests.log:ERROR tests/test_external_watch.py
+temp/gh232/full-tests.log:ERROR tests/test_figma_gating.py
+temp/gh232/full-tests.log:ERROR tests/test_focus5_three_eyes.py
+temp/gh232/full-tests.log:ERROR tests/test_github_ignore_cli.py
+temp/gh232/full-tests.log:ERROR tests/test_health_banner_collapse.py
+temp/gh232/full-tests.log:ERROR tests/test_index_ops.py
+temp/gh232/full-tests.log:ERROR tests/test_index_ops_migration_gate.py
+temp/gh232/full-tests.log:ERROR tests/test_mcp_probe.py
+temp/gh232/full-tests.log:ERROR tests/test_md_parser_property.py
+temp/gh232/full-tests.log:ERROR tests/test_migrate_keyring.py
+temp/gh232/full-tests.log:ERROR tests/test_next_actions_parity.py
+temp/gh232/full-tests.log:ERROR tests/test_next_actions_precompute.py
+temp/gh232/full-tests.log:ERROR tests/test_onboarding_e2e.py
+temp/gh232/full-tests.log:ERROR tests/test_phase5_collector_smoke.py
+temp/gh232/full-tests.log:ERROR tests/test_power_ops.py
+temp/gh232/full-tests.log:ERROR tests/test_preflight_roundtrip.py
+temp/gh232/full-tests.log:ERROR tests/test_profile_sync.py
+temp/gh232/full-tests.log:ERROR tests/test_project_inference.py
+temp/gh232/full-tests.log:ERROR tests/test_project_priority.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_server_apple_reminders.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_server_figma.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_server_health.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_warning_watch.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_web_calendar.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_web_goals.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_web_timestamp_disambiguation.py
+temp/gh232/full-tests.log:ERROR tests/test_pulse_web_worknext.py
+temp/gh232/full-tests.log:ERROR tests/test_query_cli_rendering.py
+temp/gh232/full-tests.log:ERROR tests/test_recovery_copy_commands.py
+temp/gh232/full-tests.log:ERROR tests/test_registry_property.py
+temp/gh232/full-tests.log:ERROR tests/test_repo_claim_guard.py
+temp/gh232/full-tests.log:ERROR tests/test_repo_pie_auto_promote.py
+temp/gh232/full-tests.log:ERROR tests/test_semantic_source_contract.py
+temp/gh232/full-tests.log:ERROR tests/test_shutdown_handoff.py
+temp/gh232/full-tests.log:ERROR tests/test_sleuth_graph_security.py
+temp/gh232/full-tests.log:ERROR tests/test_system_log.py
+temp/gh232/full-tests.log:ERROR tests/test_time_ops_property.py
+temp/gh232/full-tests.log:ERROR tests/test_unified_retrieval_call_sites.py
+temp/gh232/full-tests.log:ERROR tests/test_watched_repos.py
+temp/gh232/full-tests.log:ERROR tests/test_web_auth_log.py
+temp/gh232/full-tests.log:ERROR tests/test_web_badges.py
+temp/gh232/full-tests.log:ERROR tests/test_web_error_handler.py
+temp/gh232/full-tests.log:ERROR tests/test_web_focus5.py
+temp/gh232/full-tests.log:ERROR tests/test_web_whatsnext.py
+temp/gh232/full-tests.log:ERROR tests/test_welcome_walkthrough.py
+temp/gh232/full-tests.log:ERROR tests/test_zapier_webhook.py
+temp/gh232/full-tests.log:!!!!!!!!!!!!!!!!!!! Interrupted: 62 errors during collection !!!!!!!!!!!!!!!!!!!
+temp/gh232/full-tests.log:1 skipped, 62 errors in 1.66s
+temp/gh232/pdda-status.log:SUMMARY [pdda-check-status-table] errors=7 warns=0 info=0
+temp/gh232/pdda-coverage.log:SUMMARY [pdda-check-roadmap-coverage] errors=7 warns=0 info=30
+temp/gh232/doctor.log:ModuleNotFoundError: No module named 'typer'
+ERROR tests/test_apple_reminders_write_cli.py
+ERROR tests/test_auto_promote.py
+ERROR tests/test_calendar_aggregator.py
+ERROR tests/test_calendar_create_event_cli.py
+ERROR tests/test_calendar_team_loop_isolation.py
+ERROR tests/test_calendar_weekly_report_cli.py
+ERROR tests/test_capabilities_manifest.py
+ERROR tests/test_client_buckets.py
+ERROR tests/test_client_gapfill.py
+ERROR tests/test_collector_registry.py
+ERROR tests/test_dashboard_cli.py
+ERROR tests/test_dashboard_refresh_integration.py
+ERROR tests/test_diagnose.py
+ERROR tests/test_doctor.py
+ERROR tests/test_doctor_json.py
+ERROR tests/test_email_ingest.py
+ERROR tests/test_external_watch.py
+ERROR tests/test_figma_gating.py
+ERROR tests/test_focus5_three_eyes.py
+ERROR tests/test_github_ignore_cli.py
+ERROR tests/test_health_banner_collapse.py
+ERROR tests/test_index_ops.py
+ERROR tests/test_index_ops_migration_gate.py
+ERROR tests/test_mcp_probe.py
+ERROR tests/test_md_parser_property.py
+ERROR tests/test_migrate_keyring.py
+ERROR tests/test_next_actions_parity.py
+ERROR tests/test_next_actions_precompute.py
+ERROR tests/test_onboarding_e2e.py
+ERROR tests/test_phase5_collector_smoke.py
+ERROR tests/test_power_ops.py
+ERROR tests/test_preflight_roundtrip.py
+ERROR tests/test_profile_sync.py
+ERROR tests/test_project_inference.py
+ERROR tests/test_project_priority.py
+ERROR tests/test_pulse_server_apple_reminders.py
+ERROR tests/test_pulse_server_figma.py
+ERROR tests/test_pulse_server_health.py
+ERROR tests/test_pulse_warning_watch.py
+ERROR tests/test_pulse_web_calendar.py
+ERROR tests/test_pulse_web_goals.py
+ERROR tests/test_pulse_web_timestamp_disambiguation.py
+ERROR tests/test_pulse_web_worknext.py
+ERROR tests/test_query_cli_rendering.py
+ERROR tests/test_recovery_copy_commands.py
+ERROR tests/test_registry_property.py
+ERROR tests/test_repo_claim_guard.py
+ERROR tests/test_repo_pie_auto_promote.py
+ERROR tests/test_semantic_source_contract.py
+ERROR tests/test_shutdown_handoff.py
+ERROR tests/test_sleuth_graph_security.py
+ERROR tests/test_system_log.py
+ERROR tests/test_time_ops_property.py
+ERROR tests/test_unified_retrieval_call_sites.py
+ERROR tests/test_watched_repos.py
+ERROR tests/test_web_auth_log.py
+ERROR tests/test_web_badges.py
+ERROR tests/test_web_error_handler.py
+ERROR tests/test_web_focus5.py
+ERROR tests/test_web_whatsnext.py
+ERROR tests/test_welcome_walkthrough.py
+ERROR tests/test_zapier_webhook.py
+ERROR HiQS/tests/test_eval_retrieval.py
+ERROR HiQS/tests/test_github_docs.py
+ERROR HiQS/tests/test_judge_pairwise.py
+ERROR HiQS/tests/test_search.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 66 errors during collection !!!!!!!!!!!!!!!!!!!
+2324 tests collected, 66 errors in 2.25s
