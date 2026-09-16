@@ -309,6 +309,51 @@ def render(bundle):
                       f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}" for event in facts]
             if not facts:
                 lines += ['- No recorded issue events available in this preview.']
+            for link in bundle.get('delivery_links', []):
+                if tuple(link['issue']) != ref:
+                    continue
+                lines += [f"- Delivery relationship [{link['id']}]: {link['pr_url']} names {link['issue_url']} "
+                          f"in {link['source_field']}; observed {link['fetched_at']}. "
+                          'This does not prove chat causation, historical issue state or deployment.']
+                lines += [f"- {event['timestamp']} — related PR event [{event['id']}]: {event['event']} "
+                          f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}"
+                          for event in bundle['events'] if tuple(event['ref']) == tuple(link['pr'])]
+        lines += [f'- Delivery evidence gap: {gap}' for gap in bundle.get('delivery_gaps', [])]
+    if bundle.get('review_cases'):
+        lines += ['', '## E — Three histories versus plain evidence lists',
+                  'Same evidence in both views. Helpfulness is unconfirmed until the operator responds.',
+                  'Per case: useful / list is enough / misleading. Does the history beat the list?']
+        for number in bundle['review_cases']:
+            issue = (REPO, 'issue', number)
+            mentions = [r for r in bundle['prompts'] if issue in qualified_references(r['text'])]
+            relations = [link for link in bundle.get('delivery_links', []) if tuple(link['issue']) == issue]
+            artifacts = {issue} | {tuple(link['pr']) for link in relations}
+            facts = {event['id']: event for event in bundle['events'] if tuple(event['ref']) in artifacts}
+            chat_keys = {(r['device'], r['agent'], r['session']) for r in mentions if r['session']}
+            unassigned = sum(r['id'] in bundle['orphans'] for r in mentions)
+            lines += ['', f'### Review issue #{number}', '', '#### A — Compact history',
+                      f'{len(mentions)} recorded requests across {len(chat_keys)} known captured chats; '
+                      f'{unassigned} remain unassigned. Separate attempts are not continuous work.']
+            timeline = [(r['timestamp'], f"intent [{r['id']}]: " +
+                         redact_key_shaped_secrets(r['text']).replace('\n', ' ')[:500]) for r in mentions]
+            timeline += [(event['timestamp'], f"recorded event [{event['id']}]: {event['event']} "
+                          f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}") for event in facts.values()]
+            lines += [f'- {stamp} — {text}' for stamp, text in sorted(timeline)]
+            links_text = [f"{link['pr_url']} → {link['issue_url']} [{link['id']}], "
+                          f"{link['source_field']} observed {link['fetched_at']}" for link in relations]
+            lines += ['Delivery evidence: ' + ('; '.join(links_text) or 'none available') + '.',
+                      'Chat causation, deployment and fulfillment of the broader goal remain unknown.',
+                      '', '#### B — Plain issue evidence list']
+            lines += [f"- Prompt [{r['id']}], {r['timestamp']}: " +
+                      redact_key_shaped_secrets(r['text']).replace('\n', ' ')[:500] for r in mentions]
+            lines += [f"- Fact [{event['id']}]: {event['event']} {event['url']}; event {event['timestamp']}; "
+                      f"retrieved {event.get('fetched_at') or 'unknown'}" for event in facts.values()]
+            lines += ['- Relationship: ' + text for text in links_text]
+            if number == 508:
+                lines += ['Prior diagnostic caveat (applies to A and B): the earlier verdict was superseded '
+                          'in follow-up #536/#556, according to the retained CASE-AUDIT.md; '
+                          'this is not an automatically verified goal-completion chain.']
+            lines += ['- Operator judgment: pending. Missing evidence and deployment remain unknown.']
     return "\n".join(lines) + "\n"
 
 

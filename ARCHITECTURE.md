@@ -26,6 +26,11 @@ The independent `--issue-evidence` flag appends all qualified trial-issue mentio
 unassigned prompts, with separate chat labels and visible coverage gaps. It does not alter original
 grouping, start hints or evidence membership. Pull-request/foreign/bare-number mentions cannot
 supply trial-issue identity; direct issue facts retain event and retrieval times separately.
+The campaign-only retained-facts recipe can compose `closingIssuesReferences` via `--delivery-links`
+and append three fixed A/B comparisons via `--review-cases`. Whole artifact URLs, typed identities,
+merge state/window, retrieval chronology and conflicting records are checked before publication.
+This is not the production `github_links` text-matching store or reconciliation scorer. Optional
+renderer metadata adds observed relationship receipts, never chat causation or deployment proof.
 
 **INVARIANT**: **Compose, don't mutate**. No new query surfaces (like `semantic_query` vs `ask`) or UI renderers (web server vs static HTML) may be introduced without a plan to deprecate and replace the old one. If extending an existing pipeline, build reusable primitives in `src/rebalance/lib/` instead of duplicating logic in the caller.
 

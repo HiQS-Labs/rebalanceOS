@@ -1,0 +1,13 @@
+Condensed run ledger (public-safe; raw prompts and snapshots remain private).
+Initial delivery controls before implementation: 9 failed, 4 deselected (helper absent).
+Initial implementation focused suite: 89 passed.
+Independent-review regression reproduction: 5 failed, 1 passed, 13 deselected.
+After remediation: 95 passed.
+Final additional event-state/render controls: 97 passed.
+First preservation audit: AssertionError at expected relationship count of 5.
+Inspected canonical receipt pairs: 535->508,540->536,557->556,577->561,581->568,640->623,641->609,641->626.
+Corrected preservation audit expectation only; runtime output unchanged.
+Final audit: {"original_preserved":true,"saved_events":47,"closing_relationships":8,"review_cases":[508,568,623],"open_direct_shared_controls":true,"private_permissions":true,"operator_feedback":"pending","deployment":"unknown"}
+Doctor: exit 1, ModuleNotFoundError: No module named 'typer'.
+Full tests/: exit 2, 1 skipped, 62 errors during collection (existing missing dependencies).
+No merge/deployment; no human usefulness judgment; no model replacement or API fetch.
