@@ -12,6 +12,11 @@
 
 ## [0.89.1] - 2026-09-16
 
+### Documentation
+- Published frozen reference-rerun deltas and queued GH-232 as the evidence-linked journey
+  continuation, with four-step batches and explicit stop/abstention decisions. Partial review found
+  incorrect reference additions; automatic linking remains unapproved. No runtime change.
+
 ### Fixed
 - Journey references now recognize explicit issue and pull-request wording plus numeric start-task
   arguments in verified repository context. Pull-request references no longer also become issue
