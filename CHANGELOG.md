@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.89.1] - 2026-09-16
+
+### Fixed
+- Journey references now recognize explicit issue and pull-request wording plus numeric start-task
+  arguments in verified repository context. Pull-request references no longer also become issue
+  references. Ambiguous phase wording stays unresolved. Focused regression tests were witnessed
+  failing before the fix; the targeted suite passes. No change to task boundaries or completion claims.
+
 ## [0.89.0] - 2026-09-16
 
 ### Added

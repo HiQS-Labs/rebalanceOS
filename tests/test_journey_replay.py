@@ -32,6 +32,32 @@ def test_nonstarts(text):
     assert not jr.is_start(text)
 
 
+@pytest.mark.parametrize("text,kind,number", [
+    ("issue 626", "issue", 626), ("Issue #626", "issue", 626),
+    ("PR 553", "pr", 553), ("check PR #553", "pr", 553),
+    ("pull request 553", "pr", 553), ("/start-task on 567 now", "issue", 567),
+    ("/start-task 567", "issue", 567),
+])
+def test_typed_references_require_verified_context(text, kind, number):
+    assert jr.references(text, True) == [(jr.REPO, kind, number)]
+    assert jr.references(text, False) == []
+
+
+@pytest.mark.parametrize("text", ["567", "phase 2", "version 567.2", "/start-task on PR 2 phase",
+                                       "issue 626abc", "issue 626.5"])
+def test_numbers_are_not_implicitly_issues(text):
+    refs = jr.references(text, True)
+    assert all(kind != "issue" for _, kind, _ in refs)
+
+
+def test_qualified_pr_and_issue_do_not_get_duplicate_types():
+    assert jr.references("PR #553 and issue #626", True) == [
+        (jr.REPO, "issue", 626), (jr.REPO, "pr", 553)]
+    assert jr.references("https://github.com/Other/Repo/pull/553", True) == [("other/repo", "pr", 553)]
+    assert jr.references("/start-task on PR 2 phase", True) == []
+    assert jr.references("PR #2 phase", True) == []
+
+
 def test_scope_and_negative_join_control(monkeypatch):
     def check():
         refs = jr.references("Other/repo#10 and #10", False)
