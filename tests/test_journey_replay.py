@@ -144,6 +144,60 @@ def test_grouping_same_input_and_no_bridge():
     assert sum(len(j["prompts"]) for j in journeys) + len(orphans) == len(rows)
 
 
+def test_qualified_next_task_preserves_original_and_separates_events():
+    rows, _ = load(row('/start-task https://github.com/HiQS-Labs/XYZ-forge/issues/10'),
+                   row('Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+                       timestamp='2026-09-15T11:00:00Z'),
+                   row('continue', timestamp='2026-09-15T12:00:00Z'))
+    original = jr.group(rows)
+    journeys, parents, orphans = jr.group(rows, qualified_transitions=True)
+    assert len(original[0]) == 1 and len(journeys) == 2
+    assert journeys[0]['prompts'] == [rows[0]['id']]
+    assert journeys[1]['prompts'] == [rows[1]['id'], rows[2]['id']]
+    assert journeys[0]['issues'] == [(jr.REPO, 'issue', 10)]
+    assert journeys[1]['issues'] == [(jr.REPO, 'issue', 20)]
+    assert not rows[1]['start']  # Candidate boundaries do not rewrite captured intent.
+    assert jr.group(rows) == original
+    bundle = dict(prompts=rows, journeys=journeys, parents=parents, orphans=orphans,
+                  coverage={}, events=[dict(timestamp='2026-09-15T13:00:00Z', id='event-20',
+                      ref=(jr.REPO, 'issue', 20), event='closed_at', url='fixture-close-20')])
+    preview = jr.render(bundle)
+    first, second = preview.split('### ')[1:3]
+    assert 'fixture-close-20' not in first and 'fixture-close-20' in second
+    original_bundle = bundle | dict(journeys=original[0], parents=original[1], orphans=original[2],
+                                   candidate_view=dict(journeys=journeys, parents=parents, orphans=orphans))
+    candidate_sections = jr.render(original_bundle).split('### Candidate ')[1:3]
+    assert 'fixture-close-20' not in candidate_sections[0]
+    assert 'fixture-close-20' in candidate_sections[1]
+    # Disable the optional detector to witness that the boundary assertion constrains it.
+    assert len(jr.group(rows, qualified_transitions=False)[0]) != len(journeys)
+
+
+@pytest.mark.parametrize('text', [
+    'Next task: issue #20',
+    'Next task: https://github.com/Other/project/issues/20',
+    'Next task: https://github.com/HiQS-Labs/XYZ-forge/pull/20',
+    'Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20?',
+    'Next task: do not start https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+    '"Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20"',
+    'Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20 and issue #30',
+    'Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20 and https://github.com/Other/project/issues/30',
+    'Next: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+    'Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/10',
+    'And then do same for: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+])
+def test_unclear_transitions_abstain(text):
+    rows, _ = load(row(), row(text, timestamp='2026-09-15T11:00:00Z'))
+    assert jr.group(rows, qualified_transitions=True) == jr.group(rows)
+
+
+def test_transition_needs_a_known_unambiguous_prior_task():
+    for initial in ('/start-task now', '/start-task #10 and #30'):
+        rows, _ = load(row(initial), row('Next task: start https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+                                         timestamp='2026-09-15T11:00:00Z'))
+        assert jr.group(rows, qualified_transitions=True) == jr.group(rows)
+
+
 def test_repeated_start_new_attempt_and_no_lookahead():
     before, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"))
     after, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"),

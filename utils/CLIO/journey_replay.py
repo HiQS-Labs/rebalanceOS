@@ -166,15 +166,26 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
     return sorted(rows, key=lambda r: (r["timestamp"], r["ordinal"])), dict(counts)
 
 
-def group(rows):
+def group(rows, qualified_transitions=False):
     journeys, active, orphans = [], {}, []
     for row in rows:
         key = (row["device"], row["agent"], row["session"])
         if not row["session"]:
             orphans.append(row["id"])
             continue
-        if row["start"]:
+        transition = False
+        if qualified_transitions and key in active:
+            # Exact new-task wording is a candidate boundary, never completion evidence.
+            target = re.fullmatch(r"\s*next task:\s*(?:start\s+)?https://github\.com/"
+                                 r"([\w.-]+/[\w.-]+)/issues/([1-9]\d*)\s*", row['text'], re.I)
+            if target and target[1].lower() == REPO:
+                issue = (REPO, 'issue', int(target[2]))
+                old = [tuple(ref) for ref in active[key]['issues']]
+                transition = len(old) == 1 and old[0] != issue and old[0][0] == REPO
+        if row["start"] or transition:
             journey = {"id": row["id"], "prompts": [], "issues": []}
+            if transition:
+                journey['boundary'] = 'qualified new-task request; candidate only'
             journeys.append(journey)
             active[key] = journey
         if key not in active:
@@ -243,6 +254,16 @@ def render(bundle):
     lines += ["", "## B — Issue-linked parents (same child timelines)"]
     for parent, children in bundle["parents"].items():
         lines += [f"- {parent}"] + [f"  - {child}" for child in children]
+    if 'candidate_view' in bundle:
+        lines += ['', '## C — Qualified task-transition candidates',
+                  'Original chat journeys above are preserved. A boundary does not attest completion.']
+        for journey in bundle['candidate_view']['journeys']:
+            lines += ['', f"### Candidate {journey['id']}",
+                      f"- Boundary: {journey.get('boundary', 'original start hint')}",
+                      '- Intent prompt IDs: ' + ', '.join(journey['prompts'])]
+            refs = {tuple(ref) for pid in journey['prompts'] for ref in rows[pid]['refs']}
+            lines += [f"- {e['timestamp']} — recorded event: {e['event']} {e['url']}"
+                      for e in bundle['events'] if tuple(e['ref']) in refs]
     lines += ["", f"Unassigned prompts: {len(bundle['orphans'])}", "", "## Review sample — first ten non-starts"]
     lines += [f"- {r['id']}: {redact_key_shaped_secrets(r['text']).replace(chr(10), ' ')[:320]}"
               for r in bundle["prompts"] if not r["start"]][:10]
@@ -278,6 +299,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument('--explicit-links-only', action='store_true',
                         help='Use only typed qualified GitHub URLs for joins; retain other mentions as unresolved.')
+    parser.add_argument('--qualified-transitions', action='store_true',
+                        help='Add a candidate view for exact qualified Next task requests; preserve original grouping.')
     args = parser.parse_args()
     as_of = parse_iso(args.as_of)
     if as_of is None:
@@ -304,6 +327,10 @@ def main():
     coverage['unresolved_reference_candidates'] = sum(len(r.get('unresolved_refs', [])) for r in rows)
     bundle = {"as_of_utc": as_of.isoformat(), "source": meta, "source_format": args.source_format, "coverage": coverage,
               "prompts": rows, "journeys": journeys, "parents": parents, "orphans": orphans, "events": events}
+    if args.qualified_transitions:
+        candidate_journeys, candidate_parents, candidate_orphans = group(rows, qualified_transitions=True)
+        bundle['candidate_view'] = dict(journeys=candidate_journeys, parents=candidate_parents,
+                                        orphans=candidate_orphans)
     publish(args.output, raw, bundle, source, meta)
     print(_json_dumps(coverage))  # no prompt text, session IDs, or private paths
 
