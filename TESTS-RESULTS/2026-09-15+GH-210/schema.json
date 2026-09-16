@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "state", "completion_claimed", "evidence_ids", "abstain"],
+  "properties": {
+    "project": {"type": "string"},
+    "state": {
+      "enum": ["planning", "implementation", "verification", "blocked", "complete", "unknown"]
+    },
+    "completion_claimed": {"type": "boolean"},
+    "evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^ev-[0-9]{3}$"}
+    },
+    "abstain": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,13 @@
+PASS: perfect fixture scored 48/48; deliberate corruption scored 47/48
+PASS: deliberate false completion claim was counted exactly once
+PASS: malformed output was retained and failed contract validation
+PASS: runner validator rejected array envelopes and non-string states without raising
+PASS: both parsers contained malformed usage receipts without raising
+PASS: mocked end-to-end malformed attempts remained in denominators and failed eligibility
+PASS: malformed envelopes and parsing exceptions retained complete raw receipt fields
+PASS: recursive sanitization removed keyed secrets, bearer values, and local home paths
+PASS: raw JSON/container/whitespace secrets and non-JSON bearer lines were redacted
+PASS: multiline and timeout container secrets were redacted
+PASS: missing Flash usage propagated through runner and scorer
+PASS: invalid string/boolean/nested usage counters were rejected and reported for both arms
+PASS: diagnostic tails derive from sanitized receipts
