@@ -1,0 +1,106 @@
+..............................FFFFFFFFFFF....F.........                  [100%]
+=================================== FAILURES ===================================
+_ test_reference_abstention_regressions[Merge Catalog PR 8. Review XYZ PR 520.-expected0] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 520)] == [('hiqs-labs/...', 'pr', 520)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'pr', 8) != ('hiqs-labs/xyz-forge', 'pr', 520)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 520)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[File the plan on Other-project. Another device is on issue 25.-expected1] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/... 'issue', 25)] == []
+E     
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'issue', 25)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[In the OtherProject repo, review issue 25.-expected2] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/... 'issue', 25)] == []
+E     
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'issue', 25)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[Other/project#25 then issue 26-expected3] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/... 'issue', 25)] == [('other/proj... 'issue', 25)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 26) != ('other/project', 'issue', 25)
+E     Left contains one more item: ('other/project', 'issue', 25)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[https://github.com/Other/project/pull/25 then PR 26-expected4] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...t', 'pr', 25)] == [('other/project', 'pr', 25)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'pr', 26) != ('other/project', 'pr', 25)
+E     Left contains one more item: ('other/project', 'pr', 25)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[PR 1 \u2014 #40 producer; PR 2 \u2014 #41 recovery-expected5] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...ge', 'pr', 2)] == [('hiqs-labs/... 'issue', 41)]
+E     
+E     Left contains 2 more items, first extra item: ('hiqs-labs/xyz-forge', 'pr', 1)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[Let's focus on issue 1 first only. Issue 61 has the wrong URL for issue 62.-expected6] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/... 'issue', 62)] == [('hiqs-labs/... 'issue', 62)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 1) != ('hiqs-labs/xyz-forge', 'issue', 61)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'issue', 62)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[Join XYZ AgentChorus #123456 to discuss PR #519-expected7] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 519)] == [('hiqs-labs/...', 'pr', 519)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 123456) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[Join XYZ agent2agent #123456 to discuss issue #12-expected8] _
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...sue', 123456)] == [('hiqs-labs/... 'issue', 12)]
+E     
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'issue', 123456)
+E     Use -v to get more diff
+__ test_reference_abstention_regressions[PR **#519** and PR `#520`-expected9] __
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...'issue', 520)] == [('hiqs-labs/...', 'pr', 520)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 519) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_reference_abstention_regressions[PR #519, then PR **#519**-expected10] __
+tests/test_journey_replay.py:89: in test_reference_abstention_regressions
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...', 'pr', 519)] == [('hiqs-labs/...', 'pr', 519)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 519) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Left contains one more item: ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+_ test_reference_guard_positive_controls[In the XYZ-forge repo, review PR **#519**-expected4] _
+tests/test_journey_replay.py:101: in test_reference_guard_positive_controls
+    assert jr.references(text, True) == expected
+E   AssertionError: assert [('hiqs-labs/...'issue', 519)] == [('hiqs-labs/...', 'pr', 519)]
+E     
+E     At index 0 diff: ('hiqs-labs/xyz-forge', 'issue', 519) != ('hiqs-labs/xyz-forge', 'pr', 519)
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[Merge Catalog PR 8. Review XYZ PR 520.-expected0]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[File the plan on Other-project. Another device is on issue 25.-expected1]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[In the OtherProject repo, review issue 25.-expected2]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[Other/project#25 then issue 26-expected3]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[https://github.com/Other/project/pull/25 then PR 26-expected4]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[PR 1 \u2014 #40 producer; PR 2 \u2014 #41 recovery-expected5]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[Let's focus on issue 1 first only. Issue 61 has the wrong URL for issue 62.-expected6]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[Join XYZ AgentChorus #123456 to discuss PR #519-expected7]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[Join XYZ agent2agent #123456 to discuss issue #12-expected8]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[PR **#519** and PR `#520`-expected9]
+FAILED tests/test_journey_replay.py::test_reference_abstention_regressions[PR #519, then PR **#519**-expected10]
+FAILED tests/test_journey_replay.py::test_reference_guard_positive_controls[In the XYZ-forge repo, review PR **#519**-expected4]
+12 failed, 43 passed in 0.16s
