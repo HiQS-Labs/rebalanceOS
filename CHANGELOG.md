@@ -12,6 +12,11 @@
 
 ## [0.90.0] - 2026-09-16
 
+### Documentation
+- Defined three possible experiment endings and a bounded path toward a useful work-history
+  companion, compared with a plain evidence list. Human usefulness and repeatability are required;
+  simpler notebook and stop decisions remain explicit fallbacks. No new runtime feature built.
+
 ### Added
 - Optional qualified task-transition candidates alongside the unchanged original chat view.
   A new, explicitly linked issue can split a candidate task; ambiguous wording stays unsplit.

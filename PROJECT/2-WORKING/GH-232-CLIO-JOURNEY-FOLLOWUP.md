@@ -20,13 +20,16 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Synthetic transition and independent review pass; retained facts enrich the frozen preview | Check usefulness of three evidence-linked timelines; keep draft until app gates pass |
+| Synthetic transition, review and three-case coverage audit completed | Outcome-plan QA; see GH-232-OUTCOME-PLAN.md |
 
 The [GitHub issue](https://github.com/HiQS-Labs/rebalanceOS/issues/232) owns the actionable plan,
 if/then scenarios, acceptance checks and batch limits. This is a continuation of
 [#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230), under
 [#210](https://github.com/HiQS-Labs/rebalanceOS/issues/210), not a replacement for their evidence.
 Implementation remains in draft [#231](https://github.com/HiQS-Labs/rebalanceOS/pull/231).
+The operator's subsequent three-ending request is now owned by the
+[outcome plan](GH-232-OUTCOME-PLAN.md). Ordered continuation steps below are historical;
+use #232 and the outcome plan for the next executable batch.
 
 ## Sustained continuation — eight steps
 
@@ -96,7 +99,7 @@ The replay retained 288 prompts and nine journeys. Reference extraction changed 
 partial review found at least four incorrect additions across three prompts. These are not
 accuracy measurements. No automatic-linking promotion is justified yet.
 
-## Next phase — usefulness before broader inference
+## Historical next phase — superseded by the outcome plan
 
 Goal: determine whether three explicit, evidence-linked histories explain useful work without
 inventing missing steps. Existing grounded seam: load_prompts → group → render → private publish;

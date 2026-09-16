@@ -32,7 +32,7 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — conservative links and one synthetic transition reviewed; retained facts enrich the frozen preview; usefulness and app gates outstanding; [plan](PROJECT/2-WORKING/GH-232-CLIO-JOURNEY-FOLLOWUP.md).
+- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — three possible endings documented; aiming for a useful evidence-linked companion, with notebook/stop fallbacks; plan QA and usefulness outstanding; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
 
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed, full app gates and human review pending in draft #231; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
