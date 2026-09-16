@@ -69,6 +69,18 @@ def test_scope_and_negative_join_control(monkeypatch):
         check()  # deliberately broken bare-number join is caught
 
 
+@pytest.mark.parametrize('text,expected', [
+    ('PR **#519** and PR `#520`', [(jr.REPO, 'pr', 519), (jr.REPO, 'pr', 520)]),
+    ('CLOSED PR **#566**', [(jr.REPO, 'pr', 566)]),
+    ('PR #519 then PR **#519**', [(jr.REPO, 'pr', 519)]),
+    ('Join XYZ AgentChorus #123456 to discuss PR #519', [(jr.REPO, 'pr', 519)]),
+    ('Join XYZ agent2agent #123456 to discuss issue #12', [(jr.REPO, 'issue', 12)]),
+    ('Issue #123456', [(jr.REPO, 'issue', 123456)]),
+])
+def test_formatting_and_chat_ids(text, expected):
+    assert jr.references(text, True) == expected
+
+
 def test_grouping_same_input_and_no_bridge():
     rows, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"),
                    row(session_id="chat-b", machine="device-b"),

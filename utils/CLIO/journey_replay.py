@@ -27,6 +27,9 @@ REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/(\d+)\b|(
 
 
 def references(text, context):
+    text = re.sub(r"\b(issue|pr|pull\s+request)\s+(?:\*\*|`)(#?[1-9]\d*)(?:\*\*|`)",
+                  r"\1 \2", text, flags=re.I)
+    text = re.sub(r"\b(?:AgentChorus|agent2agent)\s+#\d+\b", " ", text, flags=re.I)
     refs = {(a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else
             (d.lower(), "issue", int(e)) for a, b, c, d, e in REF.findall(text)}
     if context:
