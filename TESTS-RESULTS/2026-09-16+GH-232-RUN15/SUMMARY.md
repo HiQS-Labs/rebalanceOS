@@ -30,6 +30,7 @@ The independent reviewer passed both the corrected implementation and campaign c
 | Explicit URL occurrences / unresolved candidates | 21 / 71 |
 | Existing index target facts | 0 |
 | Retained metadata composition facts / explicit reference matches | 47 / 12 |
+| Unique facts attached to original chat journeys | 8 |
 | Private output permissions | Directories 0700; files 0600 |
 | Doctor / full tests | Exit 1 (missing typer) / exit 2 (62 collection errors) |
 
@@ -48,6 +49,9 @@ chat-to-outcome causes. Deployment remains unknown.
 Public files here contain synthetic inputs, safe receipts and recipe/tests. Raw prompts, retained
 snapshots and enriched previews remain ignored/private. PR #231 remains draft. Next: inspect three
 enriched histories for usefulness and omissions before expanding inference or ingestion.
+The [three-case audit](CASE-AUDIT.md) distinguishes these matches from eight actual task-view
+attachments, records two unassigned #568 mentions, and separates attested PR relationships from
+what the strict automated composition actually joins. Human usefulness remains unconfirmed.
 
 ## Reproduction
 

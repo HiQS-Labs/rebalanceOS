@@ -83,6 +83,11 @@ composition adds 47 dated retained GitHub facts, 12 matching explicit prompt ref
 preserving exact prompts, original membership and source/cutoff. No live snapshot import was built.
 See [15-minute run receipts](../../TESTS-RESULTS/2026-09-16+GH-232-RUN15/SUMMARY.md).
 Full app checks remain blocked (doctor missing typer; 62 collection errors). PR #231 stays draft.
+A final [three-case coverage audit](../../TESTS-RESULTS/2026-09-16+GH-232-RUN15/CASE-AUDIT.md)
+found eight unique facts actually attached to original journeys, versus twelve matching references
+across all prompts. Two #568 mentions remain unassigned. Candidate intent display and per-event
+retrieval display are limited; issue-only mentions do not automatically import attested PR chains.
+The smallest next investigation is those missing boundaries, not broader semantic guessing.
 
 See the [source recon](../4-MISC/GH-230-RECON.md),
 [original plan](../2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md), and
