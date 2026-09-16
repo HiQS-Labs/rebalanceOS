@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.89.0] - 2026-09-16
+
+### Added
+- Opt-in private task-journey replay with separate-chat and explicitly issue-linked views. Reuses
+  captured history without changing live collection or notes. A bounded trial produced candidate
+  timelines, not verified task completion; model summaries and missing activity sources remain gated.
+
 ## [0.88.2] - 2026-09-13
 
 ### Documentation — 2026-09-16
