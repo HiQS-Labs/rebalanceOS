@@ -32,7 +32,7 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — plan approved by Agy under #210; bounded spike next; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
+- **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed, full app gates and human review pending in draft #231; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
 ### In progress
 - **CLIO first-prompt capture** ([#199](https://github.com/HiQS-Labs/rebalanceOS/issues/199)) — preserve initial no-history setup while capturing new root sessions before their first poll; exclude inherited child prompts. rated 85/80/50/70 → [GH-199-CLIO-FIRST-PROMPT.md](PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md)

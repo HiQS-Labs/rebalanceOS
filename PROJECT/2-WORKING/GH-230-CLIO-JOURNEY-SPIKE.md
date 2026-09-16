@@ -22,7 +22,7 @@ reversibility: Easy — read-only replay and disposable private projections; no 
 
 | What was just completed | What's next |
 |---|---|
-| Deterministic replay built; private seven-day preview generated | Agy implementation QA; inspect preview before expanding sources |
+| Private seven-day replay and Agy spike QA complete; full app gates blocked | Inspect candidate timelines, then scope missing GitHub evidence |
 
 Parent: https://github.com/HiQS-Labs/rebalanceOS/issues/210.
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/230.
@@ -128,17 +128,17 @@ One ordered execution sequence:
   fixtures and are excluded from historical counts. Verify no source/cursor/DB/scheduler changes.
 - [ ] Run targeted CLIO/daily synthesis tests, then repo-required doctor and pytest gates for any code
   changes; record failures/skips honestly. No operation of parked 3-Eyes. Capture stdout/exit codes.
-- [ ] Run both grouping modes on identical nonempty input; counts reconcile and events count once per
+- [x] Run both grouping modes on identical nonempty input; counts reconcile and events count once per
   view even if displayed under multiple references. Every factual timeline item has a source ID/link.
 - [ ] Terra mocked tests cover exhausted budget, unknown citation, timeout, missing usage, redaction,
   output failure and preservation of daily behavior before any approved live model invocation.
-- [ ] Write observed spike findings and blocked seams back into this plan before marking phase complete.
+- [x] Write observed spike findings and blocked seams back into this plan before marking phase complete.
 
 ## Phase 2 - Comparison and decision
 
 **Goal:** Decide whether a small journey viewer is useful, not declare predictive accuracy.
 
-- [ ] Publish a sanitized `TESTS-RESULTS/YYYY-MM-DD+GH-230/` receipt with source commit, frozen window,
+- [x] Publish a sanitized `TESTS-RESULTS/YYYY-MM-DD+GH-230/` receipt with source commit, frozen window,
   configuration, replay command, synthetic fixtures, console checks and primitive aggregate records.
   Keep actual prompt text, device paths and identifying session IDs private. Use opaque IDs in public
   counts; disclose that private semantic correctness cannot be independently reproduced publicly.
@@ -159,7 +159,7 @@ One ordered execution sequence:
 ### Phase 2 QA
 
 - [ ] All reported totals recompute from sanitized primitive records; empty/synthetic data are distinct.
-- [ ] Explain missing cross-device and relay/marathon coverage, snapshot history limits and capture filters.
+- [x] Explain missing cross-device and relay/marathon coverage, snapshot history limits and capture filters.
 - [ ] Final code review uses Agy relay, at most three rounds, before a ready implementation PR.
 - [ ] Mark implementation/merge/deployment separately; never close #210 as a consequence of this spike.
 
@@ -200,6 +200,11 @@ Human review has not occurred; neither grouping method is declared superior. Nex
 the relevant artifact-source gap, not train a model or widen the journey heuristic blindly.
 
 Receipts: [campaign](../../TESTS-RESULTS/2026-09-16+GH-230/SUMMARY.md).
+
+Agy implementation/adaptation review: `gemini-3.1-pro-high`, PASS in one round, driver exit 0,
+review commit `5eb6ff0`; [verbatim receipt](../../relay-system/2026-09-16/gh230-implementation.md).
+This approves retaining the bounded spike, not release readiness or the unimplemented Terra phase.
+Full-app gates and human usefulness review remain open. The PR is draft, not merged or deployed.
 
 Ponytail: one stdlib-oriented replay script plus focused tests, target <=300 new production lines for
 the spike; no generic event platform. If existing boundary reuse needs broader refactoring, stop and

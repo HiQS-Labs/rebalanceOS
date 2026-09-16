@@ -48,6 +48,10 @@ the accepted Markdown run is separate, with no synthetic entries mixed into hist
 
 ## Checks and limits
 
+Agy reviewed the implementation and Markdown adaptation in one round: PASS, driver exit 0,
+commit `5eb6ff0`. Verbatim: [review](../../relay-system/2026-09-16/gh230-implementation.md).
+Approval is for the bounded spike, not app-wide release readiness. No reviewer requested changes.
+
 Targeted output is in `targeted-console.txt`. Tests include deliberately wrong cross-repo joins and
 intent labels that are caught, source-prefix mutation, empty inputs, missing DB, caps, preservation of
 existing outputs, repeated starts, missing IDs, multi-issue ambiguity and future-start invariance.
