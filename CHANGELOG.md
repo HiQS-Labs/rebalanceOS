@@ -26,6 +26,11 @@
 
 ## [0.88.2] - 2026-09-13
 
+### Documentation — 2026-09-16
+- Planned a bounded prompt-history replay comparing separate chat journeys with explicitly linked
+  journeys. Independent plan review approved; scoped document checks passed. Existing capture and
+  storage remain unchanged. Implementation and live replay have not run.
+
 ### Added
 - Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
 
