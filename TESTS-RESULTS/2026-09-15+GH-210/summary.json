@@ -1,0 +1,107 @@
+{
+  "arms": {
+    "flash-low": {
+      "attempts": 48,
+      "completed_calls": 48,
+      "contract_valid": 48,
+      "false_completion_claims": 0,
+      "field_correct": {
+        "abstain": 48,
+        "completion_claimed": 48,
+        "evidence_ids": 40,
+        "project": 46,
+        "state": 48
+      },
+      "invalid_usage_values": 0,
+      "latency_seconds": {
+        "max": 35.785,
+        "p50": 12.957,
+        "p95": 20.638
+      },
+      "malformed_usage_receipts": 0,
+      "missing_usage_receipts": 0,
+      "paired_failure_cases": 0,
+      "provider_accepted": 48,
+      "strict_exact": 40,
+      "strict_exact_rate": 0.833333,
+      "two_attempt_consistent_cases": 24,
+      "unknown_evidence_ids": 0,
+      "usage_totals": {
+        "cache_read_tokens": 82925,
+        "input_tokens": 1125019,
+        "output_tokens": 124096,
+        "thinking_tokens": 120821,
+        "total_tokens": 1249115
+      }
+    },
+    "terra-low": {
+      "attempts": 48,
+      "completed_calls": 48,
+      "contract_valid": 48,
+      "false_completion_claims": 0,
+      "field_correct": {
+        "abstain": 48,
+        "completion_claimed": 48,
+        "evidence_ids": 39,
+        "project": 47,
+        "state": 48
+      },
+      "invalid_usage_values": 0,
+      "latency_seconds": {
+        "max": 10.118,
+        "p50": 4.56,
+        "p95": 6.409
+      },
+      "malformed_usage_receipts": 0,
+      "missing_usage_receipts": 0,
+      "paired_failure_cases": 0,
+      "provider_accepted": 48,
+      "strict_exact": 39,
+      "strict_exact_rate": 0.8125,
+      "two_attempt_consistent_cases": 23,
+      "unknown_evidence_ids": 0,
+      "usage_totals": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 716032,
+        "input_tokens": 952051,
+        "output_tokens": 2099,
+        "reasoning_output_tokens": 120
+      }
+    }
+  },
+  "attempts_per_case_arm": 2,
+  "battery_id": "gh210-flash-terra-v1",
+  "decision": {
+    "eligible": {
+      "flash-low": true,
+      "terra-low": true
+    },
+    "operational_lead": "terra-low",
+    "production_replacement_authorized": false,
+    "quality_winner": null
+  },
+  "deterministic_baseline": {
+    "cases": 24,
+    "field_correct": {
+      "abstain": 19,
+      "completion_claimed": 21,
+      "evidence_ids": 17,
+      "project": 17,
+      "state": 12
+    },
+    "strict_exact": 10,
+    "strict_exact_rate": 0.416667
+  },
+  "paired_strict": {
+    "flash_better_cases": 1,
+    "flash_minus_terra_mean_strict_delta": 0.020833,
+    "method": "exact_with_midrank_ties",
+    "n_nonzero": 2,
+    "p_two_sided": 1.0,
+    "terra_better_cases": 1,
+    "tied_cases": 22,
+    "w_plus": 2.0
+  },
+  "primitive_rows": 96,
+  "schema_version": 1
+}

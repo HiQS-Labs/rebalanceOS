@@ -2,7 +2,7 @@
 gh_issue: 210
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/210
 title: Gemini 3.8 Flash Low versus Terra Low synthetic classifier comparison
-status: Active — protocol frozen before inference
+status: Campaign complete — awaiting operator decision
 created: 2026-09-15
 updated: 2026-09-15
 owner: Mac Studio comparison arm
@@ -21,7 +21,7 @@ context_tags: [daily, classifier, model-comparison, synthetic-evaluation]
 
 | What was just completed | What's next |
 |---|---|
-| Independent pre-run review findings were resolved; final review approved revision 2, and all negative controls pass before inference. | Execute the frozen revision-2 matrix and publish the complete campaign under `TESTS-RESULTS/2026-09-15+GH-210/`. |
+| The 96-call frozen campaign completed: no quality winner; Terra Low is the operational lead on p95 latency, with both arms safety-eligible. | Keep Terra Low unless the operator separately authorizes a private shadow campaign; record this bounded result on GH-210. |
 
 ## Table of contents
 
@@ -163,10 +163,10 @@ provider decision.
 
 ### Phase 1 QA gate
 
-- [ ] Non-empty battery and exactly 96 primitive attempt rows.
-- [ ] Every input case receives two attempts from both arms.
-- [ ] Aggregates reproduce from the published primitive.
-- [ ] Threats to validity and every protocol deviation are explicit.
+- [x] Non-empty battery and exactly 96 primitive attempt rows.
+- [x] Every input case receives two attempts from both arms.
+- [x] Aggregates reproduce from the published primitive.
+- [x] Threats to validity and every protocol deviation are explicit.
 - [ ] `utils/pdda/pdda.sh run` passes for the documentation changes.
 
 ## Threats fixed before inference
@@ -184,9 +184,11 @@ provider decision.
 
 ## Pre-run review disposition
 
-Independent reviewer: `gpt-6-astra` Low via Codex CLI 0.153.4, read-only session
-`01a0a7f8-3f50-7b62-8160-2aac84c5da48`. Verbatim final review:
-`TESTS-RESULTS/2026-09-15+GH-210/qa/protocol-review.md`.
+Independent reviewer: `gpt-6-astra` Low via Codex CLI 0.153.4. The initial
+read-only review (`01a0a7f8-3f50-7b62-8160-2aac84c5da48`) and re-review are retained
+under `TESTS-RESULTS/2026-09-15+GH-210/qa/`. After their findings were resolved, the
+final bounded review (`01a0a807-7a56-7a82-8c8b-49bf7030d345`) returned `APPROVE`
+before inference.
 
 - **Accepted blockers:** explicit focus precedence plus acceptable citation sets;
   malformed envelopes/values become checkpointed failed attempts; both arms must pass
@@ -195,3 +197,7 @@ Independent reviewer: `gpt-6-astra` Low via Codex CLI 0.153.4, read-only session
   contract validation; sanitized raw and parsed provider receipts plus frozen hashes are retained
   and checked; consistency normalizes citation order and never counts two failures as
   agreement.
+
+The independent post-run audit (`01a0a81a-9a10-7781-b46a-f2a8bdd84dbe`) reproduced
+the aggregate and mismatch files from the primitive, verified the frozen decision
+rule and raw receipts, and returned `APPROVE`.

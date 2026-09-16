@@ -69,6 +69,7 @@ the reviewed party grading their own homework.
 |---|---|---|
 | [`2026-08-20+GH-81`](2026-08-20+GH-81) | Embedding model bake-off: BGE-small vs Qwen3-0.6B vs Gemini vs FTS5 baseline, 39 queries × 6 lanes | Shipped BGE's query prefix (MRR@10 0.572 → 0.751, p=0.0137); retracted an earlier conclusion; declined Gemini; kept BGE over Qwen |
 | [`2026-09-01+GH-144`](2026-09-01+GH-144) | CI lane spike: incumbent vs pip-cache / HiQS split / embeddings seam / xdist-4, S1 local + S2 same-SHA CI runners | Recommended the embeddings seam lane (C3): PR critical path 162→82 s (3.12), 159→74 s (3.13), inventory exact-once, all lanes witnessed-red; C1/C2 rejected on D1 (<20 %); C4 measured as fallback |
+| [`2026-09-15+GH-210`](2026-09-15+GH-210) | Gemini 3.8 Flash Low vs Terra Low: 24 synthetic classifier cases × 2 attempts × 2 arms | No quality winner (83.3% vs 81.3%, paired p=1.0); retain Terra as operational lead (p95 6.41s vs 20.64s) |
 
 ## Inspecting a run
 
