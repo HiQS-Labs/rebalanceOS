@@ -17,9 +17,9 @@ def row(prompt="/start-task #10", **extra):
                 machine="device-a", session_id="chat-a", prompt=prompt) | extra
 
 
-def load(*rows):
+def load(*rows, explicit_links_only=False):
     raw = b"\n".join(json.dumps(r).encode() for r in rows) + b"\n"
-    return jr.load_prompts(raw, "fixture", AS_OF, {"verified-clone"})
+    return jr.load_prompts(raw, "fixture", AS_OF, {"verified-clone"}, explicit_links_only=explicit_links_only)
 
 
 @pytest.mark.parametrize("text", ["/start-task #10", "/express #10", "Please start the fix", "Let's start GH10", "hotfix: repair loader", "[$start-task](skill.md) #10"])
@@ -187,15 +187,38 @@ def test_qualified_next_task_preserves_original_and_separates_events():
     'And then do same for: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
 ])
 def test_unclear_transitions_abstain(text):
-    rows, _ = load(row(), row(text, timestamp='2026-09-15T11:00:00Z'))
+    rows, _ = load(row('/start-task https://github.com/HiQS-Labs/XYZ-forge/issues/10'),
+                   row(text, timestamp='2026-09-15T11:00:00Z'), explicit_links_only=True)
     assert jr.group(rows, qualified_transitions=True) == jr.group(rows)
 
 
 def test_transition_needs_a_known_unambiguous_prior_task():
     for initial in ('/start-task now', '/start-task #10 and #30'):
         rows, _ = load(row(initial), row('Next task: start https://github.com/HiQS-Labs/XYZ-forge/issues/20',
-                                         timestamp='2026-09-15T11:00:00Z'))
+                                         timestamp='2026-09-15T11:00:00Z'), explicit_links_only=True)
         assert jr.group(rows, qualified_transitions=True) == jr.group(rows)
+
+
+def test_transition_view_excludes_guesses_without_explicit_links_flag():
+    rows, _ = load(row('/start-task https://github.com/HiQS-Labs/XYZ-forge/issues/10'),
+                   row('Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+                       timestamp='2026-09-15T11:00:00Z'),
+                   row('Catalog PR 8 is mentioned only', timestamp='2026-09-15T12:00:00Z'))
+    original = jr.group(rows)
+    candidate = jr.group(rows, qualified_transitions=True)
+    bundle = dict(prompts=rows, journeys=original[0], parents=original[1], orphans=original[2],
+                  coverage={}, candidate_view=dict(journeys=candidate[0], parents=candidate[1], orphans=candidate[2]),
+                  events=[dict(timestamp='2026-09-15T13:00:00Z', id='foreign-guess', ref=(jr.REPO,'pr',8),
+                               event='merged_at', url='should-not-join-candidate')])
+    assert 'should-not-join-candidate' not in jr.render(bundle).split('## C —')[1]
+    assert all((jr.REPO, 'pr', 8) not in j['issues'] for j in candidate[0])
+    assert jr.group(rows) == original
+
+
+def test_bare_prior_issue_cannot_qualify_a_transition():
+    rows, _ = load(row('/start-task #10'), row('Next task: https://github.com/HiQS-Labs/XYZ-forge/issues/20',
+                                              timestamp='2026-09-15T11:00:00Z'))
+    assert len(jr.group(rows, qualified_transitions=True)[0]) == 1
 
 
 def test_repeated_start_new_attempt_and_no_lookahead():

@@ -51,6 +51,12 @@ def references(text, context):
     return sorted(refs)
 
 
+def qualified_references(text):
+    """Typed qualified URLs only; neither prose scope nor shorthand supplies identity."""
+    return sorted({(repo.lower(), 'pr' if kind.lower() == 'pull' else 'issue', int(number))
+                   for repo, kind, number, _, _ in REF.findall(text) if repo})
+
+
 def is_start(text):
     """Conservative command hints, not an intent classifier or proof of execution."""
     text = text.strip().lower()
@@ -139,8 +145,7 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
         if explicit_links_only:
             # Only a typed, qualified URL establishes both repository and artifact type.
             # Shorthand and checkout-scoped prose stay review candidates, never join keys.
-            explicit = {(repo.lower(), 'pr' if kind.lower() == 'pull' else 'issue', int(number))
-                        for repo, kind, number, _, _ in REF.findall(text) if repo}
+            explicit = set(qualified_references(text))
             unresolved = [dict(repository=None, kind_hint=kind, number=number,
                                reason='repository or artifact type requires review')
                           for repo, kind, number in refs if (repo, kind, number) not in explicit]
@@ -167,6 +172,8 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
 
 
 def group(rows, qualified_transitions=False):
+    if qualified_transitions:
+        rows = [row | {'refs': qualified_references(row['text'])} for row in rows]
     journeys, active, orphans = [], {}, []
     for row in rows:
         key = (row["device"], row["agent"], row["session"])
@@ -261,7 +268,7 @@ def render(bundle):
             lines += ['', f"### Candidate {journey['id']}",
                       f"- Boundary: {journey.get('boundary', 'original start hint')}",
                       '- Intent prompt IDs: ' + ', '.join(journey['prompts'])]
-            refs = {tuple(ref) for pid in journey['prompts'] for ref in rows[pid]['refs']}
+            refs = {ref for pid in journey['prompts'] for ref in qualified_references(rows[pid]['text'])}
             lines += [f"- {e['timestamp']} — recorded event: {e['event']} {e['url']}"
                       for e in bundle['events'] if tuple(e['ref']) in refs]
     lines += ["", f"Unassigned prompts: {len(bundle['orphans'])}", "", "## Review sample — first ten non-starts"]

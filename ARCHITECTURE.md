@@ -17,6 +17,11 @@ DB gateway. It emits a new private run directory with two journey views, source 
 It is not an `all` collector, never updates the index, and does not call a model or publish into a vault.
 Its opt-in `--explicit-links-only` policy joins outcomes only through typed qualified GitHub URLs;
 other mentions are retained under `unresolved_refs` and excluded from grouping/event attachment.
+The independent `--qualified-transitions` option adds a third candidate view for exact new-task
+requests naming a different qualified issue. Its grouping and event joins use qualified URLs
+regardless of legacy reference settings. Original views and start hints remain unchanged; a split
+is not completion. The GH-232 retained-metadata composition recipe is campaign-only, not a new
+runtime adapter or collector.
 
 **INVARIANT**: **Compose, don't mutate**. No new query surfaces (like `semantic_query` vs `ask`) or UI renderers (web server vs static HTML) may be introduced without a plan to deprecate and replace the old one. If extending an existing pipeline, build reusable primitives in `src/rebalance/lib/` instead of duplicating logic in the caller.
 
