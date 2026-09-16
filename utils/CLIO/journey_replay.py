@@ -108,7 +108,7 @@ def markdown_rows(raw):
     return b"\n".join(rows) + b"\n"
 
 
-def load_prompts(raw, fingerprint, as_of, aliases):
+def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
     counts = Counter()
     rows, seen = [], set()
     for ordinal, line in enumerate(raw.splitlines(), 1):
@@ -135,6 +135,16 @@ def load_prompts(raw, fingerprint, as_of, aliases):
         if not context and not any(r[0] == REPO for r in refs):
             counts["unresolved_or_other_repo"] += 1
             continue
+        unresolved = []
+        if explicit_links_only:
+            # Only a typed, qualified URL establishes both repository and artifact type.
+            # Shorthand and checkout-scoped prose stay review candidates, never join keys.
+            explicit = {(repo.lower(), 'pr' if kind.lower() == 'pull' else 'issue', int(number))
+                        for repo, kind, number, _, _ in REF.findall(text) if repo}
+            unresolved = [dict(repository=None, kind_hint=kind, number=number,
+                               reason='repository or artifact type requires review')
+                          for repo, kind, number in refs if (repo, kind, number) not in explicit]
+            refs = sorted(explicit)
         if len(rows) >= MAX_ROWS:
             counts["row_cap_hit"] = 1
             break
@@ -149,6 +159,8 @@ def load_prompts(raw, fingerprint, as_of, aliases):
                      "timestamp": stamp.isoformat(), "text": text, "kind": "intent",
                      "session": row.get("session_id"), "device": row.get("machine"),
                      "agent": row.get("agent"), "refs": refs, "start": is_start(text)})
+        if explicit_links_only:
+            rows[-1]['unresolved_refs'] = unresolved
     if not rows:
         raise ValueError("no eligible seven-day prompts; coverage blocked")
     return sorted(rows, key=lambda r: (r["timestamp"], r["ordinal"])), dict(counts)
@@ -225,6 +237,9 @@ def render(bundle):
         timeline += [(e["timestamp"], f"recorded event [{e['id']}]: {e['event']} {e['url']}")
                      for e in bundle["events"] if tuple(e["ref"]) in refs]
         lines += [f"- {stamp} — {text}" for stamp, text in sorted(timeline)]
+        unresolved = sum(len(rows[pid].get('unresolved_refs', [])) for pid in journey['prompts'])
+        if unresolved:
+            lines += [f'- Unresolved reference candidates: {unresolved}; excluded from outcome joins.']
     lines += ["", "## B — Issue-linked parents (same child timelines)"]
     for parent, children in bundle["parents"].items():
         lines += [f"- {parent}"] + [f"  - {child}" for child in children]
@@ -261,6 +276,8 @@ def main():
     parser.add_argument("--checkout", type=Path, action="append", default=[])
     parser.add_argument("--as-of", default=now_utc().isoformat())
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--explicit-links-only', action='store_true',
+                        help='Use only typed qualified GitHub URLs for joins; retain other mentions as unresolved.')
     args = parser.parse_args()
     as_of = parse_iso(args.as_of)
     if as_of is None:
@@ -274,7 +291,7 @@ def main():
     source = resolve_clio_prompt_log_path(args.source)
     raw, meta = snapshot(source)
     replay_input = markdown_rows(raw) if args.source_format == "md" else raw
-    rows, counts = load_prompts(replay_input, meta["sha256"], as_of, aliases)
+    rows, counts = load_prompts(replay_input, meta["sha256"], as_of, aliases, args.explicit_links_only)
     journeys, parents, orphans = group(rows)
     events, status = github_events(resolve_database_path(args.database), as_of)
     coverage = counts | {"eligible_prompts": len(rows), "starts": sum(r["start"] for r in rows),
@@ -283,6 +300,8 @@ def main():
                         "devices": len({r['device'] for r in rows if r['device']}),
                         "terra": "not called: guarded runner has no independent output seam",
                         "relay_marathon": "not attested", "byte_cap_hit": meta["byte_cap_hit"]}
+    coverage['reference_policy'] = 'explicit URLs only' if args.explicit_links_only else 'checkout-context candidates'
+    coverage['unresolved_reference_candidates'] = sum(len(r.get('unresolved_refs', [])) for r in rows)
     bundle = {"as_of_utc": as_of.isoformat(), "source": meta, "source_format": args.source_format, "coverage": coverage,
               "prompts": rows, "journeys": journeys, "parents": parents, "orphans": orphans, "events": events}
     publish(args.output, raw, bundle, source, meta)

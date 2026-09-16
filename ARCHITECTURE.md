@@ -15,6 +15,8 @@
 prefix or canonical marker-backed Markdown export and existing GitHub snapshots via the read-only
 DB gateway. It emits a new private run directory with two journey views, source evidence and coverage.
 It is not an `all` collector, never updates the index, and does not call a model or publish into a vault.
+Its opt-in `--explicit-links-only` policy joins outcomes only through typed qualified GitHub URLs;
+other mentions are retained under `unresolved_refs` and excluded from grouping/event attachment.
 
 **INVARIANT**: **Compose, don't mutate**. No new query surfaces (like `semantic_query` vs `ask`) or UI renderers (web server vs static HTML) may be introduced without a plan to deprecate and replace the old one. If extending an existing pipeline, build reusable primitives in `src/rebalance/lib/` instead of duplicating logic in the caller.
 

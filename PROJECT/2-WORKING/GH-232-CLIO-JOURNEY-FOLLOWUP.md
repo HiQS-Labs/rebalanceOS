@@ -20,7 +20,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Batch 1 finished via the failure-report branch; rejected candidate archived and baseline restored | Scope unambiguous formatting/chat-ID fixes separately from project/type inference |
+| Separate formatting fix and conservative mode pass; three explicit issue histories reconstructed | Test one qualified task transition, then review current implementation |
 
 The [GitHub issue](https://github.com/HiQS-Labs/rebalanceOS/issues/232) owns the actionable plan,
 if/then scenarios, acceptance checks and batch limits. This is a continuation of
@@ -28,7 +28,53 @@ if/then scenarios, acceptance checks and batch limits. This is a continuation of
 [#210](https://github.com/HiQS-Labs/rebalanceOS/issues/210), not a replacement for their evidence.
 Implementation remains in draft [#231](https://github.com/HiQS-Labs/rebalanceOS/pull/231).
 
+## Sustained continuation — eight steps
+
+The operator authorized separate clear fixes followed by uncertain-project handling and a longer
+plan. This continuation supersedes batch 1's exhausted repair cap; it is a new scoped approach.
+Reversibility is Easy: optional replay policy and private projections. No database format change.
+The bet is that conservative links plus visible gaps can yield useful history; too few explicit
+references may limit coverage. No claim that unresolved candidates are correct labels.
+
+1. Pin and fix formatted typed PRs and labeled AgentChorus/agent2agent IDs separately → completed;
+   five failures witnessed before the fix, valid closed PR and large issue-number controls preserved.
+2. Trace consumers and add optional explicit-links mode → completed; grouping and rendering read
+   only `refs`, while `unresolved_refs` remains diagnostic. No project-name word registry.
+3. Run focused controls and the frozen replay → completed; source/window/prompt/start identities
+   and child membership unchanged. Preserve original previews. Compare coverage, not accuracy.
+4. Inspect evidence availability through the existing read-only adapter and retained snapshots →
+   local index still supplies zero target events. Record which explicit URLs have usable snapshots;
+   if missing, limit reconstruction to the attested subset rather than fill gaps from prompts.
+5. Reconstruct 2–3 explicit cases from retained facts → proceed only where URL identities and
+   event timestamps are available; show intent, creation, merge/closure and unknown deployment.
+   No source match means a readable coverage report instead. Shared delivery preserves child tasks.
+6. Test one explicit task transition within a chat → if it names a new qualified issue, offer a
+   separate candidate segment alongside the original view. Ambiguous “next” wording is flagged
+   for review. Read grouping fully before editing; no broad semantic detector.
+7. Review the current small implementation and preview rules → one independent review plus at
+   most one focused remediation. Dependency-blocked app gates keep #231 draft. Reviewer unavailable
+   means documented outstanding review, not an approval or endless review loop.
+8. Publish receipts, update #232/#230/#210 and #231, and recommend continue/simplify/park → each
+   independently verified implementation gets a scoped commit/push. Stop after the batch's two-hour
+   cap or at a requested merge/deployment, new private egress/spending, capture/schema change, or
+   new ingestion system. Safe missing-evidence fallbacks may finish without further user nudges.
+
+If explicit links provide adequate examples, continue steps 5–7. If coverage is too sparse, retain
+the replay as a conservative preview and scope evidence availability next. If a valid explicit link
+is lost or an unresolved mention attaches an event, fix that focused defect before progression.
+No plan step requires resolving a project name by guessing which GitHub number happens to exist.
+
 ## Evidence and next batch
+
+Continuation findings: the optional explicit-links mode retains 21 qualified URL occurrences and
+71 unresolved candidates on the same 288 prompts/nine journeys. Fifty focused tests pass.
+Existing index coverage remains absent; retained GitHub snapshots supported separate histories
+for #508/535, #568/581 and #623/640. Each preserves explicit prompt mentions and merge/closure times;
+deployment remains unknown. #508's superseded verdict remains important historical context.
+See [continuation receipts](../../TESTS-RESULTS/2026-09-16+GH-232-BATCH2/SUMMARY.md).
+Steps 1–5 have progressed; step 6 and current independent review remain outstanding. No broad
+task-boundary change or automated snapshot import was made. This is a longer resumable plan,
+not a claim that all eight steps are complete.
 
 See the [source recon](../4-MISC/GH-230-RECON.md),
 [original plan](../2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md), and

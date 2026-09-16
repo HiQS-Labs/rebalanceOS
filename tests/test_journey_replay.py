@@ -81,6 +81,35 @@ def test_formatting_and_chat_ids(text, expected):
     assert jr.references(text, True) == expected
 
 
+def test_explicit_links_mode_keeps_uncertainty_out_of_joins():
+    raw = (json.dumps(row('/start-task #10; Catalog PR 8; Other/project#25; '
+                          'https://github.com/HiQS-Labs/XYZ-forge/pull/520')).encode() + b'\n')
+    rows, _ = jr.load_prompts(raw, 'fixture', AS_OF, {'verified-clone'}, explicit_links_only=True)
+    assert rows[0]['refs'] == [(jr.REPO, 'pr', 520)]
+    assert {x['number'] for x in rows[0]['unresolved_refs']} == {10, 8, 25}
+    assert all(x['repository'] is None for x in rows[0]['unresolved_refs'])
+    assert jr.group(rows)[0][0]['issues'] == []
+
+
+def test_explicit_links_mode_requires_no_checkout_guess():
+    raw = (json.dumps(row('https://github.com/Other/project/issues/25', repo='verified-clone')).encode() + b'\n')
+    rows, _ = jr.load_prompts(raw, 'fixture', AS_OF, {'verified-clone'}, explicit_links_only=True)
+    assert rows[0]['refs'] == [('other/project', 'issue', 25)]
+    assert rows[0]['unresolved_refs'] == []
+
+
+def test_unresolved_mentions_cannot_attach_events():
+    raw = json.dumps(row('/start-task #10; Catalog PR 8')).encode() + b'\n'
+    rows, _ = jr.load_prompts(raw, 'fixture', AS_OF, {'verified-clone'}, explicit_links_only=True)
+    journeys, parents, orphans = jr.group(rows)
+    bundle = dict(prompts=rows, journeys=journeys, parents=parents, orphans=orphans, coverage={},
+                  events=[dict(timestamp='2026-09-15T11:00:00Z', id='fixture-event',
+                               ref=(jr.REPO, 'pr', 8), event='merged_at', url='fixture-merge')])
+    assert 'fixture-merge' not in jr.render(bundle)
+    rows[0]['refs'] = [(jr.REPO, 'pr', 8)]  # Deliberately restore the wrong join.
+    assert 'fixture-merge' in jr.render(bundle)
+
+
 def test_grouping_same_input_and_no_bridge():
     rows, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"),
                    row(session_id="chat-b", machine="device-b"),
