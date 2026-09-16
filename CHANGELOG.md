@@ -10,6 +10,18 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.92.0] - 2026-09-16
+
+### Added
+- Private work-history trial connects confirmed GitHub closing-issue relationships to recorded
+  pull-request delivery. Separate attempts, open issues and shared delivery remain distinct;
+  richer histories and plain evidence lists are ready for operator comparison. Usefulness is
+  unconfirmed and deployment remains unknown.
+
+### Fixed
+- Retained-metadata composition rejects spoofed artifact URLs, inconsistent merge receipts and
+  conflicting duplicate event records instead of turning them into work-history facts.
+
 ## [0.91.0] - 2026-09-16
 
 ### Added

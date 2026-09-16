@@ -1,5 +1,29 @@
 # GH-230 Recon Map — CLIO journey replay
 
+## Phase 2 bounded link recon — September 16
+
+Base: `bf2c292`; grep-only, local entry/state/build lane plus an independent read-only
+contract lane. Subject: campaign-only retained closing-issue composition; no index contract change.
+
+- `github_knowledge.py:126` parses title/body closing words, and `:260` persists inferred text
+  references through `db/github.py:213`. These links are not GitHub closing-issue API receipts.
+- `github_reconciliation.py:143` uses a normal DB connection with schema initialization, then
+  scores mentions, branch names and title similarity. It is not a read-only authoritative replay
+  adapter; do not invoke it or elevate its confidence into delivery proof.
+- Existing campaign `replay_saved_facts.py:saved_events/main` validates retained artifact identity,
+  cutoff and capture, then calls the existing `journey_replay.publish`; source/index stay unchanged.
+- Retained PR `closingIssuesReferences` includes issue URL, number and repository identity.
+  This is the usable API relationship seam, observed at the snapshot retrieval time—not proof
+  the relationship was present at an earlier prompt/merge time. Use only merged-in-window PRs,
+  canonical typed endpoints, valid retrieval time, deduplication and visible conflict abstention.
+- Renderer/publisher are the only proposed runtime consumers; bundle enrichment is optional.
+  Original prompt/start/group membership and existing events remain unchanged. Source/schema,
+  capture/export cursors, live adapters, collectors and scheduling are outside the radius.
+
+Unknowns: snapshot relationship pagination/exhaustiveness and historical relation changes are not
+established. Missing relationship metadata is an evidence gap, never a negative completeness claim.
+Private results can be rerun; rollback is stopping the optional projection. No live fetch or migration.
+
 Source base: `57b6ea9bc37841440b8207d125d7812f770c36db`, RebalanceOS development.
 Read-only source recon, 2026-09-16 UTC. Graph and Rebalance MCP tools unavailable in this session;
 used source reads/search and two read-only recon lanes. Runtime coverage remains unverified.

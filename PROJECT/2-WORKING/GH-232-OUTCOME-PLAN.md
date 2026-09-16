@@ -17,7 +17,7 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 optional issue-evidence view implemented; original frozen records preserved | Phase 2 entry recon and delivery-link checks; automated relay/app gates remain incomplete |
+| Phase 2 delivery composition independently reviewed PASS; three A/B cases prepared | Phase 3 operator judgments; ending and repeat sample remain unconfirmed; app gates blocked |
 
 ## Table of contents
 
@@ -140,6 +140,34 @@ no merge/deployment or independent implementation approval. See the retained
 - [ ] Deliberately swapped issue/PR identity fails; open/shared/direct/superseded controls run.
 - [ ] No capture/index writes, API fetch, new collector, live notes or vault publication.
 - [ ] Current independent implementation review passes; any wrong attachment blocks progression.
+
+### Phase 2 — implementation and review result
+
+The operator authorized a continued run of up to 30 minutes. Fresh local/independent recon is
+retained in the existing [Recon Map](../4-MISC/GH-230-RECON.md#phase-2-bounded-link-recon--september-16).
+Production `github_links` are text-parsed references and reconciliation initializes schema, so
+neither was reused as an authoritative read-only adapter. The existing campaign recipe now optionally
+composes the retained native `closingIssuesReferences` records; no live fetch, new schema or collector.
+
+Confirmed #535→#508, #581→#568 and #640→#623; shared #641→#609/#626 stays two links. Eight retained
+relationships total include the already available #540→#536, #557→#556 and #577→#561. Open/direct
+controls #567/#589/#608 have no invented PR links. Observed relationships do not establish their
+historical presence, chat causation or deployment. #508's superseded caveat remains explicitly
+prior diagnostic evidence, not an automatically attested evolving-goal chain.
+
+Initial independent review requested changes: spoof URL, state/retrieval conflicts, malformed
+targets and contradictory event duplicates. Witnessed five failing regression controls, then one
+focused remediation. Re-review PASS covers the bounded campaign only. Final driver suite: 97 passed;
+frozen prompts/starts/journeys/parents/orphans/candidate view/source/coverage/47 events unchanged.
+The preservation instrument initially expected only five links; inspecting receipts showed eight
+valid retained links, and its explicit expectation was corrected without changing runtime output.
+Full app gates still fail on missing dependencies; #231 remains draft, no merge/deployment.
+
+Phase 3's three A/B comparisons are now generated from the same evidence and offered for operator
+review. Feedback is pending. No ending was selected and no repeat sample was started; both depend
+on the frozen usefulness rule. Detailed issue sections preserve chat labels and unassigned status;
+compact A currently summarizes known-chat counts without per-line attempt labels (nonblocking
+review note). [Retained findings and review](../../TESTS-RESULTS/2026-09-16+GH-232-OUTCOME/SUMMARY.md).
 
 ## Phase 3: test usefulness and choose the ending
 

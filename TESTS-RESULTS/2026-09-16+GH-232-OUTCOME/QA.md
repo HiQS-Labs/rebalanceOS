@@ -75,3 +75,49 @@ The reviewer explicitly stated none block PASS. These requested clarifications w
 no additional claim of a second review or automated approval. Broader source validation was not
 performed by this plan-only review. The changed operational fallback is disclosed separately in
 the plan; it was not part of the original reviewed text.
+# Phase 2 independent implementation review
+
+Reviewer: separate read-only Codex subagent, inherited session model. Not Claude Fable and not an
+automated relay approval. No reviewer edits. Initial findings were reproduced by driver before one
+remediation. This section is distinct from the older plan-only review below.
+
+Initial reviewer verdict, verbatim:
+
+> CHANGES REQUESTED on current Phase 2 diff. Existing focused tests pass 86/86, but independent synthetic probes exposed missing controls:
+>
+> 1. Embedded fake URL accepted: `https://evil.test/?next=https://github.com/HiQS-Labs/XYZ-forge/pull/20`. The reference parser scans substrings rather than validating the entire artifact URL.
+> 2. PR state `OPEN` plus a merge timestamp still yields a delivery relationship.
+> 3. Retrieval timestamp earlier than the asserted merge still yields a relationship.
+> 4. `closingIssuesReferences=[None]` crashes with `AttributeError` instead of visibly abstaining.
+> 5. Duplicate PR records with conflicting merge times produce two incompatible merge events in `saved_events`.
+>
+> Required before PASS: strict artifact URL/type validation; defensive shape checks; coherent merged state/retrieval receipts; conflict rejection for duplicate event records; synthetic regression tests.
+>
+> Positive: composition stays campaign-only/read-side, retains shared issue identities, and its renderer explicitly avoids chat-causation and deployment claims. No files changed during review.
+
+Disposition: whole-URL typed identity, MERGED state and retrieval coherence, malformed-target gaps,
+contradictory duplicate failure before publication, and synthetic controls added. Null-target handling
+was already corrected when driver reproduced the other five failures. Event-state/render controls
+and the corrected eight-link preservation instrument were additionally verified by driver afterward.
+
+Re-review verdict, verbatim:
+
+> PASS for the bounded campaign implementation—not full-app readiness or usefulness approval.
+>
+> Independent verification:
+>
+> - Four earlier malformed/spoofed delivery probes now visibly abstain.
+> - Conflicting duplicate merge records fail closed before publication.
+> - Focused journey/saved-fact tests: **92 passed**.
+> - Frozen prompts, journeys, parents, orphans, source receipts and candidate grouping remain exactly unchanged.
+> - Confirmed links: `535→508`, `581→568`, `640→623`.
+> - Shared `641→609/626` remains two separate issue relationships.
+> - Open/direct controls `567/589/608` have no invented delivery links.
+> - A/B views use the same evidence and distinguish historical events from retrieval receipts.
+> - #508’s earlier diagnostic caution is explicitly not an automatically verified goal-completion chain.
+> - No new source/index/schema/network mutation.
+>
+> Nonblocking usability note: compact A timelines could retain per-line chat-attempt labels; the existing detailed D section already provides them, and A explicitly warns against treating separate attempts as continuous work.
+
+Disposition of nonblocking note: retained as a possible usability follow-up, not an automatic
+third review/repair cycle. Operator feedback remains pending; current detailed D labels are preserved.

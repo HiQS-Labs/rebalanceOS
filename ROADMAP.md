@@ -32,7 +32,7 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — optional explicit issue-evidence view built; original chats/gaps preserved; next verify delivery relationships, then human usefulness; plan-only Fable PASS, automated relay/app gates incomplete; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
+- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — explicit mentions and confirmed delivery links built; bounded implementation review PASS; three history/list comparisons await operator feedback; automated relay/app gates incomplete; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
 
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed, full app gates and human review pending in draft #231; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
