@@ -32,7 +32,7 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — queued experiment under #210; [plan](PROJECT/1-INBOX/GH-230-CLIO-JOURNEY-SPIKE.md).
+- **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — planning under #210, Agy QA pending; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
 ### In progress
 - **Broken runtime virtualenv strands scheduler fleet at EX_CONFIG** ([#236](https://github.com/HiQS-Labs/rebalanceOS/issues/236)) — active one-phase repair: add one declared-runtime interpreter diagnosis, route status 78 through verify, and keep all remediation explicit. rated 90/90/50/80 → [GH-236-RUNTIME-VENV-DIAGNOSTICS.md](PROJECT/2-WORKING/GH-236-RUNTIME-VENV-DIAGNOSTICS.md)
