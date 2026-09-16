@@ -69,38 +69,6 @@ def test_scope_and_negative_join_control(monkeypatch):
         check()  # deliberately broken bare-number join is caught
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("Merge Catalog PR 8. Review XYZ PR 520.", [(jr.REPO, "pr", 520)]),
-    ("File the plan on Other-project. Another device is on issue 25.", []),
-    ("In the OtherProject repo, review issue 25.", []),
-    ("Other/project#25 then issue 26", [("other/project", "issue", 25)]),
-    ("https://github.com/Other/project/pull/25 then PR 26",
-     [("other/project", "pr", 25)]),
-    ("PR 1 — #40 producer; PR 2 — #41 recovery",
-     [(jr.REPO, "issue", 40), (jr.REPO, "issue", 41)]),
-    ("Let's focus on issue 1 first only. Issue 61 has the wrong URL for issue 62.",
-     [(jr.REPO, "issue", 61), (jr.REPO, "issue", 62)]),
-    ("Join XYZ AgentChorus #123456 to discuss PR #519", [(jr.REPO, "pr", 519)]),
-    ("Join XYZ agent2agent #123456 to discuss issue #12", [(jr.REPO, "issue", 12)]),
-    ("PR **#519** and PR `#520`", [(jr.REPO, "pr", 519), (jr.REPO, "pr", 520)]),
-    ("PR #519, then PR **#519**", [(jr.REPO, "pr", 519)]),
-])
-def test_reference_abstention_regressions(text, expected):
-    assert jr.references(text, True) == expected
-
-
-@pytest.mark.parametrize("text,expected", [
-    ("Please review PR 495", [(jr.REPO, "pr", 495)]),
-    ("Review PR #1 and issue #2", [(jr.REPO, "issue", 2), (jr.REPO, "pr", 1)]),
-    ("PR 553 is merged", [(jr.REPO, "pr", 553)]),
-    ("/start-task on 567 now", [(jr.REPO, "issue", 567)]),
-    ("In the XYZ-forge repo, review PR **#519**", [(jr.REPO, "pr", 519)]),
-    ("https://github.com/Other/project/issues/25", [("other/project", "issue", 25)]),
-])
-def test_reference_guard_positive_controls(text, expected):
-    assert jr.references(text, True) == expected
-
-
 def test_grouping_same_input_and_no_bridge():
     rows, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"),
                    row(session_id="chat-b", machine="device-b"),

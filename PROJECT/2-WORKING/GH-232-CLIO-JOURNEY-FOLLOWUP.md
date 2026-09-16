@@ -20,7 +20,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Operator authorized the four-step batch; observed failures reproduced from retained evidence | Pin synthetic expectations, then make the smallest reference guard |
+| Batch 1 finished via the failure-report branch; rejected candidate archived and baseline restored | Scope unambiguous formatting/chat-ID fixes separately from project/type inference |
 
 The [GitHub issue](https://github.com/HiQS-Labs/rebalanceOS/issues/232) owns the actionable plan,
 if/then scenarios, acceptance checks and batch limits. This is a continuation of
@@ -54,7 +54,9 @@ Raw prompts and reviewer-only source excerpts stay in private ignored scratch, n
 Decision rule, frozen before rerun: all synthetic negative and positive controls must pass, and
 every changed reference must be inspected for known-good losses and unresolved/wrong additions.
 Include the prior 24 changed cases, not just newly affected cases. Any known-good loss or wrong
-new association blocks progression. Maximum two narrow repair passes, two-hour total batch cap.
+new association OR unresolved retained/new association in the reviewed cases blocks progression.
+Every changed reference (including all prior 24 cases) needs a recorded disposition. Intentional
+abstention is reported, not counted as a correct link. Maximum two narrow repair passes, two-hour total batch cap.
 If the reference gate passes, inspect 2–3 candidate journeys with retained GitHub evidence; if it
 fails, step four is a failure report with a narrower next proposal, not a forced reconstruction.
 Assistant inspection is diagnostic, not human ground-truth labeling; no accuracy/generalization
@@ -69,6 +71,33 @@ HiQS literal-reference projection was inspected; it resolves IDs against its sep
 does not handle these typed/ordinal distinctions, and is not a replacement for this replay seam.
 
 ## Verification
+
+Protocol review: Agy timed out without findings (driver exit 7). The bounded Codex fallback found
+the unresolved-addition gap above; its FAIL findings are retained in
+../../relay-system/2026-09-16/gh232-protocol-codex.md. The run itself exited 6 because a generated
+gate-evidence directory appeared during containment; it is not an approved relay. The blocker was
+addressed before the replay by strengthening the gate. No further protocol-review loop this batch;
+current implementation QA remains required before promotion.
+
+## Batch 1 outcome
+
+All four steps were attempted in order, with step four taking its explicit failure-report branch.
+The first guard passed its synthetic suite but lost known-good references in the frozen replay.
+Five new regression cases pinned that overreach. The second/final guard still failed one synthetic
+case and lost a valid “CLOSED PR” reference in real input; no third pass and no new reconstruction.
+Both runs preserved 288 prompts, nine journeys and 212 unassigned prompts. All 24 affected cases
+were inspected, including the prior parser's changes; retained bare-hash type conflicts and
+unresolved candidates remain. These are assistant diagnostic findings, not human accuracy labels.
+
+The [campaign](../../TESTS-RESULTS/2026-09-16+GH-232/SUMMARY.md) retains both runs, all-case disposition
+counts, witnessed failures, comparison controls and the rejected patch. Runtime parser and tests
+were restored to the pre-batch state; its 41 focused tests pass. Six comparator controls pass.
+Doctor and full-suite collection remain blocked by missing dependencies. PR #231 remains draft.
+
+Next bet: isolate the unambiguous formatting/chat-ID fixes before attempting any representation
+change for uncertain project/type references. Growing a prose-word allowlist was not reliable enough
+in this batch. Any later representation change needs the consumers reviewed first; no capture,
+database, privacy/budget or deployment expansion is authorized by this result.
 
 Require witnessed failing negative controls, preserved positive controls, unchanged replay input,
 review of all changed references, and evidence for every claimed outcome. Earlier Agy approval

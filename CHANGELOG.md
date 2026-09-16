@@ -13,6 +13,9 @@
 ## [0.89.1] - 2026-09-16
 
 ### Documentation
+- Recorded a bounded two-attempt reference experiment: the proposed safeguards also lost valid
+  links, so they were rejected and the previous parser restored. Retained the attempted patch,
+  failed controls, frozen-input comparisons and narrower follow-up; no runtime improvement shipped.
 - Published frozen reference-rerun deltas and queued GH-232 as the evidence-linked journey
   continuation, with four-step batches and explicit stop/abstention decisions. Partial review found
   incorrect reference additions; automatic linking remains unapproved. No runtime change.
