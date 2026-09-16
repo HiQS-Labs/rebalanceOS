@@ -27,11 +27,24 @@ REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/(\d+)\b|(
 
 
 def references(text, context):
-    refs = {(a.lower(), "pr" if b == "pull" else "issue", int(c)) if a else
+    refs = {(a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else
             (d.lower(), "issue", int(e)) for a, b, c, d, e in REF.findall(text)}
     if context:
-        # Bare numbers are scoped ONLY by independently verified checkout identity.
-        refs.update((REPO, "issue", int(n)) for n in re.findall(r"(?<![\w/])#(\d+)\b", text))
+        # Consume typed refs before bare #N so PR #N does not also become issue #N.
+        local = REF.sub(" ", text)
+        number = r"([1-9]\d*)(?![\w]|\.\d)"
+        def typed(match):
+            if match[3]:  # "PR 2 phase" may be a phase ordinal, not a GitHub ID.
+                return " "
+            kind = "issue" if match[1].lower() == "issue" else "pr"
+            refs.add((REPO, kind, int(match[2])))
+            return " "
+        local = re.sub(r"\b(issue|pr|pull\s+request)\s+#?" + number + r"(\s+phase\b)?", typed, local, flags=re.I)
+        refs.update((REPO, "issue", int(n)) for n in re.findall(r"(?<![\w/])#" + number, local))
+        # A bare command argument is scoped by the command, not arbitrary prose numbers.
+        command = re.match(r"^\s*/start-task\s+(?:(?:on|for)\s+)?" + number, local, re.I)
+        if command:
+            refs.add((REPO, "issue", int(command[1])))
     return sorted(refs)
 
 
