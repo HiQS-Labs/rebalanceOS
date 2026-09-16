@@ -22,7 +22,7 @@ reversibility: Easy — read-only replay and disposable private projections; no 
 
 | What was just completed | What's next |
 |---|---|
-| Issue and source recon recorded; operator choices incorporated | Agy plan QA before spike implementation |
+| Agy approved the plan; scoped document checks passed | Implement Phase 1 bounded replay, then inspect private previews |
 
 Parent: https://github.com/HiQS-Labs/rebalanceOS/issues/210.
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/230.
@@ -43,7 +43,7 @@ Recon: [source map](../4-MISC/GH-230-RECON.md).
 - [x] Inspect related issues/PRs and source across src, utils and HiQS before adding a plan.
 - [x] Record operator choices: dynamic start hints, last seven days of XYZ Forge, Terra summaries
   within existing limits, compare separate chats and connected issue journeys.
-- [ ] Agy approves the committed plan through relay-xyz (maximum three review rounds).
+- [x] Agy approves the committed plan through relay-xyz (maximum three review rounds).
 
 Findings: SQLite ingestion already exists. Keep the JSONL writer and current prompt-note exporter.
 The existing daily synthesis has a two-hour/16-prompt input and a daily-note output, so cannot simply
@@ -54,8 +54,9 @@ The graph/MCP tools are unavailable here; source recon used file reads, not priv
 
 ### Phase 0 QA
 
-- [ ] Source claims checked against committed base; runtime unknowns remain explicit.
-- [ ] PDDA document checks pass for this plan and pointer; Agy receipt has a valid verdict and driver exit.
+- [x] Source claims checked against committed base; runtime unknowns remain explicit.
+- [x] Scoped PDDA frontmatter, status-table and roadmap-coverage checks pass;
+  Agy receipt has a valid verdict and driver exit.
 
 ## Phase 1 - Bounded technical spike
 
@@ -182,4 +183,12 @@ Recent-vs-prior 14-day trend remains unknown. PDDA effort/risk fields are separa
 No existing plan/PR duplicates this journey replay in the searched issue/PR inventory.
 
 Review inputs are public-safe docs/source only. Agy must check identity, temporal leakage, live-state
-preservation, Terra shared guards, phase bounds and falsifiable tests. Review status: pending.
+preservation, Terra shared guards, phase bounds and falsifiable tests.
+
+Review: Agy `gemini-3.1-pro-high` approved in one round, driver exit 0 (2026-09-16 UTC).
+[Verbatim review](../../relay-system/2026-09-16/gh230-plan.md), committed at `4acc673`.
+No requested changes; post-review edits only record status/evidence, not the protocol.
+The Agy shim fixture suite returned exit 0 (62 pass / 0 fail); vendored harness lacks `validate.sh`,
+so no full harness validation is claimed. Scoped PDDA checks returned zero errors/warnings.
+Runtime doctor, full application tests and historical replay are not run: this is a documentation-only
+delivery, not a verified implementation. No private prompt text entered the review.
