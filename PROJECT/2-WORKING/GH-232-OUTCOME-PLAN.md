@@ -17,7 +17,7 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| Frozen replay, clear synthetic transition and independent implementation review | Plan QA, then a small explicit issue-evidence preview |
+| Fable low-effort plan review PASS; three non-blocking clarifications incorporated | Operator-authorized Phase 1; automated relay gate remains incomplete |
 
 ## Table of contents
 
@@ -59,8 +59,11 @@ not only with an empty baseline.
   retained fields, 12 whole-prompt matches and eight unique original-journey attachments. These
   are coverage counts, not actions completed or accuracy. Recompute rather than assuming them.
 - [ ] Obtain Claude Code Fable low-effort plan QA through relay-xyz. Record exact model/effort,
-  verdict and exit; allow one remediation and one re-review. Unavailable/failed review stays a
-  blocker, never becomes approval or a silent model substitution.
+  verdict and exit; allow one remediation and one re-review. If the harness gate is unavailable,
+  record a same-model, tools-disabled full-plan review as an advisory fallback and keep the
+  automation verdict separate. Failed/unavailable model review stays a blocker; a model PASS
+  never becomes a clean relay approval or a silent model substitution. Any future driven work
+  still requires its automation gates.
 - [ ] Freeze the Phase 3 usefulness rule before generating the new views. No benchmark claims
   without operator-established labels; assistant diagnostics are not ground truth.
 
@@ -116,6 +119,8 @@ not only with an empty baseline.
 
 ### Phase 2 — QA checklist
 
+- [ ] The implementation owner has recorded a fresh bounded recon of the actual link consumers;
+  this is a Phase 2 entry gate before any adapter/composition change.
 - [ ] Every attached PR relationship has canonical repo/type/number and an attested closing link.
 - [ ] Deliberately swapped issue/PR identity fails; open/shared/direct/superseded controls run.
 - [ ] No capture/index writes, API fetch, new collector, live notes or vault publication.
@@ -134,6 +139,8 @@ not only with an empty baseline.
   or misleading connection remains. These thresholds are a product choice, not statistical proof.
   If B helps but A fails these conditions, choose B. If neither helps after one focused correction,
   choose C. Missing source or unresolved privacy authority blocks the trial rather than proves C.
+  Any “misleading” reply fails A for that sample. One focused correction is allowed; A can qualify
+  only after the operator confirms it is no longer misleading. Otherwise choose B/C as above.
 - [ ] If A qualifies, repeat on three explicitly linked tasks from a second disjoint captured period
   with unchanged rules. Same two-of-three usefulness/preference rule; zero unsupported remaining
   claims; at most one focused correction. If the second sample is absent, A remains unconfirmed.
@@ -150,8 +157,17 @@ not only with an empty baseline.
 - [ ] Known wrong joins or unsupported completion/deployment claims prevent A; gaps stay visible.
 - [ ] Doctor, full `tests/`, applicable PDDA and final review pass before a merge is considered.
   Current missing-dependency failures keep #231 draft; fixing them is separate scoped work.
+  The offline A/B/C usefulness decision and experiment handoff can complete independently of
+  those unrelated integration fixes; selection is not permission to merge or deploy.
 
 ## Boundaries and handoff
+
+Plan QA: Fable 5.1 (`claude-fable-5-1[1m]`) with native `--effort low` returned PASS on the complete
+plan, tools disabled, task-local Claude Code 2.1.273. It raised three non-blocking clarifications
+above. The global 2.1.29 client was not changed. Full relay-harness validation was capped at
+20 minutes without a final verdict; the clean automated relay was not driven. A prior file-reading
+advisory exhausted its unchanged $0.50 per-call limit with no verdict. No model substitution or
+budget increase. [Review and dispositions](../../TESTS-RESULTS/2026-09-16+GH-232-OUTCOME/QA.md).
 
 Source/replay trace: `load_prompts` → `qualified_references` → `group` → `render` → `publish`.
 The current replay source was read in full; the existing recon covers capture/storage/export.
