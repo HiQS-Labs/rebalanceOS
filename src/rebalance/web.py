@@ -1036,7 +1036,10 @@ def focus5_note() -> JSONResponse:
 
 def _focus5_goals_payload() -> dict[str, Any]:
     from rebalance.ingest.config import get_vault_path
-    from rebalance.ingest.goals_file import parse_goals
+    from rebalance.ingest.goals_file import (
+        compute_goals_revision,
+        parse_goals_content,
+    )
 
     vault = get_vault_path()
     if not vault:
@@ -1045,6 +1048,7 @@ def _focus5_goals_payload() -> dict[str, Any]:
             "items": [],
             "path": None,
             "total_open": 0,
+            "goals_revision": None,
             "reason": "vault_not_configured",
             "message": "vault_path is not configured",
         }
@@ -1057,10 +1061,13 @@ def _focus5_goals_payload() -> dict[str, Any]:
                 "items": [],
                 "path": str(goals),
                 "total_open": 0,
+                "goals_revision": None,
                 "reason": "file_missing",
                 "message": f"{FOCUS5_GOALS_FILENAME} not found in the configured vault",
             }
-        all_items = parse_goals(goals, limit=None)
+        content = goals.read_text(encoding="utf-8")
+        revision = compute_goals_revision(content)
+        all_items = parse_goals_content(content, limit=None)
     except OSError as exc:
         logger.warning("focus5.goals: could not read %s: %s", goals, exc)
         return {
@@ -1068,6 +1075,7 @@ def _focus5_goals_payload() -> dict[str, Any]:
             "items": [],
             "path": str(goals),
             "total_open": 0,
+            "goals_revision": None,
             "reason": "read_failed",
             "message": str(exc),
         }
@@ -1091,6 +1099,7 @@ def _focus5_goals_payload() -> dict[str, Any]:
         "items": items,
         "path": str(goals),
         "total_open": len(all_items),
+        "goals_revision": revision,
         "reason": None,
         "message": None,
     }
@@ -1100,7 +1109,7 @@ def _focus5_goals_payload() -> dict[str, Any]:
 def focus5_goals() -> JSONResponse:
     """Read-only projection of the operator's top open tasks from ``0. Goals.md``.
 
-    Always returns ``{exists, items, path, total_open}`` at HTTP 200 so the
+    Always returns ``{exists, items, path, total_open, goals_revision}`` at HTTP 200 so the
     native client decodes one shape. ``items`` are the first 8 unchecked tasks
     in file order, each with ``title``, ``description``, and ``line_index``.
     """
@@ -1110,12 +1119,17 @@ def focus5_goals() -> JSONResponse:
 class Focus5GoalCompleteRequest(BaseModel):
     title: str
     line_index: int | None = None
+    goals_revision: str | None = None
 
 
 @app.post("/api/focus5/goals/complete")
 def focus5_complete_goal(req: Focus5GoalCompleteRequest, request: Request) -> JSONResponse:
     """Flip one ``0. Goals.md`` checkbox from open to complete, then re-read."""
-    from rebalance.ingest.goals_file import complete_goal_in_file
+    from rebalance.ingest.goals_file import (
+        AmbiguousGoalError,
+        StaleRevisionError,
+        complete_goal_in_file,
+    )
 
     if not _request_is_local(request):
         logger.warning("focus5 goals: rejected non-local request from %s", request.client)
@@ -1133,11 +1147,38 @@ def focus5_complete_goal(req: Focus5GoalCompleteRequest, request: Request) -> JS
             status_code=404,
         )
 
-    completion = complete_goal_in_file(
-        Path(path),
-        title,
-        line_index=req.line_index,
-    )
+    try:
+        completion = complete_goal_in_file(
+            Path(path),
+            title,
+            line_index=req.line_index,
+            expected_revision=req.goals_revision,
+        )
+    except StaleRevisionError as exc:
+        logger.warning("focus5.goals.complete: stale revision: %s", exc)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "stale_goal_snapshot",
+                "message": "Goal file has changed since snapshot was loaded",
+                "current_revision": exc.current_revision,
+                "expected_revision": exc.expected_revision,
+            },
+            status_code=409,
+        )
+    except AmbiguousGoalError as exc:
+        logger.warning("focus5.goals.complete: ambiguous goal: %s", exc)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "ambiguous_goal_title",
+                "message": f"Multiple open goals match title '{exc.title}'",
+                "title": exc.title,
+                "matching_indexes": exc.matching_indexes,
+            },
+            status_code=409,
+        )
+
     if not completion:
         return JSONResponse(
             {"ok": False, "error": "goal not found", "title": title},
@@ -1150,7 +1191,183 @@ def focus5_complete_goal(req: Focus5GoalCompleteRequest, request: Request) -> JS
             "ok": True,
             "title": title,
             "line_index": completion["line_index"],
+            "goals_revision": completion.get("goals_revision"),
             **refreshed,
+        }
+    )
+
+
+def _safe_int(val: Any, default: int = 0) -> int:
+    """Coerce arbitrary metric value to int without raising exceptions."""
+    if val is None:
+        return default
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    if isinstance(val, str):
+        try:
+            return int(val.strip())
+        except ValueError:
+            return default
+    return default
+
+
+@app.get("/portfolio-matrix.json")
+def portfolio_matrix() -> JSONResponse:
+    """Read-only 2D Executive Portfolio Matrix projection.
+
+    Returns active projects from project_registry merged with their top 3 open goals
+    from 0. Goals.md in file order, sorted descending by computed_score.
+    """
+    from rebalance.paths import resolve_database_path
+    from rebalance.ingest.registry import get_projects
+    from rebalance.ingest.config import get_vault_path
+    from rebalance.ingest.goals_file import (
+        compute_goals_revision,
+        parse_sectioned_goals_content,
+    )
+    from rebalance.ingest.project_classifier import normalize_match_text
+    from rebalance.lib.time_ops import now_iso
+
+    db_path = resolve_database_path()
+    active_projects: list[dict[str, Any]] = []
+    if db_path and db_path.exists():
+        try:
+            active_projects = get_projects(db_path, status="active")
+        except Exception as exc:
+            logger.warning("portfolio_matrix: error reading project_registry: %s", exc)
+
+    vault = get_vault_path()
+    goals_revision: str | None = None
+    section_groups = []
+    if vault:
+        goals_file = Path(vault).expanduser() / FOCUS5_GOALS_FILENAME
+        if goals_file.is_file():
+            try:
+                content = goals_file.read_text(encoding="utf-8")
+                goals_revision = compute_goals_revision(content)
+                section_groups = parse_sectioned_goals_content(content)
+            except OSError as exc:
+                logger.warning("portfolio_matrix: error reading goals file %s: %s", goals_file, exc)
+
+    # Index active projects by normalized name for exact normalized match
+    normalized_to_projects: dict[str, list[dict[str, Any]]] = {}
+    for proj in active_projects:
+        name = proj.get("name") or ""
+        norm = normalize_match_text(name)
+        normalized_to_projects.setdefault(norm, []).append(proj)
+
+    # Detect collisions in project_registry
+    colliding_norms: set[str] = {
+        norm for norm, projs in normalized_to_projects.items() if len(projs) > 1
+    }
+    for norm in colliding_norms:
+        logger.warning("portfolio_matrix: colliding normalized project name: %s", norm)
+
+    # Parse and match sections: header split on spaced slash " / "
+    # Key: (canonical_project_name, subproject_or_None)
+    tasks_by_group: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    for group in section_groups:
+        if not group.header:
+            continue
+        header = group.header.strip()
+        if " / " in header:
+            parts = header.split(" / ", 1)
+            proj_token, subproject = parts[0].strip(), parts[1].strip()
+        else:
+            proj_token, subproject = header, None
+
+        norm_token = normalize_match_text(proj_token)
+        if norm_token in colliding_norms:
+            continue
+
+        matched_projs = normalized_to_projects.get(norm_token)
+        if matched_projs and len(matched_projs) == 1:
+            canon_name = matched_projs[0]["name"]
+            key = (canon_name, subproject)
+            tasks_by_group.setdefault(key, []).extend(group.tasks)
+
+    rows: list[dict[str, Any]] = []
+    for proj in active_projects:
+        name = proj.get("name") or ""
+        custom_fields = proj.get("custom_fields") or {}
+        tier = proj.get("priority_tier")
+
+        rev_ranking = _safe_int(
+            custom_fields.get("revenue_ranking"),
+            default=_safe_int(tier, default=0),
+        )
+        rev_potential = _safe_int(custom_fields.get("revenue_potential"), default=0)
+        computed_score = _safe_int(
+            custom_fields.get("computed_score"),
+            default=rev_ranking + rev_potential,
+        )
+
+        # Look up any matched section groups for this project
+        matched_subs = [
+            sub for (p_name, sub) in tasks_by_group.keys() if p_name == name
+        ]
+
+        if not matched_subs:
+            # Active project with zero matching sections in 0. Goals.md: emit bare row
+            rows.append(
+                {
+                    "id": f"{name}:",
+                    "name": name,
+                    "subproject": None,
+                    "revenue_ranking": rev_ranking,
+                    "revenue_potential": rev_potential,
+                    "computed_score": computed_score,
+                    "tasks": [],
+                }
+            )
+        else:
+            # Sort subprojects: None first, then alphabetically
+            sorted_subs = sorted(
+                matched_subs,
+                key=lambda s: ("" if s is None else s.lower()),
+            )
+            for sub in sorted_subs:
+                raw_tasks = tasks_by_group.get((name, sub), [])
+                # Cap at first 3 open tasks in file order
+                capped = raw_tasks[:3]
+                task_items = [
+                    {
+                        "id": f"{name}:{sub or ''}:{t['line_index']}",
+                        "title": t["title"],
+                        "line_index": t["line_index"],
+                        "is_blocked": False,
+                        "source_header": f"{name}{' / ' + sub if sub else ''}",
+                    }
+                    for t in capped
+                ]
+                rows.append(
+                    {
+                        "id": f"{name}:{sub or ''}",
+                        "name": name,
+                        "subproject": sub,
+                        "revenue_ranking": rev_ranking,
+                        "revenue_potential": rev_potential,
+                        "computed_score": computed_score,
+                        "tasks": task_items,
+                    }
+                )
+
+    # Sort rows: descending by computed_score, then name, then subproject
+    rows.sort(
+        key=lambda r: (
+            -r["computed_score"],
+            r["name"].lower(),
+            ("" if r["subproject"] is None else r["subproject"].lower()),
+        )
+    )
+
+    return JSONResponse(
+        {
+            "computed_at": now_iso(),
+            "goals_revision": goals_revision,
+            "projects": rows,
         }
     )
 
