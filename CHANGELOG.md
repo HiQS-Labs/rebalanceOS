@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.91.0] - 2026-09-16
+
+### Added
+- Optional issue-linked preview shows all qualified issue mentions, including unassigned requests,
+  without changing the original timelines. Separate chats and missing starts remain visible;
+  shared mentions keep the same identity and are counted once in unique totals. This is an offline
+  preview, not a completion claim or a live deployment.
+
 ## [0.90.0] - 2026-09-16
 
 ### Documentation

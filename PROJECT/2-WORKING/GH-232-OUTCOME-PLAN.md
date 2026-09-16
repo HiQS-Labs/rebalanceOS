@@ -17,7 +17,7 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| Fable low-effort plan review PASS; three non-blocking clarifications incorporated | Operator-authorized Phase 1; automated relay gate remains incomplete |
+| Phase 1 optional issue-evidence view implemented; original frozen records preserved | Phase 2 entry recon and delivery-link checks; automated relay/app gates remain incomplete |
 
 ## Table of contents
 
@@ -97,6 +97,21 @@ not only with an empty baseline.
 - [ ] Wrong-repository and unresolved references attach zero events; red controls retained under
   `TESTS-RESULTS/<UTC-date>+GH-232-OUTCOME/` with synthetic primitives and console output.
 - [ ] Private publisher still rejects existing output, verifies source prefix and uses 0700/0600.
+
+### Phase 1 — batch result
+
+Implemented the optional `--issue-evidence` renderer projection. It shows typed, qualified
+XYZ Forge issue mentions from every eligible prompt, including unassigned ones; other-repository,
+pull-request and ambiguous bare-number references cannot become trial-issue identities. Separate
+captured chats have local attempt labels; unknown sessions stay unknown. Multi-issue mentions
+share their original prompt ID, show “also mentions” and contribute once to the unique total.
+Displayed intent is a redacted excerpt (up to 500 characters), not a new summary or full-text export.
+
+The frozen enriched bundle and entire old preview prefix remain exactly unchanged apart from the
+opt-in flag and appended section. All three #568 mentions are now visible; two remain unassigned.
+The new view adds no issue-to-PR closing links. Full app checks still fail on missing dependencies;
+no merge/deployment or independent implementation approval. See the retained
+[batch receipts](../../TESTS-RESULTS/2026-09-16+GH-232-OUTCOME/SUMMARY.md#phase-1-implementation-batch).
 
 ## Phase 2: verify delivery relationships
 
