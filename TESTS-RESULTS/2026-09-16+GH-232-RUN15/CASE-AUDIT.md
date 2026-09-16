@@ -16,6 +16,14 @@ in those task timelines. These are distinct coverage measures, not confirmed cau
 The candidate view has unchanged membership on this sample. More linked facts does not resolve
 the 212 unassigned prompts, including two explicit mentions of #568.
 
+The two missing mentions have no earlier detected start in their same-chat eligible window.
+One is in a different agent/chat with no detected starts; the other precedes two later starts in
+the same chat that eventually has an assigned #568 mention. This is expected conservative grouping,
+not a lost qualified reference. It does not establish that no task began before the frozen window.
+Backfilling the latter from a later start would introduce lookahead; merging the former would
+erase separate attempts. An explicit issue-evidence grouping could show both while keeping their
+unassigned status, but that view has not been implemented or validated in this run.
+
 ## Candidate stories from public evidence
 
 1. Portable skill projection experiment: [PR #535](https://github.com/HiQS-Labs/XYZ-forge/pull/535)
