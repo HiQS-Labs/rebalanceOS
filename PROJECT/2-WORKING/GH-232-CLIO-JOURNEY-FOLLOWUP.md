@@ -20,7 +20,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Separate formatting fix and conservative mode pass; three explicit issue histories reconstructed | Test one qualified task transition, then review current implementation |
+| Synthetic transition and independent review pass; retained facts enrich the frozen preview | Check usefulness of three evidence-linked timelines; keep draft until app gates pass |
 
 The [GitHub issue](https://github.com/HiQS-Labs/rebalanceOS/issues/232) owns the actionable plan,
 if/then scenarios, acceptance checks and batch limits. This is a continuation of
@@ -72,9 +72,17 @@ Existing index coverage remains absent; retained GitHub snapshots supported sepa
 for #508/535, #568/581 and #623/640. Each preserves explicit prompt mentions and merge/closure times;
 deployment remains unknown. #508's superseded verdict remains important historical context.
 See [continuation receipts](../../TESTS-RESULTS/2026-09-16+GH-232-BATCH2/SUMMARY.md).
-Steps 1–5 have progressed; step 6 and current independent review remain outstanding. No broad
-task-boundary change or automated snapshot import was made. This is a longer resumable plan,
-not a claim that all eight steps are complete.
+The subsequent operator-authorized 15-minute run completed steps 6–8: an isolated implementation
+agent built the exact qualified transition, while a separate read-only agent reviewed the current
+implementation. Review found malformed URL/chat-ID defects and a flag-combination wrong join;
+their failing controls were witnessed and focused remediations independently passed.
+The synthetic example changes one chat segment into two candidate tasks without changing starts
+or claiming completion. The frozen week remains nine segments: zero additional unambiguous
+transitions. Seventy-seven focused checks pass, including four retained-fact controls. A campaign-only
+composition adds 47 dated retained GitHub facts, 12 matching explicit prompt references, while
+preserving exact prompts, original membership and source/cutoff. No live snapshot import was built.
+See [15-minute run receipts](../../TESTS-RESULTS/2026-09-16+GH-232-RUN15/SUMMARY.md).
+Full app checks remain blocked (doctor missing typer; 62 collection errors). PR #231 stays draft.
 
 See the [source recon](../4-MISC/GH-230-RECON.md),
 [original plan](../2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md), and
@@ -83,10 +91,33 @@ The replay retained 288 prompts and nine journeys. Reference extraction changed 
 partial review found at least four incorrect additions across three prompts. These are not
 accuracy measurements. No automatic-linking promotion is justified yet.
 
-The next batch progresses from synthetic regression cases to a minimal abstention guard,
-then the identical frozen replay, then a conditional 2–3-journey reconstruction using retained
-GitHub evidence. Maximum two repair passes and two hours; report failures instead of expanding
-scope. No source capture changes, new collector, unguarded model calls, merge or deployment.
+## Next phase — usefulness before broader inference
+
+Goal: determine whether three explicit, evidence-linked histories explain useful work without
+inventing missing steps. Existing grounded seam: load_prompts → group → render → private publish;
+the runtime and campaign composition have been read end to end. Reuse their output, not a new UI.
+Reversibility Easy: private reports only; flags shield the original view. No capture/index writes.
+The failure bet is sparse explicit references or misleading chronology. debug-mantra remains the
+execution-time protocol. Cap: one 15-minute batch and one focused correction, then report.
+
+1. Inspect the enriched private preview for #508, #568 and #623 → every displayed fact must have
+   matching qualified identity, event time and separately labeled retrieval time; missing PR
+   references remain missing, rather than importing a closure chain from proximity.
+2. Produce three compact candidate timelines using the existing preview → distinguish requested
+   work, recorded events, possible association and unknown deployment; preserve superseded goals.
+3. Check usefulness and omissions → record wrong joins, missing attested facts and unassigned
+   activity separately. Assistant inspection is diagnostic; operator confirmation is still needed
+   before claiming useful reconstruction. No added model calls or semantic transition grammar.
+4. Decide continue/simplify/park → if useful but snapshot coverage is missing, scope the existing
+   adapter seam separately; if confusing or sparse, retain the explicit preview and park broader
+   inference. App gates must pass before any merge; new ingestion/deployment needs separate scope.
+
+### Phase QA checklist
+
+- [ ] Three timelines have identity/time evidence and explicit unknowns.
+- [ ] Wrong-join checks and nonempty-source controls run with public-safe receipts.
+- [ ] Operator usefulness remains unconfirmed unless actually reviewed.
+- [ ] Source/index/live notes remain unchanged; batch cap and status table reconciled.
 
 ## Frozen protocol — batch 1
 

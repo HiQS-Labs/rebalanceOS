@@ -10,6 +10,17 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.90.0] - 2026-09-16
+
+### Added
+- Optional qualified task-transition candidates alongside the unchanged original chat view.
+  A new, explicitly linked issue can split a candidate task; ambiguous wording stays unsplit.
+  Candidate links use qualified URLs even when legacy reference mode is selected. No prior-task
+  completion is inferred. Independent review and synthetic transition controls pass.
+- Published a retained-GitHub-facts composition trial: the frozen history remains unchanged,
+  while dated facts enrich explicitly referenced artifacts. This is a private research preview,
+  not live ingestion, deployment proof or measured task-detection accuracy.
+
 ## [0.89.3] - 2026-09-16
 
 ### Fixed

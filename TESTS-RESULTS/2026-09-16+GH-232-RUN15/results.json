@@ -1,0 +1,22 @@
+{
+  "scope": "synthetic controls and one frozen week; not accuracy",
+  "eligible_prompts": 288,
+  "original_journeys": 9,
+  "unassigned_prompts": 212,
+  "additional_real_qualified_transitions": 0,
+  "synthetic_prompts": 4,
+  "synthetic_original_segments": 1,
+  "synthetic_candidate_segments": 2,
+  "explicit_url_occurrences": 21,
+  "unresolved_candidate_occurrences": 71,
+  "index_target_events": 0,
+  "retained_events": 47,
+  "explicitly_referenced_events": 12,
+  "focused_checks_passed": 77,
+  "doctor_exit": 1,
+  "full_tests_exit": 2,
+  "collection_errors": 62,
+  "deployment": "unknown",
+  "human_usefulness": "not reviewed",
+  "models_called": 0
+}
