@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.89.2] - 2026-09-16
+
+### Fixed
+- Formatted pull-request numbers retain their type, and explicitly labeled discussion IDs no
+  longer become issue references. Regression checks include valid closed pull requests and large
+  issue numbers, preserving both while excluding discussion identifiers.
+
 ## [0.89.1] - 2026-09-16
 
 ### Documentation
