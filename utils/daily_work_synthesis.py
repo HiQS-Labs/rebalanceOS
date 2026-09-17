@@ -146,13 +146,16 @@ def issue_status(
     labels = native.get("labels")
     remote = isinstance(labels, list) and "in-progress" in labels
     native_fresh = (
-        native.get("native_identity_valid") is True
+        not native.get("native_conflict")
+        and native.get("native_identity_valid") is True
         and native.get("state") in ("open", "closed")
         and fresh(native.get("fetched_at"), max_age)
     )
     if native_fresh and native["state"] == "closed":
         label = {"completed": "Completed", "not_planned": "Cancelled"}.get(native.get("state_reason"), "Closed")
         return result("closed", label, "Closed; label cleanup pending" if local or remote else "Native issue is closed")
+    if native.get("native_conflict"):
+        return result("unknown", "Conflicting observations", "Equal-time native cache records disagree")
     if native.get("native_identity_valid") is False:
         return result("unknown", "Unavailable", "Native issue identity does not agree")
     if not native_fresh:

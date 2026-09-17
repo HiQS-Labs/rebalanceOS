@@ -184,9 +184,10 @@ def test_newest_case_variant_and_strict_url_validation(tmp_path, monkeypatch):
     db = tmp_path / "rebalance.db"
     native_database(db)
     cx = sqlite3.connect(db)
+    cx.execute("UPDATE github_items SET fetched_at=?", ((NOW - timedelta(seconds=60)).isoformat(),))
     cx.execute(
         "INSERT INTO github_items SELECT upper(repo_full_name),item_type,number,'closed',html_url,?,?,created_at,labels_json,'completed',title FROM github_items",
-        (AT, AT),
+        ("2020-01-01T00:00:00Z", "2026-09-17T13:00:00-07:00"),
     )
     cx.commit()
     cx.close()
@@ -205,6 +206,25 @@ def test_newest_case_variant_and_strict_url_validation(tmp_path, monkeypatch):
             native = fetch_issue_status_evidence(conn, [("example/project", 7)], time.monotonic() + 1)
         assert native[("example/project", 7)]["state"] == "closed"
         assert native[("example/project", 7)]["native_identity_valid"] is valid
+
+
+def test_equal_time_contradictory_native_copies_are_uncertain(tmp_path, monkeypatch):
+    from rebalance.ingest.db import queries
+
+    monkeypatch.setattr(queries, "_get_alias_map", lambda: {})
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+    cx = sqlite3.connect(db)
+    cx.execute(
+        "INSERT INTO github_items SELECT upper(repo_full_name),item_type,number,'closed',html_url,updated_at,fetched_at,created_at,labels_json,'completed',title FROM github_items"
+    )
+    cx.commit()
+    cx.close()
+    with db_connection_readonly(db) as conn:
+        native = fetch_issue_status_evidence(conn, [("example/project", 7)], time.monotonic() + 1)
+    row = native[("example/project", 7)]
+    assert row["native_conflict"] is True
+    assert dws.issue_status(dict(row, labels=["in-progress"]), [EVIDENCE], NOW)["kind"] == "unknown"
 
 
 def test_native_sql_lock_is_bounded(tmp_path, monkeypatch):
