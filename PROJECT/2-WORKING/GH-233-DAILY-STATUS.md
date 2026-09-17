@@ -2,7 +2,7 @@
 gh_issue: 233
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/233
 title: Daily established-work status reader
-status: Implementation in progress — producer landing required
+status: Reader built — review and producer landing required
 created: 2026-09-17
 updated: 2026-09-17
 owner: Codex
@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Fresh development57b6ea9 anchored; 12 baseline Daily tests pass. Real cross-repo reader plan QA approved Round3 in XYZ. | Add the bounded data-only adapter, existing cache gateway query and deterministic output; producer646 landing remains a release dependency. |
+| Reader and Daily skill changes built; 36 focused tests and nine witnessed red controls pass. Eight broader failures also reproduce on unchanged development; standalone HiQS163 pass. | Resolve native WAL lock-file preservation contract, complete final independent QA and refresh after PR234; producer646 landing remains a release dependency. |
 
 ## Grounded recon and implementation gate
 

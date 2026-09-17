@@ -1,0 +1,23 @@
+CONTROL direct-entry; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_populated_collector_is_readonly_and_egress_is_whitelisted ________
+
+tmp_path = PosixPath('<fixture-temp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1098b36f0>
+
+    def test_populated_collector_is_readonly_and_egress_is_whitelisted(tmp_path, monkeypatch):
+        db = tmp_path / "rebalance.db"
+        native_database(db)
+        harness, ledger = trusted_fixture(tmp_path, report())
+        monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_: (harness, (ledger,)))
+        before = db.read_bytes(), (ledger / "releases.db").read_bytes()
+        result = dws.collect_issue_statuses(db, NOW, dws.default_config())
+>       assert result["facts"][0]["kind"] == "in-progress"
+               ^^^^^^^^^^^^^^^^^^
+E       IndexError: list index out of range
+
+tests/test_daily_issue_status.py:159: IndexError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_populated_collector_is_readonly_and_egress_is_whitelisted
+1 failed in 0.24s
