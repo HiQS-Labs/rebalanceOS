@@ -230,7 +230,7 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
         source = {
             "id": hashlib.sha256(str(root).encode()).hexdigest()[:16],
             "read_at": now.isoformat(),
-            "generation": report.get("generation"),
+            "generation": report.get("generation") if type(report.get("generation")) is int else None,
             "supported": report.get("status_label_supported") is True,
         }
         if not report.get("schema_ready") or not source["supported"]:
