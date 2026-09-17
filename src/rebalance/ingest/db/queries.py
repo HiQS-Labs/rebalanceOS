@@ -39,7 +39,7 @@ from urllib.parse import urlsplit
 
 from rebalance.ingest.agent_tags import classify as classify_source
 from rebalance.ingest.config import get_github_org_aliases
-from rebalance.lib.time_ops import now_utc, parse_utc_iso
+from rebalance.lib.time_ops import now_utc, parse_utc_iso, parse_iso
 
 
 # Default cloud agent bots recognized as automated commit authors
@@ -287,11 +287,30 @@ def fetch_issue_status_evidence(conn, identities, deadline):
             rows.extend(selected)
         if time.monotonic() >= deadline:
             raise TimeoutError("native-read-deadline")
+        # Status uses the newest *observation*, not an old item's update text.
+        # Keep existing general-query resolution semantics unchanged.
+        newest = {}
+        ranks = {}
+        for cached in rows:
+            key = (_canonical_lower(cached["repo_full_name"], aliases), cached["number"])
+            parsed = parse_iso(cached["fetched_at"], force_utc=False)
+            rank = parsed.timestamp() if parsed and parsed.tzinfo else float("-inf")
+            if key not in ranks or rank > ranks[key]:
+                ranks[key], newest[key] = rank, [cached]
+            elif rank == ranks[key]:
+                newest[key].append(cached)
+        conflicting = {
+            key
+            for key, copies in newest.items()
+            if len({(r["state"], r["labels_json"], r["state_reason"]) for r in copies}) > 1
+        }
+        reduced = [row for copies in newest.values() for row in copies]
         resolved = {}
-        for (repo, _kind, number), row in _resolve_newest_items(rows, aliases).items():
+        for (repo, _kind, number), row in _resolve_newest_items(reduced, aliases).items():
             key = (repo, number)
             if key not in wanted:
                 continue
+            row["native_conflict"] = key in conflicting
             try:
                 url = urlsplit(row.get("html_url") or "")
                 parts = url.path.strip("/").split("/")
