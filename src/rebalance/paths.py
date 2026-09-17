@@ -116,17 +116,27 @@ def resolve_clio_prompt_log_path(explicit: Path | None = None) -> Path:
 # Internals
 # ---------------------------------------------------------------------------
 
+
 def resolve_xyz_work_sources(explicit_harness=None, explicit_roots=None):
     """Explicit trusted code/ledger locations; no sibling discovery or new defaults."""
     configured = _load_user_config()
-    harness = explicit_harness if explicit_harness is not None else os.environ.get("REBALANCE_XYZ_HARNESS") or configured.get("xyz_harness_root")
-    raw_roots = explicit_roots if explicit_roots is not None else os.environ.get("REBALANCE_XYZ_LEDGER_ROOTS") or configured.get("xyz_ledger_roots", [])
+    harness = (
+        explicit_harness
+        if explicit_harness is not None
+        else os.environ.get("REBALANCE_XYZ_HARNESS") or configured.get("xyz_harness_root")
+    )
+    raw_roots = (
+        explicit_roots
+        if explicit_roots is not None
+        else os.environ.get("REBALANCE_XYZ_LEDGER_ROOTS") or configured.get("xyz_ledger_roots", [])
+    )
     roots = raw_roots.split(os.pathsep) if isinstance(raw_roots, str) else raw_roots
     if not isinstance(roots, list) or any(not isinstance(root, str) for root in roots):
         raise ValueError("xyz_ledger_roots must be explicit path strings")
-    return (Path(harness).expanduser().absolute() if harness else None,
-            tuple(Path(root).expanduser().absolute() for root in roots if root))
-
+    return (
+        Path(harness).expanduser().absolute() if harness else None,
+        tuple(Path(root).expanduser().absolute() for root in roots if root),
+    )
 
 
 def _load_user_config() -> dict:

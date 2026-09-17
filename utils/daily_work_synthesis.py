@@ -18,7 +18,12 @@ from pathlib import Path
 from typing import Any
 
 from rebalance.lib.redaction import redact_key_shaped_secrets
-from rebalance.paths import resolve_clio_prompt_log_path, resolve_database_path, resolve_project_root, resolve_xyz_work_sources
+from rebalance.paths import (
+    resolve_clio_prompt_log_path,
+    resolve_database_path,
+    resolve_project_root,
+    resolve_xyz_work_sources,
+)
 from rebalance.lib.time_ops import now_utc, parse_iso, to_local
 
 
@@ -118,24 +123,33 @@ def recent_prompt_rows(cutoff: datetime, limit: int = 16) -> list[dict[str, Any]
     return rows
 
 
-def issue_status(native: dict[str, Any], evidence: list[dict[str, Any]], now: datetime,
-                 max_age: int = 7200) -> dict[str, str]:
+def issue_status(
+    native: dict[str, Any], evidence: list[dict[str, Any]], now: datetime, max_age: int = 7200
+) -> dict[str, str]:
     """Recorded facts, not model interpretation or proof of current execution."""
+
     def stamp(value):
         try:
             parsed = parse_iso(value, force_utc=False) if isinstance(value, str) else None
             return parsed if parsed and parsed.tzinfo else None
         except (ValueError, TypeError):
             return None
+
     def fresh(value, age):
         parsed = stamp(value)
         return parsed is not None and 0 <= (now - parsed).total_seconds() <= age
+
     def result(kind, label, reason):
         return {"kind": kind, "label": label, "reason": reason}
+
     local = any(e.get("status_label") == "in-progress" for e in evidence)
     labels = native.get("labels")
     remote = isinstance(labels, list) and "in-progress" in labels
-    native_fresh = native.get("native_identity_valid") is True and native.get("state") in ("open", "closed") and fresh(native.get("fetched_at"), max_age)
+    native_fresh = (
+        native.get("native_identity_valid") is True
+        and native.get("state") in ("open", "closed")
+        and fresh(native.get("fetched_at"), max_age)
+    )
     if native_fresh and native["state"] == "closed":
         label = {"completed": "Completed", "not_planned": "Cancelled"}.get(native.get("state_reason"), "Closed")
         return result("closed", label, "Closed; label cleanup pending" if local or remote else "Native issue is closed")
@@ -145,22 +159,41 @@ def issue_status(native: dict[str, Any], evidence: list[dict[str, Any]], now: da
         return result("unknown", "Unverified", "Native issue state is missing, stale or invalid")
     if not isinstance(labels, list):
         return result("unknown", "Unavailable", "Cached GitHub labels are unavailable")
-    if not evidence or any(not e.get("supported") or e.get("error") or e.get("roots_complete") is False for e in evidence):
+    if not evidence or any(
+        not e.get("supported") or e.get("error") or e.get("roots_complete") is False for e in evidence
+    ):
         return result("unknown", "Unavailable", "XYZ evidence is unsupported or incomplete")
     if any(not fresh(e.get("read_at"), 300) for e in evidence):
         return result("unknown", "Stale evidence", "XYZ observation has expired")
-    signatures = {json.dumps([e.get("status_label"), (e.get("start") or {}).get("at"), (e.get("start") or {}).get("event"),
-                            (e.get("lifecycle") or {}).get("at"), (e.get("lifecycle") or {}).get("event")]) for e in evidence}
+    signatures = {
+        json.dumps(
+            [
+                e.get("status_label"),
+                (e.get("start") or {}).get("at"),
+                (e.get("start") or {}).get("event"),
+                (e.get("lifecycle") or {}).get("at"),
+                (e.get("lifecycle") or {}).get("event"),
+            ]
+        )
+        for e in evidence
+    }
     if len(signatures) > 1:
         return result("conflict", "Conflicting records", "Configured XYZ ledgers disagree")
-    established = all(e.get("status_label") == "in-progress" and (e.get("start") or {}).get("event") in ("in_flight", "jog_running", "jog_leased")
-                      and stamp((e.get("start") or {}).get("at")) is not None and stamp(e["start"]["at"]) <= now for e in evidence)
+    established = all(
+        e.get("status_label") == "in-progress"
+        and (e.get("start") or {}).get("event") in ("in_flight", "jog_running", "jog_leased")
+        and stamp((e.get("start") or {}).get("at")) is not None
+        and stamp(e["start"]["at"]) <= now
+        for e in evidence
+    )
     if local != remote:
         return result("conflict", "Label mismatch", "XYZ and cached GitHub labels disagree")
     if local and not established:
         return result("unknown", "Unverified label", "No genuine unsuperseded task start")
     if established and remote:
-        return result("in-progress", "In progress", "Explicit start and cached GitHub agree; current execution unverified")
+        return result(
+            "in-progress", "In progress", "Explicit start and cached GitHub agree; current execution unverified"
+        )
     return result("context", "Not marked active", "Absent label is not completion")
 
 
@@ -182,7 +215,9 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
         return {"facts": [], "partial": True, "errors": ["missing-trusted-harness"]}
     # Our local portable adapter, not code from the configured ledger/harness.
     # File-based import also works when this CLI is executed by absolute path.
-    spec = importlib.util.spec_from_file_location("daily_releases_cycle", Path(__file__).parent / "py/releases_cycle.py")
+    spec = importlib.util.spec_from_file_location(
+        "daily_releases_cycle", Path(__file__).parent / "py/releases_cycle.py"
+    )
     adapter = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
     deadline = time.monotonic() + 6
@@ -192,28 +227,55 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
     grouped: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for root in unique_roots[:4]:
         report = adapter.read_work_status(harness, root, ledger_deadline, now.isoformat())
-        source = {"id": hashlib.sha256(str(root).encode()).hexdigest()[:16], "read_at": now.isoformat(),
-                  "generation": report.get("generation"), "supported": report.get("status_label_supported") is True}
+        source = {
+            "id": hashlib.sha256(str(root).encode()).hexdigest()[:16],
+            "read_at": now.isoformat(),
+            "generation": report.get("generation"),
+            "supported": report.get("status_label_supported") is True,
+        }
         if not report.get("schema_ready") or not source["supported"]:
             errors.append("xyz-source-unavailable-or-unsupported")
         rows = report.get("issues", [])
         if len(rows) > 2000:
             errors.append("issue-cap")
-        ordered = sorted(rows, key=lambda r: not (isinstance(r, dict) and r.get("status_label") == "in-progress" and r.get("recent_start")))
+        ordered = sorted(
+            rows,
+            key=lambda r: (
+                not (isinstance(r, dict) and r.get("status_label") == "in-progress" and r.get("recent_start"))
+            ),
+        )
         for row in ordered[:2000]:
-            repo, number = row.get("repo") if isinstance(row, dict) else None, row.get("number") if isinstance(row, dict) else None
-            if not isinstance(row, dict) or row.get("identity_valid") is not True or not isinstance(repo, str) or not re.fullmatch(r"[\w.-]+/[\w.-]+", repo) or type(number) is not int or number <= 0:
+            repo, number = (
+                row.get("repo") if isinstance(row, dict) else None,
+                row.get("number") if isinstance(row, dict) else None,
+            )
+            if (
+                not isinstance(row, dict)
+                or row.get("identity_valid") is not True
+                or not isinstance(repo, str)
+                or not re.fullmatch(r"[\w.-]+/[\w.-]+", repo)
+                or type(number) is not int
+                or number <= 0
+            ):
                 errors.append("invalid-owned-identity")
                 continue
-            evidence = {**source, "status_label": row.get("status_label") if row.get("status_label") == "in-progress" else None,
-                        "supported": source["supported"] and row.get("status_label_supported") is True}
-            for dest, original, fields in (("start", "recent_start", ("at", "event", "freshness")), ("lifecycle", "latest_lifecycle", ("at", "event"))):
+            evidence = {
+                **source,
+                "status_label": row.get("status_label") if row.get("status_label") == "in-progress" else None,
+                "supported": source["supported"] and row.get("status_label_supported") is True,
+            }
+            for dest, original, fields in (
+                ("start", "recent_start", ("at", "event", "freshness")),
+                ("lifecycle", "latest_lifecycle", ("at", "event")),
+            ):
                 value = row.get(original)
                 evidence[dest] = {field: value.get(field) for field in fields} if isinstance(value, dict) else None
             grouped.setdefault((repo.lower(), number), []).append(evidence)
     if len(grouped) > 2000:
         errors.append("issue-cap")
-    identities = sorted(grouped, key=lambda key: (not any(e["status_label"] == "in-progress" and e["start"] for e in grouped[key]), key))[:2000]
+    identities = sorted(
+        grouped, key=lambda key: (not any(e["status_label"] == "in-progress" and e["start"] for e in grouped[key]), key)
+    )[:2000]
     native = {}
     try:
         with db_connection_readonly(db_path) as conn:
@@ -228,22 +290,41 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
         row = dict(native.get(key) or {})
         try:
             labels = json.loads(row.get("labels_json"))
-            row["labels"] = labels if isinstance(labels, list) and all(isinstance(label, str) for label in labels) else None
+            row["labels"] = (
+                labels if isinstance(labels, list) and all(isinstance(label, str) for label in labels) else None
+            )
         except (ValueError, TypeError):
             row["labels"] = None
         derived = issue_status(row, evidence, now, max_age)
+
         def public_stamp(value):
             try:
                 parsed = parse_iso(value, force_utc=False) if isinstance(value, str) else None
                 return parsed.isoformat() if parsed and parsed.tzinfo else None
             except (ValueError, TypeError):
                 return None
-        facts.append({"id": f"issue-status:{key[0]}#{key[1]}", "repo": key[0], "number": key[1], **derived,
-                      "native_at": public_stamp(row.get("fetched_at")), "established_at": next((public_stamp(e["start"].get("at")) for e in evidence if e["start"]), None),
-                      "sources": [{name: e.get(name) for name in ("id", "generation", "read_at", "supported")} for e in evidence]})
+
+        facts.append(
+            {
+                "id": f"issue-status:{key[0]}#{key[1]}",
+                "repo": key[0],
+                "number": key[1],
+                **derived,
+                "native_at": public_stamp(row.get("fetched_at")),
+                "established_at": next((public_stamp(e["start"].get("at")) for e in evidence if e["start"]), None),
+                "sources": [
+                    {name: e.get(name) for name in ("id", "generation", "read_at", "supported")} for e in evidence
+                ],
+            }
+        )
     facts.sort(key=lambda f: (f["kind"] != "in-progress", f["repo"], f["number"]))
-    return {"facts": facts[:20], "shown": min(20, len(facts)), "total_known": len(facts),
-            "partial": bool(errors or len(facts) > 20), "errors": sorted(set(errors))}
+    return {
+        "facts": facts[:20],
+        "shown": min(20, len(facts)),
+        "total_known": len(facts),
+        "partial": bool(errors or len(facts) > 20),
+        "errors": sorted(set(errors)),
+    }
 
 
 def collect_packet(db_path: Path, now: datetime, log_dir: Path, cfg: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -372,9 +453,16 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path, cfg: dict[str, A
     statuses = collect_issue_statuses(db_path, now, cfg or default_config())
     if statuses is not None:
         packet["issue_statuses"] = statuses
-        packet["evidence"] = [{"id": f["id"], "kind": "recorded_issue_status", "attested": True,
-                               "repo": f["repo"], "text": f"#{f['number']} {f['label']}: {f['reason']}"}
-                              for f in statuses["facts"]] + packet["evidence"]
+        packet["evidence"] = [
+            {
+                "id": f["id"],
+                "kind": "recorded_issue_status",
+                "attested": True,
+                "repo": f["repo"],
+                "text": f"#{f['number']} {f['label']}: {f['reason']}",
+            }
+            for f in statuses["facts"]
+        ] + packet["evidence"]
     return packet
 
 
@@ -539,11 +627,15 @@ def render(
         statuses = packet["issue_statuses"]
         lines.append("- **Recorded issue status — authoritative read facts**:")
         for fact in statuses["facts"]:
-            lines.append(f"  - {fact['repo']} #{fact['number']}: {fact['label']} — {fact['reason']}; "
-                         f"GitHub observed {fact['native_at'] or 'unknown'}; task established {fact['established_at'] or 'unknown'}. [{fact['id']}]")
-        lines.append(f"  - Inventory: {statuses.get('shown', 0)} shown of {statuses.get('total_known', 0)} known; "
-                     f"{'partial / verify missing evidence' if statuses['partial'] else 'configured sources read successfully (not an all-repo census)'}. "
-                     f"Warnings: {', '.join(statuses['errors']) or 'none'}.")
+            lines.append(
+                f"  - {fact['repo']} #{fact['number']}: {fact['label']} — {fact['reason']}; "
+                f"GitHub observed {fact['native_at'] or 'unknown'}; task established {fact['established_at'] or 'unknown'}. [{fact['id']}]"
+            )
+        lines.append(
+            f"  - Inventory: {statuses.get('shown', 0)} shown of {statuses.get('total_known', 0)} known; "
+            f"{'partial / verify missing evidence' if statuses['partial'] else 'configured sources read successfully (not an all-repo census)'}. "
+            f"Warnings: {', '.join(statuses['errors']) or 'none'}."
+        )
     return "\n".join(lines) + "\n"
 
 
