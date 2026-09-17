@@ -225,6 +225,49 @@ def test_native_sql_lock_is_bounded(tmp_path, monkeypatch):
         cx.close()
 
 
+def test_native_expensive_query_is_interrupted(tmp_path, monkeypatch):
+    from rebalance.ingest.db import queries
+
+    monkeypatch.setattr(queries, "_get_alias_map", lambda: {})
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+
+    class ExpensiveRead:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def execute(self, sql, params=()):
+            if sql.startswith("SELECT repo_full_name"):
+                return self.conn.execute(
+                    "WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT SUM(x) FROM n"
+                )
+            return self.conn.execute(sql, params)
+
+        def set_progress_handler(self, *args):
+            self.conn.set_progress_handler(*args)
+
+    began = time.monotonic()
+    with db_connection_readonly(db) as conn, pytest.raises(sqlite3.OperationalError):
+        fetch_issue_status_evidence(ExpensiveRead(conn), [("example/project", 7)], began + 0.15)
+    assert time.monotonic() - began < 0.5
+
+
+def test_issue_display_cap_retains_quiet_active_before_other_context(tmp_path, monkeypatch):
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+    value = report()
+    value["issues"] = [
+        dict(value["issues"][0], number=n, status_label=None, recent_start=None) for n in range(100, 125)
+    ] + value["issues"]
+    harness, ledger = trusted_fixture(tmp_path, value)
+    monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_: (harness, (ledger,)))
+    result = dws.collect_issue_statuses(db, NOW, dws.default_config())
+    assert result["facts"][0]["number"] == 7
+    assert result["facts"][0]["kind"] == "in-progress"
+    assert result["shown"] == 20 and result["total_known"] == 26
+    assert result["partial"]
+
+
 def test_model_prose_cannot_replace_authoritative_rendered_status():
     packet = {
         "unclosed_loops": {},
