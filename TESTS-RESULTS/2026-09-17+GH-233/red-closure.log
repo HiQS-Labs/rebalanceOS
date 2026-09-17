@@ -1,0 +1,56 @@
+CONTROL closure; disposable source1f1f16b; expected nonzero, observed1
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[completed-Completed] _
+
+reason = 'completed', label = 'Completed'
+
+    @pytest.mark.parametrize("reason,label", [("completed", "Completed"), ("not_planned", "Cancelled"), (None, "Closed")])
+    def test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger(reason, label):
+        closed = NATIVE | {"state": "closed", "state_reason": reason}
+        bad = EVIDENCE | {"supported": False, "roots_complete": False, "start": None}
+        result = dws.issue_status(closed, [bad], NOW)
+>       assert result["label"] == label
+E       AssertionError: assert 'Unavailable' == 'Completed'
+E         
+E         - Completed
+E         + Unavailable
+
+tests/test_daily_issue_status.py:105: AssertionError
+_ test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[not_planned-Cancelled] _
+
+reason = 'not_planned', label = 'Cancelled'
+
+    @pytest.mark.parametrize("reason,label", [("completed", "Completed"), ("not_planned", "Cancelled"), (None, "Closed")])
+    def test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger(reason, label):
+        closed = NATIVE | {"state": "closed", "state_reason": reason}
+        bad = EVIDENCE | {"supported": False, "roots_complete": False, "start": None}
+        result = dws.issue_status(closed, [bad], NOW)
+>       assert result["label"] == label
+E       AssertionError: assert 'Unavailable' == 'Cancelled'
+E         
+E         - Cancelled
+E         + Unavailable
+
+tests/test_daily_issue_status.py:105: AssertionError
+_ test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[None-Closed] _
+
+reason = None, label = 'Closed'
+
+    @pytest.mark.parametrize("reason,label", [("completed", "Completed"), ("not_planned", "Cancelled"), (None, "Closed")])
+    def test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger(reason, label):
+        closed = NATIVE | {"state": "closed", "state_reason": reason}
+        bad = EVIDENCE | {"supported": False, "roots_complete": False, "start": None}
+        result = dws.issue_status(closed, [bad], NOW)
+>       assert result["label"] == label
+E       AssertionError: assert 'Unavailable' == 'Closed'
+E         
+E         - Closed
+E         + Unavailable
+
+tests/test_daily_issue_status.py:105: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[completed-Completed]
+FAILED tests/test_daily_issue_status.py::test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[not_planned-Cancelled]
+FAILED tests/test_daily_issue_status.py::test_fresh_closure_precedes_stale_conflicting_or_stopped_ledger[None-Closed]
+3 failed in 0.88s

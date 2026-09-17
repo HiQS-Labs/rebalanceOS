@@ -1,0 +1,31 @@
+CONTROL privacy; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_populated_collector_is_readonly_and_egress_is_whitelisted ________
+
+tmp_path = PosixPath('<fixture-temp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10540be10>
+
+    def test_populated_collector_is_readonly_and_egress_is_whitelisted(tmp_path, monkeypatch):
+        db = tmp_path / "rebalance.db"
+        native_database(db)
+        harness, ledger = trusted_fixture(tmp_path, report())
+        monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_: (harness, (ledger,)))
+        before = db.read_bytes(), (ledger / "releases.db").read_bytes()
+        result = dws.collect_issue_statuses(db, NOW, dws.default_config())
+        assert result["facts"][0]["kind"] == "in-progress"
+        assert result["facts"][0]["sources"][0]["generation"] == 7
+        assert not result["partial"]
+        encoded = json.dumps(result)
+        for forbidden in ("PRIVATE", "private-token", "/Users/", str(tmp_path), "cursor", "raw_payload"):
+>           assert forbidden not in encoded
+E           assert 'PRIVATE' not in '{"facts": [...errors": []}'
+E             
+E             'PRIVATE' is contained here:
+E               ive_at": "PRIVATE-TITLE /Users/private/account token=private-token", "established_at": "2026-09-10T20:00:00+00:00", "sources": [{"id": "bff39bb01e71f220", "generation": 7, "read_at": "2026-09-17T20:00:00+00:00", "supported": true}]}], "shown": 1, "total_known": 1, "partial": false, "errors": []}
+E             ?           +++++++
+
+tests/test_daily_issue_status.py:164: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_populated_collector_is_readonly_and_egress_is_whitelisted
+1 failed in 0.23s

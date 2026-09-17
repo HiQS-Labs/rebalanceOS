@@ -1,0 +1,20 @@
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+FAILED tests/test_github_commit_peeker.py::GitCommitPeekerTests::test_sync_github_repo_metadata_authoritative_fixture
+FAILED tests/test_hiqs_digest.py::test_a_repo_the_sync_missed_is_named_stale
+FAILED tests/test_hiqs_digest.py::test_an_uncoverable_commit_corpus_is_named_with_its_reason
+FAILED tests/test_hiqs_digest.py::test_the_stale_list_is_capped_with_an_overflow_marker
+FAILED tests/test_hiqs_digest.py::test_build_facts_attaches_freshness_to_the_github_half
+FAILED tests/test_queries_mirror_invariance.py::test_duplicate_day_snapshot_latest_scan_wins[canonical]
+FAILED tests/test_queries_mirror_invariance.py::test_duplicate_day_snapshot_latest_scan_wins[mirror]
+FAILED tests/test_queries_mirror_invariance.py::test_activity_distinct_days_and_logins_still_sum
+8 failed, 2430 passed, 20 skipped, 10 xfailed, 2 warnings, 143 subtests passed in 284.00s (0:04:44)

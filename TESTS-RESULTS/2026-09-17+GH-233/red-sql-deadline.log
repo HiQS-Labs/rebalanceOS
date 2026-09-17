@@ -1,0 +1,2 @@
+CONTROL sql-deadline; disposable source1f1f16b; expected nonzero, observed124
+RED CONTROL: native query exceeded external 2-second safety deadline

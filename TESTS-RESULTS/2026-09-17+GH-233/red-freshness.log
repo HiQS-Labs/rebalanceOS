@@ -1,0 +1,74 @@
+CONTROL freshness; disposable source1f1f16b; expected nonzero, observed1
+FFF..                                                                    [100%]
+=================================== FAILURES ===================================
+_________ test_invalid_or_stale_native_is_not_current_work[override0] __________
+
+override = {'fetched_at': '2026-09-17T17:59:59+00:00'}
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"fetched_at": (NOW - timedelta(seconds=7201)).isoformat()},
+            {"fetched_at": (NOW + timedelta(seconds=1)).isoformat()},
+            {"fetched_at": "2026-09-17T20:00:00"},
+            {"native_identity_valid": False},
+            {"labels": None},
+        ],
+    )
+    def test_invalid_or_stale_native_is_not_current_work(override):
+>       assert dws.issue_status(NATIVE | override, [EVIDENCE], NOW)["kind"] == "unknown"
+E       AssertionError: assert 'in-progress' == 'unknown'
+E         
+E         - unknown
+E         + in-progress
+
+tests/test_daily_issue_status.py:120: AssertionError
+_________ test_invalid_or_stale_native_is_not_current_work[override1] __________
+
+override = {'fetched_at': '2026-09-17T20:00:01+00:00'}
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"fetched_at": (NOW - timedelta(seconds=7201)).isoformat()},
+            {"fetched_at": (NOW + timedelta(seconds=1)).isoformat()},
+            {"fetched_at": "2026-09-17T20:00:00"},
+            {"native_identity_valid": False},
+            {"labels": None},
+        ],
+    )
+    def test_invalid_or_stale_native_is_not_current_work(override):
+>       assert dws.issue_status(NATIVE | override, [EVIDENCE], NOW)["kind"] == "unknown"
+E       AssertionError: assert 'in-progress' == 'unknown'
+E         
+E         - unknown
+E         + in-progress
+
+tests/test_daily_issue_status.py:120: AssertionError
+_________ test_invalid_or_stale_native_is_not_current_work[override2] __________
+
+override = {'fetched_at': '2026-09-17T20:00:00'}
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"fetched_at": (NOW - timedelta(seconds=7201)).isoformat()},
+            {"fetched_at": (NOW + timedelta(seconds=1)).isoformat()},
+            {"fetched_at": "2026-09-17T20:00:00"},
+            {"native_identity_valid": False},
+            {"labels": None},
+        ],
+    )
+    def test_invalid_or_stale_native_is_not_current_work(override):
+>       assert dws.issue_status(NATIVE | override, [EVIDENCE], NOW)["kind"] == "unknown"
+E       AssertionError: assert 'in-progress' == 'unknown'
+E         
+E         - unknown
+E         + in-progress
+
+tests/test_daily_issue_status.py:120: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_invalid_or_stale_native_is_not_current_work[override0]
+FAILED tests/test_daily_issue_status.py::test_invalid_or_stale_native_is_not_current_work[override1]
+FAILED tests/test_daily_issue_status.py::test_invalid_or_stale_native_is_not_current_work[override2]
+3 failed, 2 passed in 0.21s

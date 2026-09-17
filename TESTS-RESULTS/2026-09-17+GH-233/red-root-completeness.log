@@ -1,0 +1,25 @@
+CONTROL root-completeness; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_failed_second_root_is_visible_uncertainty_not_confirmed_work _______
+
+tmp_path = PosixPath('<fixture-temp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107eafe10>
+
+    def test_failed_second_root_is_visible_uncertainty_not_confirmed_work(tmp_path, monkeypatch):
+        db = tmp_path / "rebalance.db"
+        native_database(db)
+        harness, ledger = trusted_fixture(tmp_path, report())
+        for roots in ((ledger, tmp_path / "missing"), (tmp_path / "missing", ledger)):
+            monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_, roots=roots: (harness, roots))
+            result = dws.collect_issue_statuses(db, NOW, dws.default_config())
+>           assert result["facts"][0]["kind"] == "unknown"
+E           AssertionError: assert 'in-progress' == 'unknown'
+E             
+E             - unknown
+E             + in-progress
+
+tests/test_daily_issue_status.py:176: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_failed_second_root_is_visible_uncertainty_not_confirmed_work
+1 failed in 0.24s
