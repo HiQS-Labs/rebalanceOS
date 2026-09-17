@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.3] - 2026-09-17
+
+### Fixed
+- The Daily skill's close-the-loop ledger sync is opt-in again and actually runs in daily mode. The scanner had forked between this repo and its XYZ-forge projection: one side wrote `temp/close-the-loop.md` unconditionally, making `--update-ledger` dead code, while the projected side honored the flag but the documented invocation never passed it, so the deployed skill silently stopped syncing the ledger. The merged contract keeps writes gated on `--update-ledger`, passes that flag from the skill's daily invocation, and adopts the projection's calibration rule that a zero open-PR count is not reported unless the GitHub query is known to have succeeded. A regression test locks in all three paths (bare, `--update-ledger`, and `--no-ledger-write` winning). This repo is the sole owner of the Daily skill going forward; the forge copy is being retired.
+
 ## [0.88.2] - 2026-09-13
 
 ### Added
