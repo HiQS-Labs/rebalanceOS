@@ -32,8 +32,10 @@ Reconciliation semantics (SOP §6 — one entity counted twice is a defect):
 from __future__ import annotations
 
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 from rebalance.ingest.agent_tags import classify as classify_source
 from rebalance.ingest.config import get_github_org_aliases
@@ -231,6 +233,61 @@ def _recency_desc(
 # ---------------------------------------------------------------------------
 # 1. GitHub Balance per Project (F1)
 # ---------------------------------------------------------------------------
+
+def fetch_issue_status_evidence(conn, identities, deadline):
+    """Bounded requested issues, newest aliases first; never refresh/migrate."""
+    aliases = _get_alias_map()
+    wanted = {(_canonical_lower(repo, aliases), number) for repo, number in identities
+              if isinstance(repo, str) and "/" in repo and type(number) is int and number > 0}
+    if len(wanted) > 2000:
+        raise ValueError("issue-cap")
+    spellings = sorted({(spelling, number) for repo, number in wanted
+                        for spelling in _all_repo_spellings(repo, aliases)})
+    remaining = int((deadline - time.monotonic()) * 1000)
+    if remaining <= 0:
+        raise TimeoutError("native-read-deadline")
+    conn.execute(f"PRAGMA busy_timeout={min(250, remaining)}")
+    conn.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+    try:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(github_items)")}
+        required = {"repo_full_name", "item_type", "number", "state", "html_url", "updated_at", "fetched_at", "created_at"}
+        if not required <= columns:
+            raise ValueError("unsupported-native-cache")
+        optional = ",".join(name if name in columns else f"NULL AS {name}" for name in ("labels_json", "state_reason", "title"))
+        rows = []
+        for offset in range(0, len(spellings), 200):
+            if time.monotonic() >= deadline:
+                raise TimeoutError("native-read-deadline")
+            chunk = spellings[offset:offset + 200]
+            predicates = " OR ".join("(lower(repo_full_name)=? AND number=?)" for _ in chunk)
+            params = tuple(value for pair in chunk for value in pair)
+            selected = conn.execute(
+                f"SELECT repo_full_name,item_type,number,state,html_url,updated_at,fetched_at,created_at,{optional} "
+                f"FROM github_items WHERE item_type='issue' AND ({predicates}) LIMIT 2001", params).fetchall()
+            if len(selected) > 2000:
+                raise ValueError("native-row-cap")
+            rows.extend(selected)
+        if time.monotonic() >= deadline:
+            raise TimeoutError("native-read-deadline")
+        resolved = {}
+        for (repo, kind, number), row in _resolve_newest_items(rows, aliases).items():
+            key = (repo, number)
+            if key not in wanted:
+                continue
+            try:
+                url = urlsplit(row.get("html_url") or "")
+                parts = url.path.strip("/").split("/")
+                row["native_identity_valid"] = (url.scheme == "https" and url.netloc.lower() == "github.com"
+                    and not url.query and not url.fragment and len(parts) == 4
+                    and parts[2:] == ["issues", str(number)]
+                    and _canonical_lower("/".join(parts[:2]), aliases) == repo)
+            except ValueError:
+                row["native_identity_valid"] = False
+            resolved[key] = row
+        return resolved
+    finally:
+        conn.set_progress_handler(None, 0)
+
 
 
 def fetch_github_balance(

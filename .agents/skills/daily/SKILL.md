@@ -35,6 +35,7 @@ Then begin work.
 
 - **Reuse Existing Subsystems**: Do not create parallel pipelines or bespoke ad-hoc trackers. Query the resolved SQLite database (`src/rebalance/paths.py:resolve_db()`), `get_next_actions()`, `clio_prompts`, `calendar_events`, `sleuth_reminders`, Apple Reminders snapshots, and `.claude/skills/rebalance/collect.sh`.
 - **Read-Only Against Repositories & External Stores**: Synthesis inspects files and SQLite tables; it never mutates git state, resets branches, alters worktrees, or writes to external stores. Apple Reminders access uses the read-only Core Data snapshot extractor with graceful degradation.
+- **Recorded task status is separate from interpretation**: When XYZ sources are explicitly configured, use `utils/daily_work_synthesis.py`'s bounded qualified reader and native GitHub cache query; do not invent another tracker or write labels. Retain quiet multi-day work. A fresh, identity-verified closed issue is authoritative (completed versus cancelled); a merged PR is not issue closure, an absent label is not completion, and a fresh read is not proof of current execution. Show stale, missing, conflicting, unsupported or truncated evidence as uncertainty. Keep a deterministic recorded-status block apart from model prose; the prose is interpretation, not a validator of task lifecycle.
 - **Deterministic Daily Logging**: Output records append to `temp/daily-log/YYYY-MM-DD.log` (gitignored under `temp/`) matching the fixed log-entry schema.
 - **Debug Mantra Ground-Truth Calibration**: Never report unclosed loops, open PRs, or stalled branches from unverified memory, stale logs, or un-refreshed ledgers. Always verify against live GitHub/git state (`state == 'OPEN'`). A merged or closed PR is not an open loop. Inspect the fresh output of `scan_unclosed_loops.py` before citing telemetry. Do not report `0 open PRs` unless GitHub query success is established. In shutdown JSON, treat non-empty `pr_query_errors` or any `pr_status == "unknown"` as unavailable affected counts, not zero.
 
@@ -48,6 +49,7 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
 - Identify active repositories, tools/agents (Claude, Agy, Codex, ZCode), and explicit directives (e.g. PR reviews, feature builds, hotfixes, refactors).
 
 ### Step 2 — Read Rebalance Live Work Signal (Operational Signal)
+- Optionally consume established XYZ status from explicitly configured `xyz_harness_root` and `xyz_ledger_roots` (or `REBALANCE_XYZ_HARNESS` / `REBALANCE_XYZ_LEDGER_ROOTS`, path-separated roots). No discovery or guessed sibling path. The helper reads at most four roots, 2 MiB per helper and 2,000 issues per root, with a shared two-second ledger window inside six seconds for the complete status read. Native SQLite reads use the existing read gateway and deadline. No CLI `main`, refresh, migration, writer or remote update is called. If unconfigured, preserve the existing Daily output. Configuration does not enable the opt-in Terra canary or change its privacy/spending limits.
 - Call `get_next_actions()` / load ranked next actions from `rebalance.db`.
 - Query upcoming calendar events for today from `calendar_events` (or trigger `rebalance calendar-sync` if needed).
 - Query active Sleuth reminders (`sleuth_reminders`).
@@ -133,6 +135,7 @@ Format the synthesis matching this exact Markdown template:
 - **Machine CPU Health**: <0 runaway candidates, or N candidates with PID / command / duty / cycles and the ready kill command> `[Details: temp/daily-log/cpu-watch.json]`
 - **Coaching Nudge**: <1-2 sentences of actionable guidance> `[Trigger: <telemetry_metric>]`
 - **Model Receipt**: <model/effort, input/cached/output tokens, latency, dated list-price estimate, confidence and evidence IDs when an LLM canary produced the entry>
+[When explicit XYZ status sources are configured: label the prose above "Model interpretation", then append the collector's deterministic "Recorded issue status — authoritative read facts" block, including observation/start times, inventory limits and warnings. Do not let model prose supply or override this block.]
 ```
 
 ---

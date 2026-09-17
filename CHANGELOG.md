@@ -10,6 +10,16 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.89.0] - 2026-09-17
+
+### Added
+- Daily can optionally show recorded task status from explicitly configured work ledgers and the
+  existing GitHub cache. Quiet multi-day work stays visible, closed issues take precedence, and
+  missing, old or conflicting records remain uncertain. These read-only facts are shown separately
+  from AI interpretation, without changing task labels, schedules or spending limits (#233).
+- This reader requires the upstream status-writing change before end-to-end use can be qualified;
+  fixture verification does not declare that dependency ready.
+
 ## [0.88.4] - 2026-09-21
 
 ### Fixed
