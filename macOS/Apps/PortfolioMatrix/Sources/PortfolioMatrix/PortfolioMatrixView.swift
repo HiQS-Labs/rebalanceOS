@@ -31,18 +31,39 @@ public struct PortfolioMatrixView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Spacer()
                         Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
+                            .font(.system(size: 36))
                             .foregroundColor(.orange)
-                        Text(viewModel.errorMessage ?? "Failed to connect to local server (port 8787).")
+                        Text("Cannot Connect to Rebalance Server")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text(viewModel.errorMessage ?? "Could not reach local server on port 8787 or 8767.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("To start the local server, run:")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text("uv run rebalance serve")
+                                .font(.system(size: 12, design: .monospaced))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(6)
+                                .foregroundColor(.cyan)
+                        }
+                        .padding(.vertical, 6)
+
                         Button("Retry") {
                             Task { await viewModel.refresh() }
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.cyan)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -96,15 +117,15 @@ public struct PortfolioMatrixView: View {
 
             HStack(spacing: 4) {
                 Circle()
-                    .fill(Color.green)
+                    .fill(viewModel.connectedPort != nil ? Color.green : Color.orange)
                     .frame(width: 5, height: 5)
-                Text("8787")
+                Text(viewModel.connectedPort != nil ? "\(viewModel.connectedPort!)" : "Offline")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.green)
+                    .foregroundColor(viewModel.connectedPort != nil ? .green : .orange)
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Color.green.opacity(0.12))
+            .background((viewModel.connectedPort != nil ? Color.green : Color.orange).opacity(0.12))
             .cornerRadius(4)
 
             Spacer()

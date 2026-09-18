@@ -251,3 +251,24 @@ def test_portfolio_matrix_endpoint(tmp_path: Path, monkeypatch: Any) -> None:
     assert projects[3]["computed_score"] == 2
     assert projects[3]["subproject"] is None
     assert projects[3]["tasks"] == []
+
+
+def test_pulse_server_portfolio_matrix(tmp_path: Path, monkeypatch: Any) -> None:
+    """Verify scripts/pulse_server.py mirrors GET /portfolio-matrix.json correctly."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import pulse_server
+
+    dummy_db = tmp_path / "dummy.db"
+    dummy_db.touch()
+
+    monkeypatch.setattr("rebalance.ingest.config.get_vault_path", lambda: str(tmp_path))
+    monkeypatch.setattr("rebalance.paths.resolve_database_path", lambda: dummy_db)
+    monkeypatch.setattr("rebalance.ingest.registry.get_projects", lambda db, status="active": [])
+
+    client = TestClient(pulse_server.app)
+    res = client.get("/portfolio-matrix.json")
+    assert res.status_code == 200
+    data = res.json()
+    assert "projects" in data
+    assert data["projects"] == []

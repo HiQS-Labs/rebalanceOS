@@ -10,6 +10,7 @@ public final class PortfolioMatrixViewModel: ObservableObject {
     @Published public var toastMessage: String?
     @Published public var isNewIssueModalPresented: Bool = false
     @Published public var selectedRepoForNewIssue: String = ""
+    @Published public var connectedPort: Int? = nil
 
     private let client: PortfolioClient
 
@@ -23,8 +24,10 @@ public final class PortfolioMatrixViewModel: ObservableObject {
         do {
             let res = try await client.fetchMatrix()
             self.matrix = res
+            self.connectedPort = client.activePort
         } catch {
             self.errorMessage = error.localizedDescription
+            self.connectedPort = nil
         }
         isLoading = false
     }

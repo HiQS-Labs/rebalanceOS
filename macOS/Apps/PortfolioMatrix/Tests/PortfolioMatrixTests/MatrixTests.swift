@@ -83,4 +83,17 @@ final class MatrixTests: XCTestCase {
         XCTAssertFalse(errorResp.ok ?? true)
         XCTAssertEqual(errorResp.error, "stale_goal_snapshot")
     }
+
+    func testPortfolioClientCandidateBaseURLs() throws {
+        let client = PortfolioClient()
+        let urls = client.candidateBaseURLs
+        XCTAssertEqual(urls.count, 2)
+        XCTAssertEqual(urls[0], URL(string: "http://127.0.0.1:8787")!)
+        XCTAssertEqual(urls[1], URL(string: "http://127.0.0.1:8767")!)
+    }
+
+    func testClientErrorDescriptions() throws {
+        let err = ClientError.allCandidatesFailed("8787: offline, 8767: 404")
+        XCTAssertEqual(err.errorDescription, "Could not connect to local server: 8787: offline, 8767: 404")
+    }
 }
