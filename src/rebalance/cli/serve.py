@@ -47,6 +47,8 @@ def serve_cmd(
     url = f"http://{host}:{port}"
     typer.echo(f"Starting rebalance web server at {url}")
     typer.echo(f"  Auth log: {url}/auth-log")
+    typer.echo(f"  Portfolio Matrix: {url}/portfolio-matrix.json")
+    typer.echo("Server running. Press Ctrl+C to stop.\n")
     threading.Timer(0.8, lambda: webbrowser.open(f"{url}/auth-log")).start()
 
     from rebalance.web import app as web_app

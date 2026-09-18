@@ -86,15 +86,15 @@ def _load_zapier_secret(*, log_errors: bool) -> str | None:
         secret = path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
         if log_errors:
-            logger.error("zapier webhook secret missing: %s", path)
+            logger.info("zapier webhook secret not found (optional): %s", path)
         return None
     except OSError as exc:
         if log_errors:
-            logger.error("zapier webhook secret unreadable: %s (%s)", path, exc)
+            logger.warning("zapier webhook secret unreadable: %s (%s)", path, exc)
         return None
     if not secret:
         if log_errors:
-            logger.error("zapier webhook secret empty: %s", path)
+            logger.warning("zapier webhook secret empty: %s", path)
         return None
     return secret
 
