@@ -1034,6 +1034,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
 
     runtime_root, _ = _expected_runtime_root()
     runtime_python = runtime_root / ".venv" / "bin" / "python"
+    managed_labels = {f"com.rebalance-os.{job}" for job in _scheduler_policy_jobs()}
     affected: set[str] = set()
     unreadable: list[str] = []
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
@@ -1047,7 +1048,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
             continue
 
         label = payload.get("Label")
-        if not isinstance(label, str) or not label.startswith("com.rebalance-os."):
+        if not isinstance(label, str) or label not in managed_labels:
             continue
         values: list[str] = []
         program = payload.get("Program")

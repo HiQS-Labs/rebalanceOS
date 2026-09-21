@@ -116,12 +116,24 @@ def test_no_matching_interpreter_jobs_emits_no_health_claim(tmp_path: Path) -> N
     assert _check(tmp_path, agents) == []
 
 
+def test_policy_unmanaged_prefixed_label_is_ignored(tmp_path: Path) -> None:
+    _, python, agents = _runtime(tmp_path)
+    _write_plist(agents, "foreign-job", [str(python), "foreign.py"])
+
+    assert _check(tmp_path, agents) == []
+
+    _write_plist(agents, "github-sync", [str(python), "job_guard.py"])
+    check = _check(tmp_path, agents)[0]
+    assert check.status == FAIL
+    assert "1 installed job(s)" in check.detail
+
+
 def test_duplicate_labels_count_as_one_job_and_foreign_label_is_ignored(tmp_path: Path) -> None:
     _, python, agents = _runtime(tmp_path)
     python.write_text("#!/bin/sh\n", encoding="utf-8")
     python.chmod(0o755)
-    _write_plist(agents, "first", [str(python)], label="com.rebalance-os.same-job")
-    _write_plist(agents, "second", [str(python)], label="com.rebalance-os.same-job")
+    _write_plist(agents, "first", [str(python)], label="com.rebalance-os.pulse-sync")
+    _write_plist(agents, "second", [str(python)], label="com.rebalance-os.pulse-sync")
     _write_plist(agents, "camouflage", [str(python)], label="com.foreign.job")
 
     checks = _check(tmp_path, agents)
