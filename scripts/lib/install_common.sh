@@ -30,7 +30,9 @@ RB_INSTALL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="$(cd "$RB_INSTALL_LIB_DIR/.." && pwd)"
 REBALANCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [ -f "${HOME:-}/.config/rebalance/runtime-root" ]; then
-    _declared_root="$(head -n 1 "${HOME:-}/.config/rebalance/runtime-root" | tr -d '[:space:]')"
+    # Preserve spaces inside a valid checkout path; remove only a CR left by
+    # a CRLF line ending. Doctor applies the same whitespace-preserving rule.
+    _declared_root="$(sed -n '1{s/\r$//;p;}' "${HOME:-}/.config/rebalance/runtime-root")"
     if [ -n "$_declared_root" ] && [ -d "$_declared_root" ]; then
         REBALANCE_DIR="$_declared_root"
     fi
