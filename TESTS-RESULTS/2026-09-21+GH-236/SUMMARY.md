@@ -32,6 +32,7 @@ the runtime behavior, with the final evidence commit recorded separately.
 | Focused Doctor/launchd/stack/version and dependency regressions | 73 passed; Ruff passed |
 | Focused tests after the final two policy-boundary fixes | 44 passed; Ruff passed |
 | CodeRabbit/Greptile remediation regressions | 54 passed; Ruff, front-door, and doc-link checks passed |
+| Binary-plist orchestration regression and focused set | 56 passed; Ruff, front-door, and doc-link checks passed |
 | Version/front-door check after CI correction | Passed; package, project, and manifest are 0.88.4 |
 | Full `pytest tests/ -q` at predecessor `4a9228a` | 2,418 passed, 17 failed, 20 skipped, 10 xfailed, 143 subtests passed |
 | Canonical runtime extras import | FastAPI, Google auth, and sentence-transformers imported successfully |

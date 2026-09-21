@@ -160,3 +160,8 @@ of truthful per-job failures, or changes to launchd status semantics.
 - Exact-head Codex QA then found that the fallback-root regression depended on the ambient checkout's
   `.venv` health. Commit `0b68c02` makes the test assert root selection directly; the same 54-test
   set and changed-file Ruff check pass without that machine-state dependency.
+- The ensuing whole-file sweep reproduced a pre-existing crash when the adjacent scheduler-checkout
+  check encountered a valid binary launchd plist. Commit `6ee28f6` routes both checks through the
+  same encoding-neutral structured parser, emits WARN for unreadable plists instead of a false OK,
+  and verifies through `run_doctor()` that the new runtime finding remains in the report. The expanded
+  focused set passes 56 tests; Ruff, front-door, doc-link, and whitespace checks also pass.
