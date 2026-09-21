@@ -1105,10 +1105,14 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
                     "scheduler runtime interpreter",
                     FAIL,
                     f"{len(affected)} installed job(s) reference {runtime_python}, which {problem}",
-                    f"repair the declared runtime explicitly: `cd {root} && python3 -m venv .venv "
+                    f"repair the declared runtime explicitly: `cd {root} && {{ "
+                    "if [ -e .venv ] || [ -L .venv ]; then "
+                    'backup="$(mktemp -d .venv.broken.XXXXXX)" '
+                    '&& mv .venv "$backup/original" || exit 1; fi; '
+                    "python3 -m venv .venv "
                     "&& .venv/bin/pip install -e '.[embeddings,calendar,server,dev]' "
                     "&& bash scripts/stack.sh verify "
-                    "&& bash scripts/stack.sh restart`",
+                    "&& bash scripts/stack.sh restart; }`",
                 )
             )
         elif not unreadable:
@@ -1189,6 +1193,14 @@ def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Chec
             )
         )
     return checks
+
+
+def _scheduler_configuration_checks(agents_dir: Path | None = None) -> list[Check]:
+    """Collect the two installed-plist checks without invoking unrelated Doctor probes."""
+    return [
+        *_check_scheduler_runtime_interpreter(agents_dir),
+        *_check_scheduled_stack_checkout(agents_dir),
+    ]
 
 
 def _check_launchd(
@@ -2530,11 +2542,9 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
 
     # GH-236: launchd cannot start job_guard or write a current log when the
     # interpreter embedded in installed plists is missing or dangling.
-    report.checks.extend(_check_scheduler_runtime_interpreter())
-
-    # GH-36 tripwire: the scheduled stack must run from the same checkout as
-    # this code — absolute plist paths otherwise strand it on an old clone.
-    report.checks.extend(_check_scheduled_stack_checkout())
+    # GH-36/GH-236: inspect the same installed plists for interpreter health
+    # and checkout drift without coupling their orchestration to other probes.
+    report.checks.extend(_scheduler_configuration_checks())
 
     # 3-Eyes' own supervision verdict over the catalogued fleet. Complements —
     # never replaces — _check_launchd's persisted crash-loop detection above.

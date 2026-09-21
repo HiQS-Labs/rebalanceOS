@@ -92,19 +92,10 @@ class ScheduledStackCheckoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             agents = Path(tmp)
             _write_binary(agents, "github-sync", str(REPO_ROOT / "scripts" / "github_sync.sh"))
-            checkout_check = doctor._check_scheduled_stack_checkout
             runtime_check = doctor.Check("scheduler runtime interpreter", WARN, "retained sentinel")
-            with (
-                patch.object(doctor, "_check_scheduler_runtime_interpreter", return_value=[runtime_check]),
-                patch.object(
-                    doctor,
-                    "_check_scheduled_stack_checkout",
-                    side_effect=lambda: checkout_check(agents),
-                ),
-            ):
-                report = doctor.run_doctor()
+            with patch.object(doctor, "_check_scheduler_runtime_interpreter", return_value=[runtime_check]):
+                scheduler_checks = doctor._scheduler_configuration_checks(agents)
 
-        scheduler_checks = [check for check in report.checks if check.name.startswith("scheduler ")]
         self.assertIn(runtime_check, scheduler_checks)
         self.assertTrue(any(check.name == "scheduler checkout" and check.status == OK for check in scheduler_checks))
 

@@ -201,6 +201,32 @@ class StackScriptTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(".[embeddings,calendar,server,dev]", output)
 
+    def test_advertised_repair_backs_up_a_dangling_venv_before_rebuild(self):
+        runtime = self.home / "declared runtime"
+        broken_bin = runtime / ".venv" / "bin"
+        broken_bin.mkdir(parents=True)
+        (broken_bin / "python3.14").symlink_to("removed-cellar-python")
+        (broken_bin / "python").symlink_to("python3.14")
+        config = self.home / ".config" / "rebalance"
+        config.mkdir(parents=True)
+        (config / "runtime-root").write_text(str(runtime) + "\n", encoding="utf-8")
+
+        result = run_stack("verify", home=self.home)
+        output = strip_ansi(result.stdout + result.stderr)
+        command = next(line.partition("Run: ")[2] for line in output.splitlines() if "Run: " in line)
+        install = ".venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
+        command = command.replace(install, "test -x .venv/bin/python && test -x .venv/bin/pip")
+
+        repaired = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+
+        self.assertEqual(repaired.returncode, 0, repaired.stderr)
+        backups = list(runtime.glob(".venv.broken.*/original"))
+        self.assertEqual(len(backups), 1)
+        self.assertTrue((backups[0] / "bin" / "python3.14").is_symlink())
+        self.assertFalse((backups[0] / "bin" / "python3.14").exists())
+        self.assertTrue((runtime / ".venv" / "bin" / "python").is_file())
+        self.assertTrue(os.access(runtime / ".venv" / "bin" / "python", os.X_OK))
+
     def test_state_changing_commands_ignore_the_read_only_python_override(self):
         runtime = self.home / "declared-runtime"
         runtime.mkdir()
