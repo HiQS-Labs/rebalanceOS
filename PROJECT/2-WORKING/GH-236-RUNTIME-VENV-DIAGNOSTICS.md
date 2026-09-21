@@ -157,3 +157,6 @@ of truthful per-job failures, or changes to launchd status semantics.
   reported without aborting Doctor; and every retained provenance record now has one campaign
   `run_id` plus an explicit transcript-retention status. The focused 54-test set, Ruff, front-door,
   doc-link, and whitespace checks all pass.
+- Exact-head Codex QA then found that the fallback-root regression depended on the ambient checkout's
+  `.venv` health. Commit `0b68c02` makes the test assert root selection directly; the same 54-test
+  set and changed-file Ruff check pass without that machine-state dependency.
