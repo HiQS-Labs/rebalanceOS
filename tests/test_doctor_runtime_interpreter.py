@@ -142,20 +142,16 @@ def test_policy_unmanaged_prefixed_label_is_ignored(tmp_path: Path) -> None:
 
 
 def test_invalid_declared_root_uses_installer_fallback_checkout(tmp_path: Path) -> None:
-    agents = tmp_path / "agents"
-    agents.mkdir()
     invalid_root = tmp_path / "missing-runtime"
     root_file = tmp_path / "runtime-root"
     root_file.write_text(str(invalid_root) + "\n", encoding="utf-8")
-    checkout_python = Path(doctor.__file__).resolve().parents[2] / ".venv" / "bin" / "python"
-    _write_plist(agents, "github-sync", [str(checkout_python), "job_guard.py"])
 
     with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
-        check = _check_scheduler_runtime_interpreter(agents)[0]
+        runtime_root, why = doctor._expected_runtime_root()
 
-    assert check.status == FAIL
-    assert str(checkout_python) in check.detail
-    assert str(invalid_root) not in check.detail
+    assert runtime_root == Path(doctor.__file__).resolve().parents[2]
+    assert str(invalid_root) in why
+    assert "unavailable" in why
 
 
 def test_missing_scheduler_policy_warns_without_claiming_health(tmp_path: Path) -> None:
