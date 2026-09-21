@@ -22,7 +22,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan and final implementation approved by Codex relay; public fix and local runtime repair verified. | Push the reviewed branch and open the ready PR against `development`; merge remains maintainer-gated. |
+| PR review findings from CodeRabbit and Greptile are fixed and focused verification is green. | Complete exact-head Codex QA, push, verify hosted checks, and merge PR #237. |
 
 ## Bug
 
@@ -151,3 +151,9 @@ of truthful per-job failures, or changes to launchd status semantics.
   and assertion level on base `development`: fixed September fixtures have aged out of real-clock
   7/14-day windows. That public baseline defect is tracked separately; GH-236 does not change
   production freshness semantics to mask it.
+- CodeRabbit and Greptile follow-up is implemented in `ab0594f`: state-changing stack commands ignore
+  the read-only Python test override; an unavailable declared runtime root falls back exactly as the
+  installer does; regular-file checks reject executable directories; cyclic symlink resolution is
+  reported without aborting Doctor; and every retained provenance record now has one campaign
+  `run_id` plus an explicit transcript-retention status. The focused 54-test set, Ruff, front-door,
+  doc-link, and whitespace checks all pass.

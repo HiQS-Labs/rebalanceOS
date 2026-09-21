@@ -17,11 +17,13 @@ tracked files. The rebuilt ignored virtual environment contains the repository's
 managed launchd job currently reports exit 78. Running the candidate Doctor code against the live
 installed plists reports 12 jobs referencing a healthy declared runtime interpreter.
 
-The public candidate adds the missing fleet-level diagnosis and read-only stack warning. The final
+The public candidate adds the missing fleet-level diagnosis and read-only stack warning. The initial
 implementation review approved commit `ffe48ad74938494e12c62132ce3b3074a007f04b`. The next commit,
 `4d02fa992501512cca323ce43253e7903ff34e53`, has that commit as its sole parent and changes only the
 GH-236 working document; `git rev-list --count ffe48ad..4d02fa9` returned `1` and
-`git diff --name-status ffe48ad..4d02fa9` returned only that document.
+`git diff --name-status ffe48ad..4d02fa9` returned only that document. Automated PR review then
+identified two runtime-boundary defects and two evidence-contract gaps; commit `ab0594f` corrects
+the runtime behavior, with the final evidence commit recorded separately.
 
 ## Verification results
 
@@ -29,6 +31,7 @@ GH-236 working document; `git rev-list --count ffe48ad..4d02fa9` returned `1` an
 |---|---|
 | Focused Doctor/launchd/stack/version and dependency regressions | 73 passed; Ruff passed |
 | Focused tests after the final two policy-boundary fixes | 44 passed; Ruff passed |
+| CodeRabbit/Greptile remediation regressions | 54 passed; Ruff, front-door, and doc-link checks passed |
 | Version/front-door check after CI correction | Passed; package, project, and manifest are 0.88.4 |
 | Full `pytest tests/ -q` at predecessor `4a9228a` | 2,418 passed, 17 failed, 20 skipped, 10 xfailed, 143 subtests passed |
 | Canonical runtime extras import | FastAPI, Google auth, and sentence-transformers imported successfully |
@@ -92,3 +95,5 @@ freshness semantics in GH-236.
    base commit. This PR does not establish that any other base-branch CI failure is unrelated.
 6. The hosted root-suite comparison establishes identical failures on base and candidate, while the
    fixed-date/rolling-clock explanation is a source-trace diagnosis rather than a repaired control.
+7. The Codex relay transcript for the earlier approval remains local and is explicitly marked
+   unretained in provenance; its attestation digest is retained.
