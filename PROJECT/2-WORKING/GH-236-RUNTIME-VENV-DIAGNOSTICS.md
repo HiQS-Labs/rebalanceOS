@@ -165,3 +165,9 @@ of truthful per-job failures, or changes to launchd status semantics.
   same encoding-neutral structured parser, emits WARN for unreadable plists instead of a false OK,
   and verifies through `run_doctor()` that the new runtime finding remains in the report. The expanded
   focused set passes 56 tests; Ruff, front-door, doc-link, and whitespace checks also pass.
+- Final source QA found that `python3 -m venv .venv` can preserve the very dangling symlink being
+  repaired, and that the first orchestration regression still reached ambient Doctor probes. Commit
+  `3bcf5de` makes the documented command move an existing environment into a collision-safe `mktemp`
+  backup before rebuilding, executes that recovery against a broken-link fixture, preserves spaces
+  in installer runtime-root declarations, and narrows orchestration verification to the two scheduler
+  checks. The focused set passes 57 tests and 76 related scheduler/runtime tests also pass.
