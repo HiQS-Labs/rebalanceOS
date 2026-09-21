@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.4] - 2026-09-21
+
+### Fixed
+- Scheduler diagnostics now identify a missing, non-executable, or dangling declared-runtime
+  Python interpreter as one fleet-level failure, count the installed jobs affected, and anchor the
+  explicit rebuild and reload instructions to the deployed checkout. Stack status surfaces the same
+  root cause, while generic nonzero job failures direct operators through configuration verification
+  before logs or kickstart so a launchd configuration error is no longer presented as restartable.
+
 ## [0.88.3] - 2026-09-17
 
 ### Fixed

@@ -150,6 +150,14 @@ class StackScriptTests(unittest.TestCase):
         out = strip_ansi(run_stack("status", home=self.home).stdout)
         self.assertIn(f"managed: {count}", out)
 
+    def test_status_names_broken_runtime_interpreter_and_verify(self):
+        result = run_stack("status", home=self.home)
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Runtime interpreter unavailable", output)
+        self.assertIn(str(REPO / ".venv" / "bin" / "python"), output)
+        self.assertIn("bash scripts/stack.sh verify", output)
+
     # -- 2. unmanaged plists are shown but never touched --------------------
 
     def test_unmanaged_plists_are_listed_separately(self):

@@ -87,6 +87,8 @@ def test_job_without_structured_result_fails_on_nonzero_exit(tmp_path: Path) -> 
     assert checks[0].status == FAIL
     assert checks[0].severity == ERROR
     assert checks[0].detail == "last run exited with status 1"
+    assert "bash scripts/stack.sh verify" in checks[0].hint
+    assert "after fixing the cause" in checks[0].hint
 
 
 def test_overlong_live_job_fails_instead_of_reporting_running(tmp_path: Path) -> None:

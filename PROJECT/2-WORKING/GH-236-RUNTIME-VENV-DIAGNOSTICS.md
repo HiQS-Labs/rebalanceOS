@@ -2,7 +2,7 @@
 gh_issue: 236
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/236
 title: "Diagnose a broken runtime virtualenv across the scheduler fleet"
-status: "Active — plan pending Codex relay QA"
+status: "Implementation complete — final Codex QA pending"
 created: 2026-09-21
 updated: 2026-09-21
 owner: Codex
@@ -22,7 +22,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Issue intake, duplicate search, current-code recon, and an isolated task clone anchored to `origin/development`. | Run pre-implementation Codex relay QA; implement only after approval. |
+| Plan approved by Codex relay; implementation and focused verification complete. | Commit the candidate, run final Codex QA, then execute the final repo gates and open the PR. |
 
 ## Bug
 
@@ -116,4 +116,10 @@ of truthful per-job failures, or changes to launchd status semantics.
 
 ## Verification
 
-Pending implementation and final relay approval.
+- Witnessed red: the new doctor test module failed collection because the fleet-level
+  interpreter check did not exist on baseline; no implementation tests could pass vacuously.
+- Focused: 38 doctor/launchd/stack regression tests passed.
+- Relevant suite: 179 doctor, scheduler-policy, and stack tests plus 19 subtests passed.
+- Ruff passed on every changed Python file.
+- Pre-implementation Codex relay approved the revised plan in round 2; final implementation
+  review and repo-wide gates remain pending.

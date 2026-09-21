@@ -458,6 +458,10 @@ stack_status() {
     echo "                     rebalance OS — Stack Status                                "
     echo "================================================================================"
     echo "Target root: $REBALANCE_DIR"
+    if [ ! -x "$PYTHON_BIN" ]; then
+        log_error "Runtime interpreter unavailable: $PYTHON_BIN"
+        log_error "Run: bash scripts/stack.sh verify"
+    fi
     echo
     printf "%-28s %-8s %-10s %-14s %s\n" "JOB" "PID" "LAST EXIT" "STATE" "BOUND TO"
     echo "--------------------------------------------------------------------------------"

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import shutil
 import sqlite3
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -24,6 +26,7 @@ from pathlib import Path
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Callable, Literal
+from xml.parsers.expat import ExpatError
 
 from rebalance.lib.time_ops import now_utc
 from rebalance import three_eyes_bridge
@@ -1022,6 +1025,86 @@ def _expected_runtime_root() -> tuple[Path, str]:
     return Path(__file__).resolve().parents[2], "this checkout"
 
 
+def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list[Check]:
+    """Check the interpreter referenced by the installed scheduler fleet."""
+    if agents_dir is None:
+        agents_dir = Path.home() / "Library" / "LaunchAgents"
+    if not agents_dir.is_dir():
+        return []
+
+    runtime_root, _ = _expected_runtime_root()
+    runtime_python = runtime_root / ".venv" / "bin" / "python"
+    affected: list[str] = []
+    unreadable: list[str] = []
+    for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
+        try:
+            with plist.open("rb") as fh:
+                payload = plistlib.load(fh)
+            if not isinstance(payload, dict):
+                raise ValueError("plist root is not a dictionary")
+        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError):
+            unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
+            continue
+
+        values: list[str] = []
+        program = payload.get("Program")
+        if isinstance(program, str):
+            values.append(program)
+        arguments = payload.get("ProgramArguments")
+        if isinstance(arguments, list):
+            values.extend(value for value in arguments if isinstance(value, str))
+        if str(runtime_python) in values:
+            affected.append(plist.stem.removeprefix("com.rebalance-os."))
+
+    checks: list[Check] = []
+    if affected:
+        problem = ""
+        try:
+            resolved = runtime_python.resolve(strict=True)
+        except FileNotFoundError:
+            problem = "is a dangling symlink" if runtime_python.is_symlink() else "is missing"
+        except OSError as exc:
+            problem = f"cannot be resolved ({exc})"
+        else:
+            if not resolved.is_file():
+                problem = "does not resolve to a regular file"
+            elif not os.access(runtime_python, os.X_OK):
+                problem = "is not executable"
+
+        if problem:
+            root = shlex.quote(str(runtime_root))
+            checks.append(
+                Check(
+                    "scheduler runtime interpreter",
+                    FAIL,
+                    f"{len(affected)} installed job(s) reference {runtime_python}, which {problem}",
+                    f"repair the declared runtime explicitly: `cd {root} && python3 -m venv .venv "
+                    "&& .venv/bin/pip install -e '.[dev]' && bash scripts/stack.sh verify "
+                    "&& bash scripts/stack.sh restart`",
+                )
+            )
+        elif not unreadable:
+            checks.append(
+                Check(
+                    "scheduler runtime interpreter",
+                    OK,
+                    f"{len(affected)} installed job(s) reference healthy {runtime_python}",
+                    severity=NOTICE,
+                )
+            )
+
+    if unreadable:
+        checks.append(
+            Check(
+                "scheduler runtime interpreter",
+                WARN,
+                f"could not inspect {len(unreadable)} installed plist(s): {', '.join(unreadable)}",
+                "repair or reinstall those scheduler plists, then run `bash scripts/stack.sh verify`",
+            )
+        )
+    return checks
+
+
 def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Check]:
     """Every scheduled job must run from ONE declared checkout (GH-36 tripwire).
 
@@ -1203,9 +1286,10 @@ def _check_launchd(
                     f"launchd:{short}",
                     FAIL,
                     f"last run exited with status {status_val}",
-                    "inspect temp/logs/ for this job's error output. This status is sticky: "
+                    "run `bash scripts/stack.sh verify` first to rule out runtime/configuration "
+                    "failures, then inspect temp/logs/ for this job's error output. This status is sticky: "
                     "launchctl keeps it until launchd reruns the job, so running the wrapper "
-                    "by hand will not clear it — use "
+                    "by hand will not clear it — after fixing the cause, use "
                     f"`launchctl kickstart -k gui/$(id -u)/com.rebalance-os.{short}`",
                 )
             )
@@ -2406,6 +2490,10 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     launchctl_output = _launchctl_list()
     report.checks.extend(_check_scheduler_liveness(launchctl_output=launchctl_output))
     report.checks.extend(_check_launchd(launchctl_output))
+
+    # GH-236: launchd cannot start job_guard or write a current log when the
+    # interpreter embedded in installed plists is missing or dangling.
+    report.checks.extend(_check_scheduler_runtime_interpreter())
 
     # GH-36 tripwire: the scheduled stack must run from the same checkout as
     # this code — absolute plist paths otherwise strand it on an old clone.
