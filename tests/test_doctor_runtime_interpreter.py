@@ -64,6 +64,7 @@ def test_missing_interpreter_fails_with_declared_root_repair(tmp_path: Path) -> 
     assert "1 installed job(s)" in check.detail
     assert "missing" in check.detail
     assert f"cd {shlex.quote(str(runtime))}" in check.hint
+    assert ".[embeddings,calendar,server,dev]" in check.hint
     assert "bash scripts/stack.sh verify" in check.hint
     assert "bash scripts/stack.sh restart" in check.hint
 

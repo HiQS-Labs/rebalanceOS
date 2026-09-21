@@ -1082,7 +1082,8 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
                     FAIL,
                     f"{len(affected)} installed job(s) reference {runtime_python}, which {problem}",
                     f"repair the declared runtime explicitly: `cd {root} && python3 -m venv .venv "
-                    "&& .venv/bin/pip install -e '.[dev]' && bash scripts/stack.sh verify "
+                    "&& .venv/bin/pip install -e '.[embeddings,calendar,server,dev]' "
+                    "&& bash scripts/stack.sh verify "
                     "&& bash scripts/stack.sh restart`",
                 )
             )

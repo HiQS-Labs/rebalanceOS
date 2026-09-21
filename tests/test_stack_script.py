@@ -176,6 +176,17 @@ class StackScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertNotIn("Runtime interpreter unavailable", output)
 
+    def test_verify_prescribes_the_complete_runtime_dependency_set(self):
+        missing_python = self.home / "missing-python"
+        result = run_stack(
+            "verify",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(missing_python)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(".[embeddings,calendar,server,dev]", output)
+
     # -- 2. unmanaged plists are shown but never touched --------------------
 
     def test_unmanaged_plists_are_listed_separately(self):

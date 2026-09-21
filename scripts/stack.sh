@@ -180,7 +180,7 @@ validate_environment() {
 
     if [ ! -x "$PYTHON_BIN" ]; then
         log_error "Virtualenv Python not found at: $PYTHON_BIN"
-        log_error "Run: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'"
+        log_error "Run: python3 -m venv .venv && .venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
         errors=$((errors + 1))
     else
         log_ok "Virtualenv Python present ($("$PYTHON_BIN" --version 2>&1))"
@@ -569,7 +569,7 @@ case "$cmd" in
     doctor)
         if [ ! -x "$REBALANCE_CLI" ]; then
             log_error "rebalance CLI not found at $REBALANCE_CLI"
-            log_error "Run: .venv/bin/pip install -e '.[dev]'"
+            log_error "Run: .venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
             exit 1
         fi
         exec "$REBALANCE_CLI" doctor
