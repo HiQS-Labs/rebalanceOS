@@ -2,7 +2,7 @@
 gh_issue: 236
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/236
 title: "Diagnose a broken runtime virtualenv across the scheduler fleet"
-status: "Implementation complete — final Codex QA pending"
+status: "Implementation complete — ready PR pending"
 created: 2026-09-21
 updated: 2026-09-21
 owner: Codex
@@ -22,7 +22,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan approved by Codex relay; implementation and focused verification complete. | Close final Codex re-review, then execute the final repo gates and open the PR. |
+| Plan and final implementation approved by Codex relay; public fix and local runtime repair verified. | Push the reviewed branch and open the ready PR against `development`; merge remains maintainer-gated. |
 
 ## Bug
 
@@ -118,10 +118,25 @@ of truthful per-job failures, or changes to launchd status semantics.
 
 - Witnessed red: the new doctor test module failed collection because the fleet-level
   interpreter check did not exist on baseline; no implementation tests could pass vacuously.
-- Focused after final-review remediation: 63 doctor/launchd/stack/scheduler/version tests passed.
+- Focused after final-review remediation: 73 doctor/launchd/stack/version and dependency-regression
+  tests passed; after the policy-boundary corrections, 44 focused tests passed again.
 - Relevant suite: 179 doctor, scheduler-policy, and stack tests plus 19 subtests passed.
 - Ruff passed on every changed Python file.
 - Pre-implementation Codex relay approved the revised plan in round 2. Final implementation
   review found and drove two corrections: count validated unique launchd labels rather than plist
-  filenames, and control interpreter health explicitly in stack-status tests. Re-review and
-  repo-wide gates remain pending.
+  filenames, and control interpreter health explicitly in stack-status tests. The post-gate relay
+  then caught and closed two boundary defects: namespace-prefixed but policy-unmanaged labels no
+  longer count, and an unreadable `SCHEDULER.md` now returns a structured warning instead of
+  aborting Doctor. Codex approved and attested final commit `ffe48ad` in round 3.
+- The one repo-wide pytest run (on predecessor `4a9228a`) completed with 2,418 passed, 20 skipped,
+  10 xfailed, 143 subtests passed, and 17 failed. Nine failures were caused by following the then-
+  documented `.[dev]` repair, which omitted runtime extras; the canonical
+  `.[embeddings,calendar,server,dev]` install and the nine affected dependency tests now pass.
+  The remaining eight failures are untouched, pre-existing/date-sensitive GitHub peeker, HiQS
+  digest, and query-mirror cases. The full suite was not repeated; every later code change was
+  covered by focused tests and final source review.
+- Local repair: rebuilt the declared runtime checkout's `.venv` on Python 3.14.7 with the complete
+  runtime extras; `stack.sh verify` passes, pulse-server is running, launchd reports zero managed
+  jobs at exit 78, and the new Doctor check reports 12 installed jobs referencing a healthy runtime
+  interpreter. Six jobs currently retain exit 75 from the separate memory-pressure guard. The
+  runtime checkout remains seven commits behind and its five unrelated local changes are untouched.
