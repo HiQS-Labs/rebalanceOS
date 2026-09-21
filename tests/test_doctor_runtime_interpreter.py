@@ -128,6 +128,16 @@ def test_policy_unmanaged_prefixed_label_is_ignored(tmp_path: Path) -> None:
     assert "1 installed job(s)" in check.detail
 
 
+def test_missing_scheduler_policy_warns_without_claiming_health(tmp_path: Path) -> None:
+    _, _, agents = _runtime(tmp_path)
+    with patch("rebalance.paths.resolve_project_root", return_value=tmp_path / "missing-project"):
+        checks = _check(tmp_path, agents)
+
+    assert len(checks) == 1
+    assert checks[0].status == WARN
+    assert "could not read SCHEDULER.md" in checks[0].detail
+
+
 def test_duplicate_labels_count_as_one_job_and_foreign_label_is_ignored(tmp_path: Path) -> None:
     _, python, agents = _runtime(tmp_path)
     python.write_text("#!/bin/sh\n", encoding="utf-8")
