@@ -22,7 +22,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan approved by Codex relay; implementation and focused verification complete. | Commit the candidate, run final Codex QA, then execute the final repo gates and open the PR. |
+| Plan approved by Codex relay; implementation and focused verification complete. | Close final Codex re-review, then execute the final repo gates and open the PR. |
 
 ## Bug
 

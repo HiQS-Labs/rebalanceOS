@@ -73,8 +73,6 @@
 
 ### Added
 - Full clone detection and parent checkout grouping in Focus 5: secondary task checkouts and temporary clones are now detected and clustered under their primary parent repository card rather than occupying individual top-five slots. Parent cards roll up the most recent activity across all clones, display active clone counts and dirty status indicators, and allow quick opening of individual clone checkouts (#204).
->>>>>>> origin/development
-
 ## [0.86.0] - 2026-09-08
 
 ### Added
