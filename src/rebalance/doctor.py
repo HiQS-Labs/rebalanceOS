@@ -1028,6 +1028,27 @@ def _expected_runtime_root() -> tuple[Path, str]:
     return checkout, "this checkout"
 
 
+def _load_launchd_plist(plist: Path) -> dict[str, object]:
+    """Load one launchd plist without assuming its on-disk encoding."""
+    with plist.open("rb") as fh:
+        payload = plistlib.load(fh)
+    if not isinstance(payload, dict):
+        raise ValueError("plist root is not a dictionary")
+    return payload
+
+
+def _launchd_program_values(payload: dict[str, object]) -> list[str]:
+    """Return executable and argument strings from a parsed launchd plist."""
+    values: list[str] = []
+    program = payload.get("Program")
+    if isinstance(program, str):
+        values.append(program)
+    arguments = payload.get("ProgramArguments")
+    if isinstance(arguments, list):
+        values.extend(value for value in arguments if isinstance(value, str))
+    return values
+
+
 def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list[Check]:
     """Check the interpreter referenced by the installed scheduler fleet."""
     if agents_dir is None:
@@ -1051,10 +1072,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
     unreadable: list[str] = []
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
         try:
-            with plist.open("rb") as fh:
-                payload = plistlib.load(fh)
-            if not isinstance(payload, dict):
-                raise ValueError("plist root is not a dictionary")
+            payload = _load_launchd_plist(plist)
         except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError):
             unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
             continue
@@ -1062,14 +1080,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
         label = payload.get("Label")
         if not isinstance(label, str) or label not in managed_labels:
             continue
-        values: list[str] = []
-        program = payload.get("Program")
-        if isinstance(program, str):
-            values.append(program)
-        arguments = payload.get("ProgramArguments")
-        if isinstance(arguments, list):
-            values.extend(value for value in arguments if isinstance(value, str))
-        if str(runtime_python) in values:
+        if str(runtime_python) in _launchd_program_values(payload):
             affected.add(label)
 
     checks: list[Check] = []
@@ -1141,34 +1152,43 @@ def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Chec
 
     repo_root, root_why = _expected_runtime_root()
     drifted: list[str] = []
-    path_re = re.compile(r"<string>(/[^<]*?\.(?:sh|py)|/[^<]*?/python3?)</string>")
+    unreadable: list[str] = []
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
         try:
-            text = plist.read_text(encoding="utf-8")
-        except OSError:
+            payload = _load_launchd_plist(plist)
+        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError):
+            unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
             continue
-        for raw in path_re.findall(text):
+        for raw in _launchd_program_values(payload):
             p = Path(raw)
-            if "rebalance" in raw.lower() and not p.is_relative_to(repo_root):
+            is_runtime_path = p.suffix in {".sh", ".py"} or p.name in {"python", "python3"}
+            if p.is_absolute() and is_runtime_path and "rebalance" in raw.lower() and not p.is_relative_to(repo_root):
                 drifted.append(plist.stem.removeprefix("com.rebalance-os."))
                 break
 
-    if not drifted:
-        return [
+    checks: list[Check] = []
+    if drifted:
+        checks.append(
             Check(
                 "scheduler checkout",
-                OK,
-                f"every scheduled job runs from {root_why}",
+                WARN,
+                f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than {root_why}: {', '.join(drifted)}",
+                f"their plists pin absolute paths into another clone — repoint them at {repo_root} and reload (see GH-36)",
             )
-        ]
-    return [
-        Check(
-            "scheduler checkout",
-            WARN,
-            f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than {root_why}: {', '.join(drifted)}",
-            f"their plists pin absolute paths into another clone — repoint them at {repo_root} and reload (see GH-36)",
         )
-    ]
+    elif not unreadable:
+        checks.append(Check("scheduler checkout", OK, f"every scheduled job runs from {root_why}"))
+
+    if unreadable:
+        checks.append(
+            Check(
+                "scheduler checkout",
+                WARN,
+                f"could not inspect {len(unreadable)} installed plist(s): {', '.join(unreadable)}",
+                "repair or reinstall those scheduler plists, then run `rebalance doctor` again",
+            )
+        )
+    return checks
 
 
 def _check_launchd(
