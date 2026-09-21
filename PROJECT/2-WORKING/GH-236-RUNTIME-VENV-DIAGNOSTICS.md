@@ -82,9 +82,13 @@ Graph note: the available index generation predates current `development`, and
 1. Add a read-only doctor check beside the existing scheduler-checkout check. Parse
    installed Rebalance plists, count only jobs that reference the declared runtime's
    `.venv/bin/python`, and validate that executable's path, resolved target, regular-file
-   type, and execute bit. Emit one fleet-level error with the count and the existing
-   explicit rebuild → `stack.sh verify` → reload flow. Healthy jobs produce one quiet OK;
-   no installed interpreter-backed jobs produce no claim.
+   type, and execute bit. Use standard-library structured plist parsing; an unreadable or
+   malformed installed Rebalance plist emits an explicit unknown/WARN and is excluded from
+   the affected count, never converted into a healthy claim. Emit one fleet-level error
+   with the count and an explicit `cd <declared-runtime-root>` (safely quoted) before the
+   rebuild → `bash scripts/stack.sh verify` → reload flow, so doctor invoked from a dev
+   checkout cannot repair the wrong venv. Healthy matching jobs produce one quiet OK; no
+   installed interpreter-backed jobs produce no health claim.
 2. Change the generic nonzero launchd hint to run `bash scripts/stack.sh verify` first,
    then inspect logs and kickstart only after preflight succeeds. Preserve exit grading,
    daily-sync's richer result, crash-loop state, and every launchctl predicate.
@@ -92,9 +96,11 @@ Graph note: the available index generation predates current `development`, and
    owned by `validate_environment()`. On failure, name the interpreter and direct the
    operator to `bash scripts/stack.sh verify`; leave status exit behavior unchanged.
 4. Add hermetic tests for a healthy executable, absent interpreter, dangling symlink,
-   exact affected-job count, unrelated/foreign plist exclusion, the revised exit hint,
-   and stack-status output. Witness red by running the new tests against the baseline
-   before implementation, and again by temporarily transposing the fixed predicate.
+   non-executable regular file, executable directory, malformed installed plist, exact
+   affected-job count when one plist repeats the interpreter argument, zero matching jobs,
+   unrelated/foreign plist exclusion, distinct current/declared roots in remediation, the
+   revised exit hint, and stack-status output. Witness red by running the new regression
+   cases against the baseline before implementation.
 5. Run focused doctor/stack tests during implementation. After final relay approval,
    run the repo-required `rebalance doctor`, `pytest tests/`, and deterministic PDDA
    checks once against the final commit; disclose unrelated baseline failures.
