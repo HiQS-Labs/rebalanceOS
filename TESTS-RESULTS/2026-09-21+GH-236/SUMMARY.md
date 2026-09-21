@@ -73,6 +73,12 @@ commit `c4fc5e2e75d259d5bf2c150f44e361900472c278` reports the same file and same
 That is a public-repo baseline failure, not a GH-236 regression; it remains visible rather than being
 folded into this runtime-diagnostics PR.
 
+Both hosted `root-noembed` lanes also fail the same eight test IDs with the same assertion values as
+development run `35266158410`. Direct source reads show fixed September 1–8 fixture timestamps
+flowing into rolling 7/14-day queries based on the real clock; by September 21 the rows have aged
+out. This second public baseline defect is tracked separately rather than changing production
+freshness semantics in GH-236.
+
 ## Threats to validity
 
 1. The full suite ran on predecessor `4a9228a`, before the final policy-membership and missing-policy
@@ -84,3 +90,5 @@ folded into this runtime-diagnostics PR.
    unrelated local work. This receipt proves local interpreter recovery, not deployment of GH-236.
 5. Hosted lint remains red on an untouched historical evidence script that is also red on the exact
    base commit. This PR does not establish that any other base-branch CI failure is unrelated.
+6. The hosted root-suite comparison establishes identical failures on base and candidate, while the
+   fixed-date/rolling-clock explanation is a source-trace diagnosis rather than a repaired control.

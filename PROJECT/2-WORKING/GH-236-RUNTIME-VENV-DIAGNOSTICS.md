@@ -147,3 +147,7 @@ of truthful per-job failures, or changes to launchd status semantics.
   0.88.3 after the 0.88.4 bump. The manifest is now synchronized and the front-door check passes.
   CI's separate eight-error Ruff failure is identical on base `development` and confined to an
   untouched GH-199 evidence script; it is tracked separately rather than hidden in this fix.
+- Hosted root-suite lanes reproduce the remaining eight pytest failures byte-for-byte at the test-ID
+  and assertion level on base `development`: fixed September fixtures have aged out of real-clock
+  7/14-day windows. That public baseline defect is tracked separately; GH-236 does not change
+  production freshness semantics to mask it.
