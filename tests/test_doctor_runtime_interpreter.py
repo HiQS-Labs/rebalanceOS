@@ -80,6 +80,19 @@ def test_dangling_symlink_fails_specifically(tmp_path: Path) -> None:
     assert "dangling symlink" in check.detail
 
 
+def test_cyclic_symlink_fails_without_aborting_doctor(tmp_path: Path) -> None:
+    _, python, agents = _runtime(tmp_path)
+    peer = python.with_name("python-loop")
+    python.symlink_to(peer.name)
+    peer.symlink_to(python.name)
+    _write_plist(agents, "pulse-sync", [str(python), "job_guard.py"])
+
+    check = _check(tmp_path, agents)[0]
+
+    assert check.status == FAIL
+    assert "cannot be resolved" in check.detail
+
+
 def test_non_executable_file_and_executable_directory_both_fail(tmp_path: Path) -> None:
     _, python, agents = _runtime(tmp_path)
     _write_plist(agents, "pulse-sync", [str(python)])
@@ -126,6 +139,23 @@ def test_policy_unmanaged_prefixed_label_is_ignored(tmp_path: Path) -> None:
     check = _check(tmp_path, agents)[0]
     assert check.status == FAIL
     assert "1 installed job(s)" in check.detail
+
+
+def test_invalid_declared_root_uses_installer_fallback_checkout(tmp_path: Path) -> None:
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    invalid_root = tmp_path / "missing-runtime"
+    root_file = tmp_path / "runtime-root"
+    root_file.write_text(str(invalid_root) + "\n", encoding="utf-8")
+    checkout_python = Path(doctor.__file__).resolve().parents[2] / ".venv" / "bin" / "python"
+    _write_plist(agents, "github-sync", [str(checkout_python), "job_guard.py"])
+
+    with patch.object(doctor, "RUNTIME_ROOT_FILE", root_file):
+        check = _check_scheduler_runtime_interpreter(agents)[0]
+
+    assert check.status == FAIL
+    assert str(checkout_python) in check.detail
+    assert str(invalid_root) not in check.detail
 
 
 def test_missing_scheduler_policy_warns_without_claiming_health(tmp_path: Path) -> None:

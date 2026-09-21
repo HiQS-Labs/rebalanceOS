@@ -176,6 +176,20 @@ class StackScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertNotIn("Runtime interpreter unavailable", output)
 
+    def test_status_rejects_an_executable_directory_as_the_interpreter(self):
+        directory = self.home / "python-directory"
+        directory.mkdir()
+        directory.chmod(0o755)
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(directory)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Runtime interpreter unavailable", output)
+        self.assertIn("bash scripts/stack.sh verify", output)
+
     def test_verify_prescribes_the_complete_runtime_dependency_set(self):
         missing_python = self.home / "missing-python"
         result = run_stack(
@@ -186,6 +200,27 @@ class StackScriptTests(unittest.TestCase):
         output = strip_ansi(result.stdout + result.stderr)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(".[embeddings,calendar,server,dev]", output)
+
+    def test_state_changing_commands_ignore_the_read_only_python_override(self):
+        runtime = self.home / "declared-runtime"
+        runtime.mkdir()
+        config = self.home / ".config" / "rebalance"
+        config.mkdir(parents=True)
+        (config / "runtime-root").write_text(str(runtime) + "\n", encoding="utf-8")
+        override = self.home / "override-python"
+        override.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        override.chmod(0o755)
+
+        result = run_stack(
+            "restart",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(override)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"Virtualenv Python not found at: {runtime}/.venv/bin/python", output)
+        self.assertNotIn(f"Virtualenv Python not found at: {override}", output)
 
     # -- 2. unmanaged plists are shown but never touched --------------------
 

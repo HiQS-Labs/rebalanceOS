@@ -39,8 +39,6 @@ AGENTS_DIR="$HOME/Library/LaunchAgents"
 LABEL_PREFIX="com.rebalance-os."
 
 source "$SCRIPT_DIR/lib/install_common.sh"
-# Test seam: production leaves this unset and uses install_common's declared-runtime path.
-PYTHON_BIN="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
 
 log_info()  { echo -e "\033[1;34m[INFO]\033[0m  $*"; }
 log_ok()    { echo -e "\033[1;32m[OK]\033[0m    $*"; }
@@ -178,7 +176,7 @@ validate_environment() {
     log_info "Validating environment and runtime prerequisites..."
     local errors=0
 
-    if [ ! -x "$PYTHON_BIN" ]; then
+    if [ ! -f "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
         log_error "Virtualenv Python not found at: $PYTHON_BIN"
         log_error "Run: python3 -m venv .venv && .venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
         errors=$((errors + 1))
@@ -455,13 +453,16 @@ runtime_drift() {
 }
 
 stack_status() {
+    # Read-only test seam. State-changing commands always retain the interpreter
+    # selected by install_common.sh and cannot inherit this override.
+    local status_python="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
     refresh_launchctl_cache
     echo "================================================================================"
     echo "                     rebalance OS — Stack Status                                "
     echo "================================================================================"
     echo "Target root: $REBALANCE_DIR"
-    if [ ! -x "$PYTHON_BIN" ]; then
-        log_error "Runtime interpreter unavailable: $PYTHON_BIN"
+    if [ ! -f "$status_python" ] || [ ! -x "$status_python" ]; then
+        log_error "Runtime interpreter unavailable: $status_python"
         log_error "Run: bash scripts/stack.sh verify"
     fi
     echo
@@ -574,7 +575,11 @@ case "$cmd" in
         fi
         exec "$REBALANCE_CLI" doctor
         ;;
-    verify|test)    validate_environment ;;
+    verify|test)
+        # Test-only override is deliberately scoped to this read-only command.
+        PYTHON_BIN="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
+        validate_environment
+        ;;
     *)
         echo "Usage: $0 {up [--force]|down|restart|status|drift|doctor|verify|purge}"
         exit 2

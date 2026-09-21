@@ -1020,9 +1020,12 @@ def _expected_runtime_root() -> tuple[Path, str]:
         declared = RUNTIME_ROOT_FILE.read_text(encoding="utf-8").strip()
     except OSError:
         declared = ""
-    if declared:
+    if declared and Path(declared).is_dir():
         return Path(declared), f"the declared runtime root ({RUNTIME_ROOT_FILE})"
-    return Path(__file__).resolve().parents[2], "this checkout"
+    checkout = Path(__file__).resolve().parents[2]
+    if declared:
+        return checkout, f"this checkout (declared runtime root is unavailable: {declared})"
+    return checkout, "this checkout"
 
 
 def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list[Check]:
@@ -1076,7 +1079,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
             resolved = runtime_python.resolve(strict=True)
         except FileNotFoundError:
             problem = "is a dangling symlink" if runtime_python.is_symlink() else "is missing"
-        except OSError as exc:
+        except (OSError, RuntimeError) as exc:
             problem = f"cannot be resolved ({exc})"
         else:
             if not resolved.is_file():
