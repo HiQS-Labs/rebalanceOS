@@ -39,6 +39,8 @@ AGENTS_DIR="$HOME/Library/LaunchAgents"
 LABEL_PREFIX="com.rebalance-os."
 
 source "$SCRIPT_DIR/lib/install_common.sh"
+# Test seam: production leaves this unset and uses install_common's declared-runtime path.
+PYTHON_BIN="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
 
 log_info()  { echo -e "\033[1;34m[INFO]\033[0m  $*"; }
 log_ok()    { echo -e "\033[1;32m[OK]\033[0m    $*"; }

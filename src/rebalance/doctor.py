@@ -1034,7 +1034,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
 
     runtime_root, _ = _expected_runtime_root()
     runtime_python = runtime_root / ".venv" / "bin" / "python"
-    affected: list[str] = []
+    affected: set[str] = set()
     unreadable: list[str] = []
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
         try:
@@ -1046,6 +1046,9 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
             unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
             continue
 
+        label = payload.get("Label")
+        if not isinstance(label, str) or not label.startswith("com.rebalance-os."):
+            continue
         values: list[str] = []
         program = payload.get("Program")
         if isinstance(program, str):
@@ -1054,7 +1057,7 @@ def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list
         if isinstance(arguments, list):
             values.extend(value for value in arguments if isinstance(value, str))
         if str(runtime_python) in values:
-            affected.append(plist.stem.removeprefix("com.rebalance-os."))
+            affected.add(label)
 
     checks: list[Check] = []
     if affected:

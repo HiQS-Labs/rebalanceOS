@@ -151,12 +151,30 @@ class StackScriptTests(unittest.TestCase):
         self.assertIn(f"managed: {count}", out)
 
     def test_status_names_broken_runtime_interpreter_and_verify(self):
-        result = run_stack("status", home=self.home)
+        missing_python = self.home / "missing-python"
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(missing_python)},
+        )
         output = strip_ansi(result.stdout + result.stderr)
         self.assertEqual(result.returncode, 0)
         self.assertIn("Runtime interpreter unavailable", output)
-        self.assertIn(str(REPO / ".venv" / "bin" / "python"), output)
+        self.assertIn(str(missing_python), output)
         self.assertIn("bash scripts/stack.sh verify", output)
+
+    def test_status_omits_runtime_warning_for_healthy_interpreter(self):
+        healthy_python = self.home / "healthy-python"
+        healthy_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        healthy_python.chmod(0o755)
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(healthy_python)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("Runtime interpreter unavailable", output)
 
     # -- 2. unmanaged plists are shown but never touched --------------------
 

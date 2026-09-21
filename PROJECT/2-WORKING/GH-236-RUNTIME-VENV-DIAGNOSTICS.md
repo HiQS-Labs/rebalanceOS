@@ -118,8 +118,10 @@ of truthful per-job failures, or changes to launchd status semantics.
 
 - Witnessed red: the new doctor test module failed collection because the fleet-level
   interpreter check did not exist on baseline; no implementation tests could pass vacuously.
-- Focused: 38 doctor/launchd/stack regression tests passed.
+- Focused after final-review remediation: 63 doctor/launchd/stack/scheduler/version tests passed.
 - Relevant suite: 179 doctor, scheduler-policy, and stack tests plus 19 subtests passed.
 - Ruff passed on every changed Python file.
-- Pre-implementation Codex relay approved the revised plan in round 2; final implementation
-  review and repo-wide gates remain pending.
+- Pre-implementation Codex relay approved the revised plan in round 2. Final implementation
+  review found and drove two corrections: count validated unique launchd labels rather than plist
+  filenames, and control interpreter health explicitly in stack-status tests. Re-review and
+  repo-wide gates remain pending.

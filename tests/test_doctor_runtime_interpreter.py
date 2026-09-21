@@ -11,9 +11,9 @@ from rebalance import doctor
 from rebalance.doctor import FAIL, OK, WARN, _check_scheduler_runtime_interpreter
 
 
-def _write_plist(agents: Path, name: str, arguments: list[str]) -> None:
+def _write_plist(agents: Path, name: str, arguments: list[str], *, label: str | None = None) -> None:
     payload = {
-        "Label": f"com.rebalance-os.{name}",
+        "Label": label or f"com.rebalance-os.{name}",
         "ProgramArguments": arguments,
     }
     with (agents / f"com.rebalance-os.{name}.plist").open("wb") as fh:
@@ -113,3 +113,18 @@ def test_no_matching_interpreter_jobs_emits_no_health_claim(tmp_path: Path) -> N
     _write_plist(agents, "foreign", ["/usr/bin/python3", "/opt/foreign/job.py"])
 
     assert _check(tmp_path, agents) == []
+
+
+def test_duplicate_labels_count_as_one_job_and_foreign_label_is_ignored(tmp_path: Path) -> None:
+    _, python, agents = _runtime(tmp_path)
+    python.write_text("#!/bin/sh\n", encoding="utf-8")
+    python.chmod(0o755)
+    _write_plist(agents, "first", [str(python)], label="com.rebalance-os.same-job")
+    _write_plist(agents, "second", [str(python)], label="com.rebalance-os.same-job")
+    _write_plist(agents, "camouflage", [str(python)], label="com.foreign.job")
+
+    checks = _check(tmp_path, agents)
+
+    assert len(checks) == 1
+    assert checks[0].status == OK
+    assert "1 installed job(s)" in checks[0].detail
