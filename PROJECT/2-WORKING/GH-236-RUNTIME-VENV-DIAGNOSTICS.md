@@ -132,11 +132,14 @@ of truthful per-job failures, or changes to launchd status semantics.
   10 xfailed, 143 subtests passed, and 17 failed. Nine failures were caused by following the then-
   documented `.[dev]` repair, which omitted runtime extras; the canonical
   `.[embeddings,calendar,server,dev]` install and the nine affected dependency tests now pass.
-  The remaining eight failures are untouched, pre-existing/date-sensitive GitHub peeker, HiQS
-  digest, and query-mirror cases. The full suite was not repeated; every later code change was
-  covered by focused tests and final source review.
+  The remaining eight failures are in untouched GitHub peeker, HiQS digest, and query-mirror files;
+  no same-environment baseline run was retained, so their pre-existing/date-sensitive attribution
+  is unverified. The full suite was not repeated; every later code change was covered by focused
+  tests and final source review.
 - Local repair: rebuilt the declared runtime checkout's `.venv` on Python 3.14.7 with the complete
   runtime extras; `stack.sh verify` passes, pulse-server is running, launchd reports zero managed
   jobs at exit 78, and the new Doctor check reports 12 installed jobs referencing a healthy runtime
   interpreter. Six jobs currently retain exit 75 from the separate memory-pressure guard. The
   runtime checkout remains seven commits behind and its five unrelated local changes are untouched.
+- Sanitized commands, counts, exact commit relationships, local-state evidence, and limitations are
+  retained in [`TESTS-RESULTS/2026-09-21+GH-236`](../../TESTS-RESULTS/2026-09-21+GH-236/).
