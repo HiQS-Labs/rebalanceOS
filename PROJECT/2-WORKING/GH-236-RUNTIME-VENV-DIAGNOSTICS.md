@@ -143,3 +143,7 @@ of truthful per-job failures, or changes to launchd status semantics.
   runtime checkout remains seven commits behind and its five unrelated local changes are untouched.
 - Sanitized commands, counts, exact commit relationships, local-state evidence, and limitations are
   retained in [`TESTS-RESULTS/2026-09-21+GH-236`](../../TESTS-RESULTS/2026-09-21+GH-236/).
+- Hosted CI exposed and locally reproduced one release-metadata defect: `manifest.json` still named
+  0.88.3 after the 0.88.4 bump. The manifest is now synchronized and the front-door check passes.
+  CI's separate eight-error Ruff failure is identical on base `development` and confined to an
+  untouched GH-199 evidence script; it is tracked separately rather than hidden in this fix.

@@ -29,6 +29,7 @@ GH-236 working document; `git rev-list --count ffe48ad..4d02fa9` returned `1` an
 |---|---|
 | Focused Doctor/launchd/stack/version and dependency regressions | 73 passed; Ruff passed |
 | Focused tests after the final two policy-boundary fixes | 44 passed; Ruff passed |
+| Version/front-door check after CI correction | Passed; package, project, and manifest are 0.88.4 |
 | Full `pytest tests/ -q` at predecessor `4a9228a` | 2,418 passed, 17 failed, 20 skipped, 10 xfailed, 143 subtests passed |
 | Canonical runtime extras import | FastAPI, Google auth, and sentence-transformers imported successfully |
 | `bash scripts/stack.sh verify` in the runtime checkout | Passed all five displayed checks |
@@ -60,6 +61,18 @@ not byte identity. The virtual environment is ignored state and was rebuilt expl
 Six jobs currently show exit 75. Recent scheduler logs attribute exit 75 to the independent
 memory-pressure guard; they are not EX_CONFIG and were not bypassed or repeatedly restarted.
 
+## Hosted CI diagnostic
+
+PR run `35644452332` found one GH-236-owned documentation failure: `manifest.json` remained at
+0.88.3 after the package/project bump to 0.88.4. The exact `utils/frontdoor-check.sh` command failed
+before the correction and passes afterward.
+
+The same run's lint job reports eight Ruff errors, all in the untouched historical
+`TESTS-RESULTS/2026-09-08+GH-199/scripts/mutation-check.py`. Development run `35266158410` at base
+commit `c4fc5e2e75d259d5bf2c150f44e361900472c278` reports the same file and same eight-error count.
+That is a public-repo baseline failure, not a GH-236 regression; it remains visible rather than being
+folded into this runtime-diagnostics PR.
+
 ## Threats to validity
 
 1. The full suite ran on predecessor `4a9228a`, before the final policy-membership and missing-policy
@@ -69,3 +82,5 @@ memory-pressure guard; they are not EX_CONFIG and were not bypassed or repeatedl
 3. The local launchd and memory-pressure observations are a point-in-time device snapshot.
 4. The runtime checkout is still behind public `development` and intentionally was not pulled over
    unrelated local work. This receipt proves local interpreter recovery, not deployment of GH-236.
+5. Hosted lint remains red on an untouched historical evidence script that is also red on the exact
+   base commit. This PR does not establish that any other base-branch CI failure is unrelated.
