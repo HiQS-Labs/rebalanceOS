@@ -150,6 +150,104 @@ class StackScriptTests(unittest.TestCase):
         out = strip_ansi(run_stack("status", home=self.home).stdout)
         self.assertIn(f"managed: {count}", out)
 
+    def test_status_names_broken_runtime_interpreter_and_verify(self):
+        missing_python = self.home / "missing-python"
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(missing_python)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Runtime interpreter unavailable", output)
+        self.assertIn(str(missing_python), output)
+        self.assertIn("bash scripts/stack.sh verify", output)
+
+    def test_status_omits_runtime_warning_for_healthy_interpreter(self):
+        healthy_python = self.home / "healthy-python"
+        healthy_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        healthy_python.chmod(0o755)
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(healthy_python)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("Runtime interpreter unavailable", output)
+
+    def test_status_rejects_an_executable_directory_as_the_interpreter(self):
+        directory = self.home / "python-directory"
+        directory.mkdir()
+        directory.chmod(0o755)
+        result = run_stack(
+            "status",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(directory)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Runtime interpreter unavailable", output)
+        self.assertIn("bash scripts/stack.sh verify", output)
+
+    def test_verify_prescribes_the_complete_runtime_dependency_set(self):
+        missing_python = self.home / "missing-python"
+        result = run_stack(
+            "verify",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(missing_python)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(".[embeddings,calendar,server,dev]", output)
+
+    def test_advertised_repair_backs_up_a_dangling_venv_before_rebuild(self):
+        runtime = self.home / "declared runtime"
+        broken_bin = runtime / ".venv" / "bin"
+        broken_bin.mkdir(parents=True)
+        (broken_bin / "python3.14").symlink_to("removed-cellar-python")
+        (broken_bin / "python").symlink_to("python3.14")
+        config = self.home / ".config" / "rebalance"
+        config.mkdir(parents=True)
+        (config / "runtime-root").write_text(str(runtime) + "\n", encoding="utf-8")
+
+        result = run_stack("verify", home=self.home)
+        output = strip_ansi(result.stdout + result.stderr)
+        command = next(line.partition("Run: ")[2] for line in output.splitlines() if "Run: " in line)
+        install = ".venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
+        command = command.replace(install, "test -x .venv/bin/python && test -x .venv/bin/pip")
+
+        repaired = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+
+        self.assertEqual(repaired.returncode, 0, repaired.stderr)
+        backups = list(runtime.glob(".venv.broken.*/original"))
+        self.assertEqual(len(backups), 1)
+        self.assertTrue((backups[0] / "bin" / "python3.14").is_symlink())
+        self.assertFalse((backups[0] / "bin" / "python3.14").exists())
+        self.assertTrue((runtime / ".venv" / "bin" / "python").is_file())
+        self.assertTrue(os.access(runtime / ".venv" / "bin" / "python", os.X_OK))
+
+    def test_state_changing_commands_ignore_the_read_only_python_override(self):
+        runtime = self.home / "declared-runtime"
+        runtime.mkdir()
+        config = self.home / ".config" / "rebalance"
+        config.mkdir(parents=True)
+        (config / "runtime-root").write_text(str(runtime) + "\n", encoding="utf-8")
+        override = self.home / "override-python"
+        override.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        override.chmod(0o755)
+
+        result = run_stack(
+            "restart",
+            home=self.home,
+            extra_env={"STACK_PYTHON_BIN": str(override)},
+        )
+        output = strip_ansi(result.stdout + result.stderr)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"Virtualenv Python not found at: {runtime}/.venv/bin/python", output)
+        self.assertNotIn(f"Virtualenv Python not found at: {override}", output)
+
     # -- 2. unmanaged plists are shown but never touched --------------------
 
     def test_unmanaged_plists_are_listed_separately(self):

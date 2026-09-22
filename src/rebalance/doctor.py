@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import shutil
 import sqlite3
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -24,6 +26,7 @@ from pathlib import Path
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Callable, Literal
+from xml.parsers.expat import ExpatError
 
 from rebalance.lib.time_ops import now_utc
 from rebalance import three_eyes_bridge
@@ -1017,9 +1020,121 @@ def _expected_runtime_root() -> tuple[Path, str]:
         declared = RUNTIME_ROOT_FILE.read_text(encoding="utf-8").strip()
     except OSError:
         declared = ""
-    if declared:
+    if declared and Path(declared).is_dir():
         return Path(declared), f"the declared runtime root ({RUNTIME_ROOT_FILE})"
-    return Path(__file__).resolve().parents[2], "this checkout"
+    checkout = Path(__file__).resolve().parents[2]
+    if declared:
+        return checkout, f"this checkout (declared runtime root is unavailable: {declared})"
+    return checkout, "this checkout"
+
+
+def _load_launchd_plist(plist: Path) -> dict[str, object]:
+    """Load one launchd plist without assuming its on-disk encoding."""
+    with plist.open("rb") as fh:
+        payload = plistlib.load(fh)
+    if not isinstance(payload, dict):
+        raise ValueError("plist root is not a dictionary")
+    return payload
+
+
+def _launchd_program_values(payload: dict[str, object]) -> list[str]:
+    """Return executable and argument strings from a parsed launchd plist."""
+    values: list[str] = []
+    program = payload.get("Program")
+    if isinstance(program, str):
+        values.append(program)
+    arguments = payload.get("ProgramArguments")
+    if isinstance(arguments, list):
+        values.extend(value for value in arguments if isinstance(value, str))
+    return values
+
+
+def _check_scheduler_runtime_interpreter(agents_dir: Path | None = None) -> list[Check]:
+    """Check the interpreter referenced by the installed scheduler fleet."""
+    if agents_dir is None:
+        agents_dir = Path.home() / "Library" / "LaunchAgents"
+    if not agents_dir.is_dir():
+        return []
+
+    runtime_root, _ = _expected_runtime_root()
+    runtime_python = runtime_root / ".venv" / "bin" / "python"
+    try:
+        managed_labels = {f"com.rebalance-os.{job}" for job in _scheduler_policy_jobs()}
+    except (OSError, RuntimeError) as exc:
+        return [
+            Check(
+                "scheduler runtime interpreter",
+                WARN,
+                f"could not read SCHEDULER.md: {exc}",
+            )
+        ]
+    affected: set[str] = set()
+    unreadable: list[str] = []
+    for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
+        try:
+            payload = _load_launchd_plist(plist)
+        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError):
+            unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
+            continue
+
+        label = payload.get("Label")
+        if not isinstance(label, str) or label not in managed_labels:
+            continue
+        if str(runtime_python) in _launchd_program_values(payload):
+            affected.add(label)
+
+    checks: list[Check] = []
+    if affected:
+        problem = ""
+        try:
+            resolved = runtime_python.resolve(strict=True)
+        except FileNotFoundError:
+            problem = "is a dangling symlink" if runtime_python.is_symlink() else "is missing"
+        except (OSError, RuntimeError) as exc:
+            problem = f"cannot be resolved ({exc})"
+        else:
+            if not resolved.is_file():
+                problem = "does not resolve to a regular file"
+            elif not os.access(runtime_python, os.X_OK):
+                problem = "is not executable"
+
+        if problem:
+            root = shlex.quote(str(runtime_root))
+            checks.append(
+                Check(
+                    "scheduler runtime interpreter",
+                    FAIL,
+                    f"{len(affected)} installed job(s) reference {runtime_python}, which {problem}",
+                    f"repair the declared runtime explicitly: `cd {root} && {{ "
+                    "if [ -e .venv ] || [ -L .venv ]; then "
+                    'backup="$(mktemp -d .venv.broken.XXXXXX)" '
+                    '&& mv .venv "$backup/original" || exit 1; fi; '
+                    "python3 -m venv .venv "
+                    "&& .venv/bin/pip install -e '.[embeddings,calendar,server,dev]' "
+                    "&& bash scripts/stack.sh verify "
+                    "&& bash scripts/stack.sh restart; }`",
+                )
+            )
+        elif not unreadable:
+            checks.append(
+                Check(
+                    "scheduler runtime interpreter",
+                    OK,
+                    f"{len(affected)} installed job(s) reference healthy {runtime_python}",
+                    severity=NOTICE,
+                )
+            )
+
+    if unreadable:
+        checks.append(
+            Check(
+                "scheduler runtime interpreter",
+                WARN,
+                f"could not inspect {len(unreadable)} installed plist(s): {', '.join(unreadable)}",
+                "repair or reinstall those scheduler plists, then run `bash scripts/stack.sh verify`",
+            )
+        )
+    return checks
 
 
 def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Check]:
@@ -1041,33 +1156,50 @@ def _check_scheduled_stack_checkout(agents_dir: Path | None = None) -> list[Chec
 
     repo_root, root_why = _expected_runtime_root()
     drifted: list[str] = []
-    path_re = re.compile(r"<string>(/[^<]*?\.(?:sh|py)|/[^<]*?/python3?)</string>")
+    unreadable: list[str] = []
     for plist in sorted(agents_dir.glob("com.rebalance-os.*.plist")):
         try:
-            text = plist.read_text(encoding="utf-8")
-        except OSError:
+            payload = _load_launchd_plist(plist)
+        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError):
+            unreadable.append(plist.stem.removeprefix("com.rebalance-os."))
             continue
-        for raw in path_re.findall(text):
+        for raw in _launchd_program_values(payload):
             p = Path(raw)
-            if "rebalance" in raw.lower() and not p.is_relative_to(repo_root):
+            is_runtime_path = p.suffix in {".sh", ".py"} or p.name in {"python", "python3"}
+            if p.is_absolute() and is_runtime_path and "rebalance" in raw.lower() and not p.is_relative_to(repo_root):
                 drifted.append(plist.stem.removeprefix("com.rebalance-os."))
                 break
 
-    if not drifted:
-        return [
+    checks: list[Check] = []
+    if drifted:
+        checks.append(
             Check(
                 "scheduler checkout",
-                OK,
-                f"every scheduled job runs from {root_why}",
+                WARN,
+                f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than {root_why}: {', '.join(drifted)}",
+                f"their plists pin absolute paths into another clone — repoint them at {repo_root} and reload (see GH-36)",
             )
-        ]
-    return [
-        Check(
-            "scheduler checkout",
-            WARN,
-            f"{len(drifted)} scheduled job(s) run from a DIFFERENT checkout than {root_why}: {', '.join(drifted)}",
-            f"their plists pin absolute paths into another clone — repoint them at {repo_root} and reload (see GH-36)",
         )
+    elif not unreadable:
+        checks.append(Check("scheduler checkout", OK, f"every scheduled job runs from {root_why}"))
+
+    if unreadable:
+        checks.append(
+            Check(
+                "scheduler checkout",
+                WARN,
+                f"could not inspect {len(unreadable)} installed plist(s): {', '.join(unreadable)}",
+                "repair or reinstall those scheduler plists, then run `rebalance doctor` again",
+            )
+        )
+    return checks
+
+
+def _scheduler_configuration_checks(agents_dir: Path | None = None) -> list[Check]:
+    """Collect the two installed-plist checks without invoking unrelated Doctor probes."""
+    return [
+        *_check_scheduler_runtime_interpreter(agents_dir),
+        *_check_scheduled_stack_checkout(agents_dir),
     ]
 
 
@@ -1203,9 +1335,10 @@ def _check_launchd(
                     f"launchd:{short}",
                     FAIL,
                     f"last run exited with status {status_val}",
-                    "inspect temp/logs/ for this job's error output. This status is sticky: "
+                    "run `bash scripts/stack.sh verify` first to rule out runtime/configuration "
+                    "failures, then inspect temp/logs/ for this job's error output. This status is sticky: "
                     "launchctl keeps it until launchd reruns the job, so running the wrapper "
-                    "by hand will not clear it — use "
+                    "by hand will not clear it — after fixing the cause, use "
                     f"`launchctl kickstart -k gui/$(id -u)/com.rebalance-os.{short}`",
                 )
             )
@@ -2407,9 +2540,11 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.extend(_check_scheduler_liveness(launchctl_output=launchctl_output))
     report.checks.extend(_check_launchd(launchctl_output))
 
-    # GH-36 tripwire: the scheduled stack must run from the same checkout as
-    # this code — absolute plist paths otherwise strand it on an old clone.
-    report.checks.extend(_check_scheduled_stack_checkout())
+    # GH-236: launchd cannot start job_guard or write a current log when the
+    # interpreter embedded in installed plists is missing or dangling.
+    # GH-36/GH-236: inspect the same installed plists for interpreter health
+    # and checkout drift without coupling their orchestration to other probes.
+    report.checks.extend(_scheduler_configuration_checks())
 
     # 3-Eyes' own supervision verdict over the catalogued fleet. Complements —
     # never replaces — _check_launchd's persisted crash-loop detection above.

@@ -10,6 +10,20 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.88.4] - 2026-09-21
+
+### Fixed
+- Scheduler diagnostics now identify a missing, non-executable, or dangling declared-runtime
+  Python interpreter as one fleet-level failure, count the installed jobs affected, and anchor the
+  explicit rebuild and reload instructions to the deployed checkout. Stack status surfaces the same
+  root cause, while generic nonzero job failures direct operators through configuration verification
+  before logs or kickstart so a launchd configuration error is no longer presented as restartable.
+
+## [0.88.3] - 2026-09-17
+
+### Fixed
+- The Daily skill's close-the-loop ledger sync is opt-in again and actually runs in daily mode. The scanner had forked between this repo and its XYZ-forge projection: one side wrote `temp/close-the-loop.md` unconditionally, making `--update-ledger` dead code, while the projected side honored the flag but the documented invocation never passed it, so the deployed skill silently stopped syncing the ledger. The merged contract keeps writes gated on `--update-ledger`, passes that flag from the skill's daily invocation, and adopts the projection's calibration rule that a zero open-PR count is not reported unless the GitHub query is known to have succeeded. A regression test locks in all three paths (bare, `--update-ledger`, and `--no-ledger-write` winning). This repo is the sole owner of the Daily skill going forward; the forge copy is being retired.
+
 ## [0.88.2] - 2026-09-13
 
 ### Added
@@ -59,8 +73,6 @@
 
 ### Added
 - Full clone detection and parent checkout grouping in Focus 5: secondary task checkouts and temporary clones are now detected and clustered under their primary parent repository card rather than occupying individual top-five slots. Parent cards roll up the most recent activity across all clones, display active clone counts and dirty status indicators, and allow quick opening of individual clone checkouts (#204).
->>>>>>> origin/development
-
 ## [0.86.0] - 2026-09-08
 
 ### Added

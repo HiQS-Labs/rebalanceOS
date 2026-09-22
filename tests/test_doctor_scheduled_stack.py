@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import plistlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,6 +30,15 @@ PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 
 def _write(agents: Path, name: str, script: str) -> None:
     (agents / f"com.rebalance-os.{name}.plist").write_text(PLIST.format(name=name, script=script), encoding="utf-8")
+
+
+def _write_binary(agents: Path, name: str, script: str) -> None:
+    payload = {
+        "Label": f"com.rebalance-os.{name}",
+        "ProgramArguments": [script],
+    }
+    with (agents / f"com.rebalance-os.{name}.plist").open("wb") as fh:
+        plistlib.dump(payload, fh, fmt=plistlib.FMT_BINARY)
 
 
 class ScheduledStackCheckoutTests(unittest.TestCase):
@@ -77,6 +87,28 @@ class ScheduledStackCheckoutTests(unittest.TestCase):
             _write(agents, "misc", "/usr/local/bin/some-tool.sh")
             checks = _check_scheduled_stack_checkout(agents)
         self.assertEqual(checks[0].status, OK)
+
+    def test_binary_plist_is_parsed_without_aborting_doctor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            agents = Path(tmp)
+            _write_binary(agents, "github-sync", str(REPO_ROOT / "scripts" / "github_sync.sh"))
+            runtime_check = doctor.Check("scheduler runtime interpreter", WARN, "retained sentinel")
+            with patch.object(doctor, "_check_scheduler_runtime_interpreter", return_value=[runtime_check]):
+                scheduler_checks = doctor._scheduler_configuration_checks(agents)
+
+        self.assertIn(runtime_check, scheduler_checks)
+        self.assertTrue(any(check.name == "scheduler checkout" and check.status == OK for check in scheduler_checks))
+
+    def test_unreadable_plist_warns_without_claiming_checkout_health(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            agents = Path(tmp)
+            (agents / "com.rebalance-os.bad.plist").write_bytes(b"not a plist")
+            checks = _check_scheduled_stack_checkout(agents)
+
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].status, WARN)
+        self.assertIn("could not inspect", checks[0].detail)
+        self.assertIn("bad", checks[0].detail)
 
     def test_missing_agents_dir_is_silent(self) -> None:
         self.assertEqual([], _check_scheduled_stack_checkout(Path("/nonexistent/LaunchAgents")))

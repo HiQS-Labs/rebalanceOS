@@ -176,9 +176,11 @@ validate_environment() {
     log_info "Validating environment and runtime prerequisites..."
     local errors=0
 
-    if [ ! -x "$PYTHON_BIN" ]; then
+    if [ ! -f "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+        local runtime_root_q
+        printf -v runtime_root_q '%q' "$REBALANCE_DIR"
         log_error "Virtualenv Python not found at: $PYTHON_BIN"
-        log_error "Run: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'"
+        log_error "Run: cd $runtime_root_q && { if [ -e .venv ] || [ -L .venv ]; then backup=\"\$(mktemp -d .venv.broken.XXXXXX)\" && mv .venv \"\$backup/original\" || exit 1; fi; python3 -m venv .venv && .venv/bin/pip install -e '.[embeddings,calendar,server,dev]'; }"
         errors=$((errors + 1))
     else
         log_ok "Virtualenv Python present ($("$PYTHON_BIN" --version 2>&1))"
@@ -453,11 +455,18 @@ runtime_drift() {
 }
 
 stack_status() {
+    # Read-only test seam. State-changing commands always retain the interpreter
+    # selected by install_common.sh and cannot inherit this override.
+    local status_python="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
     refresh_launchctl_cache
     echo "================================================================================"
     echo "                     rebalance OS — Stack Status                                "
     echo "================================================================================"
     echo "Target root: $REBALANCE_DIR"
+    if [ ! -f "$status_python" ] || [ ! -x "$status_python" ]; then
+        log_error "Runtime interpreter unavailable: $status_python"
+        log_error "Run: bash scripts/stack.sh verify"
+    fi
     echo
     printf "%-28s %-8s %-10s %-14s %s\n" "JOB" "PID" "LAST EXIT" "STATE" "BOUND TO"
     echo "--------------------------------------------------------------------------------"
@@ -563,12 +572,16 @@ case "$cmd" in
     doctor)
         if [ ! -x "$REBALANCE_CLI" ]; then
             log_error "rebalance CLI not found at $REBALANCE_CLI"
-            log_error "Run: .venv/bin/pip install -e '.[dev]'"
+            log_error "Run: .venv/bin/pip install -e '.[embeddings,calendar,server,dev]'"
             exit 1
         fi
         exec "$REBALANCE_CLI" doctor
         ;;
-    verify|test)    validate_environment ;;
+    verify|test)
+        # Test-only override is deliberately scoped to this read-only command.
+        PYTHON_BIN="${STACK_PYTHON_BIN:-$PYTHON_BIN}"
+        validate_environment
+        ;;
     *)
         echo "Usage: $0 {up [--force]|down|restart|status|drift|doctor|verify|purge}"
         exit 2

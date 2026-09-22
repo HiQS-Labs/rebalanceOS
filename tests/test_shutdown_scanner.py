@@ -174,6 +174,39 @@ def test_a6_no_scan_mutations(tmp_path: Path):
     assert not ledger_path.exists(), "Ledger must not be written when --no-ledger-write is passed"
 
 
+def test_ledger_write_is_opt_in(tmp_path: Path):
+    """Ledger writes require --update-ledger; the bare documented invocation stays read-only.
+
+    Regression for the daily-skill fork: one side wrote the ledger unconditionally
+    (making --update-ledger dead code), the other honored the flag but SKILL.md never
+    passed it, so the close-the-loop ledger silently stopped syncing. The merged
+    contract is: opt-in via --update-ledger, and SKILL.md passes it in daily mode.
+    """
+    repo = init_test_git_repo(tmp_path / "ledger_repo")
+    ledger_path = tmp_path / "temp" / "close-the-loop.md"
+
+    def run(argv: list[str]) -> None:
+        buf = io.StringIO()
+        with (
+            patch.object(scanner, "find_repo_root", return_value=tmp_path),
+            patch.object(scanner, "discover_git_repos", return_value=[repo]),
+            patch.object(scanner, "fetch_prs_for_remotes", return_value=({}, [])),
+            patch.object(sys, "argv", ["scan", "--json", *argv]),
+            contextlib.redirect_stdout(buf),
+        ):
+            scanner.main()
+
+    run([])
+    assert not ledger_path.exists(), "Bare invocation must not write the ledger"
+
+    run(["--update-ledger"])
+    assert ledger_path.exists(), "--update-ledger must write the ledger"
+
+    ledger_path.unlink()
+    run(["--update-ledger", "--no-ledger-write"])
+    assert not ledger_path.exists(), "--no-ledger-write must win over --update-ledger"
+
+
 # --------------------------------------------------------------------------
 # Reproduction verification tests from code review
 # --------------------------------------------------------------------------
