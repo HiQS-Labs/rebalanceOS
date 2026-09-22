@@ -168,6 +168,7 @@ operator name from what it does, never from how it ships.
 - Hardcoding credentials or secrets in code or config files.
 - Destructive operations without explicit confirmation or dry-run support.
 - Counting one real-world entity twice because it has an alias, rename, mirror, fork, or casing variant. Canonicalise before aggregating, de-duplicate the store, and never let the de-dup test assert on zeros — see [`SOP.md` §6](SOP.md).
+- **Script and LaunchAgent Sprawl (GH-241)**: Never create ad-hoc `.sh` or `.py` files in `scripts/` or `utils/`, and never add new LaunchAgent plists. All operator CLI commands must be subcommands in `src/rebalance/cli/`, agent capabilities in `src/rebalance/mcp/`, and periodic tasks dispatched through the orchestrator (`src/rebalance/ingest/index_ops.py`). Any addition of `.py`, `.sh`, or `.swift` files under `scripts/` and `utils/`, or `*.plist.template` files is blocked mechanically by `utils/pdda/check_script_inventory.py --check` against `utils/pdda/script_inventory_baseline.json` in CI (non-template `.plist` files and `SCHEDULER.md` are governed by scheduler policy). Governance checkers and baselines live exclusively in `utils/pdda/check_*.py` and `utils/pdda/*_baseline.json`. Exemptions require a non-empty `SCRIPT-INVENTORY-OK: <reason>` pragma in the first 10 lines AND explicit registration in `script_inventory_baseline.json`'s `exemptions` list with operator review; non-exempt additions are strictly prohibited. Deletions ratchet downward permanently — deleting code counts as progress.
 
 ## Security & Credentials
 

@@ -39,6 +39,11 @@ jobs:
       # wider banned-import ratchet wiring stays with #126.
       - name: SQLite gateway ratchet (GH-136)
         run: python utils/pdda/check_banned_imports.py --check
+      # GH-241: no ad-hoc scripts in scripts/ or utils/, and hard ceiling on LaunchAgent
+      # plists (<= 13). New CLI verbs route through src/rebalance/cli/. Deletions ratchet
+      # downward via --update-baseline.
+      - name: Script inventory ratchet (GH-241)
+        run: python utils/pdda/check_script_inventory.py --check
 
   # GH-92. GH-88 found 136 broken relative links in tracked docs (ROADMAP.md alone
   # held 107) and 45% breakage overall, none of which any test could catch -- a doc
