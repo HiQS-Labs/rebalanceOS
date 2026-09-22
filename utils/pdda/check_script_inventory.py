@@ -14,7 +14,10 @@ Contract mirrors GH-136 (``check_banned_imports.py``) and GH-150 (``check_read_l
   in the reduction (enforcing the 'deleting code counts as progress' KPI).
 - LaunchAgent ceiling: ``launchd_templates`` count is capped at <= 13 (and ratchets downward).
 - Pragma exemption: A file whose first 10 lines contain ``# SCRIPT-INVENTORY-OK: <reason>``
-  (or ``// SCRIPT-INVENTORY-OK: <reason>``) is exempted. An empty reason fails closed.
+  (or ``// SCRIPT-INVENTORY-OK: <reason>`` or ``<!-- SCRIPT-INVENTORY-OK: <reason> -->``)
+  is exempted from script counts, BUT must be explicitly recorded in
+  ``script_inventory_baseline.json`` under ``exemptions`` with operator review.
+  An empty reason fails closed; an unrecorded exemption fails CI.
 """
 
 from __future__ import annotations
@@ -25,12 +28,28 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+
+def _resolve_repo_root() -> Path:
+    """Resolve project root using shared paths resolver or upward marker walk (no parents[N])."""
+    try:
+        from rebalance.paths import resolve_project_root
+
+        return resolve_project_root(Path(__file__))
+    except (ImportError, RuntimeError):
+        cur = Path(__file__).resolve().parent
+        while cur != cur.parent:
+            if (cur / ".git").is_dir() or (cur / "pyproject.toml").is_file():
+                return cur
+            cur = cur.parent
+        raise RuntimeError("Could not resolve repo root from " + str(__file__))
+
+
+REPO_ROOT = _resolve_repo_root()
 BASELINE_PATH = Path(__file__).with_name("script_inventory_baseline.json")
 
 PRUNED_DIRS = {"__pycache__", "tests", ".git", "3-eyes"}
 SCRIPT_EXTENSIONS = {".py", ".sh", ".swift"}
-PRAGMA_RE = re.compile(r"(?:#|//)\s*SCRIPT-INVENTORY-OK:\s*(.*)$")
+PRAGMA_RE = re.compile(r"(?:#|//|<!--)\s*SCRIPT-INVENTORY-OK:\s*(.*?)(?:\s*-->)?$")
 MAX_LAUNCHD_TEMPLATES = 13
 
 
@@ -55,6 +74,7 @@ def scan_inventory(root: Path = REPO_ROOT) -> dict[str, list[str]]:
     launchd_templates: list[str] = []
     scripts: list[str] = []
     utils: list[str] = []
+    exemptions: list[str] = []
 
     scripts_dir = root / "scripts"
     if scripts_dir.is_dir():
@@ -63,8 +83,11 @@ def scan_inventory(root: Path = REPO_ROOT) -> dict[str, list[str]]:
                 continue
             if any(part in PRUNED_DIRS for part in p.parts):
                 continue
+            if not (p.name.endswith(".plist.template") or p.suffix in SCRIPT_EXTENSIONS):
+                continue
             rel = p.relative_to(root).as_posix()
             if is_exempt(p):
+                exemptions.append(rel)
                 continue
             if p.name.endswith(".plist.template"):
                 launchd_templates.append(rel)
@@ -78,16 +101,22 @@ def scan_inventory(root: Path = REPO_ROOT) -> dict[str, list[str]]:
                 continue
             if any(part in PRUNED_DIRS for part in p.parts):
                 continue
+            if not (p.name.endswith(".plist.template") or p.suffix in SCRIPT_EXTENSIONS):
+                continue
             rel = p.relative_to(root).as_posix()
             if is_exempt(p):
+                exemptions.append(rel)
                 continue
-            if p.suffix in SCRIPT_EXTENSIONS:
+            if p.name.endswith(".plist.template"):
+                launchd_templates.append(rel)
+            elif p.suffix in SCRIPT_EXTENSIONS:
                 utils.append(rel)
 
     return {
         "launchd_templates": sorted(launchd_templates),
         "scripts": sorted(scripts),
         "utils": sorted(utils),
+        "exemptions": sorted(exemptions),
     }
 
 
@@ -103,20 +132,46 @@ def load_baseline(path: Path = BASELINE_PATH) -> dict:
     for section in ("launchd_templates", "scripts", "utils"):
         if section not in data or not isinstance(data[section], list):
             raise SystemExit(f"script-inventory ratchet: missing or invalid '{section}' in {path}")
+    if "exemptions" in data and not isinstance(data["exemptions"], list):
+        raise SystemExit(f"script-inventory ratchet: invalid 'exemptions' in {path}")
     return data
 
 
 def compare_to_baseline(actual: dict[str, list[str]], baseline: dict) -> list[str]:
     """Compare actual inventory to baseline and return findings."""
     findings: list[str] = []
-    max_templates = baseline.get("max_launchd_templates", MAX_LAUNCHD_TEMPLATES)
+    baseline_max = baseline.get("max_launchd_templates", MAX_LAUNCHD_TEMPLATES)
+    if not isinstance(baseline_max, int) or baseline_max > MAX_LAUNCHD_TEMPLATES:
+        findings.append(
+            f"script_inventory_baseline.json:1: invalid max_launchd_templates: {baseline_max}, "
+            f"cannot exceed hard ceiling of {MAX_LAUNCHD_TEMPLATES} (GH-241)"
+        )
+        effective_max = MAX_LAUNCHD_TEMPLATES
+    else:
+        effective_max = baseline_max
 
     # Ceiling guard
     template_count = len(actual.get("launchd_templates", []))
-    if template_count > max_templates:
+    if template_count > effective_max:
         findings.append(
             f"scripts:1: LaunchAgent ceiling exceeded: {template_count} templates found, "
-            f"maximum allowed is {max_templates} (GH-241)"
+            f"maximum allowed is {effective_max} (GH-241)"
+        )
+
+    # Check exemptions: files with SCRIPT-INVENTORY-OK must be registered in baseline
+    actual_exemptions = set(actual.get("exemptions", []))
+    baseline_exemptions = set(baseline.get("exemptions", []))
+
+    for added_exempt in sorted(actual_exemptions - baseline_exemptions):
+        findings.append(
+            f"{added_exempt}:1: unrecorded exemption — SCRIPT-INVENTORY-OK pragma requires explicit operator review "
+            f"and registration in script_inventory_baseline.json 'exemptions' (GH-241)"
+        )
+
+    for removed_exempt in sorted(baseline_exemptions - actual_exemptions):
+        findings.append(
+            f"{removed_exempt}:1: stale exemption — registered in baseline 'exemptions' but lacks valid "
+            f"SCRIPT-INVENTORY-OK pragma in tree (GH-241)"
         )
 
     for section in ("launchd_templates", "scripts", "utils"):
@@ -145,13 +200,14 @@ def update_baseline(path: Path = BASELINE_PATH, root: Path = REPO_ROOT) -> None:
     inv = scan_inventory(root)
     payload = {
         "max_launchd_templates": MAX_LAUNCHD_TEMPLATES,
+        "exemptions": inv.get("exemptions", []),
         "launchd_templates": inv["launchd_templates"],
         "scripts": inv["scripts"],
         "utils": inv["utils"],
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(
-        f"Updated baseline at {path} ({len(inv['launchd_templates'])} templates, {len(inv['scripts'])} scripts, {len(inv['utils'])} utils)"
+        f"Updated baseline at {path} ({len(inv['launchd_templates'])} templates, {len(inv['scripts'])} scripts, {len(inv['utils'])} utils, {len(inv.get('exemptions', []))} exemptions)"
     )
 
 
@@ -186,6 +242,7 @@ def main() -> None:
     print(f"LaunchAgent templates: {len(actual['launchd_templates'])} (ceiling: {MAX_LAUNCHD_TEMPLATES})")
     print(f"Scripts (scripts/):    {len(actual['scripts'])}")
     print(f"Utilities (utils/):    {len(actual['utils'])}")
+    print(f"Exemptions:            {len(actual.get('exemptions', []))}")
 
 
 if __name__ == "__main__":

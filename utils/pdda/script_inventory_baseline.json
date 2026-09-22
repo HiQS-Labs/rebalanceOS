@@ -1,5 +1,8 @@
 {
   "max_launchd_templates": 13,
+  "exemptions": [
+    "utils/stickies-to-obsidian/com.user.stickies2obsidian.plist.template"
+  ],
   "launchd_templates": [
     "scripts/com.rebalance-os.daily-sync.plist.template",
     "scripts/com.rebalance-os.daily-synthesis.plist.template",

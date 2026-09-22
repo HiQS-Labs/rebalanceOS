@@ -15,7 +15,22 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+
+def _resolve_repo_root() -> Path:
+    try:
+        from rebalance.paths import resolve_project_root
+
+        return resolve_project_root(Path(__file__))
+    except (ImportError, RuntimeError):
+        cur = Path(__file__).resolve().parent
+        while cur != cur.parent:
+            if (cur / ".git").is_dir() or (cur / "pyproject.toml").is_file():
+                return cur
+            cur = cur.parent
+        raise RuntimeError("Could not resolve repo root from " + str(__file__))
+
+
+REPO_ROOT = _resolve_repo_root()
 CHECKER_PATH = REPO_ROOT / "utils" / "pdda" / "check_script_inventory.py"
 BASELINE_PATH = REPO_ROOT / "utils" / "pdda" / "script_inventory_baseline.json"
 
@@ -85,7 +100,7 @@ def test_launchd_template_ceiling(checker, tmp_path: Path):
 
 
 def test_pragma_exemption(checker, tmp_path: Path):
-    """Valid pragma with reason exempts a file; empty reason fails closed."""
+    """Valid pragma with reason exempts a file and records it under exemptions; empty reason fails closed."""
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -95,8 +110,66 @@ def test_pragma_exemption(checker, tmp_path: Path):
     )
     actual = checker.scan_inventory(tmp_path)
     assert "scripts/exempt_utility.sh" not in actual["scripts"]
+    assert "scripts/exempt_utility.sh" in actual["exemptions"]
 
     invalid_script = scripts_dir / "invalid_utility.sh"
     invalid_script.write_text("#!/bin/bash\n# SCRIPT-INVENTORY-OK:\necho hi\n", encoding="utf-8")
     actual2 = checker.scan_inventory(tmp_path)
     assert "scripts/invalid_utility.sh" in actual2["scripts"]
+    assert "scripts/invalid_utility.sh" not in actual2["exemptions"]
+
+
+def test_unrecorded_pragma_exemption_fails(checker):
+    """A file with SCRIPT-INVENTORY-OK pragma not recorded in baseline exemptions must fail."""
+    actual = {
+        "launchd_templates": [],
+        "scripts": [],
+        "utils": [],
+        "exemptions": ["scripts/unrecorded.sh"],
+    }
+    baseline = {
+        "max_launchd_templates": 13,
+        "exemptions": [],
+        "launchd_templates": [],
+        "scripts": [],
+        "utils": [],
+    }
+    findings = checker.compare_to_baseline(actual, baseline)
+    assert any("unrecorded exemption" in f for f in findings)
+
+
+def test_stale_baseline_exemption_fails(checker):
+    """An exemption recorded in baseline that lacks the pragma in the tree must fail."""
+    actual = {
+        "launchd_templates": [],
+        "scripts": [],
+        "utils": [],
+        "exemptions": [],
+    }
+    baseline = {
+        "max_launchd_templates": 13,
+        "exemptions": ["scripts/stale.sh"],
+        "launchd_templates": [],
+        "scripts": [],
+        "utils": [],
+    }
+    findings = checker.compare_to_baseline(actual, baseline)
+    assert any("stale exemption" in f for f in findings)
+
+
+def test_baseline_ceiling_tamper_fails(checker):
+    """Specifying max_launchd_templates > 13 in the baseline must fail."""
+    actual = {"launchd_templates": [], "scripts": [], "utils": []}
+    baseline = {"max_launchd_templates": 14, "launchd_templates": [], "scripts": [], "utils": []}
+    findings = checker.compare_to_baseline(actual, baseline)
+    assert any("invalid max_launchd_templates: 14" in f for f in findings)
+
+
+def test_launchd_template_under_utils_detected(checker, tmp_path: Path):
+    """A .plist.template file placed under utils/ must be counted under launchd_templates."""
+    utils_dir = tmp_path / "utils"
+    utils_dir.mkdir(parents=True, exist_ok=True)
+    template = utils_dir / "rogue.plist.template"
+    template.write_text("<plist></plist>\n", encoding="utf-8")
+    actual = checker.scan_inventory(tmp_path)
+    assert "utils/rogue.plist.template" in actual["launchd_templates"]
