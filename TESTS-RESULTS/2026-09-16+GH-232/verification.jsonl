@@ -1,0 +1,12 @@
+{"check":"doctor","exit":1,"reason":"missing typer"}
+{"check":"pytest tests/","exit":2,"collection_errors":62,"skipped":1}
+{"check":"pytest tests/ utils/3-eyes/tests HiQS/tests --collect-only","exit":2,"collection_errors":66,"collected":2324}
+{"check":"pdda frontmatter","exit":0,"errors":6,"gh232_findings":0,"mode":"observe"}
+{"check":"pdda status-table","exit":0,"errors":7,"gh232_findings":0,"mode":"observe"}
+{"check":"pdda roadmap-coverage","exit":0,"errors":7,"gh232_findings":0,"mode":"observe"}
+{"check":"restored parser and CLIO tests","exit":0,"passed":41}
+{"check":"campaign comparator controls","exit":0,"passed":6}
+{"check":"archived patch reapplication in disposable clone","exit":1,"failed":1,"passed":62,"expected":true}
+{"check":"Agy protocol review","exit":7,"verdict":"no review; timeout"}
+{"check":"Codex protocol review","exit":6,"verdict":"FAIL feedback retained; containment failure; not approved"}
+{"check":"wide harness validate","exit":143,"verdict":"terminated after failures; incomplete; not qualifying"}

@@ -1,0 +1,121 @@
+diff --git a/tests/test_journey_replay.py b/tests/test_journey_replay.py
+index 98eaeb1..44581d3 100644
+--- a/tests/test_journey_replay.py
++++ b/tests/test_journey_replay.py
+@@ -64,11 +64,56 @@ def test_scope_and_negative_join_control(monkeypatch):
+         assert (jr.REPO, "issue", 10) not in refs
+     check()
+     original = jr.references
+-    monkeypatch.setattr(jr, "references", lambda text, context: original(text, True))
++    monkeypatch.setattr(jr, "references", lambda text, context: original(text, context) + [(jr.REPO, "issue", 10)])
+     with pytest.raises(AssertionError):
+         check()  # deliberately broken bare-number join is caught
+ 
+ 
++@pytest.mark.parametrize("text,expected", [
++    ("Merge Catalog PR 8. Review XYZ PR 520.", [(jr.REPO, "pr", 520)]),
++    ("File the plan on Other-project. Another device is on issue 25.", []),
++    ("In the OtherProject repo, review issue 25.", []),
++    ("Other/project#25 then issue 26", [("other/project", "issue", 25)]),
++    ("https://github.com/Other/project/pull/25 then PR 26",
++     [("other/project", "pr", 25)]),
++    ("PR 1 — #40 producer; PR 2 — #41 recovery",
++     [(jr.REPO, "issue", 40), (jr.REPO, "issue", 41)]),
++    ("Let's focus on issue 1 first only. Issue 61 has the wrong URL for issue 62.",
++     [(jr.REPO, "issue", 61), (jr.REPO, "issue", 62)]),
++    ("Join XYZ AgentChorus #123456 to discuss PR #519", [(jr.REPO, "pr", 519)]),
++    ("Join XYZ agent2agent #123456 to discuss issue #12", [(jr.REPO, "issue", 12)]),
++    ("PR **#519** and PR `#520`", [(jr.REPO, "pr", 519), (jr.REPO, "pr", 520)]),
++    ("PR #519, then PR **#519**", [(jr.REPO, "pr", 519)]),
++])
++def test_reference_abstention_regressions(text, expected):
++    assert jr.references(text, True) == expected
++
++
++@pytest.mark.parametrize("text,expected", [
++    ("Please review PR 495", [(jr.REPO, "pr", 495)]),
++    ("Review PR #1 and issue #2", [(jr.REPO, "issue", 2), (jr.REPO, "pr", 1)]),
++    ("PR 553 is merged", [(jr.REPO, "pr", 553)]),
++    ("/start-task on 567 now", [(jr.REPO, "issue", 567)]),
++    ("In the XYZ-forge repo, review PR **#519**", [(jr.REPO, "pr", 519)]),
++    ("https://github.com/Other/project/issues/25", [("other/project", "issue", 25)]),
++])
++def test_reference_guard_positive_controls(text, expected):
++    assert jr.references(text, True) == expected
++
++
++@pytest.mark.parametrize("text,expected", [
++    ("Land PR 520 first and continue", [(jr.REPO, "pr", 520)]),
++    ("In your GH issue 567 add a test", [(jr.REPO, "issue", 567)]),
++    ("PR **#519** in XYZ-forge. Work on GH-516, in relay-automation, on ROADMAP-DASHBOARD.md.",
++     [(jr.REPO, "pr", 519)]),
++    ("Work in HiQS-Labs/XYZ-forge on 2026-09-12. The project tracks issue 591.",
++     [(jr.REPO, "issue", 591)]),
++    ("Work on GH-609. PR #441 is merged.", [(jr.REPO, "pr", 441)]),
++])
++def test_reference_guard_does_not_confuse_work_words_with_projects(text, expected):
++    assert jr.references(text, True) == expected
++
++
+ def test_grouping_same_input_and_no_bridge():
+     rows, _ = load(row(), row("continue", timestamp="2026-09-15T11:00:00Z"),
+                    row(session_id="chat-b", machine="device-b"),
+diff --git a/utils/CLIO/journey_replay.py b/utils/CLIO/journey_replay.py
+index 7f6c665..7c5002c 100644
+--- a/utils/CLIO/journey_replay.py
++++ b/utils/CLIO/journey_replay.py
+@@ -27,23 +27,48 @@ REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/(\d+)\b|(
+ 
+ 
+ def references(text, context):
++    # Formatting must not turn a typed PR into a bare issue hash.
++    text = text.replace("**", "").replace("`", "")
+     refs = {(a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else
+             (d.lower(), "issue", int(e)) for a, b, c, d, e in REF.findall(text)}
+     if context:
+         # Consume typed refs before bare #N so PR #N does not also become issue #N.
+         local = REF.sub(" ", text)
+         number = r"([1-9]\d*)(?![\w]|\.\d)"
++        local = re.sub(r"\b(?:AgentChorus|agent2agent)\s+#" + number, " ", local, flags=re.I)
++        # This trial knows one repo; a named foreign project is a reason to abstain,
++        # not to invent a registry mapping. Qualified references above remain intact.
++        scope_names = re.findall(
++            r"\b(?:on|in|for)\s+(?:the\s+)?([A-Z][a-zA-Z]*-[a-zA-Z][\w-]*)(?![\w/-]|\.\w)|"
++            r"\b([A-Z][\w-]*)\s+(?:repo|repository|project)\b", local)
++        target_names = {"xyz", "xyz-forge"}
++        foreign = any(repo != REPO for repo, _, _ in refs) or any(
++            name.lower() not in target_names | {"the", "this", "current", "your", "our", "my", "same"}
++            for pair in scope_names for name in pair if name)
++
+         def typed(match):
+-            if match[3]:  # "PR 2 phase" may be a phase ordinal, not a GitHub ID.
++            suffix = local[match.end():]
++            if re.match(r"\s+phase\b", suffix, re.I) or (
++                not match[2] and (re.match(r"\s*[—–-]\s*#", suffix) or
++                                 match[1].lower() == "issue" and re.match(r"\s+first\s+only\b", suffix, re.I))
++            ):  # Ordinal/planned-step wording is not a literal artifact identity.
++                return " "
++            prefix = re.search(r"\b([A-Z][\w.-]*)\s+$", local[:match.start()])
++            qualifier = prefix[1].lower() if prefix else None
++            if qualifier and qualifier not in target_names | {"review", "merge", "check", "update", "use", "the", "land", "gh"}:
++                return " "  # e.g. "Catalog PR 8" is not this checkout's PR.
++            if foreign and qualifier not in target_names:
+                 return " "
+             kind = "issue" if match[1].lower() == "issue" else "pr"
+-            refs.add((REPO, kind, int(match[2])))
++            refs.add((REPO, kind, int(match[3])))
+             return " "
+-        local = re.sub(r"\b(issue|pr|pull\s+request)\s+#?" + number + r"(\s+phase\b)?", typed, local, flags=re.I)
+-        refs.update((REPO, "issue", int(n)) for n in re.findall(r"(?<![\w/])#" + number, local))
++        local = re.sub(r"\b(issue|pr|pull\s+request)\s+(#?)" + number, typed, local, flags=re.I)
++        if not foreign:
++            refs.update((REPO, "issue", int(n)) for n in re.findall(r"(?<![\w/])#" + number, local)
++                        if (REPO, "pr", int(n)) not in refs)
+         # A bare command argument is scoped by the command, not arbitrary prose numbers.
+         command = re.match(r"^\s*/start-task\s+(?:(?:on|for)\s+)?" + number, local, re.I)
+-        if command:
++        if command and not foreign:
+             refs.add((REPO, "issue", int(command[1])))
+     return sorted(refs)
+ 
+ 

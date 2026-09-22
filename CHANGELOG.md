@@ -10,6 +10,83 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.92.0] - 2026-09-16
+
+### Added
+- Private work-history trial connects confirmed GitHub closing-issue relationships to recorded
+  pull-request delivery. Separate attempts, open issues and shared delivery remain distinct;
+  richer histories and plain evidence lists are ready for operator comparison. Usefulness is
+  unconfirmed and deployment remains unknown.
+
+### Fixed
+- Retained-metadata composition rejects spoofed artifact URLs, inconsistent merge receipts and
+  conflicting duplicate event records instead of turning them into work-history facts.
+
+## [0.91.0] - 2026-09-16
+
+### Added
+- Optional issue-linked preview shows all qualified issue mentions, including unassigned requests,
+  without changing the original timelines. Separate chats and missing starts remain visible;
+  shared mentions keep the same identity and are counted once in unique totals. This is an offline
+  preview, not a completion claim or a live deployment.
+
+## [0.90.0] - 2026-09-16
+
+### Changed
+- Defined three possible experiment endings and a bounded path toward a useful work-history
+  companion, compared with a plain evidence list. Human usefulness and repeatability are required;
+  simpler notebook and stop decisions remain explicit fallbacks. No new runtime feature built.
+
+### Added
+- Optional qualified task-transition candidates alongside the unchanged original chat view.
+  A new, explicitly linked issue can split a candidate task; ambiguous wording stays unsplit.
+  Candidate links use qualified URLs even when legacy reference mode is selected. No prior-task
+  completion is inferred. Independent review and synthetic transition controls pass.
+- Published a retained-GitHub-facts composition trial: the frozen history remains unchanged,
+  while dated facts enrich explicitly referenced artifacts. This is a private research preview,
+  not live ingestion, deployment proof or measured task-detection accuracy.
+
+## [0.89.3] - 2026-09-16
+
+### Fixed
+- Invalid artifact URL suffixes no longer become links to a different issue or pull request.
+  Formatted discussion IDs are excluded while valid issue numbers and URL delimiters are retained.
+  Independent review reproduced the defects and verified the focused corrections.
+
+## [0.89.2] - 2026-09-16
+
+### Added
+- An optional replay mode uses qualified issue and pull-request URLs for timeline connections.
+  Other mentions remain visible as unresolved candidates and cannot attach completion events.
+
+### Fixed
+- Formatted pull-request numbers retain their type, and explicitly labeled discussion IDs no
+  longer become issue references. Regression checks include valid closed pull requests and large
+  issue numbers, preserving both while excluding discussion identifiers.
+
+## [0.89.1] - 2026-09-16
+
+### Changed
+- Recorded a bounded two-attempt reference experiment: the proposed safeguards also lost valid
+  links, so they were rejected and the previous parser restored. Retained the attempted patch,
+  failed controls, frozen-input comparisons and narrower follow-up; no runtime improvement shipped.
+- Published frozen reference-rerun deltas and queued GH-232 as the evidence-linked journey
+  continuation, with four-step batches and explicit stop/abstention decisions. Partial review found
+  incorrect reference additions; automatic linking remains unapproved. No runtime change.
+
+### Fixed
+- Journey references now recognize explicit issue and pull-request wording plus numeric start-task
+  arguments in verified repository context. Pull-request references no longer also become issue
+  references. Ambiguous phase wording stays unresolved. Focused regression tests were witnessed
+  failing before the fix; the targeted suite passes. No change to task boundaries or completion claims.
+
+## [0.89.0] - 2026-09-16
+
+### Added
+- Opt-in private task-journey replay with separate-chat and explicitly issue-linked views. Reuses
+  captured history without changing live collection or notes. A bounded trial produced candidate
+  timelines, not verified task completion; model summaries and missing activity sources remain gated.
+
 ## [0.88.4] - 2026-09-21
 
 ### Fixed
@@ -25,6 +102,11 @@
 - The Daily skill's close-the-loop ledger sync is opt-in again and actually runs in daily mode. The scanner had forked between this repo and its XYZ-forge projection: one side wrote `temp/close-the-loop.md` unconditionally, making `--update-ledger` dead code, while the projected side honored the flag but the documented invocation never passed it, so the deployed skill silently stopped syncing the ledger. The merged contract keeps writes gated on `--update-ledger`, passes that flag from the skill's daily invocation, and adopts the projection's calibration rule that a zero open-PR count is not reported unless the GitHub query is known to have succeeded. A regression test locks in all three paths (bare, `--update-ledger`, and `--no-ledger-write` winning). This repo is the sole owner of the Daily skill going forward; the forge copy is being retired.
 
 ## [0.88.2] - 2026-09-13
+
+### Changed — 2026-09-16
+- Planned a bounded prompt-history replay comparing separate chat journeys with explicitly linked
+  journeys. Independent plan review approved; scoped document checks passed. Existing capture and
+  storage remain unchanged. Implementation and live replay have not run.
 
 ### Added
 - Recent open issues and pull requests on Focus 5 cards: repository cards now surface up to three open issues and up to two open pull requests, prioritizing items created within the last 24 hours with automatic fallback to highest issue IDs. Closed items are strictly excluded, and issue numbers link directly to the corresponding GitHub page.
