@@ -168,6 +168,7 @@ operator name from what it does, never from how it ships.
 - Hardcoding credentials or secrets in code or config files.
 - Destructive operations without explicit confirmation or dry-run support.
 - Counting one real-world entity twice because it has an alias, rename, mirror, fork, or casing variant. Canonicalise before aggregating, de-duplicate the store, and never let the de-dup test assert on zeros — see [`SOP.md` §6](SOP.md).
+- **Script and LaunchAgent Sprawl (GH-241)**: Never create ad-hoc `.sh` or `.py` files in `scripts/` or `utils/`, and never add new LaunchAgent plists. All operator CLI commands must be subcommands in `src/rebalance/cli/`, agent capabilities in `src/rebalance/mcp/`, and periodic tasks dispatched through the orchestrator (`src/rebalance/ingest/index_ops.py`). Any addition to `scripts/` or `utils/` is blocked mechanically by `utils/pdda/check_script_inventory.py --check` in CI. Deletions ratchet downward permanently — deleting code counts as progress.
 
 ## Security & Credentials
 
