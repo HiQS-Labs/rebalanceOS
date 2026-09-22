@@ -88,6 +88,7 @@ from rebalance.web import (  # noqa: E402
     unhandled_exception_handler as _unhandled_exception_handler,
     whatsnext_page as _whatsnext_page,
     settings_page as _settings_page,
+    portfolio_matrix as _portfolio_matrix,
 )
 
 # Show the real traceback in-browser on an unhandled error instead of a bare
@@ -139,6 +140,14 @@ def focus5_goals():
 @app.post("/api/focus5/goals/complete")
 def focus5_complete_goal(req: Focus5GoalCompleteRequest, request: Request):
     return _focus5_complete_goal(req, request)
+
+
+@app.get("/portfolio-matrix.json")
+def portfolio_matrix():
+    # Mirror the portfolio matrix fetch on this always-running server so
+    # PortfolioMatrix loads live project data without a separate `rebalance serve`
+    # on :8787 (shared renderer in rebalance.web — keeps both surfaces identical).
+    return _portfolio_matrix()
 
 
 class AppleReminderCompleteRequest(BaseModel):
