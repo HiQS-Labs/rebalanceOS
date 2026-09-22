@@ -32,9 +32,7 @@ class StaleRevisionError(Exception):
     """Raised when expected_revision does not match current file content hash."""
 
     def __init__(self, current_revision: str, expected_revision: str):
-        super().__init__(
-            f"Stale goals revision: expected {expected_revision}, current {current_revision}"
-        )
+        super().__init__(f"Stale goals revision: expected {expected_revision}, current {current_revision}")
         self.current_revision = current_revision
         self.expected_revision = expected_revision
 
@@ -43,9 +41,7 @@ class AmbiguousGoalError(Exception):
     """Raised when multiple open goals match title without an unambiguous revision/line index."""
 
     def __init__(self, title: str, matching_indexes: list[int]):
-        super().__init__(
-            f"Ambiguous goal title '{title}' matches lines {matching_indexes}"
-        )
+        super().__init__(f"Ambiguous goal title '{title}' matches lines {matching_indexes}")
         self.title = title
         self.matching_indexes = matching_indexes
 
@@ -133,9 +129,7 @@ def parse_sectioned_goals_content(content: str) -> list[RawSectionGroup]:
             continue
 
         if current_task is not None:
-            current_task["description"] = (
-                current_task["description"] + " " + stripped
-            ).strip()
+            current_task["description"] = (current_task["description"] + " " + stripped).strip()
 
     if current_task is not None:
         current_group.tasks.append(current_task)

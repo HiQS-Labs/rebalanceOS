@@ -1259,9 +1259,7 @@ def portfolio_matrix() -> JSONResponse:
         normalized_to_projects.setdefault(norm, []).append(proj)
 
     # Detect collisions in project_registry
-    colliding_norms: set[str] = {
-        norm for norm, projs in normalized_to_projects.items() if len(projs) > 1
-    }
+    colliding_norms: set[str] = {norm for norm, projs in normalized_to_projects.items() if len(projs) > 1}
     for norm in colliding_norms:
         logger.warning("portfolio_matrix: colliding normalized project name: %s", norm)
 
@@ -1305,9 +1303,7 @@ def portfolio_matrix() -> JSONResponse:
         )
 
         # Look up any matched section groups for this project
-        matched_subs = [
-            sub for (p_name, sub) in tasks_by_group.keys() if p_name == name
-        ]
+        matched_subs = [sub for (p_name, sub) in tasks_by_group.keys() if p_name == name]
 
         if not matched_subs:
             # Active project with zero matching sections in 0. Goals.md: emit bare row
@@ -1326,7 +1322,7 @@ def portfolio_matrix() -> JSONResponse:
             # Sort subprojects: None first, then alphabetically
             sorted_subs = sorted(
                 matched_subs,
-                key=lambda s: ("" if s is None else s.lower()),
+                key=lambda s: "" if s is None else s.lower(),
             )
             for sub in sorted_subs:
                 raw_tasks = tasks_by_group.get((name, sub), [])

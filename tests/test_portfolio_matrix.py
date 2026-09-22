@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from typing import Any
 import pytest
@@ -10,7 +9,6 @@ from starlette.testclient import TestClient
 
 from rebalance.ingest.goals_file import (
     AmbiguousGoalError,
-    RawSectionGroup,
     StaleRevisionError,
     complete_goal_in_file,
     compute_goals_revision,
@@ -256,6 +254,7 @@ def test_portfolio_matrix_endpoint(tmp_path: Path, monkeypatch: Any) -> None:
 def test_pulse_server_portfolio_matrix(tmp_path: Path, monkeypatch: Any) -> None:
     """Verify scripts/pulse_server.py mirrors GET /portfolio-matrix.json correctly."""
     import sys
+
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     import pulse_server
 
