@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Reader and Daily skill changes built; 36 focused tests and nine witnessed red controls pass. Eight broader failures also reproduce on unchanged development; standalone HiQS163 pass. | Resolve native WAL lock-file preservation contract, complete final independent QA and refresh after PR234; producer646 landing remains a release dependency. |
+| Reader and Daily skill changes built; focused tests and nine witnessed red controls pass. The WAL read-only contract and repository-alias join now have explicit regressions. Eight broader failures also reproduce on unchanged development; standalone HiQS163 pass. | Rebase and repeat final qualification after PR234; producer646 landing remains an end-to-end release dependency. |
 
 ## Grounded recon and implementation gate
 
@@ -54,8 +54,10 @@ GitHub bodies. Preserve status facts through packet ceiling reduction; do not al
 the output JSON schema, budgets, cadence or existing CPU-state writes. Update only
 the relevant instructions in canonical Daily skill; deployment is separate.
 
-Populated fixtures plus source-byte/sidecar and no-writer/config sentinels prove
-the added reader's preservation. Cover agreement, quiet work, closure/cancellation,
+Populated fixtures plus source-byte/WAL and no-writer/config sentinels prove
+the added reader's preservation. Normal SQLite WAL/SHM coordination files are
+allowed; the reader must not change database bytes, logical rows, schema or journal
+mode, and write statements through the gateway must fail. Cover agreement, quiet work, closure/cancellation,
 label-only/DB-only, unknown/stale/future/invalid timestamps, schema8/9/NULL, foreign
 identity, PR exclusion, aliases/newest closure, failed/capped duplicate roots and
 reversed order, deadline/output caps, privacy sentinels and adversarial model prose.
@@ -66,7 +68,7 @@ Independent final real-relay QA cap3; focused tests, then applicable supported-c
 and HiQS gates in a disposable full clone (3-Eyes remains stood down). Separate
 commit/push/PR; no merge or deployment. ProducerXYZ646 and proven end-to-end
 comparison remain finish gates. Concurrent PR234 owns ledger opt-in/skill ownership;
-preserve it and re-anchor after landing. Easy rollback disables the additive reader,
+its landed changes must remain intact after rebase. Easy rollback disables the additive reader,
 without changing source ledgers or labels.
 
 ## Ranking rationale

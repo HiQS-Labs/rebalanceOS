@@ -166,6 +166,62 @@ def test_populated_collector_is_readonly_and_egress_is_whitelisted(tmp_path, mon
     assert not any(path.exists() for path in (Path(str(db) + "-wal"), Path(str(db) + "-shm")))
 
 
+def test_collector_joins_ledger_alias_to_canonical_native_identity(tmp_path, monkeypatch):
+    from rebalance.ingest.db import queries
+
+    monkeypatch.setattr(queries, "_get_alias_map", lambda: {"legacy-owner": "Example"})
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+    value = report()
+    value["issues"][0]["repo"] = "Legacy-Owner/Project"
+    harness, ledger = trusted_fixture(tmp_path, value)
+    monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_: (harness, (ledger,)))
+
+    result = dws.collect_issue_statuses(db, NOW, dws.default_config())
+
+    assert result["facts"][0]["id"] == "issue-status:example/project#7"
+    assert result["facts"][0]["kind"] == "in-progress"
+    assert not result["partial"]
+
+
+def test_wal_native_reader_preserves_database_and_rejects_writes(tmp_path, monkeypatch):
+    from rebalance.ingest.db import queries
+
+    monkeypatch.setattr(queries, "_get_alias_map", lambda: {})
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+    writer = sqlite3.connect(db)
+    writer.row_factory = sqlite3.Row
+    assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    writer.execute("UPDATE github_items SET title=title || ' via WAL'")
+    writer.commit()
+    before_bytes = db.read_bytes()
+    before_rows = [tuple(row) for row in writer.execute("SELECT * FROM github_items ORDER BY number")]
+    before_schema = [tuple(row) for row in writer.execute("SELECT type,name,sql FROM sqlite_master ORDER BY type,name")]
+
+    try:
+        with db_connection_readonly(db) as conn:
+            native = fetch_issue_status_evidence(conn, [("example/project", 7)], time.monotonic() + 1)
+            assert native[("example/project", 7)]["title"].endswith(" via WAL")
+            for statement in (
+                "UPDATE github_items SET state='closed'",
+                "DELETE FROM github_items",
+                "CREATE TABLE forbidden(value TEXT)",
+            ):
+                with pytest.raises(sqlite3.OperationalError):
+                    conn.execute(statement)
+
+        assert db.read_bytes() == before_bytes
+        assert [tuple(row) for row in writer.execute("SELECT * FROM github_items ORDER BY number")] == before_rows
+        assert [
+            tuple(row) for row in writer.execute("SELECT type,name,sql FROM sqlite_master ORDER BY type,name")
+        ] == before_schema
+        assert writer.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    finally:
+        writer.close()
+
+
 def test_failed_second_root_is_visible_uncertainty_not_confirmed_work(tmp_path, monkeypatch):
     db = tmp_path / "rebalance.db"
     native_database(db)

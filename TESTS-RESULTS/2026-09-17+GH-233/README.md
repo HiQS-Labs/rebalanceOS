@@ -16,13 +16,14 @@ missing private-name scan is unknown. 3-Eyes remains stood down and wasn't run.
 Complete diagnostic logs remain ignored in disposable-clone temp directories;
 sanitized summaries and command/SHA provenance are retained here.
 
-Independent final review is queued, not passed. Sibling Flight Deck review has
-exhausted its cap and identified a shared contract question: native mode=ro can
-create SQLite WAL locking sidecars without changing DB bytes. Existing Rebalance
-RO gateway is reused unchanged; no claim of physical sidecar preservation for a
-WAL-mode native cache is made. The operator must resolve that contract before
-qualification. Do not add a snapshot service, change the live journal mode or
-mark a mutable source immutable to hide this question.
+Takeover review resolved the WAL contract without adding a snapshot service or
+changing journal mode: normal SQLite WAL/SHM coordination files are allowed, while
+the native reader must preserve database bytes, logical records, schema and WAL
+mode and reject UPDATE, DELETE and CREATE TABLE. A regression reads nonempty facts
+from an active WAL database and proves those invariants. A second regression proves
+that ledger repository aliases join the canonical native-cache identity rather than
+degrading a valid active task to unknown. Final post-rebase qualification is recorded
+on the pull request's exact head SHA.
 
 XYZ646 writer is unmerged: no deployed skill, real pilot, source label/status
 writes, merge, passing broad gate or end-to-end qualification is claimed. PR234
