@@ -189,3 +189,7 @@ review of all changed references, and evidence for every claimed outcome. Earlie
 does not cover the parser follow-up or this plan. Full application gates remain blocked by
 missing dependencies. Filing did not begin implementation; the operator subsequently authorized
 this bounded batch. No application readiness claim is permitted while those gates are blocked.
+
+## Merge evidence
+
+- PR #231 merged 2026-09-22 — linked issue still OPEN; doc stays active by design (GH-202: promotion requires the issue to be closed).

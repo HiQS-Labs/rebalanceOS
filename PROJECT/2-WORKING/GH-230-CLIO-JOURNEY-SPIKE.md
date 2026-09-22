@@ -233,3 +233,7 @@ The Agy shim fixture suite returned exit 0 (62 pass / 0 fail); vendored harness 
 so no full harness validation is claimed. Scoped PDDA checks returned zero errors/warnings.
 Runtime doctor, full application tests and historical replay are not run: this is a documentation-only
 delivery, not a verified implementation. No private prompt text entered the review.
+
+## Merge evidence
+
+- PR #231 merged 2026-09-22 — linked issue still OPEN; doc stays active by design (GH-202: promotion requires the issue to be closed).
