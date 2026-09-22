@@ -32,7 +32,7 @@
 
 ## [0.90.0] - 2026-09-16
 
-### Documentation
+### Changed
 - Defined three possible experiment endings and a bounded path toward a useful work-history
   companion, compared with a plain evidence list. Human usefulness and repeatability are required;
   simpler notebook and stop decisions remain explicit fallbacks. No new runtime feature built.
@@ -66,7 +66,7 @@
 
 ## [0.89.1] - 2026-09-16
 
-### Documentation
+### Changed
 - Recorded a bounded two-attempt reference experiment: the proposed safeguards also lost valid
   links, so they were rejected and the previous parser restored. Retained the attempted patch,
   failed controls, frozen-input comparisons and narrower follow-up; no runtime improvement shipped.
@@ -103,7 +103,7 @@
 
 ## [0.88.2] - 2026-09-13
 
-### Documentation — 2026-09-16
+### Changed — 2026-09-16
 - Planned a bounded prompt-history replay comparing separate chat journeys with explicitly linked
   journeys. Independent plan review approved; scoped document checks passed. Existing capture and
   storage remain unchanged. Implementation and live replay have not run.

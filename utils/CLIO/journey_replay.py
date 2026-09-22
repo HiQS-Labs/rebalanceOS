@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Opt-in GH-230 historical replay. No ingestion, model calls, or live publication."""
+
 from __future__ import annotations
 
 import argparse
@@ -23,25 +24,33 @@ from rebalance.paths import resolve_clio_prompt_log_path, resolve_database_path
 REPO = "hiqs-labs/xyz-forge"
 MAX_BYTES = 100_000_000
 MAX_ROWS = 10_000
-REF = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/([1-9]\d*)(?![\w-]|\.\d)\b|(?<![\w/])([\w.-]+/[\w.-]+)#([1-9]\d*)(?![\w-]|\.\d)\b", re.I)
+REF = re.compile(
+    r"https://github\.com/([\w.-]+/[\w.-]+)/(issues|pull)/([1-9]\d*)(?![\w-]|\.\d)\b|(?<![\w/])([\w.-]+/[\w.-]+)#([1-9]\d*)(?![\w-]|\.\d)\b",
+    re.I,
+)
 
 
 def references(text, context):
-    text = re.sub(r"\b(issue|pr|pull\s+request|AgentChorus|agent2agent)\s+(\*\*|`)(#?[1-9]\d*)\2",
-                  r"\1 \3", text, flags=re.I)
+    text = re.sub(
+        r"\b(issue|pr|pull\s+request|AgentChorus|agent2agent)\s+(\*\*|`)(#?[1-9]\d*)\2", r"\1 \3", text, flags=re.I
+    )
     text = re.sub(r"\b(?:AgentChorus|agent2agent)\s+#\d+\b", " ", text, flags=re.I)
-    refs = {(a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else
-            (d.lower(), "issue", int(e)) for a, b, c, d, e in REF.findall(text)}
+    refs = {
+        (a.lower(), "pr" if b.lower() == "pull" else "issue", int(c)) if a else (d.lower(), "issue", int(e))
+        for a, b, c, d, e in REF.findall(text)
+    }
     if context:
         # Consume typed refs before bare #N so PR #N does not also become issue #N.
         local = REF.sub(" ", text)
         number = r"([1-9]\d*)(?![\w]|\.\d)"
+
         def typed(match):
             if match[3]:  # "PR 2 phase" may be a phase ordinal, not a GitHub ID.
                 return " "
             kind = "issue" if match[1].lower() == "issue" else "pr"
             refs.add((REPO, kind, int(match[2])))
             return " "
+
         local = re.sub(r"\b(issue|pr|pull\s+request)\s+#?" + number + r"(\s+phase\b)?", typed, local, flags=re.I)
         refs.update((REPO, "issue", int(n)) for n in re.findall(r"(?<![\w/])#" + number, local))
         # A bare command argument is scoped by the command, not arbitrary prose numbers.
@@ -53,8 +62,13 @@ def references(text, context):
 
 def qualified_references(text):
     """Typed qualified URLs only; neither prose scope nor shorthand supplies identity."""
-    return sorted({(repo.lower(), 'pr' if kind.lower() == 'pull' else 'issue', int(number))
-                   for repo, kind, number, _, _ in REF.findall(text) if repo})
+    return sorted(
+        {
+            (repo.lower(), "pr" if kind.lower() == "pull" else "issue", int(number))
+            for repo, kind, number, _, _ in REF.findall(text)
+            if repo
+        }
+    )
 
 
 def is_start(text):
@@ -66,7 +80,12 @@ def is_start(text):
         return False
     # IDE skill links are normalized only at the command position.
     text = re.sub(r"^\[\$(start-task|express)\]\([^\n)]*\)", r"/\1", text)
-    return bool(re.match(r"^(?:(?:ok[, ]+)?please\s+|ok[, ]+)?(?:/(?:start-task|express)\b|(?:let's\s+)?start\b|(?:fix|apply|implement)\s+(?:the\s+|a\s+)?hotfix\b|hotfix\s*:)", text))
+    return bool(
+        re.match(
+            r"^(?:(?:ok[, ]+)?please\s+|ok[, ]+)?(?:/(?:start-task|express)\b|(?:let's\s+)?start\b|(?:fix|apply|implement)\s+(?:the\s+|a\s+)?hotfix\b|hotfix\s*:)",
+            text,
+        )
+    )
 
 
 def snapshot(path):
@@ -77,8 +96,12 @@ def snapshot(path):
     raw = raw[:end]
     if not raw:
         raise ValueError("no complete capture records")
-    return raw, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
-                 "byte_cap_hit": size > MAX_BYTES, "partial_tail": end < min(size, MAX_BYTES)}
+    return raw, {
+        "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "byte_cap_hit": size > MAX_BYTES,
+        "partial_tail": end < min(size, MAX_BYTES),
+    }
 
 
 def verify_prefix(path, meta):
@@ -98,7 +121,11 @@ def markdown_rows(raw):
     blocks = re.split(r"(?m)^<!-- clio:id:", text)[1:]
     rows = []
     for block in blocks:
-        match = re.match(r"([^\n]+?):(\d{4}-\d{2}-\d{2}T[^\n ]+) -->\n## ([^\n]+)\n[^\n]*\n([^\n]*)\n\n(> .*?)(?=\n[^>]|\Z)", block, re.S)
+        match = re.match(
+            r"([^\n]+?):(\d{4}-\d{2}-\d{2}T[^\n ]+) -->\n## ([^\n]+)\n[^\n]*\n([^\n]*)\n\n(> .*?)(?=\n[^>]|\Z)",
+            block,
+            re.S,
+        )
         if not match:
             rows.append(b"null")  # counted as malformed, not silently accepted
             continue
@@ -108,9 +135,18 @@ def markdown_rows(raw):
         if not (prompt.startswith('"') and prompt.endswith('"')):
             rows.append(b"null")
             continue
-        rows.append(_json_dumps(dict(session_id=session, timestamp=stamp, repo=repo,
-                                    machine=parts[0] or None, agent=parts[-1] if len(parts) > 1 else None,
-                                    prompt=prompt[1:-1])).encode())
+        rows.append(
+            _json_dumps(
+                dict(
+                    session_id=session,
+                    timestamp=stamp,
+                    repo=repo,
+                    machine=parts[0] or None,
+                    agent=parts[-1] if len(parts) > 1 else None,
+                    prompt=prompt[1:-1],
+                )
+            ).encode()
+        )
     return b"\n".join(rows) + b"\n"
 
 
@@ -146,9 +182,13 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
             # Only a typed, qualified URL establishes both repository and artifact type.
             # Shorthand and checkout-scoped prose stay review candidates, never join keys.
             explicit = set(qualified_references(text))
-            unresolved = [dict(repository=None, kind_hint=kind, number=number,
-                               reason='repository or artifact type requires review')
-                          for repo, kind, number in refs if (repo, kind, number) not in explicit]
+            unresolved = [
+                dict(
+                    repository=None, kind_hint=kind, number=number, reason="repository or artifact type requires review"
+                )
+                for repo, kind, number in refs
+                if (repo, kind, number) not in explicit
+            ]
             refs = sorted(explicit)
         if len(rows) >= MAX_ROWS:
             counts["row_cap_hit"] = 1
@@ -160,12 +200,22 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
         seen.add(identity)
         counts["missing_session"] += not bool(row.get("session_id"))
         counts["missing_device"] += not bool(row.get("machine"))
-        rows.append({"id": f"clio:{fingerprint}:{ordinal}", "ordinal": ordinal,
-                     "timestamp": stamp.isoformat(), "text": text, "kind": "intent",
-                     "session": row.get("session_id"), "device": row.get("machine"),
-                     "agent": row.get("agent"), "refs": refs, "start": is_start(text)})
+        rows.append(
+            {
+                "id": f"clio:{fingerprint}:{ordinal}",
+                "ordinal": ordinal,
+                "timestamp": stamp.isoformat(),
+                "text": text,
+                "kind": "intent",
+                "session": row.get("session_id"),
+                "device": row.get("machine"),
+                "agent": row.get("agent"),
+                "refs": refs,
+                "start": is_start(text),
+            }
+        )
         if explicit_links_only:
-            rows[-1]['unresolved_refs'] = unresolved
+            rows[-1]["unresolved_refs"] = unresolved
     if not rows:
         raise ValueError("no eligible seven-day prompts; coverage blocked")
     return sorted(rows, key=lambda r: (r["timestamp"], r["ordinal"])), dict(counts)
@@ -173,7 +223,7 @@ def load_prompts(raw, fingerprint, as_of, aliases, explicit_links_only=False):
 
 def group(rows, qualified_transitions=False):
     if qualified_transitions:
-        rows = [row | {'refs': qualified_references(row['text'])} for row in rows]
+        rows = [row | {"refs": qualified_references(row["text"])} for row in rows]
     journeys, active, orphans = [], {}, []
     for row in rows:
         key = (row["device"], row["agent"], row["session"])
@@ -183,16 +233,20 @@ def group(rows, qualified_transitions=False):
         transition = False
         if qualified_transitions and key in active:
             # Exact new-task wording is a candidate boundary, never completion evidence.
-            target = re.fullmatch(r"\s*next task:\s*(?:start\s+)?https://github\.com/"
-                                 r"([\w.-]+/[\w.-]+)/issues/([1-9]\d*)\s*", row['text'], re.I)
+            target = re.fullmatch(
+                r"\s*next task:\s*(?:start\s+)?https://github\.com/"
+                r"([\w.-]+/[\w.-]+)/issues/([1-9]\d*)\s*",
+                row["text"],
+                re.I,
+            )
             if target and target[1].lower() == REPO:
-                issue = (REPO, 'issue', int(target[2]))
-                old = [tuple(ref) for ref in active[key]['issues']]
+                issue = (REPO, "issue", int(target[2]))
+                old = [tuple(ref) for ref in active[key]["issues"]]
                 transition = len(old) == 1 and old[0] != issue and old[0][0] == REPO
         if row["start"] or transition:
             journey = {"id": row["id"], "prompts": [], "issues": []}
             if transition:
-                journey['boundary'] = 'qualified new-task request; candidate only'
+                journey["boundary"] = "qualified new-task request; candidate only"
             journeys.append(journey)
             active[key] = journey
         if key not in active:
@@ -219,9 +273,10 @@ def github_events(database, as_of):
             conn.execute("PRAGMA query_only=ON")
             for offset in range(0, MAX_ROWS + 1, 1000):
                 rows = conn.execute(
-                    "SELECT item_type,number,created_at,closed_at,merged_at,fetched_at FROM github_items "
+                    "SELECT item_type,number,created_at,closed_at,merged_at,fetched_at FROM github_items "  # READ-LAYER-OK: bounded opt-in replay snapshot (GH-230)
                     "WHERE lower(repo_full_name)=? ORDER BY item_type,number LIMIT 1000 OFFSET ?",
-                    (REPO, offset)).fetchall()
+                    (REPO, offset),
+                ).fetchall()
                 if offset == MAX_ROWS and rows:
                     return events, "incomplete: artifact row cap"
                 for row in rows:
@@ -229,131 +284,217 @@ def github_events(database, as_of):
                     for field in ("created_at", "closed_at", "merged_at"):
                         stamp = parse_iso(row[field])
                         if stamp and as_of - timedelta(days=7) <= stamp < as_of:
-                            events.append({"id": f"gh:{REPO}:{kind}:{row['number']}:{field}:{stamp.isoformat()}",
-                                           "timestamp": stamp.isoformat(), "kind": "recorded event",
-                                           "event": field, "ref": (REPO, kind, row["number"]),
-                                           "fetched_at": row["fetched_at"],
-                                           "url": f"https://github.com/{REPO}/{'pull' if kind == 'pr' else 'issues'}/{row['number']}"})
+                            events.append(
+                                {
+                                    "id": f"gh:{REPO}:{kind}:{row['number']}:{field}:{stamp.isoformat()}",
+                                    "timestamp": stamp.isoformat(),
+                                    "kind": "recorded event",
+                                    "event": field,
+                                    "ref": (REPO, kind, row["number"]),
+                                    "fetched_at": row["fetched_at"],
+                                    "url": f"https://github.com/{REPO}/{'pull' if kind == 'pr' else 'issues'}/{row['number']}",
+                                }
+                            )
                 if len(rows) < 1000:
                     break
     except Exception as exc:
         return [], f"unavailable: {type(exc).__name__}"
     unique = {event["id"]: event for event in events}
-    return sorted(unique.values(), key=lambda e: (e["timestamp"], e["id"])), "available" if events else "no events in window"
+    return sorted(
+        unique.values(), key=lambda e: (e["timestamp"], e["id"])
+    ), "available" if events else "no events in window"
 
 
 def render(bundle):
     rows = {r["id"]: r for r in bundle["prompts"]}
-    lines = ["# XYZ Forge journey replay — private preview", "", "Requests are intent, not proof of completion.",
-             "GitHub facts are retrospective snapshots; linking them does not prove a chat caused them.",
-             "", "## Coverage", _json_dumps(bundle["coverage"]), "", "## A — Separate chat journeys"]
+    lines = [
+        "# XYZ Forge journey replay — private preview",
+        "",
+        "Requests are intent, not proof of completion.",
+        "GitHub facts are retrospective snapshots; linking them does not prove a chat caused them.",
+        "",
+        "## Coverage",
+        _json_dumps(bundle["coverage"]),
+        "",
+        "## A — Separate chat journeys",
+    ]
     for journey in bundle["journeys"]:
         lines += ["", f"### {journey['id']}"]
         refs = {tuple(ref) for pid in journey["prompts"] for ref in rows[pid]["refs"]}
-        timeline = [(rows[pid]["timestamp"], f"intent [{pid}]: " +
-                     redact_key_shaped_secrets(rows[pid]["text"]).replace("\n", " ")[:500]) for pid in journey["prompts"]]
-        timeline += [(e["timestamp"], f"recorded event [{e['id']}]: {e['event']} {e['url']}")
-                     for e in bundle["events"] if tuple(e["ref"]) in refs]
+        timeline = [
+            (
+                rows[pid]["timestamp"],
+                f"intent [{pid}]: " + redact_key_shaped_secrets(rows[pid]["text"]).replace("\n", " ")[:500],
+            )
+            for pid in journey["prompts"]
+        ]
+        timeline += [
+            (e["timestamp"], f"recorded event [{e['id']}]: {e['event']} {e['url']}")
+            for e in bundle["events"]
+            if tuple(e["ref"]) in refs
+        ]
         lines += [f"- {stamp} — {text}" for stamp, text in sorted(timeline)]
-        unresolved = sum(len(rows[pid].get('unresolved_refs', [])) for pid in journey['prompts'])
+        unresolved = sum(len(rows[pid].get("unresolved_refs", [])) for pid in journey["prompts"])
         if unresolved:
-            lines += [f'- Unresolved reference candidates: {unresolved}; excluded from outcome joins.']
+            lines += [f"- Unresolved reference candidates: {unresolved}; excluded from outcome joins."]
     lines += ["", "## B — Issue-linked parents (same child timelines)"]
     for parent, children in bundle["parents"].items():
         lines += [f"- {parent}"] + [f"  - {child}" for child in children]
-    if 'candidate_view' in bundle:
-        lines += ['', '## C — Qualified task-transition candidates',
-                  'Original chat journeys above are preserved. A boundary does not attest completion.']
-        for journey in bundle['candidate_view']['journeys']:
-            lines += ['', f"### Candidate {journey['id']}",
-                      f"- Boundary: {journey.get('boundary', 'original start hint')}",
-                      '- Intent prompt IDs: ' + ', '.join(journey['prompts'])]
-            refs = {ref for pid in journey['prompts'] for ref in qualified_references(rows[pid]['text'])}
-            lines += [f"- {e['timestamp']} — recorded event: {e['event']} {e['url']}"
-                      for e in bundle['events'] if tuple(e['ref']) in refs]
+    if "candidate_view" in bundle:
+        lines += [
+            "",
+            "## C — Qualified task-transition candidates",
+            "Original chat journeys above are preserved. A boundary does not attest completion.",
+        ]
+        for journey in bundle["candidate_view"]["journeys"]:
+            lines += [
+                "",
+                f"### Candidate {journey['id']}",
+                f"- Boundary: {journey.get('boundary', 'original start hint')}",
+                "- Intent prompt IDs: " + ", ".join(journey["prompts"]),
+            ]
+            refs = {ref for pid in journey["prompts"] for ref in qualified_references(rows[pid]["text"])}
+            lines += [
+                f"- {e['timestamp']} — recorded event: {e['event']} {e['url']}"
+                for e in bundle["events"]
+                if tuple(e["ref"]) in refs
+            ]
     lines += ["", f"Unassigned prompts: {len(bundle['orphans'])}", "", "## Review sample — first ten non-starts"]
-    lines += [f"- {r['id']}: {redact_key_shaped_secrets(r['text']).replace(chr(10), ' ')[:320]}"
-              for r in bundle["prompts"] if not r["start"]][:10]
-    if bundle.get('issue_evidence'):
+    lines += [
+        f"- {r['id']}: {redact_key_shaped_secrets(r['text']).replace(chr(10), ' ')[:320]}"
+        for r in bundle["prompts"]
+        if not r["start"]
+    ][:10]
+    if bundle.get("issue_evidence"):
         if not rows:
-            raise ValueError('issue evidence requires nonempty prompts')
+            raise ValueError("issue evidence requires nonempty prompts")
         linked, chats = {}, {}
-        membership = {pid: journey['id'] for journey in bundle['journeys'] for pid in journey['prompts']}
-        for row in bundle['prompts']:
-            issues = [ref for ref in qualified_references(row['text'])
-                      if ref[0] == REPO and ref[1] == 'issue']
+        membership = {pid: journey["id"] for journey in bundle["journeys"] for pid in journey["prompts"]}
+        for row in bundle["prompts"]:
+            issues = [ref for ref in qualified_references(row["text"]) if ref[0] == REPO and ref[1] == "issue"]
             for ref in issues:
                 linked.setdefault(ref, []).append((row, issues))
-            if issues and row['session']:
-                key = (row['device'], row['agent'], row['session'])
+            if issues and row["session"]:
+                key = (row["device"], row["agent"], row["session"])
                 chats.setdefault(key, len(chats) + 1)
-        unique = {row['id'] for mentions in linked.values() for row, _ in mentions}
-        lines += ['', '## D — Explicit issue evidence',
-                  'Qualified issue URLs only; separate chat attempts are not one continuous task.',
-                  f'Unique linked prompts: {len(unique)}; issue appearances: {sum(map(len, linked.values()))}',
-                  'Missing evidence stays missing; deployment unknown.']
+        unique = {row["id"] for mentions in linked.values() for row, _ in mentions}
+        lines += [
+            "",
+            "## D — Explicit issue evidence",
+            "Qualified issue URLs only; separate chat attempts are not one continuous task.",
+            f"Unique linked prompts: {len(unique)}; issue appearances: {sum(map(len, linked.values()))}",
+            "Missing evidence stays missing; deployment unknown.",
+        ]
         for ref, mentions in sorted(linked.items()):
-            lines += ['', f'### {ref[0]}#{ref[2]}']
+            lines += ["", f"### {ref[0]}#{ref[2]}"]
             for row, issues in mentions:
-                chat = (f"Chat attempt {chats[(row['device'], row['agent'], row['session'])]}"
-                        if row['session'] else 'Chat unknown')
-                gap = ('Assigned to original journey ' + membership[row['id']] if row['id'] in membership
-                       else 'Unassigned — session unknown' if not row['session']
-                       else 'Unassigned — no detected prior start in this window')
-                others = [f'{repo}#{number}' for repo, _, number in issues if (repo, 'issue', number) != ref]
-                also = '; also mentions ' + ', '.join(others) if others else ''
-                intent = redact_key_shaped_secrets(row['text']).replace('\n', ' ')[:500]
+                chat = (
+                    f"Chat attempt {chats[(row['device'], row['agent'], row['session'])]}"
+                    if row["session"]
+                    else "Chat unknown"
+                )
+                gap = (
+                    "Assigned to original journey " + membership[row["id"]]
+                    if row["id"] in membership
+                    else "Unassigned — session unknown"
+                    if not row["session"]
+                    else "Unassigned — no detected prior start in this window"
+                )
+                others = [f"{repo}#{number}" for repo, _, number in issues if (repo, "issue", number) != ref]
+                also = "; also mentions " + ", ".join(others) if others else ""
+                intent = redact_key_shaped_secrets(row["text"]).replace("\n", " ")[:500]
                 lines += [f"- {row['timestamp']} — intent [{row['id']}] ({chat}; {gap}{also}): {intent}"]
-            facts = [event for event in bundle['events'] if tuple(event['ref']) == ref]
-            lines += [f"- {event['timestamp']} — recorded event [{event['id']}]: {event['event']} "
-                      f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}" for event in facts]
+            facts = [event for event in bundle["events"] if tuple(event["ref"]) == ref]
+            lines += [
+                f"- {event['timestamp']} — recorded event [{event['id']}]: {event['event']} "
+                f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}"
+                for event in facts
+            ]
             if not facts:
-                lines += ['- No recorded issue events available in this preview.']
-            for link in bundle.get('delivery_links', []):
-                if tuple(link['issue']) != ref:
+                lines += ["- No recorded issue events available in this preview."]
+            for link in bundle.get("delivery_links", []):
+                if tuple(link["issue"]) != ref:
                     continue
-                lines += [f"- Delivery relationship [{link['id']}]: {link['pr_url']} names {link['issue_url']} "
-                          f"in {link['source_field']}; observed {link['fetched_at']}. "
-                          'This does not prove chat causation, historical issue state or deployment.']
-                lines += [f"- {event['timestamp']} — related PR event [{event['id']}]: {event['event']} "
-                          f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}"
-                          for event in bundle['events'] if tuple(event['ref']) == tuple(link['pr'])]
-        lines += [f'- Delivery evidence gap: {gap}' for gap in bundle.get('delivery_gaps', [])]
-    if bundle.get('review_cases'):
-        lines += ['', '## E — Three histories versus plain evidence lists',
-                  'Same evidence in both views. Helpfulness is unconfirmed until the operator responds.',
-                  'Per case: useful / list is enough / misleading. Does the history beat the list?']
-        for number in bundle['review_cases']:
-            issue = (REPO, 'issue', number)
-            mentions = [r for r in bundle['prompts'] if issue in qualified_references(r['text'])]
-            relations = [link for link in bundle.get('delivery_links', []) if tuple(link['issue']) == issue]
-            artifacts = {issue} | {tuple(link['pr']) for link in relations}
-            facts = {event['id']: event for event in bundle['events'] if tuple(event['ref']) in artifacts}
-            chat_keys = {(r['device'], r['agent'], r['session']) for r in mentions if r['session']}
-            unassigned = sum(r['id'] in bundle['orphans'] for r in mentions)
-            lines += ['', f'### Review issue #{number}', '', '#### A — Compact history',
-                      f'{len(mentions)} recorded requests across {len(chat_keys)} known captured chats; '
-                      f'{unassigned} remain unassigned. Separate attempts are not continuous work.']
-            timeline = [(r['timestamp'], f"intent [{r['id']}]: " +
-                         redact_key_shaped_secrets(r['text']).replace('\n', ' ')[:500]) for r in mentions]
-            timeline += [(event['timestamp'], f"recorded event [{event['id']}]: {event['event']} "
-                          f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}") for event in facts.values()]
-            lines += [f'- {stamp} — {text}' for stamp, text in sorted(timeline)]
-            links_text = [f"{link['pr_url']} → {link['issue_url']} [{link['id']}], "
-                          f"{link['source_field']} observed {link['fetched_at']}" for link in relations]
-            lines += ['Delivery evidence: ' + ('; '.join(links_text) or 'none available') + '.',
-                      'Chat causation, deployment and fulfillment of the broader goal remain unknown.',
-                      '', '#### B — Plain issue evidence list']
-            lines += [f"- Prompt [{r['id']}], {r['timestamp']}: " +
-                      redact_key_shaped_secrets(r['text']).replace('\n', ' ')[:500] for r in mentions]
-            lines += [f"- Fact [{event['id']}]: {event['event']} {event['url']}; event {event['timestamp']}; "
-                      f"retrieved {event.get('fetched_at') or 'unknown'}" for event in facts.values()]
-            lines += ['- Relationship: ' + text for text in links_text]
+                lines += [
+                    f"- Delivery relationship [{link['id']}]: {link['pr_url']} names {link['issue_url']} "
+                    f"in {link['source_field']}; observed {link['fetched_at']}. "
+                    "This does not prove chat causation, historical issue state or deployment."
+                ]
+                lines += [
+                    f"- {event['timestamp']} — related PR event [{event['id']}]: {event['event']} "
+                    f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}"
+                    for event in bundle["events"]
+                    if tuple(event["ref"]) == tuple(link["pr"])
+                ]
+        lines += [f"- Delivery evidence gap: {gap}" for gap in bundle.get("delivery_gaps", [])]
+    if bundle.get("review_cases"):
+        lines += [
+            "",
+            "## E — Three histories versus plain evidence lists",
+            "Same evidence in both views. Helpfulness is unconfirmed until the operator responds.",
+            "Per case: useful / list is enough / misleading. Does the history beat the list?",
+        ]
+        for number in bundle["review_cases"]:
+            issue = (REPO, "issue", number)
+            mentions = [r for r in bundle["prompts"] if issue in qualified_references(r["text"])]
+            relations = [link for link in bundle.get("delivery_links", []) if tuple(link["issue"]) == issue]
+            artifacts = {issue} | {tuple(link["pr"]) for link in relations}
+            facts = {event["id"]: event for event in bundle["events"] if tuple(event["ref"]) in artifacts}
+            chat_keys = {(r["device"], r["agent"], r["session"]) for r in mentions if r["session"]}
+            unassigned = sum(r["id"] in bundle["orphans"] for r in mentions)
+            lines += [
+                "",
+                f"### Review issue #{number}",
+                "",
+                "#### A — Compact history",
+                f"{len(mentions)} recorded requests across {len(chat_keys)} known captured chats; "
+                f"{unassigned} remain unassigned. Separate attempts are not continuous work.",
+            ]
+            timeline = [
+                (
+                    r["timestamp"],
+                    f"intent [{r['id']}]: " + redact_key_shaped_secrets(r["text"]).replace("\n", " ")[:500],
+                )
+                for r in mentions
+            ]
+            timeline += [
+                (
+                    event["timestamp"],
+                    f"recorded event [{event['id']}]: {event['event']} "
+                    f"{event['url']}; retrieved {event.get('fetched_at') or 'unknown'}",
+                )
+                for event in facts.values()
+            ]
+            lines += [f"- {stamp} — {text}" for stamp, text in sorted(timeline)]
+            links_text = [
+                f"{link['pr_url']} → {link['issue_url']} [{link['id']}], "
+                f"{link['source_field']} observed {link['fetched_at']}"
+                for link in relations
+            ]
+            lines += [
+                "Delivery evidence: " + ("; ".join(links_text) or "none available") + ".",
+                "Chat causation, deployment and fulfillment of the broader goal remain unknown.",
+                "",
+                "#### B — Plain issue evidence list",
+            ]
+            lines += [
+                f"- Prompt [{r['id']}], {r['timestamp']}: "
+                + redact_key_shaped_secrets(r["text"]).replace("\n", " ")[:500]
+                for r in mentions
+            ]
+            lines += [
+                f"- Fact [{event['id']}]: {event['event']} {event['url']}; event {event['timestamp']}; "
+                f"retrieved {event.get('fetched_at') or 'unknown'}"
+                for event in facts.values()
+            ]
+            lines += ["- Relationship: " + text for text in links_text]
             if number == 508:
-                lines += ['Prior diagnostic caveat (applies to A and B): the earlier verdict was superseded '
-                          'in follow-up #536/#556, according to the retained CASE-AUDIT.md; '
-                          'this is not an automatically verified goal-completion chain.']
-            lines += ['- Operator judgment: pending. Missing evidence and deployment remain unknown.']
+                lines += [
+                    "Prior diagnostic caveat (applies to A and B): the earlier verdict was superseded "
+                    "in follow-up #536/#556, according to the retained CASE-AUDIT.md; "
+                    "this is not an automatically verified goal-completion chain."
+                ]
+            lines += ["- Operator judgment: pending. Missing evidence and deployment remain unknown."]
     return "\n".join(lines) + "\n"
 
 
@@ -365,8 +506,11 @@ def publish(output, raw, bundle, source, meta):
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix=".journey-", dir=output.parent) as stage:
         stage = Path(stage)
-        for name, data in (("capture." + bundle.get("source_format", "jsonl"), raw), ("evidence.json", _json_dumps(bundle).encode()),
-                           ("preview.md", markdown.encode())):
+        for name, data in (
+            ("capture." + bundle.get("source_format", "jsonl"), raw),
+            ("evidence.json", _json_dumps(bundle).encode()),
+            ("preview.md", markdown.encode()),
+        ):
             with (stage / name).open("xb") as handle:
                 os.fchmod(handle.fileno(), 0o600)
                 handle.write(data)
@@ -384,12 +528,21 @@ def main():
     parser.add_argument("--checkout", type=Path, action="append", default=[])
     parser.add_argument("--as-of", default=now_utc().isoformat())
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument('--explicit-links-only', action='store_true',
-                        help='Use only typed qualified GitHub URLs for joins; retain other mentions as unresolved.')
-    parser.add_argument('--qualified-transitions', action='store_true',
-                        help='Add a candidate view for exact qualified Next task requests; preserve original grouping.')
-    parser.add_argument('--issue-evidence', action='store_true',
-                        help='Append all qualified trial-issue mentions, including unassigned prompts, without regrouping.')
+    parser.add_argument(
+        "--explicit-links-only",
+        action="store_true",
+        help="Use only typed qualified GitHub URLs for joins; retain other mentions as unresolved.",
+    )
+    parser.add_argument(
+        "--qualified-transitions",
+        action="store_true",
+        help="Add a candidate view for exact qualified Next task requests; preserve original grouping.",
+    )
+    parser.add_argument(
+        "--issue-evidence",
+        action="store_true",
+        help="Append all qualified trial-issue mentions, including unassigned prompts, without regrouping.",
+    )
     args = parser.parse_args()
     as_of = parse_iso(args.as_of)
     if as_of is None:
@@ -406,22 +559,39 @@ def main():
     rows, counts = load_prompts(replay_input, meta["sha256"], as_of, aliases, args.explicit_links_only)
     journeys, parents, orphans = group(rows)
     events, status = github_events(resolve_database_path(args.database), as_of)
-    coverage = counts | {"eligible_prompts": len(rows), "starts": sum(r["start"] for r in rows),
-                        "journeys": len(journeys), "parents": len(parents), "orphans": len(orphans),
-                        "github_events": len(events), "github_status": status,
-                        "devices": len({r['device'] for r in rows if r['device']}),
-                        "terra": "not called: guarded runner has no independent output seam",
-                        "relay_marathon": "not attested", "byte_cap_hit": meta["byte_cap_hit"]}
-    coverage['reference_policy'] = 'explicit URLs only' if args.explicit_links_only else 'checkout-context candidates'
-    coverage['unresolved_reference_candidates'] = sum(len(r.get('unresolved_refs', [])) for r in rows)
-    bundle = {"as_of_utc": as_of.isoformat(), "source": meta, "source_format": args.source_format, "coverage": coverage,
-              "prompts": rows, "journeys": journeys, "parents": parents, "orphans": orphans, "events": events}
+    coverage = counts | {
+        "eligible_prompts": len(rows),
+        "starts": sum(r["start"] for r in rows),
+        "journeys": len(journeys),
+        "parents": len(parents),
+        "orphans": len(orphans),
+        "github_events": len(events),
+        "github_status": status,
+        "devices": len({r["device"] for r in rows if r["device"]}),
+        "terra": "not called: guarded runner has no independent output seam",
+        "relay_marathon": "not attested",
+        "byte_cap_hit": meta["byte_cap_hit"],
+    }
+    coverage["reference_policy"] = "explicit URLs only" if args.explicit_links_only else "checkout-context candidates"
+    coverage["unresolved_reference_candidates"] = sum(len(r.get("unresolved_refs", [])) for r in rows)
+    bundle = {
+        "as_of_utc": as_of.isoformat(),
+        "source": meta,
+        "source_format": args.source_format,
+        "coverage": coverage,
+        "prompts": rows,
+        "journeys": journeys,
+        "parents": parents,
+        "orphans": orphans,
+        "events": events,
+    }
     if args.qualified_transitions:
         candidate_journeys, candidate_parents, candidate_orphans = group(rows, qualified_transitions=True)
-        bundle['candidate_view'] = dict(journeys=candidate_journeys, parents=candidate_parents,
-                                        orphans=candidate_orphans)
+        bundle["candidate_view"] = dict(
+            journeys=candidate_journeys, parents=candidate_parents, orphans=candidate_orphans
+        )
     if args.issue_evidence:
-        bundle['issue_evidence'] = True
+        bundle["issue_evidence"] = True
     publish(args.output, raw, bundle, source, meta)
     print(_json_dumps(coverage))  # no prompt text, session IDs, or private paths
 
