@@ -150,7 +150,9 @@ def update_baseline(path: Path = BASELINE_PATH, root: Path = REPO_ROOT) -> None:
         "utils": inv["utils"],
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(f"Updated baseline at {path} ({len(inv['launchd_templates'])} templates, {len(inv['scripts'])} scripts, {len(inv['utils'])} utils)")
+    print(
+        f"Updated baseline at {path} ({len(inv['launchd_templates'])} templates, {len(inv['scripts'])} scripts, {len(inv['utils'])} utils)"
+    )
 
 
 def main() -> None:
