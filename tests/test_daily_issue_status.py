@@ -167,9 +167,11 @@ def test_populated_collector_is_readonly_and_egress_is_whitelisted(tmp_path, mon
 
 
 def test_collector_joins_ledger_alias_to_canonical_native_identity(tmp_path, monkeypatch):
+    from rebalance.ingest import config
     from rebalance.ingest.db import queries
 
     monkeypatch.setattr(queries, "_get_alias_map", lambda: {"legacy-owner": "Example"})
+    monkeypatch.setattr(config, "get_github_org_aliases", lambda: {"legacy-owner": "Example"})
     db = tmp_path / "rebalance.db"
     native_database(db)
     value = report()

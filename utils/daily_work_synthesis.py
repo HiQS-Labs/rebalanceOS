@@ -203,7 +203,8 @@ def issue_status(
 def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) -> dict[str, Any] | None:
     """Optional fixed-code reader. Explicit roots only; every source is read-only."""
     from rebalance.ingest.db.connection import db_connection_readonly
-    from rebalance.ingest.db.queries import _canonical_lower, _get_alias_map, fetch_issue_status_evidence
+    from rebalance.ingest.config import canonical_github_repo_name
+    from rebalance.ingest.db.queries import fetch_issue_status_evidence
 
     try:
         harness, roots = resolve_xyz_work_sources(cfg.get("xyz_harness_root"), cfg.get("xyz_ledger_roots"))
@@ -228,7 +229,6 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
     unique_roots = sorted(set(root.resolve() for root in roots))
     errors = ["root-cap"] if len(unique_roots) > 4 else []
     grouped: dict[tuple[str, int], list[dict[str, Any]]] = {}
-    alias_map = _get_alias_map()
     for root in unique_roots[:4]:
         report = adapter.read_work_status(harness, root, ledger_deadline, now.isoformat())
         source = {
@@ -274,7 +274,7 @@ def collect_issue_statuses(db_path: Path, now: datetime, cfg: dict[str, Any]) ->
             ):
                 value = row.get(original)
                 evidence[dest] = {field: value.get(field) for field in fields} if isinstance(value, dict) else None
-            grouped.setdefault((_canonical_lower(repo, alias_map), number), []).append(evidence)
+            grouped.setdefault((canonical_github_repo_name(repo).casefold(), number), []).append(evidence)
     if len(grouped) > 2000:
         errors.append("issue-cap")
     identities = sorted(
