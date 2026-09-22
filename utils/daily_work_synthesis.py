@@ -694,7 +694,17 @@ def run(config_path: Path, *, force: bool = False, dry_run: bool = False, now: d
     packet = collect_packet(resolve_database_path(), now, log_dir, cfg)
     encoded = json.dumps(packet, ensure_ascii=False)
     if len(encoded) > int(cfg["max_packet_chars"]):
-        packet["evidence"] = packet["evidence"][:8]
+        statuses = packet.get("issue_statuses")
+        if isinstance(statuses, dict) and isinstance(statuses.get("facts"), list):
+            statuses["facts"] = statuses["facts"][:8]
+            statuses["shown"] = len(statuses["facts"])
+            total_known = statuses.get("total_known")
+            statuses["partial"] = statuses.get("partial") is True or (
+                type(total_known) is int and total_known > statuses["shown"]
+            )
+        status_evidence = [item for item in packet["evidence"] if item.get("kind") == "recorded_issue_status"][:8]
+        other_evidence = [item for item in packet["evidence"] if item.get("kind") != "recorded_issue_status"][:8]
+        packet["evidence"] = status_evidence + other_evidence
         packet["prior_daily_log"] = packet["prior_daily_log"][-2000:]
         encoded = json.dumps(packet, ensure_ascii=False)
     if len(encoded) > int(cfg["max_packet_chars"]):

@@ -285,6 +285,8 @@ def fetch_issue_status_evidence(conn, identities, deadline):
             if len(selected) > 2000:
                 raise ValueError("native-row-cap")
             rows.extend(selected)
+            if len(rows) > 2000:
+                raise ValueError("native-row-cap")
         if time.monotonic() >= deadline:
             raise TimeoutError("native-read-deadline")
         # Status uses the newest *observation*, not an old item's update text.

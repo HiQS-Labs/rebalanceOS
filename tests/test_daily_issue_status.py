@@ -330,6 +330,41 @@ def test_native_expensive_query_is_interrupted(tmp_path, monkeypatch):
     assert time.monotonic() - began < 0.5
 
 
+def test_native_row_cap_applies_across_alias_query_chunks(tmp_path, monkeypatch):
+    from rebalance.ingest.db import queries
+
+    monkeypatch.setattr(queries, "_get_alias_map", lambda: {"legacy-owner": "Example"})
+    db = tmp_path / "rebalance.db"
+    native_database(db)
+    identities = [(f"example/project-{number}", number) for number in range(1, 2001)]
+    cx = sqlite3.connect(db)
+    rows = []
+    for repo, number in identities:
+        suffix = repo.partition("/")[2]
+        for owner in ("Example", "legacy-owner"):
+            rows.append(
+                (
+                    f"{owner}/{suffix}",
+                    "issue",
+                    number,
+                    "open",
+                    f"https://github.com/{owner}/{suffix}/issues/{number}",
+                    OLD,
+                    AT,
+                    OLD,
+                    "[]",
+                    None,
+                    "bounded fixture",
+                )
+            )
+    cx.executemany("INSERT INTO github_items VALUES(?,?,?,?,?,?,?,?,?,?,?)", rows)
+    cx.commit()
+    cx.close()
+
+    with db_connection_readonly(db) as conn, pytest.raises(ValueError, match="native-row-cap"):
+        fetch_issue_status_evidence(conn, identities, time.monotonic() + 5)
+
+
 def test_issue_display_cap_retains_quiet_active_before_other_context(tmp_path, monkeypatch):
     db = tmp_path / "rebalance.db"
     native_database(db)

@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Reader and Daily skill changes built; focused tests and nine witnessed red controls pass. The WAL read-only contract and repository-alias join now have explicit regressions. Eight broader failures also reproduce on unchanged development; standalone HiQS163 pass. | Rebase and repeat final qualification after PR234; producer646 landing remains an end-to-end release dependency. |
+| Reader and Daily skill changes are rebased after PR234. Fifty-two focused tests and eleven witnessed red controls pass, including WAL preservation, canonical alias joins, aggregate native-row caps and mixed-evidence packet reduction. The same eight broader failures reproduce on unchanged development; standalone HiQS163 passes. | Complete final exact-head qualification and hosted review; producer646 landing remains an end-to-end release dependency. |
 
 ## Grounded recon and implementation gate
 
