@@ -214,3 +214,30 @@ The solution is an always-on-top Executive Matrix HUD inside a decoupled standal
 - [ ] Run Python test suite (`pytest tests/test_portfolio_matrix.py`).
 - [ ] Run Swift test suite (`swift test --package-path macOS/Apps/Focus5Float`).
 - [ ] Verify manual layout and row alignment at 340pt and 420pt window sizes.
+
+## Lessons Learned (For Future Agents)
+
+- **The plan's Phase 2 checklist predates the decoupling decision.** It names `Focus5Float`
+  files, but the shipped implementation is the standalone `macOS/Apps/PortfolioMatrix` package
+  (frontmatter goal and non-goals are the authoritative statement). When a plan pivots
+  mid-flight, rewrite the phase checklist in the same commit — a stale checklist reads as
+  "139 open tasks" to `merge-cleanup` and to any agent triaging the doc later.
+- **A read-only projection needs a home on the server that is actually running.** The first
+  cut put `GET /portfolio-matrix.json` only in `rebalance serve` (port 8787), which is not
+  always up. The fix (620f42d) mirrors the route on the always-running pulse server
+  (`scripts/pulse_server.py`, port 8767) and gives `PortfolioClient` an ordered candidate list
+  (`pulseServerBaseURL`, `devServerBaseURL`) with an `allCandidatesFailed` error, so the HUD
+  shows live data without asking the operator to start a second server.
+- **Single-writer hardening was the right place to spend effort.** `goals_revision`
+  (SHA-256 of the goals file) plus a process-local path lock in `complete_goal_in_file()`
+  turned a silent last-write-wins into an explicit `StaleRevisionError` → HTTP 409; the matrix
+  app refetches on 409 instead of retrying blind.
+- **Operator-facing server output is part of the contract.** `serve` now prints the matrix URL
+  and an explicit "Server running" line (e163047); the earlier output made a healthy server look
+  stalled during the first manual test.
+- **Landing friction was all housekeeping, not code.** `ROADMAP.md` conflicted with
+  `development` only because both sides appended a bullet at the same spot (resolved by keeping
+  both); `ruff` failed on two unused test imports and formatting in three files. Run
+  `ruff check . && ruff format --check .` before opening the PR. The remaining red `lint` and
+  `root-noembed` checks on the PR were pre-existing on `development` (since 2026-09-13) and are
+  not from this change.
