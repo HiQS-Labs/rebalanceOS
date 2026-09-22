@@ -2,7 +2,7 @@
 gh_issue: 241
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/241
 title: "Audit and consolidate reader scripts and add mechanical script-inventory CI ratchet gate"
-status: "Complete — PR #242 open on feat/gh241-script-inventory-ratchet awaiting merge"
+status: "Complete — merged into development via PR #242"
 created: 2026-09-22
 updated: 2026-09-22
 owner: noel
@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| All phases 0–3 implemented on branch `feat/gh241-script-inventory-ratchet`: Phase 0 audit complete; Phase 1 deterministic checker (`utils/pdda/check_script_inventory.py`) and baseline (`script_inventory_baseline.json`) created; Phase 2 test suite (`tests/test_script_inventory_ratchet.py`) and CI workflow gate wired; Phase 3 governance hardened across `AGENTS.md`, `GUIDING-PRINCIPLES.md`, and `ROUTER.md`. Greptile and CodeRabbit reviews addressed (baseline exemptions enforcement, upward project root discovery, hard ceiling clamping). | Merge PR #242 into `development` and close issue #241. |
+| All phases 0–3 implemented and merged into `development` via PR #242: Phase 0 audit complete; Phase 1 deterministic checker (`utils/pdda/check_script_inventory.py`) and baseline (`script_inventory_baseline.json`) created; Phase 2 test suite (`tests/test_script_inventory_ratchet.py`) and CI workflow gate wired; Phase 3 governance hardened across `AGENTS.md`, `GUIDING-PRINCIPLES.md`, and `ROUTER.md`. Greptile and CodeRabbit reviews addressed (baseline exemptions enforcement, upward project root discovery, hard ceiling clamping). | Done — issue #241 closed. |
 
 ## Problem
 
