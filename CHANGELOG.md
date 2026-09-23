@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.93.3] - 2026-09-22
+
+### Fixed
+- A Mac whose name uses the typographic apostrophe that macOS inserts by default (as in
+  "noel’s Mac Mini") was given a fleet check-in device id with a stray hyphen, so it did not match
+  the naming of the rest of the fleet. The apostrophe is now dropped like a plain one, and devices
+  already enrolled under the hyphenated id move to the corrected id on their next check-in.
+
 ## [0.93.2] - 2026-09-22
 
 ### Fixed
