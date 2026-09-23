@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Opt-in GH-230 historical replay. No ingestion, model calls, or live publication."""
 
 from __future__ import annotations
@@ -10,7 +9,7 @@ import os
 import re
 import tempfile
 from collections import Counter
-from datetime import timedelta
+from datetime import timedelta  # CANONICAL-PATH-OK: 7-day replay window; time_ops has no duration helper
 from pathlib import Path
 
 from rebalance.ingest.clio import filter_prompt_metadata
@@ -520,8 +519,8 @@ def publish(output, raw, bundle, source, meta):
         os.rename(stage, output)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="rebalance clio-journey-replay", description=__doc__)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--source-format", choices=("jsonl", "md"), default="jsonl")
     parser.add_argument("--database", type=Path)
@@ -543,7 +542,7 @@ def main():
         action="store_true",
         help="Append all qualified trial-issue mentions, including unassigned prompts, without regrouping.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     as_of = parse_iso(args.as_of)
     if as_of is None:
         parser.error("invalid --as-of")

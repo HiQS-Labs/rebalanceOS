@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -467,6 +467,13 @@ def _insert_activity(
     )
 
 
+# Relative to today: the queries below filter on a since_days window from the
+# wall clock, so fixed calendar dates age out and zero every total.
+_TODAY = datetime.now(timezone.utc).date()
+DAY_1 = (_TODAY - timedelta(days=3)).isoformat()
+DAY_2 = (_TODAY - timedelta(days=2)).isoformat()
+
+
 NEWER_TOTALS = dict(
     commits=48,
     pushes=11,
@@ -475,7 +482,7 @@ NEWER_TOTALS = dict(
     issues_opened=21,
     issue_comments=5,
     reviews=6,
-    last_active_at="2026-09-02T23:30:00Z",
+    last_active_at=f"{DAY_2}T23:30:00Z",
 )
 
 
@@ -499,8 +506,8 @@ def test_duplicate_day_snapshot_latest_scan_wins(tmp_path, org_alias, newer_spel
             conn,
             "noelsaw1",
             older_repo,
-            "2026-09-02",
-            "2026-09-02T17:00:00Z",
+            f"{DAY_2}",
+            f"{DAY_2}T17:00:00Z",
             commits=38,
             pushes=9,
             prs_opened=13,
@@ -508,14 +515,14 @@ def test_duplicate_day_snapshot_latest_scan_wins(tmp_path, org_alias, newer_spel
             issues_opened=21,
             issue_comments=3,
             reviews=3,
-            last_active_at="2026-09-02T16:45:00Z",
+            last_active_at=f"{DAY_2}T16:45:00Z",
         )
         _insert_activity(
             conn,
             "noelsaw1",
             newer_repo,
-            "2026-09-02",
-            "2026-09-02T23:45:00Z",
+            f"{DAY_2}",
+            f"{DAY_2}T23:45:00Z",
             **NEWER_TOTALS,
         )
 
@@ -526,7 +533,7 @@ def test_duplicate_day_snapshot_latest_scan_wins(tmp_path, org_alias, newer_spel
         assert balance[0]["prs_opened"] == 13
         assert balance[0]["prs_merged"] == 4
         assert balance[0]["issues_opened"] == 21
-        assert balance[0]["last_active_at"] == "2026-09-02T23:30:00Z"
+        assert balance[0]["last_active_at"] == f"{DAY_2}T23:30:00Z"
 
         counts = queries_mod.fetch_repo_activity_counts(conn, days=14, limit=10)
         assert len(counts) == 1
@@ -549,9 +556,9 @@ def test_activity_distinct_days_and_logins_still_sum(tmp_path, org_alias):
     with sqlite3.connect(db_path) as conn:
         ensure_schema(conn)
         ensure_github_schema(conn)
-        _insert_activity(conn, "noelsaw1", canonical, "2026-09-01", "2026-09-01T20:00:00Z", commits=5)
-        _insert_activity(conn, "noelsaw1", canonical, "2026-09-02", "2026-09-02T20:00:00Z", commits=7)
-        _insert_activity(conn, "teammate1", canonical, "2026-09-02", "2026-09-02T21:00:00Z", commits=4)
+        _insert_activity(conn, "noelsaw1", canonical, f"{DAY_1}", f"{DAY_1}T20:00:00Z", commits=5)
+        _insert_activity(conn, "noelsaw1", canonical, f"{DAY_2}", f"{DAY_2}T20:00:00Z", commits=7)
+        _insert_activity(conn, "teammate1", canonical, f"{DAY_2}", f"{DAY_2}T21:00:00Z", commits=4)
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row

@@ -49,3 +49,25 @@ def test_clio_semantic_docs(tmp_path: Path):
     assert docs[0].metadata["agent"] == "claude"
 
     conn.close()
+
+
+def test_clio_semantic_docs_without_prior_sync_yields_nothing(tmp_path: Path):
+    """A machine with no CLIO prompt log never runs the sync that creates the
+    table; the semantic provider must still yield nothing rather than raise."""
+    conn = sqlite3.connect(tmp_path / "fresh.db")
+    conn.row_factory = sqlite3.Row
+
+    assert list(clio_semantic_docs(conn)) == []
+
+    conn.close()
+
+
+def test_semantic_backfill_survives_missing_clio_table(tmp_path: Path):
+    from rebalance.ingest.semantic_index import backfill_semantic_documents
+
+    db = tmp_path / "fresh.db"
+    sqlite3.connect(db).close()
+
+    result = backfill_semantic_documents(db, source_types=["vault", "clio"], use_registry_providers=True)
+
+    assert result.total_documents == 0

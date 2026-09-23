@@ -162,6 +162,10 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
 def clio_semantic_docs(conn: Any) -> "Iterator[SemanticDoc]":
     from rebalance.ingest.semantic_index import SemanticDoc  # noqa: PLC0415
 
+    # sync_clio_prompts only creates the table once a prompt log exists; without
+    # this, the semantic stage raised on every CLIO-less machine and rolled back
+    # the rest of its pass.
+    ensure_clio_schema(conn)
     rows = conn.execute(
         """
         SELECT id, timestamp, session_id, prompt, agent, repo, synced_at

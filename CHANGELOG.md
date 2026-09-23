@@ -10,13 +10,29 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.93.1] - 2026-09-22
+## [0.93.3] - 2026-09-22
 
 ### Fixed
 - A Mac whose name uses the typographic apostrophe that macOS inserts by default (as in
   "noel’s Mac Mini") was given a fleet check-in device id with a stray hyphen, so it did not match
   the naming of the rest of the fleet. The apostrophe is now dropped like a plain one, and devices
   already enrolled under the hyphenated id move to the corrected id on their next check-in.
+
+## [0.93.2] - 2026-09-22
+
+### Fixed
+- On a machine that has never recorded any agent prompts, the semantic index refresh failed outright
+  because the prompt source's storage had never been created. The failure also discarded the notes
+  and GitHub documents indexed earlier in the same pass, leaving semantic search empty. The prompt
+  source now sets up its own storage before reading, so such machines simply contribute no prompts.
+
+## [0.93.1] - 2026-09-22
+
+### Fixed
+- The CLIO journey replay tool now lives inside the application and runs as its own
+  `rebalance clio-journey-replay` command, instead of as a loose helper script. The new rule
+  against standalone scripts had turned the main branch's checks red once the replay landed;
+  behaviour and options are unchanged (#249).
 
 ## [0.93.0] - 2026-09-22
 
