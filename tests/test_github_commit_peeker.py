@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -698,6 +698,15 @@ class GitCommitPeekerTests(unittest.TestCase):
         """Metadata polling (issues, PRs, comments) remains authoritative and updates changed existing issues (Codex R1 & R6)."""
         from rebalance.ingest.github_knowledge import sync_github_repo
 
+        # Relative to now: the sync filters PRs client-side against a since_days
+        # cutoff, so fixed calendar dates age out of the window and fail the test.
+        now = datetime.now(timezone.utc)
+
+        def stamp(hours_ago: int) -> str:
+            return (now - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        repo_touched_at, opened_at, edited_at = stamp(3), stamp(2), stamp(1)
+
         # Establish commit cache hit
         backfill_commits(self.db, REPO, clone_path=self.fx.path)
         res_cached = backfill_commits(self.db, REPO, clone_path=self.fx.path)
@@ -712,8 +721,8 @@ class GitCommitPeekerTests(unittest.TestCase):
                         "title": "Fresh issue opened without commit movement",
                         "body": "Issue details",
                         "state": "open",
-                        "updated_at": "2026-09-08T18:00:00Z",
-                        "created_at": "2026-09-08T18:00:00Z",
+                        "updated_at": opened_at,
+                        "created_at": opened_at,
                         "labels": [],
                         "user": {"login": "tester"},
                     }
@@ -723,7 +732,7 @@ class GitCommitPeekerTests(unittest.TestCase):
                     {
                         "number": 101,
                         "title": "Fresh PR opened without commit movement",
-                        "updated_at": "2026-09-08T18:00:00Z",
+                        "updated_at": opened_at,
                     }
                 ]
             if url.endswith("/pulls/101"):
@@ -735,8 +744,8 @@ class GitCommitPeekerTests(unittest.TestCase):
                     "draft": False,
                     "merged_at": None,
                     "closed_at": None,
-                    "created_at": "2026-09-08T18:00:00Z",
-                    "updated_at": "2026-09-08T18:00:00Z",
+                    "created_at": opened_at,
+                    "updated_at": opened_at,
                     "user": {"login": "pr_author"},
                     "base": {"ref": "development"},
                     "head": {"ref": "feature-pr", "sha": "headsha101"},
@@ -747,8 +756,8 @@ class GitCommitPeekerTests(unittest.TestCase):
             if url.endswith(f"/repos/{REPO}"):
                 return {
                     "default_branch": "development",
-                    "pushed_at": "2026-09-08T12:00:00Z",
-                    "updated_at": "2026-09-08T12:00:00Z",
+                    "pushed_at": repo_touched_at,
+                    "updated_at": repo_touched_at,
                     "open_issues_count": 1,
                     "has_issues": True,
                     "has_projects": False,
@@ -775,8 +784,8 @@ class GitCommitPeekerTests(unittest.TestCase):
                         "title": "Updated Title via Metadata Sync",
                         "body": "Updated body",
                         "state": "open",
-                        "updated_at": "2026-09-08T19:00:00Z",
-                        "created_at": "2026-09-08T18:00:00Z",
+                        "updated_at": edited_at,
+                        "created_at": opened_at,
                         "labels": [],
                         "user": {"login": "tester"},
                     }
