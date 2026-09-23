@@ -1,0 +1,7 @@
+....s...................................x............................... [ 43%]
+........................................................................ [ 87%]
+.....................                                                    [100%]
+=========================== short test summary info ============================
+SKIPPED [1] HiQS/tests/test_affinity.py:123: UNKNOWN, not pass: private_names.txt absent, so no name check ran. Create it (one lowercase name per line, gitignored) to enforce locally; the Phase 6 pre-extraction history scan remains the blocking gate.
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+163 passed, 1 skipped, 1 xfailed in 3.35s

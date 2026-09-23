@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -155,6 +156,60 @@ def test_rejected_completed_call_records_usage_and_cost(tmp_path, monkeypatch):
     assert receipts[0]["status"] == "rejected"
     assert receipts[0]["usage"] == usage
     assert receipts[0]["estimated_cost_usd"] > 0
+
+
+def test_packet_ceiling_keeps_status_and_existing_evidence(tmp_path, monkeypatch):
+    now = datetime.fromisoformat("2026-09-17T12:12:00-07:00")
+    sources = [
+        {
+            "id": "f" * 16,
+            "generation": 999999,
+            "read_at": "2026-09-17T20:00:00+00:00",
+            "supported": True,
+        }
+        for _ in range(4)
+    ]
+    facts = [
+        {
+            "id": f"issue-status:owner/repository-{number}#{number}",
+            "repo": f"owner/repository-{number}",
+            "number": number,
+            "kind": "in-progress",
+            "label": "In progress",
+            "reason": "Explicit start and cached GitHub agree; current execution unverified",
+            "native_at": "2026-09-17T20:00:00+00:00",
+            "established_at": "2026-09-10T20:00:00+00:00",
+            "sources": sources,
+        }
+        for number in range(1, 21)
+    ]
+    value = packet() | {
+        "evidence": [
+            {
+                "id": fact["id"],
+                "kind": "recorded_issue_status",
+                "attested": True,
+                "repo": fact["repo"],
+                "text": f"#{fact['number']} {fact['label']}: {fact['reason']}",
+            }
+            for fact in facts
+        ]
+        + [{"id": f"clio:{index}", "kind": "intent", "text": "x" * 320} for index in range(16)],
+        "issue_statuses": {"facts": facts, "shown": 20, "total_known": 20, "partial": False, "errors": []},
+        "prior_daily_log": "p" * 6000,
+        "yesterday_log": "y" * 4000,
+    }
+    assert len(json.dumps(value)) > dws.default_config()["max_packet_chars"]
+    monkeypatch.setattr(dws, "ROOT", tmp_path)
+    monkeypatch.setattr(dws, "resolve_database_path", lambda: tmp_path / "db")
+    monkeypatch.setattr(dws, "collect_packet", lambda *_args: value)
+
+    assert dws.run(tmp_path / "missing-config.json", force=True, dry_run=True, now=now) == 0
+    assert {item["kind"] for item in value["evidence"]} == {"recorded_issue_status", "intent"}
+    assert len(value["issue_statuses"]["facts"]) == 8
+    assert value["issue_statuses"]["shown"] == 8
+    assert value["issue_statuses"]["partial"] is True
+    assert len(json.dumps(value, ensure_ascii=False)) <= dws.default_config()["max_packet_chars"]
 
 
 def test_renderer_preserves_daily_sections_and_adds_receipt():

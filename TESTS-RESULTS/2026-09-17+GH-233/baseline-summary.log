@@ -1,0 +1,14 @@
+>           assert balance[0]["total_commits"] == 16
+E           assert 0 == 16
+
+tests/test_queries_mirror_invariance.py:559: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_github_commit_peeker.py::GitCommitPeekerTests::test_sync_github_repo_metadata_authoritative_fixture
+FAILED tests/test_hiqs_digest.py::test_a_repo_the_sync_missed_is_named_stale
+FAILED tests/test_hiqs_digest.py::test_an_uncoverable_commit_corpus_is_named_with_its_reason
+FAILED tests/test_hiqs_digest.py::test_the_stale_list_is_capped_with_an_overflow_marker
+FAILED tests/test_hiqs_digest.py::test_build_facts_attaches_freshness_to_the_github_half
+FAILED tests/test_queries_mirror_invariance.py::test_duplicate_day_snapshot_latest_scan_wins[canonical]
+FAILED tests/test_queries_mirror_invariance.py::test_duplicate_day_snapshot_latest_scan_wins[mirror]
+FAILED tests/test_queries_mirror_invariance.py::test_activity_distinct_days_and_logins_still_sum
+8 failed in 1.30s

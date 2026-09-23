@@ -1,0 +1,43 @@
+CONTROL native-identity; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_newest_case_variant_and_strict_url_validation ______________
+
+tmp_path = PosixPath('<fixture-temp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1100efa80>
+
+    def test_newest_case_variant_and_strict_url_validation(tmp_path, monkeypatch):
+        from rebalance.ingest.db import queries
+    
+        monkeypatch.setattr(queries, "_get_alias_map", lambda: {})
+        db = tmp_path / "rebalance.db"
+        native_database(db)
+        cx = sqlite3.connect(db)
+        cx.execute("UPDATE github_items SET fetched_at=?", ((NOW - timedelta(seconds=60)).isoformat(),))
+        cx.execute(
+            "INSERT INTO github_items SELECT upper(repo_full_name),item_type,number,'closed',html_url,?,?,created_at,labels_json,'completed',title FROM github_items",
+            ("2020-01-01T00:00:00Z", "2026-09-17T13:00:00-07:00"),
+        )
+        cx.commit()
+        cx.close()
+        for url, valid in (
+            ("https://github.com/Example/Project/issues/7", True),
+            ("https://evil.test/Example/Project/issues/7", False),
+            ("https://github.com/Other/Project/issues/7", False),
+            ("https://github.com/Example/Project/pull/7", False),
+            ("https://github.com/Example/Project/issues/8", False),
+        ):
+            cx = sqlite3.connect(db)
+            cx.execute("UPDATE github_items SET html_url=?", (url,))
+            cx.commit()
+            cx.close()
+            with db_connection_readonly(db) as conn:
+                native = fetch_issue_status_evidence(conn, [("example/project", 7)], time.monotonic() + 1)
+            assert native[("example/project", 7)]["state"] == "closed"
+>           assert native[("example/project", 7)]["native_identity_valid"] is valid
+E           assert True is False
+
+tests/test_daily_issue_status.py:208: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_newest_case_variant_and_strict_url_validation
+1 failed in 0.20s

@@ -1,0 +1,45 @@
+CONTROL model-separation; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_model_prose_cannot_replace_authoritative_rendered_status _________
+
+    def test_model_prose_cannot_replace_authoritative_rendered_status():
+        packet = {
+            "unclosed_loops": {},
+            "cpu_health": {},
+            "issue_statuses": {
+                "facts": [
+                    {
+                        "id": "issue-status:example/project#7",
+                        "repo": "example/project",
+                        "number": 7,
+                        "label": "In progress",
+                        "reason": "Explicit start and cached GitHub agree",
+                        "native_at": AT,
+                        "established_at": OLD,
+                    }
+                ],
+                "partial": False,
+                "errors": [],
+                "shown": 1,
+                "total_known": 1,
+            },
+        }
+        result = {
+            "focus": "All work is complete (adversarial model claim)",
+            "trajectory": ["done", "done"],
+            "velocity": "Nominal",
+            "operational_horizon": "done",
+            "coaching_nudge": "done",
+            "coaching_trigger": "test",
+        }
+        output = dws.render(result, packet, NOW, 1, {}, 0, 0, dws.default_config())
+        assert "Model interpretation" in output
+        authoritative = output.split("Recorded issue status — authoritative read facts")[1]
+>       assert "#7: In progress" in authoritative
+E       AssertionError: assert '#7: In progress' in '**:\n  - Inventory: 1 shown of 1 known; configured sources read successfully (not an all-repo census). Warnings: none.\n'
+
+tests/test_daily_issue_status.py:324: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_model_prose_cannot_replace_authoritative_rendered_status
+1 failed in 0.19s

@@ -1,0 +1,24 @@
+CONTROL no-config; disposable source1f1f16b; expected nonzero, observed1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_default_unconfigured_does_not_launch_helper _______________
+
+tmp_path = PosixPath('<fixture-temp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1071b3e10>
+
+    def test_default_unconfigured_does_not_launch_helper(tmp_path, monkeypatch):
+        monkeypatch.setattr(dws, "resolve_xyz_work_sources", lambda *_: (None, ()))
+        monkeypatch.setattr(
+            dws.importlib.util, "spec_from_file_location", lambda *_: pytest.fail("helper import forbidden")
+        )
+>       assert dws.collect_issue_statuses(tmp_path / "missing.db", NOW, dws.default_config()) is None
+E       AssertionError: assert {'facts': [], 'partial': True, 'errors': ['missing-trusted-harness']} is None
+E        +  where {'facts': [], 'partial': True, 'errors': ['missing-trusted-harness']} = <function collect_issue_statuses at 0x1072903b0>((PosixPath('<fixture-temp>') / 'missing.db'), datetime.datetime(2026, 9, 17, 20, 0, tzinfo=datetime.timezone.utc), {'enabled': False, 'codex_executable': 'codex', 'model': 'gpt-5.6-terra', 'reasoning_effort': 'low', ...})
+E        +    where <function collect_issue_statuses at 0x1072903b0> = dws.collect_issue_statuses
+E        +    and   {'enabled': False, 'codex_executable': 'codex', 'model': 'gpt-5.6-terra', 'reasoning_effort': 'low', ...} = <function default_config at 0x107213c10>()
+E        +      where <function default_config at 0x107213c10> = dws.default_config
+
+tests/test_daily_issue_status.py:149: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_daily_issue_status.py::test_default_unconfigured_does_not_launch_helper
+1 failed in 0.21s
