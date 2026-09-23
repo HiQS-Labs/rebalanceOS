@@ -301,6 +301,13 @@ class GitPulseCollectCliTests(unittest.TestCase):
         self.assertIn("Migrated local commit", pulse_text)
 
     def test_collect_self_migrates_legacy_slugged_device_id(self) -> None:
+        self._assert_migrates_legacy_device_id("Noel's MacBook Pro 14", "noel-s-macbook-pro-14", "noels-macbook-pro-14")
+
+    def test_collect_self_migrates_curly_apostrophe_device_id(self) -> None:
+        # macOS default computer names use U+2019, not an ASCII apostrophe.
+        self._assert_migrates_legacy_device_id("noel\u2019s Mac Mini", "noel-s-mac-mini", "noels-mac-mini")
+
+    def _assert_migrates_legacy_device_id(self, name: str, legacy: str, expected: str) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             bin_dir = home / "bin"
@@ -323,36 +330,36 @@ class GitPulseCollectCliTests(unittest.TestCase):
                     f"""\
                     repos=("{local_repo}")
                     sync_repo_dir="{sync_repo}"
-                    device_id="noel-s-macbook-pro-14"
-                    device_name="Noel's MacBook Pro 14"
-                    hostname="Noel's MacBook Pro 14"
+                    device_id="{legacy}"
+                    device_name="{name}"
+                    hostname="{name}"
                     """
                 )
             )
             (config_dir / "last-run").write_text("0\n")
 
-            (devices_dir / "noel-s-macbook-pro-14.yaml").write_text(
+            (devices_dir / f"{legacy}.yaml").write_text(
                 textwrap.dedent(
-                    """\
+                    f"""\
                     schema_version: 1
-                    device_id: "noel-s-macbook-pro-14"
-                    device_name: "Noel's MacBook Pro 14"
-                    hostname: "Noel's MacBook Pro 14"
-                    host_tag: "Noel-s-MacBook-Pro-14"
+                    device_id: "{legacy}"
+                    device_name: "{name}"
+                    hostname: "{name}"
+                    host_tag: "{legacy}"
                     timezone_name: "PDT"
                     utc_offset: "-0700"
-                    pulse_file: "pulse-noel-s-macbook-pro-14.md"
+                    pulse_file: "pulse-{legacy}.md"
                     """
                 )
             )
-            (sync_repo / "pulse-noel-s-macbook-pro-14.md").write_text(
+            (sync_repo / f"pulse-{legacy}.md").write_text(
                 textwrap.dedent(
-                    """\
-                    # Git pulse — Noel's MacBook Pro 14
+                    f"""\
+                    # Git pulse — {name}
 
                     <!-- Append-only chronological log. Tab-separated columns:
                          epoch_utc \t timestamp_utc \t repo \t branch \t short-sha \t subject
-                         device_id: noel-s-macbook-pro-14
+                         device_id: {legacy}
                          canonical time: UTC
                          Oldest at top; newest at bottom. Grep-friendly; not meant for pretty rendering. -->
 
@@ -373,17 +380,17 @@ class GitPulseCollectCliTests(unittest.TestCase):
             )
 
             config_text = (config_dir / "config.sh").read_text()
-            new_metadata = (devices_dir / "noels-macbook-pro-14.yaml").read_text()
-            new_pulse = (sync_repo / "pulse-noels-macbook-pro-14.md").read_text()
+            new_metadata = (devices_dir / f"{expected}.yaml").read_text()
+            new_pulse = (sync_repo / f"pulse-{expected}.md").read_text()
 
-        self.assertIn('device_id="noels-macbook-pro-14"', config_text)
-        self.assertNotIn('device_id="noel-s-macbook-pro-14"', config_text)
-        self.assertIn('device_id: "noels-macbook-pro-14"', new_metadata)
-        self.assertIn('pulse_file: "pulse-noels-macbook-pro-14.md"', new_metadata)
-        self.assertIn("device_id: noels-macbook-pro-14", new_pulse)
+        self.assertIn(f'device_id="{expected}"', config_text)
+        self.assertNotIn(f'device_id="{legacy}"', config_text)
+        self.assertIn(f'device_id: "{expected}"', new_metadata)
+        self.assertIn(f'pulse_file: "pulse-{expected}.md"', new_metadata)
+        self.assertIn(f"device_id: {expected}", new_pulse)
         self.assertIn("Migrated local commit", new_pulse)
-        self.assertFalse((devices_dir / "noel-s-macbook-pro-14.yaml").exists())
-        self.assertFalse((sync_repo / "pulse-noel-s-macbook-pro-14.md").exists())
+        self.assertFalse((devices_dir / f"{legacy}.yaml").exists())
+        self.assertFalse((sync_repo / f"pulse-{legacy}.md").exists())
 
     def test_collect_keeps_last_run_when_a_repo_scan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
