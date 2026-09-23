@@ -78,3 +78,7 @@ display costs attention without source mutation; moderate delivery effort, no
 invented incident count/override. Existing roadmap remains the pointer ledger.
 Plan QA: XYZ `relay-system/2026-09-17/flightdeck-reader-plan-qa.md`; source baseline
 ef78114, approved reviewed-plan artifact retained in XYZ673 synthetic receipts.
+
+## Merge evidence
+
+- PR #235 merged 2026-09-23 — linked issue still OPEN; doc stays active by design (GH-202: promotion requires the issue to be closed).
