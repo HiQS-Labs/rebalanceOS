@@ -1,17 +1,12 @@
 """Synthetic, nonempty replay fixtures; never reads operator history."""
 
-import importlib.util
 import json
 import sqlite3
-from pathlib import Path
 
 import pytest
 
-SPEC = importlib.util.spec_from_file_location(
-    "journey_replay", Path(__file__).parents[1] / "utils/CLIO/journey_replay.py"
-)
-jr = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(jr)
+from rebalance.ingest import clio_journey as jr
+
 AS_OF = jr.parse_iso("2026-09-16T00:00:00Z")
 
 
@@ -537,3 +532,13 @@ Do not ingest me
     assert rows[0]["device"] == "device-a" and rows[0]["agent"] == "codex"
     assert rows[0]["timestamp"] == "2026-09-15T10:00:00+00:00"
     assert b"Personal heading" not in decoded
+
+
+def test_cli_command_forwards_to_the_replay_parser():
+    from typer.testing import CliRunner
+
+    from rebalance.cli import app
+
+    result = CliRunner().invoke(app, ["clio-journey-replay", "--help"])
+    assert result.exit_code == 0
+    assert "--explicit-links-only" in result.output and "--output" in result.output
