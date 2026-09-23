@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.93.1] - 2026-09-22
+
+### Fixed
+- The CLIO journey replay tool now lives inside the application and runs as its own
+  `rebalance clio-journey-replay` command, instead of as a loose helper script. The new rule
+  against standalone scripts had turned the main branch's checks red once the replay landed;
+  behaviour and options are unchanged (#249).
+
 ## [0.93.0] - 2026-09-22
 
 ### Added
