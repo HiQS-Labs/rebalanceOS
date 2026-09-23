@@ -18,6 +18,14 @@
   and GitHub documents indexed earlier in the same pass, leaving semantic search empty. The prompt
   source now sets up its own storage before reading, so such machines simply contribute no prompts.
 
+## [0.93.1] - 2026-09-22
+
+### Fixed
+- The CLIO journey replay tool now lives inside the application and runs as its own
+  `rebalance clio-journey-replay` command, instead of as a loose helper script. The new rule
+  against standalone scripts had turned the main branch's checks red once the replay landed;
+  behaviour and options are unchanged (#249).
+
 ## [0.93.0] - 2026-09-22
 
 ### Added

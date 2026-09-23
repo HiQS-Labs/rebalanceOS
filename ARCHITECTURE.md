@@ -11,7 +11,7 @@
 
 ## Core Pipeline
 
-**Opt-in historical projection (GH-230):** `utils/CLIO/journey_replay.py` reads a frozen CLIO JSONL
+**Opt-in historical projection (GH-230):** `src/rebalance/ingest/clio_journey.py` (run as `rebalance clio-journey-replay`) reads a frozen CLIO JSONL
 prefix or canonical marker-backed Markdown export and existing GitHub snapshots via the read-only
 DB gateway. It emits a new private run directory with two journey views, source evidence and coverage.
 It is not an `all` collector, never updates the index, and does not call a model or publish into a vault.
@@ -269,7 +269,7 @@ baseline references become violations.
 | Pulse server | scripts/pulse_server.sh, scripts/pulse_server.py | daemon | DB read layer + pulse renderer | none | localhost:8767 | — |
 | Pulse warning watch | scripts/pulse_warning_watch.py | 15 min | HTTP probe of pulse-server | none | temp JSONL | — |
 | Daily work synthesis canary | scripts/daily_work_synthesis.sh, utils/daily_work_synthesis.py | 15 min, opt-in | existing CLIO/calendar/reminder read APIs + Daily repository/CPU scanners | own (R2-baseline: utils/daily_work_synthesis.py) | append-only temp Daily log + sanitized receipt JSONL | — |
-| CLIO journey replay | utils/CLIO/journey_replay.py | manual, opt-in | frozen CLIO export + bounded read-only GitHub snapshot (GH-230 exception) | none | new private replay directory | — |
+| CLIO journey replay | src/rebalance/ingest/clio_journey.py (`rebalance clio-journey-replay`) | manual, opt-in | frozen CLIO export + bounded read-only GitHub snapshot (GH-230 exception) | none | new private replay directory | — |
 | Health issue reporter | scripts/health_issue_reporter.py | hourly :10 + 3×/day triage | doctor subprocess + GitHub API | own (R2-baseline: scripts/health_issue_reporter.py) | GitHub issues | — |
 | Daily note rollover | utils/obsidian_rollover.sh, utils/obsidian_daily_rollover.py | daily 00:40 | vault filesystem | none | Obsidian daily note | — |
 | Progress digest | scripts/hiqs_digest.sh, utils/hiqs_digest.py | 2×/day 13:05/17:05 | own SQL (R1-baseline: utils/hiqs_digest.py) + doctor + semantic | querier | pulse repo digests/ → Slack relay | — |
