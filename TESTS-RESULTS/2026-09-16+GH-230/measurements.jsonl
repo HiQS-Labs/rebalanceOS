@@ -1,0 +1,10 @@
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":1,"prompts":14,"distinct_issues":1,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":2,"prompts":4,"distinct_issues":0,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":3,"prompts":2,"distinct_issues":0,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":4,"prompts":4,"distinct_issues":1,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":5,"prompts":5,"distinct_issues":3,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":6,"prompts":11,"distinct_issues":2,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":7,"prompts":21,"distinct_issues":5,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":8,"prompts":6,"distinct_issues":1,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"journey","ordinal":9,"prompts":9,"distinct_issues":0,"parent_children":1}
+{"schema_version":1,"run_id":"gh230-md-1","kind":"coverage","unassigned":212,"eligible":288,"malformed":21,"out_of_window":3439,"other_or_unresolved":285,"devices":1,"github_events":0,"byte_cap_hit":false,"row_cap_hit":false}

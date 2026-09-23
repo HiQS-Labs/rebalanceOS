@@ -48,6 +48,7 @@ Nothing here is enforced by the schema. `github_activity`'s uniqueness is keyed 
 8. **Docs are resumable runtime state (PDDA).** Agent work is stoppable, resumable, and handed off from `PROJECT/**` alone — ROUTER points, project docs hold detail, CHANGELOG logs dated outcomes. If reality and the docs disagree, the docs are the bug.
 9. **Done means verified.** "Done" is the gates actually run (`rebalance doctor`, `pytest`, PDDA checks), not work that looks finished. An unverified success claim is itself a low-quality signal.
 10. **Low-friction and portable.** Setup and the contract stay cheap to obey, or operators and agents route around them.
+11. **Unified control plane over script sprawl (GH-241).** Operator commands belong in `src/rebalance/cli/` and agent queries in `src/rebalance/mcp/`. Periodic tasks run through the central orchestrator, not a proliferating fleet of standalone LaunchAgent scripts or loose files in `scripts/` and `utils/`. Additions to `scripts/` and `utils/` are blocked in CI by the script inventory ratchet; retiring scripts ratchets down permanently.
 
 ## Applying this
 
@@ -80,6 +81,7 @@ When reviewing any repo doc (roadmap entries, plans, architecture notes, audits,
 **Reject or escalate when**
 
 - A write path bypasses `index_ops.py` or a source-owned helper without justification.
+- A plan or PR introduces a new standalone script in `scripts/` or `utils/`, or adds a new LaunchAgent plist to `SCHEDULER.md` without an explicit operator-reviewed exception and baseline update (GH-241).
 - "Done" has no verification step.
 - Adding a source requires editing the query layer, LLM synthesis, or MCP transport (Principle 3 violation).
 - Hardcoded absolute paths or credentials (instead of resolving via `paths.py`), silent destructive operations, or opaque timing assumptions.

@@ -59,6 +59,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - Do not create a second competing plan when a canonical `PROJECT/**` doc already exists.
 - Do not build a redundant solution when extending an existing one is viable (enforced by PDDA Phase 0 review). If >50% of the new solution overlaps with an existing one, the plan MUST include deprecating/deleting the old one.
 - SQLite has exactly two gateways, and they are **separate stores by design** — `src/rebalance/ingest/db/` opens this project's own index (path resolved from `REBALANCE_DB`), while `HiQS/hiqs/db.py` opens the HiQS clean-room rebuild's app-data store, staged to spin out to its own repo. They address different database files and are not converged (settled in GH-136, 2026-08-30). New SQLite access goes through one of them: a direct `sqlite3.connect` anywhere else is pinned by `utils/pdda/check_banned_imports.py --check` against `utils/pdda/sqlite_connect_baseline.json` and fails CI — additions *and* stale baselines both block.
+- **No script or LaunchAgent sprawl (GH-241)**: Do not create ad-hoc `.sh` or `.py` files in `scripts/` or `utils/`, and do not add new LaunchAgent plists. New CLI commands go to `src/rebalance/cli/`, MCP tools to `src/rebalance/mcp/`, and background workflows to the central orchestrator (`index_ops.py`). Enforced mechanically in CI by `python utils/pdda/check_script_inventory.py --check` against `utils/pdda/script_inventory_baseline.json` — scanning all `.py`, `.sh`, and `.swift` files under `scripts/` and `utils/`, plus `*.plist.template` files (excluding non-template `.plist` files and `SCHEDULER.md`). Governance checks and baselines live exclusively in `utils/pdda/check_*.py` and `utils/pdda/*_baseline.json`. Exemptions require a non-empty `SCRIPT-INVENTORY-OK: <reason>` pragma in the first 10 lines AND explicit registration in `script_inventory_baseline.json`'s `exemptions` list with operator review. Additions and stale baselines both block.
 - Do not override deterministic PDDA findings with prose.
 - Do not report a win you did not verify with `rebalance doctor`, `pytest tests/`, or the relevant PDDA check.
 
@@ -74,6 +75,12 @@ For code correctness:
 
 ```bash
 pytest tests/
+```
+
+For script inventory sprawl check (GH-241):
+
+```bash
+python utils/pdda/check_script_inventory.py --check
 ```
 
 For document hygiene:

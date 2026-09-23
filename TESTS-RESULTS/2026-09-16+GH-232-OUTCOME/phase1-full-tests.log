@@ -1,0 +1,836 @@
+
+==================================== ERRORS ====================================
+___________ ERROR collecting tests/test_apple_reminders_write_cli.py ___________
+ImportError while importing test module '<checkout>/tests/test_apple_reminders_write_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_apple_reminders_write_cli.py:16: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_________________ ERROR collecting tests/test_auto_promote.py __________________
+ImportError while importing test module '<checkout>/tests/test_auto_promote.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_auto_promote.py:20: in <module>
+    from rebalance.ingest.project_inference import (
+src/rebalance/ingest/project_inference.py:26: in <module>
+    from rebalance.ingest.registry import canonical_repo_key, sync_db
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+______________ ERROR collecting tests/test_calendar_aggregator.py ______________
+ImportError while importing test module '<checkout>/tests/test_calendar_aggregator.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_calendar_aggregator.py:11: in <module>
+    from rebalance.ingest.registry import sync_db
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+___________ ERROR collecting tests/test_calendar_create_event_cli.py ___________
+ImportError while importing test module '<checkout>/tests/test_calendar_create_event_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_calendar_create_event_cli.py:12: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_________ ERROR collecting tests/test_calendar_team_loop_isolation.py __________
+ImportError while importing test module '<checkout>/tests/test_calendar_team_loop_isolation.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_calendar_team_loop_isolation.py:17: in <module>
+    from rebalance.ingest.index_ops import _refresh_calendar
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+__________ ERROR collecting tests/test_calendar_weekly_report_cli.py ___________
+ImportError while importing test module '<checkout>/tests/test_calendar_weekly_report_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_calendar_weekly_report_cli.py:10: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_____________ ERROR collecting tests/test_capabilities_manifest.py _____________
+ImportError while importing test module '<checkout>/tests/test_capabilities_manifest.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_capabilities_manifest.py:16: in <module>
+    import generate_capabilities_index as generator  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/generate_capabilities_index.py:11: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+________________ ERROR collecting tests/test_client_buckets.py _________________
+ImportError while importing test module '<checkout>/tests/test_client_buckets.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_client_buckets.py:16: in <module>
+    from rebalance.ingest.project_inference import _ProjectSeed, _infer_client
+src/rebalance/ingest/project_inference.py:26: in <module>
+    from rebalance.ingest.registry import canonical_repo_key, sync_db
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+________________ ERROR collecting tests/test_client_gapfill.py _________________
+ImportError while importing test module '<checkout>/tests/test_client_gapfill.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_client_gapfill.py:6: in <module>
+    from rebalance.ingest.project_inference import (
+src/rebalance/ingest/project_inference.py:26: in <module>
+    from rebalance.ingest.registry import canonical_repo_key, sync_db
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+______________ ERROR collecting tests/test_collector_registry.py _______________
+ImportError while importing test module '<checkout>/tests/test_collector_registry.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_collector_registry.py:10: in <module>
+    from rebalance.ingest.index_ops import (
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_________________ ERROR collecting tests/test_dashboard_cli.py _________________
+ImportError while importing test module '<checkout>/tests/test_dashboard_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_dashboard_cli.py:11: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_________ ERROR collecting tests/test_dashboard_refresh_integration.py _________
+ImportError while importing test module '<checkout>/tests/test_dashboard_refresh_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_dashboard_refresh_integration.py:21: in <module>
+    from rebalance.ingest.index_ops import _refresh_dashboard_note
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+___________________ ERROR collecting tests/test_diagnose.py ____________________
+ImportError while importing test module '<checkout>/tests/test_diagnose.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_diagnose.py:19: in <module>
+    from rebalance.ingest import diagnose
+src/rebalance/ingest/diagnose.py:23: in <module>
+    from rebalance.ingest.index_ops import _activity_repos, _project_repos
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+____________________ ERROR collecting tests/test_doctor.py _____________________
+ImportError while importing test module '<checkout>/tests/test_doctor.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_doctor.py:15: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+__________________ ERROR collecting tests/test_doctor_json.py __________________
+ImportError while importing test module '<checkout>/tests/test_doctor_json.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_doctor_json.py:19: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_________________ ERROR collecting tests/test_email_ingest.py __________________
+ImportError while importing test module '<checkout>/tests/test_email_ingest.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_email_ingest.py:21: in <module>
+    from rebalance.ingest.index_ops import SCOPE_VALUES, _normalize_scope, _refresh_email, get_index_status
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+________________ ERROR collecting tests/test_external_watch.py _________________
+ImportError while importing test module '<checkout>/tests/test_external_watch.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_external_watch.py:28: in <module>
+    from rebalance.ingest.index_ops import get_watched_repos
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_________________ ERROR collecting tests/test_figma_gating.py __________________
+ImportError while importing test module '<checkout>/tests/test_figma_gating.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_figma_gating.py:17: in <module>
+    from rebalance.ingest import index_ops
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_______________ ERROR collecting tests/test_focus5_three_eyes.py _______________
+ImportError while importing test module '<checkout>/tests/test_focus5_three_eyes.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_focus5_three_eyes.py:12: in <module>
+    from rebalance import web
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+_______________ ERROR collecting tests/test_github_ignore_cli.py _______________
+ImportError while importing test module '<checkout>/tests/test_github_ignore_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_github_ignore_cli.py:10: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+____________ ERROR collecting tests/test_health_banner_collapse.py _____________
+ImportError while importing test module '<checkout>/tests/test_health_banner_collapse.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_health_banner_collapse.py:33: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+___________________ ERROR collecting tests/test_index_ops.py ___________________
+ImportError while importing test module '<checkout>/tests/test_index_ops.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_index_ops.py:11: in <module>
+    from rebalance.ingest.index_ops import (
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+___________ ERROR collecting tests/test_index_ops_migration_gate.py ____________
+ImportError while importing test module '<checkout>/tests/test_index_ops_migration_gate.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_index_ops_migration_gate.py:17: in <module>
+    from rebalance.ingest.index_ops import (
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+___________________ ERROR collecting tests/test_mcp_probe.py ___________________
+ImportError while importing test module '<checkout>/tests/test_mcp_probe.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_mcp_probe.py:16: in <module>
+    from rebalance.mcp.server import create_server
+src/rebalance/mcp/__init__.py:1: in <module>
+    from rebalance.mcp.server import create_server, main
+src/rebalance/mcp/server.py:6: in <module>
+    from mcp.server.fastmcp import FastMCP
+E   ModuleNotFoundError: No module named 'mcp'
+______________ ERROR collecting tests/test_md_parser_property.py _______________
+ImportError while importing test module '<checkout>/tests/test_md_parser_property.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_md_parser_property.py:12: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+________________ ERROR collecting tests/test_migrate_keyring.py ________________
+ImportError while importing test module '<checkout>/tests/test_migrate_keyring.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_migrate_keyring.py:15: in <module>
+    from rebalance.cli.config_cmds import _migrate_google_pickle_to_keyring
+src/rebalance/cli/__init__.py:9: in <module>
+    import typer
+E   ModuleNotFoundError: No module named 'typer'
+______________ ERROR collecting tests/test_next_actions_parity.py ______________
+ImportError while importing test module '<checkout>/tests/test_next_actions_parity.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_next_actions_parity.py:35: in <module>
+    from rebalance.web import whatsnext_page
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+____________ ERROR collecting tests/test_next_actions_precompute.py ____________
+ImportError while importing test module '<checkout>/tests/test_next_actions_precompute.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_next_actions_precompute.py:24: in <module>
+    from rebalance.ingest.index_ops import (
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+________________ ERROR collecting tests/test_onboarding_e2e.py _________________
+ImportError while importing test module '<checkout>/tests/test_onboarding_e2e.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_onboarding_e2e.py:19: in <module>
+    from rebalance.ingest.preflight import confirm_and_write, discover_candidates
+src/rebalance/ingest/preflight.py:8: in <module>
+    import questionary
+E   ModuleNotFoundError: No module named 'questionary'
+____________ ERROR collecting tests/test_phase5_collector_smoke.py _____________
+ImportError while importing test module '<checkout>/tests/test_phase5_collector_smoke.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_phase5_collector_smoke.py:15: in <module>
+    from rebalance.ingest.index_ops import (
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+___________________ ERROR collecting tests/test_power_ops.py ___________________
+ImportError while importing test module '<checkout>/tests/test_power_ops.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_power_ops.py:30: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+______________ ERROR collecting tests/test_preflight_roundtrip.py ______________
+ImportError while importing test module '<checkout>/tests/test_preflight_roundtrip.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_preflight_roundtrip.py:16: in <module>
+    from rebalance.ingest.preflight import (
+src/rebalance/ingest/preflight.py:8: in <module>
+    import questionary
+E   ModuleNotFoundError: No module named 'questionary'
+_________________ ERROR collecting tests/test_profile_sync.py __________________
+ImportError while importing test module '<checkout>/tests/test_profile_sync.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_profile_sync.py:11: in <module>
+    from rich.console import Console
+E   ModuleNotFoundError: No module named 'rich'
+_______________ ERROR collecting tests/test_project_inference.py _______________
+ImportError while importing test module '<checkout>/tests/test_project_inference.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_project_inference.py:19: in <module>
+    from rebalance.ingest.project_inference import infer_project_registry, sync_inferred_project_registry
+src/rebalance/ingest/project_inference.py:26: in <module>
+    from rebalance.ingest.registry import canonical_repo_key, sync_db
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_______________ ERROR collecting tests/test_project_priority.py ________________
+ImportError while importing test module '<checkout>/tests/test_project_priority.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_project_priority.py:14: in <module>
+    from rebalance.ingest.note_builder import build_dashboard_payload
+src/rebalance/ingest/note_builder.py:27: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_________ ERROR collecting tests/test_pulse_server_apple_reminders.py __________
+ImportError while importing test module '<checkout>/tests/test_pulse_server_apple_reminders.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_server_apple_reminders.py:23: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+______________ ERROR collecting tests/test_pulse_server_figma.py _______________
+ImportError while importing test module '<checkout>/tests/test_pulse_server_figma.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_server_figma.py:8: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+______________ ERROR collecting tests/test_pulse_server_health.py ______________
+ImportError while importing test module '<checkout>/tests/test_pulse_server_health.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_server_health.py:10: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+______________ ERROR collecting tests/test_pulse_warning_watch.py ______________
+ImportError while importing test module '<checkout>/tests/test_pulse_warning_watch.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_warning_watch.py:32: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+______________ ERROR collecting tests/test_pulse_web_calendar.py _______________
+ImportError while importing test module '<checkout>/tests/test_pulse_web_calendar.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_web_calendar.py:25: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+________________ ERROR collecting tests/test_pulse_web_goals.py ________________
+ImportError while importing test module '<checkout>/tests/test_pulse_web_goals.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_web_goals.py:21: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+______ ERROR collecting tests/test_pulse_web_timestamp_disambiguation.py _______
+ImportError while importing test module '<checkout>/tests/test_pulse_web_timestamp_disambiguation.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_web_timestamp_disambiguation.py:30: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+______________ ERROR collecting tests/test_pulse_web_worknext.py _______________
+ImportError while importing test module '<checkout>/tests/test_pulse_web_worknext.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_pulse_web_worknext.py:20: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+______________ ERROR collecting tests/test_query_cli_rendering.py ______________
+ImportError while importing test module '<checkout>/tests/test_query_cli_rendering.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_query_cli_rendering.py:25: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+____________ ERROR collecting tests/test_recovery_copy_commands.py _____________
+ImportError while importing test module '<checkout>/tests/test_recovery_copy_commands.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_recovery_copy_commands.py:15: in <module>
+    from rebalance import cli, web
+src/rebalance/cli/__init__.py:9: in <module>
+    import typer
+E   ModuleNotFoundError: No module named 'typer'
+_______________ ERROR collecting tests/test_registry_property.py _______________
+ImportError while importing test module '<checkout>/tests/test_registry_property.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_registry_property.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_______________ ERROR collecting tests/test_repo_claim_guard.py ________________
+ImportError while importing test module '<checkout>/tests/test_repo_claim_guard.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_repo_claim_guard.py:28: in <module>
+    from rebalance.ingest import preflight as preflight_mod
+src/rebalance/ingest/preflight.py:8: in <module>
+    import questionary
+E   ModuleNotFoundError: No module named 'questionary'
+_____________ ERROR collecting tests/test_repo_pie_auto_promote.py _____________
+ImportError while importing test module '<checkout>/tests/test_repo_pie_auto_promote.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_repo_pie_auto_promote.py:14: in <module>
+    import pulse_web  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+scripts/pulse_web.py:44: in <module>
+    from dashboard import (  # type: ignore  # noqa: E402
+scripts/dashboard.py:36: in <module>
+    from rich.box import ROUNDED
+E   ModuleNotFoundError: No module named 'rich'
+___________ ERROR collecting tests/test_semantic_source_contract.py ____________
+ImportError while importing test module '<checkout>/tests/test_semantic_source_contract.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_semantic_source_contract.py:13: in <module>
+    from rebalance.cli.semantic import _normalize_semantic_sources_option
+src/rebalance/cli/__init__.py:9: in <module>
+    import typer
+E   ModuleNotFoundError: No module named 'typer'
+_______________ ERROR collecting tests/test_shutdown_handoff.py ________________
+ImportError while importing test module '<checkout>/tests/test_shutdown_handoff.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_shutdown_handoff.py:12: in <module>
+    from rebalance.ingest.shutdown_handoff import (
+src/rebalance/ingest/shutdown_handoff.py:20: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_____________ ERROR collecting tests/test_sleuth_graph_security.py _____________
+ImportError while importing test module '<checkout>/tests/test_sleuth_graph_security.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_sleuth_graph_security.py:17: in <module>
+    from rebalance import web
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+__________________ ERROR collecting tests/test_system_log.py ___________________
+ImportError while importing test module '<checkout>/tests/test_system_log.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_system_log.py:28: in <module>
+    from rebalance import web
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+_______________ ERROR collecting tests/test_time_ops_property.py _______________
+ImportError while importing test module '<checkout>/tests/test_time_ops_property.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_time_ops_property.py:9: in <module>
+    from hypothesis import given, strategies as st
+E   ModuleNotFoundError: No module named 'hypothesis'
+_________ ERROR collecting tests/test_unified_retrieval_call_sites.py __________
+ImportError while importing test module '<checkout>/tests/test_unified_retrieval_call_sites.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_unified_retrieval_call_sites.py:22: in <module>
+    from typer.testing import CliRunner
+E   ModuleNotFoundError: No module named 'typer'
+_________________ ERROR collecting tests/test_watched_repos.py _________________
+ImportError while importing test module '<checkout>/tests/test_watched_repos.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_watched_repos.py:11: in <module>
+    from rebalance.ingest.index_ops import get_watched_repos
+src/rebalance/ingest/index_ops.py:29: in <module>
+    from rebalance.ingest.registry import get_projects
+src/rebalance/ingest/registry.py:8: in <module>
+    import yaml
+E   ModuleNotFoundError: No module named 'yaml'
+_________________ ERROR collecting tests/test_web_auth_log.py __________________
+ImportError while importing test module '<checkout>/tests/test_web_auth_log.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_auth_log.py:4: in <module>
+    from rebalance.web import auth_log_page
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+__________________ ERROR collecting tests/test_web_badges.py ___________________
+ImportError while importing test module '<checkout>/tests/test_web_badges.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_badges.py:16: in <module>
+    from rebalance import doctor, web
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+_______________ ERROR collecting tests/test_web_error_handler.py _______________
+ImportError while importing test module '<checkout>/tests/test_web_error_handler.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_error_handler.py:9: in <module>
+    from fastapi import FastAPI
+E   ModuleNotFoundError: No module named 'fastapi'
+__________________ ERROR collecting tests/test_web_focus5.py ___________________
+ImportError while importing test module '<checkout>/tests/test_web_focus5.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_focus5.py:16: in <module>
+    from rebalance.web import _focus5_body, _rel_time, _roster_stale
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+_________________ ERROR collecting tests/test_web_whatsnext.py _________________
+ImportError while importing test module '<checkout>/tests/test_web_whatsnext.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_whatsnext.py:15: in <module>
+    from rebalance.web import _whatsnext_body, whatsnext_page
+src/rebalance/web.py:31: in <module>
+    from fastapi import FastAPI, Request
+E   ModuleNotFoundError: No module named 'fastapi'
+______________ ERROR collecting tests/test_welcome_walkthrough.py ______________
+ImportError while importing test module '<checkout>/tests/test_welcome_walkthrough.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_welcome_walkthrough.py:25: in <module>
+    from rebalance.ingest.preflight import confirm_and_write, discover_candidates
+src/rebalance/ingest/preflight.py:8: in <module>
+    import questionary
+E   ModuleNotFoundError: No module named 'questionary'
+________________ ERROR collecting tests/test_zapier_webhook.py _________________
+ImportError while importing test module '<checkout>/tests/test_zapier_webhook.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_zapier_webhook.py:10: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_schema_dim_migration.py:33: could not import 'sqlite_vec': No module named 'sqlite_vec'
+ERROR tests/test_apple_reminders_write_cli.py
+ERROR tests/test_auto_promote.py
+ERROR tests/test_calendar_aggregator.py
+ERROR tests/test_calendar_create_event_cli.py
+ERROR tests/test_calendar_team_loop_isolation.py
+ERROR tests/test_calendar_weekly_report_cli.py
+ERROR tests/test_capabilities_manifest.py
+ERROR tests/test_client_buckets.py
+ERROR tests/test_client_gapfill.py
+ERROR tests/test_collector_registry.py
+ERROR tests/test_dashboard_cli.py
+ERROR tests/test_dashboard_refresh_integration.py
+ERROR tests/test_diagnose.py
+ERROR tests/test_doctor.py
+ERROR tests/test_doctor_json.py
+ERROR tests/test_email_ingest.py
+ERROR tests/test_external_watch.py
+ERROR tests/test_figma_gating.py
+ERROR tests/test_focus5_three_eyes.py
+ERROR tests/test_github_ignore_cli.py
+ERROR tests/test_health_banner_collapse.py
+ERROR tests/test_index_ops.py
+ERROR tests/test_index_ops_migration_gate.py
+ERROR tests/test_mcp_probe.py
+ERROR tests/test_md_parser_property.py
+ERROR tests/test_migrate_keyring.py
+ERROR tests/test_next_actions_parity.py
+ERROR tests/test_next_actions_precompute.py
+ERROR tests/test_onboarding_e2e.py
+ERROR tests/test_phase5_collector_smoke.py
+ERROR tests/test_power_ops.py
+ERROR tests/test_preflight_roundtrip.py
+ERROR tests/test_profile_sync.py
+ERROR tests/test_project_inference.py
+ERROR tests/test_project_priority.py
+ERROR tests/test_pulse_server_apple_reminders.py
+ERROR tests/test_pulse_server_figma.py
+ERROR tests/test_pulse_server_health.py
+ERROR tests/test_pulse_warning_watch.py
+ERROR tests/test_pulse_web_calendar.py
+ERROR tests/test_pulse_web_goals.py
+ERROR tests/test_pulse_web_timestamp_disambiguation.py
+ERROR tests/test_pulse_web_worknext.py
+ERROR tests/test_query_cli_rendering.py
+ERROR tests/test_recovery_copy_commands.py
+ERROR tests/test_registry_property.py
+ERROR tests/test_repo_claim_guard.py
+ERROR tests/test_repo_pie_auto_promote.py
+ERROR tests/test_semantic_source_contract.py
+ERROR tests/test_shutdown_handoff.py
+ERROR tests/test_sleuth_graph_security.py
+ERROR tests/test_system_log.py
+ERROR tests/test_time_ops_property.py
+ERROR tests/test_unified_retrieval_call_sites.py
+ERROR tests/test_watched_repos.py
+ERROR tests/test_web_auth_log.py
+ERROR tests/test_web_badges.py
+ERROR tests/test_web_error_handler.py
+ERROR tests/test_web_focus5.py
+ERROR tests/test_web_whatsnext.py
+ERROR tests/test_welcome_walkthrough.py
+ERROR tests/test_zapier_webhook.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 62 errors during collection !!!!!!!!!!!!!!!!!!!
+1 skipped, 62 errors in 1.54s

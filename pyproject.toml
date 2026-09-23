@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rebalance-os"
-version = "0.89.0"
+version = "0.93.0"
 description = "Local-first workday operating system with MCP tools and Obsidian ingest"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -105,6 +105,8 @@ extend-exclude = [
   # `utils/py/`, so first-party code added beside them is still linted.
   "utils/py/releases_app.py",
   "utils/py/releases_cycle.py",
+  # Campaign measurements and experimental verification scripts (SOP.md).
+  "TESTS-RESULTS",
 ]
 
 [tool.ruff.lint]
@@ -142,4 +144,5 @@ exclude = [
   "ask_self",
   "experimental",
   ".swe-diagram",
+  "TESTS-RESULTS",
 ]

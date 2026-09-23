@@ -1,0 +1,18 @@
+Focused command:
+PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_journey_replay.py tests/test_clio.py TESTS-RESULTS/2026-09-16+GH-232-RUN15/test_saved_facts.py
+........................................................................ [ 93%]
+.....                                                                    [100%]
+77 passed in 0.16s
+
+Historical-code controls:
+EXPECTED RED: test_transition_view_excludes_guesses_without_explicit_links_flag
+EXPECTED RED: test_bare_prior_issue_cannot_qualify_a_transition
+EXPECTED RED: mutated cutoff includes excluded event
+
+Frozen comparison:
+PASS: nonempty source, cutoff, exact prompt/start/membership preservation; zero new real transitions;
+47 retained facts, 12 explicit matches; private directory/file permissions.
+
+App gates (public-safe summary):
+Doctor exit 1: ModuleNotFoundError: No module named 'typer'
+Full tests exit 2: 1 skipped, 62 errors during collection in 1.61s
