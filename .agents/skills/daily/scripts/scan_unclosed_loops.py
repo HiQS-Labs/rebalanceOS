@@ -25,6 +25,14 @@ from typing import Any
 import zoneinfo
 
 
+def find_repo_root(start_dir: Path | None = None) -> Path | None:
+    cur = (start_dir or Path.cwd()).resolve()
+    for p in [cur, *cur.parents]:
+        if (p / ".git").exists() or (p / "pyproject.toml").exists():
+            return p
+    return None
+
+
 def _default_scan_roots() -> tuple[Path, ...]:
     roots = []
     # Find current repo root first
@@ -77,14 +85,6 @@ def run_cmd(cmd: list[str], cwd: Path | None = None, timeout: int = 10) -> tuple
         return res.returncode, res.stdout.rstrip("\r\n")
     except Exception as e:
         return 1, str(e)
-
-
-def find_repo_root(start_dir: Path | None = None) -> Path | None:
-    cur = (start_dir or Path.cwd()).resolve()
-    for p in [cur, *cur.parents]:
-        if (p / ".git").exists() or (p / "pyproject.toml").exists():
-            return p
-    return None
 
 
 def load_shutdown_config(config_arg: str | None = None) -> dict[str, Any]:
