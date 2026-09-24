@@ -209,3 +209,5 @@ recognises a ledger entry matching `^- \*\*`, and only under one of these `###` 
 exactly: `Queue / parked intake`, `In progress`, `Completed`, `Deferred · vision`. Entries in any
 other section, or written with any other emphasis, are skipped silently — the planner reports
 `no ledger items parsed` and writes no plan. See GH-229.
+
+- **GH-23 publication durability** — In progress: shared Git ownership, safe reconciliation, bounded delivery; broader scheduler/transport redesign deferred. → [GH-23-PUBLICATION-DURABILITY.md](PROJECT/2-WORKING/GH-23-PUBLICATION-DURABILITY.md)
