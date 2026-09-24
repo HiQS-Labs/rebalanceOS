@@ -755,7 +755,7 @@ def _loaded_rebalance_labels(launchctl_output: str) -> set[str]:
     return labels
 
 
-def _scheduler_installer(job: str, repo_root: Path) -> str:
+def _scheduler_installer(job: str) -> str:
     """The one command that installs *job* on this device.
 
     Every policy job installs through ``stack.sh`` (GH-255 retired the per-job
@@ -793,10 +793,7 @@ def _check_scheduler_liveness(
         if policy_path is None:
             from rebalance.paths import resolve_project_root
 
-            repo_root = resolve_project_root(Path(__file__))
-            policy_path = repo_root / "SCHEDULER.md"
-        else:
-            repo_root = policy_path.parent
+            policy_path = resolve_project_root(Path(__file__)) / "SCHEDULER.md"
         jobs = _scheduler_policy_jobs(policy_path)
     except (OSError, RuntimeError) as exc:
         return [Check("scheduler policy", WARN, f"could not read SCHEDULER.md: {exc}")]
@@ -831,7 +828,7 @@ def _check_scheduler_liveness(
             if other_device is not None:
                 checks.append(other_device)
                 continue
-            installer = _scheduler_installer(job, repo_root)
+            installer = _scheduler_installer(job)
             if (agents_dir / f"com.rebalance-os.{job}.plist").is_file():
                 checks.append(
                     Check(

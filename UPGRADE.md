@@ -367,10 +367,13 @@ Unchanged: `vault-sync` :15, `github-sync` :45, `daily-sync` 6:30.
 Re-render and reload:
 
 The per-job installers this step originally listed were retired (GH-255); one
-command now re-renders every changed template through the same flow:
+targeted command re-renders the changed templates through the same flow. It
+names jobs rather than using `stack.sh up`, so jobs this step does not touch
+(for example `hiqs-digest`, whose rendered plist may carry a hand-added key)
+are not re-rendered:
 
 ```bash
-bash scripts/stack.sh up      # or: bash scripts/stack.sh install <job>...
+bash scripts/stack.sh install daily-sync github-sync obsidian-vault-embeddings pulse-sync pulse-web-sync pulse-warning-watch health-check health-check-triage obsidian-rollover daily-synthesis
 ```
 
 `pulse-server` is unchanged — no need to re-render it.

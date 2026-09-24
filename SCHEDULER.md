@@ -121,7 +121,12 @@ since GH-175 **no two jobs share a minute**:
   else — GH-255 retired the 13 per-job installers after they drifted from
   `stack.sh up`. Rendered plists live in `~/Library/LaunchAgents/` (gitignored).
 - `daily-work-synthesis` is opt-in: `up` reports it SKIPPED until
-  `temp/daily-work-synthesis.json` exists (GH-210).
+  `temp/daily-work-synthesis.json` exists (GH-210). A copy installed earlier is
+  unloaded and removed once its config is gone. `up` counts a skip as success.
+  `install <job>...` exits 3 when every named job was skipped.
+- A retired label (e.g. `vault-sync` → `obsidian-vault-embeddings`) is retired
+  only after its successor has loaded, and only when bound to this checkout.
+  A job that never registers after load is a failure, not a warning.
 - Python-direct jobs (no wrapper) log via launchd `StandardOutPath`/
   `StandardErrorPath` into `temp/logs/` instead of the dated wrapper logs;
   obsidian-rollover logs to `~/Library/Logs/rebalance-os/` because

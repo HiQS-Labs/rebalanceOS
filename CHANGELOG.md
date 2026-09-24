@@ -10,7 +10,7 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.94.0] - 2026-09-24
+## [0.94.0] - 2026-09-23
 
 ### Added
 - The fleet control script can now install or reinstall just the jobs you name, with the same
@@ -25,7 +25,12 @@
   Before, four jobs quietly lost their output.
 - A fleet bring-up now retires the renamed vault embeddings job's old entry, so the two can no longer
   both run at the same minute.
-- The opt-in daily work synthesis job is no longer installed until its local config exists.
+- The opt-in daily work synthesis job is no longer installed until its local config exists, and
+  a copy installed earlier is removed once that config is gone.
+- A job that never registers with launchd after install is now reported as failed instead of OK.
+  A job it replaces is retired only after the new one is running, and never when it belongs to
+  another checkout.
+- Reinstalling a job no longer misses a hand-added key that its template mentions only in a comment.
 - Reinstalling a job now warns, naming the key, when that job's hand-added API key is about to be
   dropped.
 - Three more scheduled jobs now retry the rare interpreter start-up interruption that one job

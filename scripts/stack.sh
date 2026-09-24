@@ -107,8 +107,8 @@ select_targets() {
         if [ -z "$found" ]; then
             log_error "unknown job: $want (policy jobs: ${JOB_NAMES[*]})"
             bad=1
-        else
-            TARGETS+=("$found")
+        elif [[ " ${TARGETS[*]-} " != *" $found "* ]]; then
+            TARGETS+=("$found")   # a repeated name installs once
         fi
     done
     [ "$bad" -eq 0 ] && [ "${#TARGETS[@]}" -gt 0 ]
@@ -156,18 +156,7 @@ is_managed() {
 
 plist_path() { echo "$AGENTS_DIR/${LABEL_PREFIX}$1.plist"; }
 
-# The checkout a rendered plist is bound to. Every template substitutes
-# {{REBALANCE_DIR}} at least once, so this is defined for all of them.
-bound_root() {
-    [ -f "$1" ] || return 0
-    # `|| true` is load-bearing: with `set -o pipefail`, a plist containing no
-    # <string> makes grep exit 1, which propagates out of the function and, via
-    # `root=$(bound_root ...)` under `set -e`, kills the whole script.
-    { /usr/bin/grep -o '<string>[^<]*</string>' "$1" 2>/dev/null || true; } \
-        | /usr/bin/sed 's|<string>||; s|</string>||' \
-        | /usr/bin/sed -nE 's#^(/.+)/(scripts|utils|\.venv|temp)/.*#\1#p' \
-        | head -1
-}
+# bound_root lives in lib/install_common.sh: the install flow needs it too.
 
 # Exact third-field match. A substring grep for "health-check" also matches
 # "health-check-triage", which silently returns two rows and corrupts the parse.
@@ -384,6 +373,13 @@ stack_up() {
     if [ "$failed" -gt 0 ]; then
         log_error "Stack bootstrap encountered $failed failure(s); $loaded job(s) loaded, $skipped skipped."
         exit 1
+    fi
+    # `install <job>` names its jobs explicitly: if every one was skipped,
+    # nothing was installed, and exit 0 would read as success in a log (the
+    # GH-211 runbook runs it one job at a time). `up` treats a skip as normal.
+    if [ "$cmd" = "install" ] && [ "$loaded" -eq 0 ] && [ "$skipped" -gt 0 ]; then
+        log_warn "No named job was installed ($skipped skipped)."
+        exit "$RB_INSTALL_SKIPPED"
     fi
     log_ok "Successfully bootstrapped $loaded job(s); $skipped skipped."
     echo

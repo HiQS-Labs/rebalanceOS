@@ -465,8 +465,11 @@ def _install(label, *, root, home, wrapper="", env=None):
 
     ``runtime-root`` under the sandbox HOME points REBALANCE_DIR at *root*, so
     temp/ writes and the opt-in config lookup never touch this checkout. plutil
-    and launchctl are stubs: launchctl records its calls and reports every label
-    as registered except the retired vault-sync.
+    and launchctl are stubs. The launchctl stub records its calls and models
+    registration: a label is loaded while ``$HOME/stub-state/<label>`` exists.
+    ``load`` creates the marker, ``unload`` removes it, and ``list`` tests it.
+    ``STUB_NEVER_REGISTER=<label>`` makes a load silently not register, and
+    ``STUB_STUCK=<label>`` makes an unload silently fail.
     """
     (home / ".config" / "rebalance").mkdir(parents=True, exist_ok=True)
     (home / ".config" / "rebalance" / "runtime-root").write_text(f"{root}\n")
@@ -474,13 +477,16 @@ def _install(label, *, root, home, wrapper="", env=None):
     stubs = home / "stub-bin"
     stubs.mkdir(exist_ok=True)
     (stubs / "plutil").write_text("#!/bin/bash\nexit 0\n")
-    # The retired vault-sync reads as loaded exactly while its plist exists.
+    (home / "stub-state").mkdir(exist_ok=True)
     (stubs / "launchctl").write_text(
         "#!/bin/bash\n"
         'printf "%s\\n" "$*" >> "$HOME/launchctl-calls.log"\n'
-        'if [ "$1" = list ] && [ "$2" = com.rebalance-os.vault-sync ]; then\n'
-        '    [ -f "$HOME/Library/LaunchAgents/com.rebalance-os.vault-sync.plist" ]; exit $?\n'
-        "fi\n"
+        'state="$HOME/stub-state"\n'
+        'case "$1" in\n'
+        '  list) [ -f "$state/$2" ]; exit $? ;;\n'
+        '  load) l="$(basename "$2" .plist)"; [ "${STUB_NEVER_REGISTER:-}" = "$l" ] || touch "$state/$l" ;;\n'
+        '  unload) l="$(basename "$2" .plist)"; [ "${STUB_STUCK:-}" = "$l" ] || rm -f "$state/$l" ;;\n'
+        "esac\n"
         "exit 0\n"
     )
     for stub in stubs.iterdir():
@@ -556,16 +562,86 @@ class TestInstallFlow(unittest.TestCase):
             self.assertTrue((self.home / "Library" / "Logs" / "rebalance-os").is_dir(), job)
             self.assertTrue((self.root / "temp" / "logs").is_dir(), job)
 
+    LEGACY = "com.rebalance-os.vault-sync"
+
+    def _seed_legacy(self, bound_to):
+        """An installed, loaded vault-sync plist bound to *bound_to*."""
+        self.agents.mkdir(parents=True, exist_ok=True)
+        plist = self.agents / f"{self.LEGACY}.plist"
+        plist.write_text(f"<plist><string>{bound_to}/scripts/vault_sync.sh</string></plist>")
+        (self.home / "stub-state").mkdir(parents=True, exist_ok=True)
+        (self.home / "stub-state" / self.LEGACY).touch()
+        return plist
+
     def test_retired_vault_sync_is_unloaded_and_removed(self):
-        legacy = self.agents
-        legacy.mkdir(parents=True, exist_ok=True)
-        (legacy / "com.rebalance-os.vault-sync.plist").write_text("<plist/>")
+        legacy = self._seed_legacy(self.root)
         proc = _install(_label("obsidian-vault-embeddings"), root=self.root, home=self.home)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertFalse((legacy / "com.rebalance-os.vault-sync.plist").exists())
-        calls = (self.home / "launchctl-calls.log").read_text()
-        self.assertIn("unload " + str(legacy / "com.rebalance-os.vault-sync.plist"), calls)
+        self.assertFalse(legacy.exists())
+        calls = (self.home / "launchctl-calls.log").read_text().splitlines()
+        self.assertIn("unload " + str(legacy), calls)
         self.assertIn("Retired com.rebalance-os.vault-sync", proc.stdout)
+        # Retirement happens only after the successor loaded (review: a failed
+        # replacement must not leave neither job running).
+        successor_load = calls.index("load " + str(self.agents / f"{_label('obsidian-vault-embeddings')}.plist"))
+        self.assertLess(successor_load, calls.index("unload " + str(legacy)))
+
+    def test_legacy_survives_a_successor_that_never_registers(self):
+        legacy = self._seed_legacy(self.root)
+        proc = _install(
+            _label("obsidian-vault-embeddings"),
+            root=self.root,
+            home=self.home,
+            env={"STUB_NEVER_REGISTER": _label("obsidian-vault-embeddings")},
+        )
+        self.assertNotEqual(proc.returncode, 0, "an unregistered job must not report success")
+        self.assertIn("did not appear in launchctl list", proc.stderr)
+        self.assertTrue(legacy.exists(), "the working legacy job was retired before its successor was up")
+        self.assertTrue((self.home / "stub-state" / self.LEGACY).exists())
+
+    def test_legacy_bound_to_another_checkout_is_left_alone(self):
+        legacy = self._seed_legacy("/some/other/checkout")
+        proc = _install(_label("obsidian-vault-embeddings"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(legacy.exists())
+        self.assertNotIn("unload " + str(legacy), (self.home / "launchctl-calls.log").read_text())
+        self.assertIn("left retired com.rebalance-os.vault-sync alone", proc.stderr)
+
+    def test_legacy_that_will_not_unload_keeps_its_plist_and_fails(self):
+        legacy = self._seed_legacy(self.root)
+        proc = _install(
+            _label("obsidian-vault-embeddings"), root=self.root, home=self.home, env={"STUB_STUCK": self.LEGACY}
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(legacy.exists(), "deleting a still-loaded job's plist hides it from every tool")
+        self.assertIn("still loaded", proc.stderr)
+
+    def test_lapsed_opt_in_job_is_unloaded_and_removed(self):
+        """Installed earlier, config since deleted: SKIPPED must not leave it scheduled."""
+        label = _label("daily-work-synthesis")
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{label}.plist"
+        dest.write_text("<plist/>")
+        (self.home / "stub-state" / label).parent.mkdir(parents=True, exist_ok=True)
+        (self.home / "stub-state" / label).touch()
+        proc = _install(label, root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 3, proc.stdout + proc.stderr)
+        self.assertFalse(dest.exists())
+        self.assertFalse((self.home / "stub-state" / label).exists())
+
+    def test_no_template_carries_a_secret_shaped_key(self):
+        """The dropped-secret warning compares key presence only. A template that
+        carried a secret-shaped key (even as a placeholder) would silence it and
+        wipe the hand-added value, so the invariant is enforced here, not in prose."""
+        import re
+
+        for job in POLICY:
+            # Commented-out examples document where to add a key; they are not live.
+            text = re.sub(r"<!--.*?-->", "", (SCRIPTS / f"{_label(job)}.plist.template").read_text(), flags=re.S)
+            self.assertIsNone(
+                re.search(r"<key>[A-Z0-9_]*(API_KEY|TOKEN|SECRET)</key>", text),
+                f"{job}: secret-shaped key in a tracked template",
+            )
 
     def test_opt_in_job_is_skipped_without_its_config(self):
         proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home)
@@ -593,6 +669,16 @@ class TestInstallFlow(unittest.TestCase):
             "<dict><key>EnvironmentVariables</key><dict><key>GEMINI_API_KEY</key><string>x</string></dict></dict>"
         )
         proc = _install(_label("hiqs-digest"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("hand-added GEMINI_API_KEY", proc.stderr)
+
+    def test_secret_warning_ignores_a_key_that_only_appears_in_a_template_comment(self):
+        """health-check's template names GEMINI_API_KEY inside an XML comment; a
+        plain grep saw it as present and would drop a hand-added key silently."""
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{_label('health-check')}.plist"
+        dest.write_text("<dict><key>GEMINI_API_KEY</key><string>x</string></dict>")
+        proc = _install(_label("health-check"), root=self.root, home=self.home)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("hand-added GEMINI_API_KEY", proc.stderr)
 

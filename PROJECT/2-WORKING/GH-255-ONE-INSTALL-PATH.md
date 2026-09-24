@@ -3,8 +3,8 @@ gh_issue: 255
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/255
 title: "One install path — fold the per-job installers into stack.sh and fix the drift between them"
 status: "Phase 1 in review"
-created: 2026-09-24
-updated: 2026-09-24
+created: 2026-09-23
+updated: 2026-09-23
 owner: noel
 doc_type: refactor
 goal: >
@@ -25,13 +25,13 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 built on `claude/gallant-hypatia-f9h6c9`: job-specific install steps moved into `install_common.sh`; `stack.sh install <job>...` added; 13 installers deleted (inventory baseline ratcheted 50 → 37 scripts); all heredoc wrappers on the EINTR-safe runner; `pulse_sync.sh` failure labelling fixed. | Operator decision on the GH-59 "second machine" gate, then merge. Phase 2 after merge. |
+| Phase 1 built on `claude/gallant-hypatia-f9h6c9`: job-specific install steps moved into `install_common.sh`; `stack.sh install <job>...` added; 13 installers deleted (inventory baseline ratcheted 50 → 37 scripts); all heredoc wrappers on the EINTR-safe runner; `pulse_sync.sh` failure labelling fixed. | Review fixes applied (retire-after-load, skip unloads a stale opt-in job, binding guard on retirement, all-skipped `install` exits 3). Merge, then prove on the Mac Studio via GH-211 (QA gate 1). |
 
 ## Table of contents
 1. [Findings](#findings)
 2. [Phase 1 — one install flow (this PR)](#phase-1--one-install-flow-this-pr)
 3. [Phase 2 — wrapper consolidation](#phase-2--wrapper-consolidation)
-4. [Decision needed](#decision-needed)
+4. [GH-59 gate — resolved](#gh-59-gate--resolved)
 
 ## Findings
 
@@ -64,7 +64,7 @@ never an independent fallback for the shared flow — which weakens the GH-59 re
 ### QA gate 1
 - [x] `pytest tests/test_scheduler_policy.py tests/test_stack_script.py tests/test_scheduler_liveness.py`
 - [x] `check_script_inventory.py --check`, `ruff check`, `ruff format --check`
-- [ ] On macOS: `bash scripts/stack.sh verify`, then `bash scripts/stack.sh install pulse-server` on the runtime checkout, then `status`
+- [ ] On macOS (second machine, via the GH-211 runbook): `bash scripts/stack.sh verify`, then `bash scripts/stack.sh install pulse-server` on the runtime checkout, then `status`. Record the result here.
 
 ## Phase 2 — wrapper consolidation
 
@@ -72,12 +72,15 @@ never an independent fallback for the shared flow — which weakens the GH-59 re
 - [ ] Move `utils/obsidian_rollover.sh` and `utils/daily_synthesis.sh` onto `scheduler_common.sh` (they differ on venv fallback: one silently uses system python, one fails)
 - [ ] Re-audit `scripts/spike_*.py` and `*_write_spike*` Swift files for deletion (spikes whose findings are recorded)
 
-## Decision needed
+## GH-59 gate — resolved
 
-GH-59 said to keep the installers until `stack.sh` had been proven on a second machine. This PR
-deletes them anyway, because (a) they shared `install_common.sh` and so could not rescue a
-shared-flow bug, and (b) they had already drifted (F1–F5). If that gate still matters, merge only
-after `stack.sh up` has run on a second machine; the change is a plain revert if needed.
+GH-59 said to keep the installers until `stack.sh` had been proven on a second machine. The
+deletion goes ahead, because (a) the installers shared `install_common.sh` and so could not rescue
+a shared-flow bug, and (b) they had already drifted (F1–F5). Operator decision on PR #256: do not
+hold the merge. Fold the proof into the GH-211 Mac Studio recovery instead. Its per-job
+`stack.sh install` steps exercise the new path end to end on the second machine. Phase 1 is not
+done until the macOS item in QA gate 1 is recorded here. A full `stack.sh up` on that machine is
+the GH-211 exit criterion. If it fails, the rollback is `git revert`.
 
 ## Task Ratings
 
