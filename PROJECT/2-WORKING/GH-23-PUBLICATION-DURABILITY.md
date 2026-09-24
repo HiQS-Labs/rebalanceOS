@@ -53,6 +53,7 @@ execution-time failures and ponytail for scope adjudication.
 | `pulse._commit_and_push_if_changed` | common publisher for page/digest/synthesis | preserve existing interfaces and exact remote verification; reject foreign staged work |
 | `daily_synthesis._publish_clio_log` | read-modify-write begins before publisher lock | move entire RMW under common lock without nested flock deadlock |
 | standalone `collect.sh` | config mkdir lock, pull before staging externally produced snapshots, independent git writer | same OS lock protocol as Python; preserve owned pending changes; no blanket commit/reset |
+| `pulse._push_repair_actions.abort_rebase` / `git_pull_rebase_safe` | unscoped rebase abort | remove repair action; only abort transaction-owned rebase |
 | `self_heal_sync_repo` | aborts existing rebase, replaces branch, hard reset | stop without modifying abnormal state; abort only self-started failed rebase |
 | `sync/*/latest.json` | every device writes same pointer | preserve schema; resolve only generated pointer conflicts from validated device snapshots |
 | installed collector | copied/symlinked by existing install.sh | verify installed source and preserve supported local collection configuration |
@@ -74,7 +75,7 @@ Timebox 1–2 hours. Reuse existing temporary-repository test helpers; no custom
 - [ ] Inventory callers/producers and latest-pointer readers; retain the file schema.
 - [ ] Inspect standalone installation/runtime compatibility. A full Rebalance install must not
   become a new collector prerequisite; reuse stdlib Python (already used by the collector).
-- [ ] Pin the proposed common lock protocol: actual git-dir/rebalance-publish.lock, OS flock,
+- [ ] Reuse the already implemented Python common lock protocol: actual git-dir/rebalance-publish.lock, OS flock,
   nonblocking defer; the collector may use a small stdlib entry shim around its existing shell
   transaction, covered by a real interoperability test. No parallel lock registry.
 - [ ] Fable low review approves this plan and explicit questions below; findings dispositioned.
@@ -86,7 +87,7 @@ work. Remote/DB access is already demonstrated by the incident reads; no live re
 
 Ordered implementation, extending existing modules:
 - [ ] Write focused red regression controls for reminder read side effects, foreign staged
-  content, dirty owned output, conflict preservation, peer races, and identical retry.
+  content, dirty owned output, conflict preservation, peer races, identical retry, and Python/shell lock exclusion spanning reconcile through push.
 - [ ] Reminder refresh returns parsed upstream content using fetch + show; fallback reads the
   unchanged local last-good file with refresh failure exposed. Validate data before ingest.
 - [ ] Extend `lib/git_ops.py` with the smallest shared publication preconditions/retry mechanism
@@ -98,7 +99,7 @@ Ordered implementation, extending existing modules:
 - [ ] Snapshot publication stages only this device's calendar/email payloads and the two known
   pointers. Never stage the whole sync directory. Authored/unrelated files remain untouched.
 - [ ] Keep pointer schema; narrow deterministic recovery to calendar/email latest.json conflicts:
-  recompute from valid device snapshots by parsed UTC generated_at (tie by device ID). Do not
+  recompute from valid device snapshots by parsed UTC generated_at (tie by device ID). Missing/malformed candidate timestamps stop automatic resolution. Do not
   generalize to sync/**/*.json or skills. Unrelated conflicts stop and preserve original work.
 - [ ] Retry existing delivery before minting more routine commits. On unresolved conflict, keep
   local commit/payload and report blocked. Preserve unique digest/history outputs on delivery
@@ -153,3 +154,20 @@ No destructive rollback. Existing blocked checkout is recovered separately from 
 
 A scoped git add does not scope a later git commit. A reader that checks out a remote file is a
 writer to the shared index. A lock is useful only if every mutator shares its transaction boundary.
+
+## Plan QA dispositions (2026-09-24)
+
+Fable 5.1 low round 1: PASS text, driver exit 4 close-mismatch (reviewer released rather than
+completed the token); not counted as a completed relay. Round 2 verifies these dispositions and
+closes through the real harness.
+
+- Implemented: reuse existing Python flock; shell bridge holds an inherited descriptor for the
+  entire transaction. Do not introduce per-step locking or another lock registry.
+- Implemented: inventory and remove the Python unscoped abort action as well as shell self-heal;
+  pre-existing rebase/detached states remain unchanged.
+- Modified: claimed zero lock tests is incorrect (`test_pulse_self_repair.py:69` already holds
+  `git_publish_lock`). Existing test covers two Python callers, not shell/Python interop; add
+  that exact missing red control before code.
+- Implemented: the standalone reconcile entry also locks and guards rebase ownership.
+- Implemented: malformed/missing candidate timestamps stop pointer auto-resolution.
+- Retained: retry only on nonzero push status and rejection signature; no string-only success path.
