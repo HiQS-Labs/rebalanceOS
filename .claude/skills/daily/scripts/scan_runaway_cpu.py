@@ -54,9 +54,15 @@ SERVICE_EXEMPTIONS = (
     "WindowServer",
 )
 
-# Mirrors scan_unclosed_loops.py's operator-machine convention: the /daily skill runs
-# from the dev checkout and keeps its state under that checkout's gitignored temp/.
-DEFAULT_STATE_PATH = Path.home() / "Documents" / "GH Repos" / "rebalanceOS" / "temp" / "daily-log" / "cpu-watch.json"
+def _find_repo_root() -> Path:
+    # 4 levels up from this script: <repo_root>/.agents/skills/daily/scripts/...
+    cand = Path(__file__).resolve().parents[4]
+    if (cand / "src" / "rebalance").exists() or (cand / "pyproject.toml").exists():
+        return cand
+    return Path.cwd()
+
+
+DEFAULT_STATE_PATH = _find_repo_root() / "temp" / "daily-log" / "cpu-watch.json"
 
 PS_COMMAND = ["ps", "-axo", "pid=,ppid=,pcpu=,etime=,cputime=,lstart=,command="]
 
@@ -198,8 +204,12 @@ def load_state(state_path: Path) -> tuple[list[dict[str, Any]], list[dict[str, A
     """Previous cycle's (eligible, flagged); missing or malformed state = first sighting."""
     try:
         data = json.loads(state_path.read_text(encoding="utf-8"))
-        return data.get("eligible", []), data.get("flagged", [])
-    except (OSError, json.JSONDecodeError):
+        if not isinstance(data, dict):
+            return [], []
+        eligible = data.get("eligible", [])
+        flagged = data.get("flagged", [])
+        return (eligible if isinstance(eligible, list) else []), (flagged if isinstance(flagged, list) else [])
+    except (OSError, json.JSONDecodeError, AttributeError):
         return [], []
 
 
@@ -260,7 +270,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--update-state",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
         help="Write the rolling snapshot so the next cycle can compare (default: on)",
     )
@@ -268,7 +278,10 @@ def main() -> int:
 
     processes = snapshot_processes()
     if processes is None:
-        print("- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)")
+        if args.json:
+            print(json.dumps({"summary_line": "- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)", "status": "degraded"}, indent=2))
+        else:
+            print("- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)")
         return 0
 
     prev_eligible, prev_flagged = load_state(args.state_path)

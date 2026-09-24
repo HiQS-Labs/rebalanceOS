@@ -25,11 +25,22 @@ from typing import Any
 import zoneinfo
 
 
-KNOWN_ACTIVE_ROOTS = (
-    Path.home() / "Documents" / "GH Repos",
-    Path.home() / "Local Sites",
-    Path.home() / "marathon-clones",
-)
+def _default_scan_roots() -> tuple[Path, ...]:
+    roots = []
+    # Current repo's parent directory
+    cur = Path(__file__).resolve().parents[4]
+    if cur.exists() and cur.parent.exists():
+        roots.append(cur.parent)
+    scan_env = os.environ.get("REBALANCE_REPO_SCAN_ROOTS")
+    if scan_env:
+        for r in scan_env.split(":"):
+            p = Path(r).expanduser()
+            if p.exists() and p not in roots:
+                roots.append(p)
+    return tuple(roots) if roots else (Path.cwd().parent,)
+
+
+KNOWN_ACTIVE_ROOTS = _default_scan_roots()
 
 PRIMARY_WATCHED_REPOS = [
     "HiQS-Labs/rebalanceOS",
@@ -857,7 +868,7 @@ def main() -> int:
     repo_stats = [inspect_git_repo(r, window=window) for r in repos]
 
     open_prs = []
-    prs_by_remote, _ = fetch_prs_for_remotes(PRIMARY_WATCHED_REPOS)
+    prs_by_remote, pr_errors = fetch_prs_for_remotes(PRIMARY_WATCHED_REPOS)
     for r_prs in prs_by_remote.values():
         for p in r_prs:
             if p.get("state", "OPEN").upper() == "OPEN":
@@ -920,6 +931,8 @@ def main() -> int:
     if open_pr_count > 0:
         sample_prs = ", ".join(f"`{p['repo']}#{p['number']}`" for p in open_prs[:2])
         parts.append(f"{open_pr_count} open PR{'s' if open_pr_count > 1 else ''} ({sample_prs})")
+    elif pr_errors:
+        parts.append(f"open PRs degraded ({len(pr_errors)} remote errors)")
     else:
         parts.append("0 open PRs")
 

@@ -10,6 +10,18 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.95.0] - 2026-09-24
+
+### Added
+- GitHub API client now supports conditional ETag requests and handles 304 responses, recording per-job request attribution.
+- Machine-local path validation is now enforced across all tracked code, scripts, and documentation as an explicit CI check.
+- Continuous integration now runs explicit named steps for database query read layers and near-duplicate pattern ratchets.
+
+### Fixed
+- Daily activity scanner scripts and skills now use dynamic checkout-relative paths instead of fixed machine directory structures.
+- Skills across agent configurations are now locked in bidirectional parity with automated drift tests.
+- Scanner error handling now preserves upstream API error states rather than reporting false clean counts.
+
 ## [0.94.0] - 2026-09-23
 
 ### Added

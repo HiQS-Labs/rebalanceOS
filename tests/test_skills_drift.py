@@ -1,6 +1,5 @@
 """Guard against drift between .agents/skills and .claude/skills (#258)."""
 
-import os
 import filecmp
 from pathlib import Path
 
@@ -34,10 +33,11 @@ def test_daily_skills_identical():
 
 
 def test_no_hardcoded_users_paths_in_skills():
-    skills_root = REPO_ROOT / ".agents" / "skills"
-    for path in skills_root.rglob("*.py"):
-        text = path.read_text(encoding="utf-8")
-        assert "/Users/" not in text, f"Hardcoded /Users/ path found in {path}"
-    for path in skills_root.rglob("*.md"):
-        text = path.read_text(encoding="utf-8")
-        assert "/Users/" not in text, f"Hardcoded /Users/ path found in {path}"
+    for base in [REPO_ROOT / ".agents" / "skills", REPO_ROOT / ".claude" / "skills"]:
+        for path in base.rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            assert "/Users/" not in text, f"Hardcoded /Users/ path found in {path}"
+            assert 'Path.home() / "Documents"' not in text, f"Hardcoded Path.home() Documents path found in {path}"
+        for path in base.rglob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            assert "/Users/" not in text, f"Hardcoded /Users/ path found in {path}"

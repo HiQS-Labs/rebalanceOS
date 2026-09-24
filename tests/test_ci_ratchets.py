@@ -26,3 +26,10 @@ def test_near_duplicates_ratchet_passes():
     res = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
     assert res.returncode == 0, f"check_near_duplicates failed: {res.stdout}\n{res.stderr}"
     assert "clean" in res.stdout
+
+
+def test_ci_workflow_has_named_ratchet_steps():
+    ci_yaml = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "check_machine_paths.py --check" in ci_yaml
+    assert "check_read_layer.py --check" in ci_yaml
+    assert "check_near_duplicates.py --check" in ci_yaml
