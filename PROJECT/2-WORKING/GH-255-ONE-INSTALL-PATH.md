@@ -2,7 +2,7 @@
 gh_issue: 255
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/255
 title: "One install path — fold the per-job installers into stack.sh and fix the drift between them"
-status: "Phase 1 in review"
+status: "Phase 1 merged (PR #256) — macOS proof and Phase 2 open"
 created: 2026-09-23
 updated: 2026-09-23
 owner: noel
@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 built on `claude/gallant-hypatia-f9h6c9`: job-specific install steps moved into `install_common.sh`; `stack.sh install <job>...` added; 13 installers deleted (inventory baseline ratcheted 50 → 37 scripts); all heredoc wrappers on the EINTR-safe runner; `pulse_sync.sh` failure labelling fixed. | Review fixes applied (retire-after-load, skip unloads a stale opt-in job, binding guard on retirement, all-skipped `install` exits 3). Merge, then prove on the Mac Studio via GH-211 (QA gate 1). |
+| Phase 1 merged 2026-09-23 via PR #256 (891c7df): one install flow in `install_common.sh`, `stack.sh install <job>...`, 13 installers deleted (inventory 50 → 37), EINTR-safe runner on every heredoc wrapper, plus review fixes (retire-after-load, lapsed opt-in removal, retirement binding guard, all-skipped `install` exits 3, comment-blind secret check — #264). | Prove on the Mac Studio via the GH-211 runbook (QA gate 1, unchecked below). Then Phase 2. |
 
 ## Table of contents
 1. [Findings](#findings)
@@ -85,3 +85,8 @@ the GH-211 exit criterion. If it fails, the rollback is `git revert`.
 ## Task Ratings
 
 `rated 70/65/55/60`
+
+## Merge evidence
+
+- PR #256 merged 2026-09-23 (891c7df). The PR's "Closes #255" closed the issue at merge, and the operator kept it closed as the umbrella for #36/#60. The doc stays in 2-WORKING because the macOS proof (QA gate 1) and Phase 2 are still open. Promote it once both are done, or once Phase 2 is split into its own issue.
+- Follow-up bug found in review and fixed in the same PR: #264. Its remaining operator checks are tracked there.
