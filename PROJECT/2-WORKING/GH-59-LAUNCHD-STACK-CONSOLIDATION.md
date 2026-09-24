@@ -203,7 +203,9 @@ Also in scope:
 
 Keep the 12 installers in place for now. Delete them only once `stack.sh` has been proven on a
 second machine — a bootstrap tool that has replaced its own predecessors and exists in one place is
-a single point of failure.
+a single point of failure. *(Superseded by GH-255: the installers had drifted from `stack.sh up` and
+all sourced the same `install_common.sh`, so they were never an independent fallback; replaced by
+`stack.sh install <job>` — see `PROJECT/2-WORKING/GH-255-ONE-INSTALL-PATH.md`.)*
 
 ### QA Gate 1
 - `bash scripts/stack.sh status` lists all 12 policy jobs and the 3 unmanaged 3-Eyes plists in a

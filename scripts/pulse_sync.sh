@@ -21,7 +21,9 @@ rb_job_init "pulse-sync" 14
 
 log "=== rebalance pulse sync starting ==="
 
-"$PYTHON" - <<'PY' >> "$LOG_FILE" 2>&1
+# `if` is load-bearing: under `set -e` a bare failing command exits here, so
+# the exit-code classification below never ran and failures went unlabelled.
+if rb_run_python_stdin <<'PY' >> "$LOG_FILE" 2>&1
 import json
 import os
 import sys
@@ -72,7 +74,11 @@ if git.get("git_error"):
     sys.exit(2)
 sys.exit(0)
 PY
-EXIT_CODE=$?
+then
+    EXIT_CODE=0
+else
+    EXIT_CODE=$?
+fi
 
 case $EXIT_CODE in
     0) log "=== pulse sync complete ===" ;;

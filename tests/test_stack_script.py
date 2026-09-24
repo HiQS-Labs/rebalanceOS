@@ -500,8 +500,70 @@ class StackScriptTests(unittest.TestCase):
         result = run_stack("nonsense-command", home=self.home)
         self.assertEqual(result.returncode, 2)
         usage = strip_ansi(result.stdout + result.stderr)
-        for cmd in ("up", "down", "restart", "status", "doctor", "verify", "purge"):
+        for cmd in ("up", "install", "down", "restart", "status", "doctor", "verify", "purge"):
             self.assertIn(cmd, usage)
+
+    def test_install_requires_a_job_name(self):
+        result = run_stack("install", home=self.home)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("install <job>", strip_ansi(result.stderr))
+
+    def test_install_rejects_an_unknown_job_before_touching_launchd(self):
+        result = run_stack("install", "no-such-job", home=self.home)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown job: no-such-job", strip_ansi(result.stderr))
+        self.assertFalse((self.home / "launchctl-calls.log").exists())
+
+    def _sandbox_runtime(self) -> dict[str, str]:
+        """Point install_common at a throwaway runtime root with a fake venv
+        python (answers the two preflight probes) and stub plutil/launchctl,
+        so `install` runs its full path on a box with no launchd."""
+        root = self.home / "runtime"
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "daily_work_synthesis.sh").write_text("#!/bin/sh\n")
+        (root / "scripts" / "pulse_server.sh").write_text("#!/bin/sh\n")
+        py = root / ".venv" / "bin" / "python"
+        py.parent.mkdir(parents=True)
+        py.write_text(
+            "#!/bin/sh\n"
+            'case "$*" in *resolve_database_path*) echo "OK:/tmp/db:True";; *get_github_token*) echo "env:4";; esac\n'
+        )
+        py.chmod(0o755)
+        cfg = self.home / ".config" / "rebalance"
+        cfg.mkdir(parents=True)
+        (cfg / "runtime-root").write_text(f"{root}\n")
+        stubs = self.home / "stub-bin"
+        stubs.mkdir()
+        (stubs / "plutil").write_text("#!/bin/sh\nexit 0\n")
+        (stubs / "plutil").chmod(0o755)
+        return {"PATH": f"{stubs}:{os.environ['PATH']}"}
+
+    def test_install_exits_3_when_every_named_job_is_skipped(self):
+        """An explicit `install` that installed nothing must not exit 0 (review on #256)."""
+        env = self._sandbox_runtime()
+        result = run_stack("install", "daily-work-synthesis", home=self.home, extra_env=env)
+        out = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 3, out)
+        self.assertIn("SKIPPED", out)
+        self.assertIn("No named job was installed", out)
+
+    def test_install_dedupes_repeated_job_names(self):
+        env = self._sandbox_runtime()
+        result = run_stack("install", "pulse-server", "pulse-server", home=self.home, extra_env=env)
+        out = strip_ansi(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, out)
+        self.assertIn("Installing and loading 1 LaunchAgents", out)
+
+    def test_install_guards_only_the_named_job_binding(self):
+        """A foreign binding on ANOTHER job must not block installing this one;
+        one on the named job must (the per-job installers had no guard, GH-36)."""
+        self.write_plist("github-sync", root="/some/other/checkout")
+        blocked = run_stack("install", "github-sync", home=self.home)
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("bound to a different checkout", strip_ansi(blocked.stderr))
+
+        other = run_stack("install", "pulse-sync", home=self.home)
+        self.assertNotIn("bound to a different checkout", strip_ansi(other.stderr))
 
 
 if __name__ == "__main__":

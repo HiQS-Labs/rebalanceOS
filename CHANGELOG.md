@@ -10,6 +10,34 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.94.0] - 2026-09-23
+
+### Added
+- The fleet control script can now install or reinstall just the jobs you name, with the same
+  checks as a full bring-up, including the refusal to rebind a job owned by another checkout.
+
+### Changed
+- Every scheduled job now installs through one shared flow. The thirteen per-job install scripts
+  are gone. They had drifted from the fleet bring-up, which skipped steps only they performed.
+
+### Fixed
+- Bringing up the whole fleet on a fresh machine now creates the log folders launchd writes to.
+  Before, four jobs quietly lost their output.
+- A fleet bring-up now retires the renamed vault embeddings job's old entry, so the two can no longer
+  both run at the same minute.
+- The opt-in daily work synthesis job is no longer installed until its local config exists, and
+  a copy installed earlier is removed once that config is gone.
+- A job that never registers with launchd after install is now reported as failed instead of OK.
+  A job it replaces is retired only after the new one is running, and never when it belongs to
+  another checkout.
+- Reinstalling a job no longer misses a hand-added key that its template mentions only in a comment.
+- Reinstalling a job now warns, naming the key, when that job's hand-added API key is about to be
+  dropped.
+- Three more scheduled jobs now retry the rare interpreter start-up interruption that one job
+  already handled.
+- A failed hourly pulse publish now logs why it failed and still trims its old logs. Before, it
+  exited before either step ran.
+
 ## [0.93.3] - 2026-09-22
 
 ### Fixed
@@ -2790,7 +2818,7 @@ P2 Phase 1 — team-calendar signal — plus a max-effort code-review hardening 
 
 ### Fixed
 
-- The pulse-server launchd job is now template-managed like the other five jobs. Previously `com.rebalance-os.pulse-server.plist` lived only in `~/Library/LaunchAgents/` with four hardcoded `/Users/<name>/...` paths and no checked-in template or installer — the one launchd job PR #18 didn't reach. Added [scripts/com.rebalance-os.pulse-server.plist.template](scripts/com.rebalance-os.pulse-server.plist.template) with `{{REBALANCE_DIR}}` placeholders and [scripts/install_pulse_server_scheduler.sh](scripts/install_pulse_server_scheduler.sh) to render + load it. `pulse_server.sh` itself already derived `REBALANCE_DIR` from script location (0.29.0).
+- The pulse-server launchd job is now template-managed like the other five jobs. Previously `com.rebalance-os.pulse-server.plist` lived only in `~/Library/LaunchAgents/` with four hardcoded `/Users/<name>/...` paths and no checked-in template or installer — the one launchd job PR #18 didn't reach. Added [scripts/com.rebalance-os.pulse-server.plist.template](scripts/com.rebalance-os.pulse-server.plist.template) with `{{REBALANCE_DIR}}` placeholders and `scripts/install_pulse_server_scheduler.sh` to render + load it. `pulse_server.sh` itself already derived `REBALANCE_DIR` from script location (0.29.0).
 - `install_pulse_server_scheduler.sh` always attempts an `launchctl unload` before `load`, rather than gating the unload behind a `launchctl list | grep` check. The grep check can miss a job that is loaded but momentarily absent from `launchctl list`, in which case `launchctl load` fails with an opaque `Input/output error` (observed reinstalling pulse-sync and github-sync). The other five installers still use the older gated pattern — a uniform fix across all six is a follow-up.
 
 ## [0.29.0] - 2026-05-13

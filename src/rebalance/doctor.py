@@ -755,26 +755,13 @@ def _loaded_rebalance_labels(launchctl_output: str) -> set[str]:
     return labels
 
 
-def _scheduler_installer(job: str, repo_root: Path) -> str:
-    """Find the installer that declares *job*, with a conventional fallback.
+def _scheduler_installer(job: str) -> str:
+    """The one command that installs *job* on this device.
 
-    Installers predate the policy table and some omit ``-sync`` from their
-    filename.  Reading their declared label keeps the liveness check
-    table-driven while still giving the operator the real installer command.
+    Every policy job installs through ``stack.sh`` (GH-255 retired the per-job
+    ``install_*.sh`` scripts), so the hint is table-driven with no lookup.
     """
-    label = f"com.rebalance-os.{job}"
-    scripts_dir = repo_root / "scripts"
-    installers = [
-        *scripts_dir.glob("install*_scheduler.sh"),
-        scripts_dir / "install_scheduler.sh",  # legacy daily-sync installer
-    ]
-    for installer in sorted(set(installers)):
-        try:
-            if label in installer.read_text(encoding="utf-8"):
-                return installer.relative_to(repo_root).as_posix()
-        except OSError:
-            continue
-    return f"scripts/install_{job.replace('-', '_')}_scheduler.sh"
+    return f"scripts/stack.sh install {job}"
 
 
 def _check_scheduler_liveness(
@@ -806,10 +793,7 @@ def _check_scheduler_liveness(
         if policy_path is None:
             from rebalance.paths import resolve_project_root
 
-            repo_root = resolve_project_root(Path(__file__))
-            policy_path = repo_root / "SCHEDULER.md"
-        else:
-            repo_root = policy_path.parent
+            policy_path = resolve_project_root(Path(__file__)) / "SCHEDULER.md"
         jobs = _scheduler_policy_jobs(policy_path)
     except (OSError, RuntimeError) as exc:
         return [Check("scheduler policy", WARN, f"could not read SCHEDULER.md: {exc}")]
@@ -844,7 +828,7 @@ def _check_scheduler_liveness(
             if other_device is not None:
                 checks.append(other_device)
                 continue
-            installer = _scheduler_installer(job, repo_root)
+            installer = _scheduler_installer(job)
             if (agents_dir / f"com.rebalance-os.{job}.plist").is_file():
                 checks.append(
                     Check(

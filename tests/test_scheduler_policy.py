@@ -7,7 +7,8 @@ its machine-checkable columns against the actual artifacts in ``scripts/``:
   carries the right label, cadence, RunAtLoad/KeepAlive, and program paths
 - every wrapper script uses the shared runtime (``lib/scheduler_common.sh``)
   and encodes its policy scope / entry call verbatim
-- every installer uses the shared install flow (``lib/install_common.sh``)
+- every job installs through ONE flow (``lib/install_common.sh`` via ``stack.sh``),
+  and that flow carries the job-specific steps the retired per-job installers did
 - SCHEDULER.md documents every job with its cadence-defining tokens
 
 Everything runs hermetically: templates are rendered with dummy paths and
@@ -231,22 +232,6 @@ MAX_RUNTIME_SECONDS = {
     "daily-synthesis": 900,
 }
 
-INSTALLERS = {
-    "daily-sync": "install_scheduler.sh",
-    "obsidian-vault-embeddings": "install_obsidian_vault_embeddings_scheduler.sh",
-    "github-sync": "install_github_scheduler.sh",
-    "pulse-sync": "install_pulse_scheduler.sh",
-    "pulse-web-sync": "install_pulse_web_scheduler.sh",
-    "pulse-server": "install_pulse_server_scheduler.sh",
-    "pulse-warning-watch": "install_pulse_warning_watch_scheduler.sh",
-    "daily-work-synthesis": "install_daily_work_synthesis_scheduler.sh",
-    "health-check": "install_health_check_scheduler.sh",
-    "health-check-triage": "install_health_check_triage_scheduler.sh",
-    "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
-    "daily-synthesis": "install_daily_synthesis_scheduler.sh",
-    "hiqs-digest": "install_hiqs_digest_scheduler.sh",
-}
-
 
 def _label(job):
     return f"com.rebalance-os.{job}"
@@ -389,7 +374,7 @@ class TestWrapperScripts(unittest.TestCase):
     def test_wrappers_exist_and_pass_bash_syntax(self):
         shell = list((SCRIPTS / "lib").glob("*.sh"))
         shell += [REPO / s["wrapper"] for s in self._wrapper_jobs().values()]
-        shell += [SCRIPTS / name for name in INSTALLERS.values()]
+        shell.append(SCRIPTS / "stack.sh")
         for path in shell:
             self.assertTrue(path.is_file(), f"missing {path}")
             proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
@@ -475,61 +460,232 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
             )
 
 
-class TestInstallers(unittest.TestCase):
-    def test_every_job_has_an_installer_using_shared_flow(self):
-        for job, name in INSTALLERS.items():
-            path = SCRIPTS / name
-            self.assertTrue(path.is_file(), f"{job}: missing installer {name}")
-            text = path.read_text()
-            self.assertIn(
-                "lib/install_common.sh",
-                text,
-                f"{job}: installer does not source install_common.sh",
-            )
-            self.assertIn(
-                f'rb_install_launchd_job "{_label(job)}"',
-                text,
-                f"{job}: installer does not install label {_label(job)}",
-            )
+def _install(label, *, root, home, wrapper="", env=None):
+    """Run rb_install_launchd_job hermetically.
 
-    def test_installers_have_no_inline_render_or_racy_unload(self):
-        for job, name in INSTALLERS.items():
-            text = (SCRIPTS / name).read_text()
-            self.assertNotIn("s/{{", text, f"{job}: inline sed render belongs in install_common.sh")
-            self.assertNotIn(
-                "if launchctl list",
-                text,
-                f"{job}: racy grep-conditional unload; install_common always unloads",
-            )
+    ``runtime-root`` under the sandbox HOME points REBALANCE_DIR at *root*, so
+    temp/ writes and the opt-in config lookup never touch this checkout. plutil
+    and launchctl are stubs. The launchctl stub records its calls and models
+    registration: a label is loaded while ``$HOME/stub-state/<label>`` exists.
+    ``load`` creates the marker, ``unload`` removes it, and ``list`` tests it.
+    ``STUB_NEVER_REGISTER=<label>`` makes a load silently not register, and
+    ``STUB_STUCK=<label>`` makes an unload silently fail.
+    """
+    (home / ".config" / "rebalance").mkdir(parents=True, exist_ok=True)
+    (home / ".config" / "rebalance" / "runtime-root").write_text(f"{root}\n")
+    (home / "Library" / "LaunchAgents").mkdir(parents=True, exist_ok=True)
+    stubs = home / "stub-bin"
+    stubs.mkdir(exist_ok=True)
+    (stubs / "plutil").write_text("#!/bin/bash\nexit 0\n")
+    (home / "stub-state").mkdir(exist_ok=True)
+    (stubs / "launchctl").write_text(
+        "#!/bin/bash\n"
+        'printf "%s\\n" "$*" >> "$HOME/launchctl-calls.log"\n'
+        'state="$HOME/stub-state"\n'
+        'case "$1" in\n'
+        '  list) [ -f "$state/$2" ]; exit $? ;;\n'
+        '  load) l="$(basename "$2" .plist)"; [ "${STUB_NEVER_REGISTER:-}" = "$l" ] || touch "$state/$l" ;;\n'
+        '  unload) l="$(basename "$2" .plist)"; [ "${STUB_STUCK:-}" = "$l" ] || rm -f "$state/$l" ;;\n'
+        "esac\n"
+        "exit 0\n"
+    )
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+    run_env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{stubs}:{os.environ['PATH']}",
+        "STACK_LAUNCHCTL_BIN": str(stubs / "launchctl"),
+        **(env or {}),
+    }
+    script = f'set -euo pipefail; source "{SCRIPTS}/lib/install_common.sh"; rb_install_launchd_job "$1" "$2"'
+    return subprocess.run(
+        ["bash", "-c", script, "install", label, wrapper],
+        capture_output=True,
+        text=True,
+        env=run_env,
+    )
 
-    def test_installers_are_executable_in_git(self):
-        """Every installer must be mode 100755 in the index, not just on disk.
 
-        Four of these shipped as 100644, so the documented
-        ``./scripts/install_*.sh`` invocation died with "permission denied" on
-        every fresh clone — a hard stop for anyone following UPGRADE.md. A local
-        ``chmod`` does not fix it for other people; the mode has to be in git,
-        which is what this asserts.
-        """
-        out = (
-            subprocess.run(
-                ["git", "ls-files", "-s", "--", "scripts/install_*.sh"],
-                cwd=REPO,
-                capture_output=True,
-                text=True,
-                check=True,
+class TestInstallFlow(unittest.TestCase):
+    """GH-255: one install path. The 13 per-job installers had drifted from
+    ``stack.sh up`` — each ran steps the fleet path skipped. Those steps now live
+    in install_common.sh; these tests pin that every path gets them."""
+
+    def setUp(self):
+        import tempfile
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.home = Path(tmp.name) / "home"
+        self.root = Path(tmp.name) / "root"
+        self.home.mkdir()
+        venv_python = self.root / ".venv" / "bin" / "python"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.write_text("#!/bin/sh\n")
+        venv_python.chmod(0o755)
+        self.agents = self.home / "Library" / "LaunchAgents"
+
+    def test_no_per_job_installers_remain(self):
+        leftovers = sorted(p.name for p in SCRIPTS.glob("install_*scheduler.sh"))
+        self.assertEqual(leftovers, [], "install through `stack.sh install <job>`, not a per-job script")
+
+    def test_stack_script_is_executable_in_git(self):
+        """The one documented entry point must be 100755 in the index — a local
+        chmod does not fix a fresh clone (four installers once shipped 100644)."""
+        out = subprocess.run(
+            ["git", "ls-files", "-s", "--", "scripts/stack.sh"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        self.assertTrue(out.startswith("100755"), f"scripts/stack.sh not executable in git: {out!r}")
+
+    def test_every_log_directory_in_the_plist_is_created(self):
+        """launchd does not create StandardOutPath parents; `stack.sh up` never
+        did either, so four jobs logged nowhere on a fresh machine."""
+        logging_elsewhere = [
+            job
+            for job in POLICY
+            if any(
+                str(_parse(job).get(k, "")).startswith(f"{FAKE_HOME}/Library/Logs/")
+                for k in ("StandardOutPath", "StandardErrorPath")
             )
-            .stdout.strip()
-            .splitlines()
+        ]
+        self.assertTrue(logging_elsewhere, "expected at least one job logging under ~/Library/Logs")
+        for job in logging_elsewhere:
+            proc = _install(_label(job), root=self.root, home=self.home)
+            if proc.returncode == 3:  # opt-in job skipped before any write
+                continue
+            self.assertEqual(proc.returncode, 0, f"{job}: {proc.stderr}")
+            self.assertTrue((self.home / "Library" / "Logs" / "rebalance-os").is_dir(), job)
+            self.assertTrue((self.root / "temp" / "logs").is_dir(), job)
+
+    LEGACY = "com.rebalance-os.vault-sync"
+
+    def _seed_legacy(self, bound_to):
+        """An installed, loaded vault-sync plist bound to *bound_to*."""
+        self.agents.mkdir(parents=True, exist_ok=True)
+        plist = self.agents / f"{self.LEGACY}.plist"
+        plist.write_text(f"<plist><string>{bound_to}/scripts/vault_sync.sh</string></plist>")
+        (self.home / "stub-state").mkdir(parents=True, exist_ok=True)
+        (self.home / "stub-state" / self.LEGACY).touch()
+        return plist
+
+    def test_retired_vault_sync_is_unloaded_and_removed(self):
+        legacy = self._seed_legacy(self.root)
+        proc = _install(_label("obsidian-vault-embeddings"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(legacy.exists())
+        calls = (self.home / "launchctl-calls.log").read_text().splitlines()
+        self.assertIn("unload " + str(legacy), calls)
+        self.assertIn("Retired com.rebalance-os.vault-sync", proc.stdout)
+        # Retirement happens only after the successor loaded (review: a failed
+        # replacement must not leave neither job running).
+        successor_load = calls.index("load " + str(self.agents / f"{_label('obsidian-vault-embeddings')}.plist"))
+        self.assertLess(successor_load, calls.index("unload " + str(legacy)))
+
+    def test_legacy_survives_a_successor_that_never_registers(self):
+        legacy = self._seed_legacy(self.root)
+        proc = _install(
+            _label("obsidian-vault-embeddings"),
+            root=self.root,
+            home=self.home,
+            env={"STUB_NEVER_REGISTER": _label("obsidian-vault-embeddings")},
         )
-        self.assertTrue(out, "no installers found in the git index")
+        self.assertNotEqual(proc.returncode, 0, "an unregistered job must not report success")
+        self.assertIn("did not appear in launchctl list", proc.stderr)
+        self.assertTrue(legacy.exists(), "the working legacy job was retired before its successor was up")
+        self.assertTrue((self.home / "stub-state" / self.LEGACY).exists())
 
-        not_exec = [line.split("\t")[-1] for line in out if not line.startswith("100755")]
-        self.assertEqual(
-            not_exec,
-            [],
-            f"installer(s) not executable in git — `git update-index --chmod=+x` is required for: {not_exec}",
+    def test_legacy_bound_to_another_checkout_is_left_alone(self):
+        legacy = self._seed_legacy("/some/other/checkout")
+        proc = _install(_label("obsidian-vault-embeddings"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(legacy.exists())
+        self.assertNotIn("unload " + str(legacy), (self.home / "launchctl-calls.log").read_text())
+        self.assertIn("left retired com.rebalance-os.vault-sync alone", proc.stderr)
+
+    def test_legacy_that_will_not_unload_keeps_its_plist_and_fails(self):
+        legacy = self._seed_legacy(self.root)
+        proc = _install(
+            _label("obsidian-vault-embeddings"), root=self.root, home=self.home, env={"STUB_STUCK": self.LEGACY}
         )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(legacy.exists(), "deleting a still-loaded job's plist hides it from every tool")
+        self.assertIn("still loaded", proc.stderr)
+
+    def test_lapsed_opt_in_job_is_unloaded_and_removed(self):
+        """Installed earlier, config since deleted: SKIPPED must not leave it scheduled."""
+        label = _label("daily-work-synthesis")
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{label}.plist"
+        dest.write_text("<plist/>")
+        (self.home / "stub-state" / label).parent.mkdir(parents=True, exist_ok=True)
+        (self.home / "stub-state" / label).touch()
+        proc = _install(label, root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 3, proc.stdout + proc.stderr)
+        self.assertFalse(dest.exists())
+        self.assertFalse((self.home / "stub-state" / label).exists())
+
+    def test_no_template_carries_a_secret_shaped_key(self):
+        """The dropped-secret warning compares key presence only. A template that
+        carried a secret-shaped key (even as a placeholder) would silence it and
+        wipe the hand-added value, so the invariant is enforced here, not in prose."""
+        import re
+
+        for job in POLICY:
+            # Commented-out examples document where to add a key; they are not live.
+            text = re.sub(r"<!--.*?-->", "", (SCRIPTS / f"{_label(job)}.plist.template").read_text(), flags=re.S)
+            self.assertIsNone(
+                re.search(r"<key>[A-Z0-9_]*(API_KEY|TOKEN|SECRET)</key>", text),
+                f"{job}: secret-shaped key in a tracked template",
+            )
+
+    def test_opt_in_job_is_skipped_without_its_config(self):
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 3, proc.stdout + proc.stderr)
+        self.assertIn("SKIPPED", proc.stdout)
+        self.assertFalse((self.agents / f"{_label('daily-work-synthesis')}.plist").exists())
+        self.assertFalse((self.home / "launchctl-calls.log").exists(), "a skipped job must not touch launchd")
+
+    def test_opt_in_job_installs_once_configured(self):
+        (self.root / "temp").mkdir()
+        (self.root / "temp" / "daily-work-synthesis.json").write_text("{}")
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue((self.agents / f"{_label('daily-work-synthesis')}.plist").is_file())
+
+    def test_render_check_ignores_the_opt_in_gate(self):
+        """Preflight must still prove the opt-in template renders."""
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home, env={"RB_RENDER_CHECK": "1"})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_reinstall_warns_about_a_hand_added_secret(self):
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{_label('hiqs-digest')}.plist"
+        dest.write_text(
+            "<dict><key>EnvironmentVariables</key><dict><key>GEMINI_API_KEY</key><string>x</string></dict></dict>"
+        )
+        proc = _install(_label("hiqs-digest"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("hand-added GEMINI_API_KEY", proc.stderr)
+
+    def test_secret_warning_ignores_a_key_that_only_appears_in_a_template_comment(self):
+        """health-check's template names GEMINI_API_KEY inside an XML comment; a
+        plain grep saw it as present and would drop a hand-added key silently."""
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{_label('health-check')}.plist"
+        dest.write_text("<dict><key>GEMINI_API_KEY</key><string>x</string></dict>")
+        proc = _install(_label("health-check"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("hand-added GEMINI_API_KEY", proc.stderr)
+
+    def test_fresh_install_has_no_secret_warning(self):
+        proc = _install(_label("hiqs-digest"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertNotIn("hand-added", proc.stderr)
 
 
 class TestSchedulerDoc(unittest.TestCase):

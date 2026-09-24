@@ -366,21 +366,14 @@ Unchanged: `vault-sync` :15, `github-sync` :45, `daily-sync` 6:30.
 
 Re-render and reload:
 
-Each job has its own installer — there is no single "install everything" script,
-so run the one per changed template:
+The per-job installers this step originally listed were retired (GH-255); one
+targeted command re-renders the changed templates through the same flow. It
+names jobs rather than using `stack.sh up`, so jobs this step does not touch
+(for example `hiqs-digest`, whose rendered plist may carry a hand-added key)
+are not re-rendered:
 
 ```bash
-./scripts/install_scheduler.sh                      # daily-sync           (Nice)
-./scripts/install_github_scheduler.sh               # github-sync          (Nice)
-./scripts/install_vault_scheduler.sh                # vault-sync           (Nice)
-./scripts/install_pulse_scheduler.sh                # pulse-sync           (Nice)
-./scripts/install_pulse_web_scheduler.sh            # pulse-web-sync       (Nice + :08/:38)
-./scripts/install_pulse_warning_watch_scheduler.sh  # pulse-warning-watch  (:07/:22/:37/:52)
-./scripts/install_health_check_scheduler.sh         # health-check         (:10)
-./scripts/install_health_check_triage_scheduler.sh  # health-check-triage  (:25)
-./scripts/install_obsidian_rollover_scheduler.sh    # obsidian-rollover    (00:40)
-./scripts/install_obsidian_daily_sync_scheduler.sh  # obsidian-daily-sync  (18:20)
-./scripts/install_git_pulse_daily_synthesis_scheduler.sh  # git-pulse-daily-synthesis (18:30)
+bash scripts/stack.sh install daily-sync github-sync obsidian-vault-embeddings pulse-sync pulse-web-sync pulse-warning-watch health-check health-check-triage obsidian-rollover daily-synthesis
 ```
 
 `pulse-server` is unchanged — no need to re-render it.
@@ -441,7 +434,7 @@ rm ~/Library/LaunchAgents/com.rebalance-os.obsidian-daily-sync.plist
 rm ~/Library/LaunchAgents/com.rebalance-os.git-pulse-daily-synthesis.plist
 
 # 2. Install the merged job (fires at 18:20, same slot obsidian-daily-sync used).
-./scripts/install_daily_synthesis_scheduler.sh
+bash scripts/stack.sh install daily-synthesis
 ```
 
 Nothing else changes: same vault target, same two block markers/headings

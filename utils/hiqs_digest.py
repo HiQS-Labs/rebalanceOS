@@ -832,7 +832,7 @@ class SynthesisUnconfigured(Exception):
 
     A missing Gemini key is operator state, like the kill switch, and the installer says so
     explicitly: the key is hand-added to the RENDERED plist and a reinstall overwrites it
-    (install_hiqs_digest_scheduler.sh:19-23). Treating that as a failed job writes
+    (SCHEDULER.md, hiqs-digest row). Treating that as a failed job writes
     job_failed to auth_activity.jsonl twice a day, which doctor's _check_auth_failures
     raises as an `auth:launchd` ERROR and health_issue_reporter files as a GitHub issue —
     for a machine that is merely unconfigured, and indistinguishably from a real Gemini
