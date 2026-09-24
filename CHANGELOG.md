@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.95.1] - 2026-09-24
+
+### Fixed
+
+- Fleet publication now shares one checkout lock, commits only owned output, preserves pending delivery, and refuses unrelated edits or existing Git operations. Recovery no longer discards local history or escalates deterministic conflicts to a model.
+- Reminder refresh reads remote exports without changing the shared index. Cross-device snapshot pointer conflicts retain both device payloads and select the freshest valid timestamp.
+- Fleet check-in acknowledges scans only after delivery, and daily-log updates read their current content inside the publication lock.
+
 ## [0.95.0] - 2026-09-24
 
 ### Added

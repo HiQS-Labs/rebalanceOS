@@ -178,39 +178,33 @@ def _local_source_path(base_url: str) -> Path | None:
     return Path(raw).expanduser()
 
 
-def _refresh_file_source(file_path: Path) -> str:
-    """Best-effort, **non-destructive** refresh of the export clone before reading.
+def _refresh_file_source(file_path: Path) -> tuple[str, dict[str, Any] | None]:
+    """Fetch/read an upstream export without changing the worktree or index.
 
-    `git fetch` then check out ONLY the export file from its upstream ref. Deliberately
-    avoids `git pull --rebase --autostash`: the same clone may be a writer for other
-    jobs (pulse-sync), and a rebase there can race/conflict. Fetch never touches the
-    working tree, and the scoped checkout updates only the export file — not the other
-    jobs' files. Never raises; returns a short status string for the sync result."""
+    On failure the caller explicitly falls back to the local last-good file and
+    records the refresh failure. A successful fetch is not a successful ingest.
+    """
     try:
-        result = run_git(file_path.parent, "rev-parse", "--show-toplevel", timeout=60)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
-            return f"skipped (git: {detail})"
-        root = Path(result.stdout.strip()).resolve()
-        # Run subsequent git ops FROM the repo root so the checkout pathspec (which git
-        # resolves relative to cwd, not the repo root) matches.
-        rel = file_path.resolve().relative_to(root)
-        result = run_git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", timeout=60)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
-            return f"skipped (git: {detail})"
-        upstream = result.stdout.strip()
-        result = run_git(root, "fetch", "--quiet", timeout=60)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
-            return f"skipped (git: {detail})"
-        result = run_git(root, "checkout", upstream, "--", str(rel), timeout=60)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:120] or str(result.returncode)
-            return f"skipped (git: {detail})"
-        return "ok"
-    except Exception as exc:  # noqa: BLE001 — freshness is best-effort
-        return f"skipped ({type(exc).__name__})"
+        root_result = run_git(file_path.parent, "rev-parse", "--show-toplevel", timeout=60)
+        if root_result.returncode:
+            return "skipped (not a Git checkout)", None
+        root = Path(root_result.stdout.strip()).resolve()
+        rel = file_path.resolve().relative_to(root).as_posix()
+        upstream = run_git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", timeout=60)
+        if upstream.returncode:
+            return "skipped (no upstream)", None
+        fetched = run_git(root, "fetch", "--quiet", timeout=60)
+        if fetched.returncode:
+            return "skipped (fetch failed; using local cache)", None
+        blob = run_git(root, "show", f"{upstream.stdout.strip()}:{rel}", timeout=60)
+        if blob.returncode:
+            return "skipped (upstream file unavailable; using local cache)", None
+        payload = json.loads(blob.stdout)
+        if not isinstance(payload, dict):
+            return "skipped (invalid upstream payload; using local cache)", None
+        return "ok", payload
+    except Exception as exc:  # noqa: BLE001 — report explicit cached-data fallback
+        return f"skipped ({type(exc).__name__}; using local cache)", None
 
 
 def _read_payload_from_file(path: Path) -> dict[str, Any]:
@@ -526,11 +520,13 @@ def sync_sleuth_reminders(
     is_file_source = file_path is not None
 
     source_refresh: str | None = None
+    data: dict[str, Any] | None = None
     if is_file_source and refresh_source:
         assert file_path is not None
-        source_refresh = _refresh_file_source(file_path)
+        source_refresh, data = _refresh_file_source(file_path)
 
-    data = _fetch_payload(base_url, token, workspace_name, active_only)
+    if data is None:
+        data = _fetch_payload(base_url, token, workspace_name, active_only)
 
     reminders = _validate_payload_contract(data, workspace_name=workspace_name, is_file_source=is_file_source)
 

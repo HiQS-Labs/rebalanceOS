@@ -18,9 +18,11 @@ reversibility: Costly — preserve outstanding output before changing deployed w
 
 # GH-23 — Durable fleet publication
 
+## Status
+
 | What was just completed | What's next |
 |---|---|
-| Read-only incident recon and operator-approved issue additions | Fable low plan QA, then regression controls and implementation |
+| Fable low plan QA approved; transaction repair implemented | Full verification, Fable final QA, then reviewed deployment |
 
 ## Table of contents
 - [Scope and recon](#scope-and-recon)
@@ -72,13 +74,13 @@ transaction, and package availability on other devices. Confirm before changing 
 ## Phase 0 — Confirm the contract
 
 Timebox 1–2 hours. Reuse existing temporary-repository test helpers; no custom test runner.
-- [ ] Inventory callers/producers and latest-pointer readers; retain the file schema.
-- [ ] Inspect standalone installation/runtime compatibility. A full Rebalance install must not
+- [x] Inventory callers/producers and latest-pointer readers; retain the file schema.
+- [x] Inspect standalone installation/runtime compatibility. A full Rebalance install must not
   become a new collector prerequisite; reuse stdlib Python (already used by the collector).
-- [ ] Reuse the already implemented Python common lock protocol: actual git-dir/rebalance-publish.lock, OS flock,
+- [x] Reuse the already implemented Python common lock protocol: actual git-dir/rebalance-publish.lock, OS flock,
   nonblocking defer; the collector may use a small stdlib entry shim around its existing shell
   transaction, covered by a real interoperability test. No parallel lock registry.
-- [ ] Fable low review approves this plan and explicit questions below; findings dispositioned.
+- [x] Fable low review approves this plan and explicit questions below; findings dispositioned.
 
 QA: unresolved ownership or compatibility assumptions stop dependent edits, not all independent
 work. Remote/DB access is already demonstrated by the incident reads; no live refresh needed.
@@ -86,28 +88,28 @@ work. Remote/DB access is already demonstrated by the incident reads; no live re
 ## Phase 1 — Repair publication
 
 Ordered implementation, extending existing modules:
-- [ ] Write focused red regression controls for reminder read side effects, foreign staged
+- [x] Write focused red regression controls for reminder read side effects, foreign staged
   content, dirty owned output, conflict preservation, peer races, identical retry, and Python/shell lock exclusion spanning reconcile through push.
-- [ ] Reminder refresh returns parsed upstream content using fetch + show; fallback reads the
+- [x] Reminder refresh returns parsed upstream content using fetch + show; fallback reads the
   unchanged local last-good file with refresh failure exposed. Validate data before ingest.
-- [ ] Extend `lib/git_ops.py` with the smallest shared publication preconditions/retry mechanism
+- [x] Extend `lib/git_ops.py` with the smallest shared publication preconditions/retry mechanism
   after checking existing helpers. No rebase/detached operation may discard work. All callers
   use the same OS lock from reconciliation through write/stage/commit/push; RMW reads included.
-- [ ] Preserve owned stranded output by committing its exact paths before reconciliation when
+- [x] Preserve owned stranded output by committing its exact paths before reconciliation when
   necessary. Refuse foreign staged or tracked dirty paths without modifying them. Check Git
   states before writing and before retry; no automatic stash, reset, branch replacement.
-- [ ] Snapshot publication stages only this device's calendar/email payloads and the two known
+- [x] Snapshot publication stages only this device's calendar/email payloads and the two known
   pointers. Never stage the whole sync directory. Authored/unrelated files remain untouched.
-- [ ] Keep pointer schema; narrow deterministic recovery to calendar/email latest.json conflicts:
+- [x] Keep pointer schema; narrow deterministic recovery to calendar/email latest.json conflicts:
   recompute from valid device snapshots by parsed UTC generated_at (tie by device ID). Missing/malformed candidate timestamps stop automatic resolution. Do not
   generalize to sync/**/*.json or skills. Unrelated conflicts stop and preserve original work.
-- [ ] Retry existing delivery before minting more routine commits. On unresolved conflict, keep
+- [x] Retry existing delivery before minting more routine commits. On unresolved conflict, keep
   local commit/payload and report blocked. Preserve unique digest/history outputs on delivery
   failure (never just skip their generation silently). Coalesce replaceable pending pages only
   within explicit owned output; do not rewrite arbitrary local history.
-- [ ] Remove model escalation from these deterministic Git failures; one peer-race retry, then
+- [x] Remove model escalation from these deterministic Git failures; one peer-race retry, then
   actionable error with blocked paths/pending state. Keep rendering success separate from delivery.
-- [ ] Collector shares lock with Python; moves handling of its known pending snapshot/projection
+- [x] Collector shares lock with Python; moves handling of its known pending snapshot/projection
   paths before pull, rejects other dirt, never stages the whole skills collection implicitly,
   removes destructive self-heal, retries boundedly and advances cursor only after verified delivery.
   Preserve scanner/dedup behavior; stop on pre-existing rebase rather than touching another task.
@@ -171,3 +173,41 @@ closes through the real harness.
 - Implemented: the standalone reconcile entry also locks and guards rebase ownership.
 - Implemented: malformed/missing candidate timestamps stop pointer auto-resolution.
 - Retained: retry only on nonzero push status and rejection signature; no string-only success path.
+
+## Deployment runbook
+
+Pause only the existing writers that target this checkout; record which were loaded so the same
+set can be restored. Take a full private copy and Git bundle of the sync checkout, including
+untracked content and local refs. Fetch remote under the common lock and merge preserved history
+in a recovery checkout first. Keep unique dated outputs and newest per-device payloads; recompute
+only the two generated pointers. Inspect every authored-file conflict individually. Never force
+push or reset the original evidence. A successful recovery must retain the original local tip in
+ancestry or a separately verified recovery ref/bundle and prove the selected payloads remotely.
+
+Deploy the reviewed runtime revision and the installed standalone collector together. Confirm
+source hashes, preserve the existing device configuration, resume the recorded writers, and
+observe a real publication plus its remote content. Do not claim other devices were upgraded.
+Rollback stops the affected writer and returns to preserved code/config; it never deletes data.
+
+### Execution refinement: generated live-page conflict
+
+The pointer-only resolver would leave the shared generated live page blocked after a simultaneous
+peer publication. The final review must assess a second, explicit opt-in: only the live-page
+publisher may resolve a conflict in exactly its one generated path, and only when the replayed
+commit changes that path alone. Digests, daily logs, skills, and mixed commits retain fail-closed
+conflict handling. Pending replaceable delivery is retried before generating another revision;
+append-only daily log updates and distinct dated digests continue to retain unique local output.
+
+### Recovery evidence discovered during execution
+
+At 10:02 local time, the still-installed collector aborted an in-progress rebase and reset the
+live branch to origin. This is corroborated by the live reflog and the installed self-heal source,
+not inferred from a clean status. The displaced tip contains 45 local-only commits relative to the
+fresh remote. It has now been copied into an isolated recovery ref and verified full Git bundle;
+the old collector was unloaded with restoration metadata retained privately.
+
+An isolated merge preserves both tips as ancestors. Its only conflicts are the two generated
+snapshot pointers and the reminder export. The reminder export on the remote is newer (17:00 UTC
+versus 13:00 UTC); both per-device snapshot histories and four missing dated digests are retained.
+No authored skill conflict needs resolution. No recovery push or live checkout change has yet
+been made. Final review must assess this preservation-first recovery procedure as well as code.

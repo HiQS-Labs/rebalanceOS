@@ -46,11 +46,10 @@ from rebalance.ingest.db.schema import ensure_calendar_schema, ensure_email_sche
 from rebalance.lib.git_ops import (
     GitPublishLockBusy,
     git_publish_lock,
-    git_pull_rebase_safe,
+    publish_git_paths,
     run_git,
 )
-from rebalance.lib.time_ops import now_iso, now_utc
-from rebalance.repair import RepairFSM, RepairResult, RepairStatus
+from rebalance.lib.time_ops import now_iso, now_utc, parse_utc_iso
 
 SCHEMA_VERSION = 1
 DEFAULT_CALENDAR_WINDOW_DAYS = 90
@@ -238,10 +237,14 @@ def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) 
     if latest_path.exists():
         try:
             current = json.loads(latest_path.read_text(encoding="utf-8"))
-            if current.get("generated_at", "") >= generated_at:
-                return  # another device has a newer snapshot
-        except Exception:  # noqa: BLE001
-            pass  # corrupt latest.json — overwrite it
+            current_stamp = parse_utc_iso(current.get("generated_at"))
+            stamp = parse_utc_iso(generated_at)
+            if current_stamp is None or stamp is None:
+                raise ValueError("invalid latest pointer timestamp")
+            if (current_stamp, current["device_id"]) >= (stamp, device_id):
+                return
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("invalid latest pointer") from exc
 
     pointer = {
         "device_id": device_id,
@@ -261,11 +264,7 @@ def commit_and_push_sync(
     generated_at: str,
     lock_acquired: bool = False,
 ) -> dict[str, Any]:
-    """Stage ``sync_subdir/``, commit, and push to the remote.
-
-    Uses RepairFSM for non-fast-forward push failures (same circuit breakers
-    as pulse). Returns a structured result dict.
-    """
+    """Publish only this device's payloads and the generated latest pointers."""
     if not lock_acquired:
         try:
             with git_publish_lock(target_repo):
@@ -279,58 +278,60 @@ def commit_and_push_sync(
         except GitPublishLockBusy as exc:
             return {"committed": False, "pushed": False, "deferred": True, "git_error": str(exc)}
 
-    proc = run_git(target_repo, "add", sync_subdir)
-    if proc.returncode != 0:
-        return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
-
-    proc = run_git(target_repo, "status", "--porcelain", sync_subdir)
-    if proc.returncode != 0 or not proc.stdout.strip():
+    paths = [
+        f"{sync_subdir}/{source}/{name}.json"
+        for source in ("calendar", "email")
+        for name in (device_id, "latest")
+        if (target_repo / sync_subdir / source / f"{name}.json").exists()
+    ]
+    if not paths:
         return {"committed": False, "pushed": False, "reason": "no changes to sync"}
+    return publish_git_paths(
+        target_repo,
+        paths,
+        f"sync: {device_id} {generated_at}",
+        resolve_conflicts=lambda: _resolve_pointer_conflicts(target_repo, sync_subdir),
+    )
 
-    msg = f"sync: {device_id} {generated_at[:19]}Z"
-    proc = run_git(target_repo, "commit", "-m", msg)
-    if proc.returncode != 0:
-        return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
 
-    proc = run_git(target_repo, "push")
-    if proc.returncode == 0:
-        return {"committed": True, "pushed": True}
-
-    git_error = proc.stderr.strip()
-    if "fetch first" in git_error or "rejected" in git_error:
-
-        def pull_rebase() -> RepairResult:
-            pull = git_pull_rebase_safe(target_repo)
-            if pull.returncode != 0:
-                return RepairResult(ok=False, error=pull.stderr.strip())
-            push = run_git(target_repo, "push")
-            return RepairResult(ok=push.returncode == 0, error=push.stderr.strip() if push.returncode != 0 else "")
-
-        def notify_only() -> RepairResult:
-            return RepairResult(ok=False, error="notify_only: repair deferred to operator")
-
-        fsm = RepairFSM(
-            actions={"pull_rebase": pull_rebase, "notify_only": notify_only},
-            action_descriptions={
-                "pull_rebase": "pull --rebase to integrate remote commits then retry push",
-                "notify_only": "do not repair — report failure and stop",
-            },
-            preferred_action="pull_rebase",
-            error_context=f"sync push to {target_repo} rejected",
-        )
-        state = fsm.run(git_error)
-        base = {"committed": True, "repair_log": state.log}
-        if state.status == RepairStatus.REPAIRED:
-            return {**base, "pushed": True, "repaired": True}
-        return {
-            **base,
-            "pushed": False,
-            "git_error": git_error,
-            "repair_status": state.status.value,
-            "repair_error": state.final_error,
-        }
-
-    return {"committed": True, "pushed": False, "git_error": git_error}
+def _resolve_pointer_conflicts(target_repo: Path, sync_subdir: str) -> bool:
+    """Resolve only generated pointers; malformed device evidence fails closed."""
+    result = run_git(target_repo, "diff", "--name-only", "--diff-filter=U", "-z")
+    conflicts = set(result.stdout.rstrip("\0").split("\0")) - {""}
+    allowed = {f"{sync_subdir}/{source}/latest.json" for source in ("calendar", "email")}
+    if result.returncode or not conflicts or not conflicts <= allowed:
+        return False
+    pointers = {}
+    for relative in conflicts:
+        directory = (target_repo / relative).parent
+        candidates = []
+        files = list(directory.glob("*.json"))
+        if len(files) > 1000:
+            raise ValueError("snapshot candidate limit exceeded")
+        for path in files:
+            if path.name == "latest.json":
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or path.is_symlink():
+                raise ValueError(f"invalid snapshot evidence: {path.name}")
+            stamp = parse_utc_iso(payload.get("generated_at"))
+            device = payload.get("device_id")
+            if (
+                stamp is None
+                or not device
+                or path.name != f"{device}.json"
+                or payload.get("source") != directory.name
+                or payload.get("schema_version") != SCHEMA_VERSION
+            ):
+                raise ValueError(f"invalid snapshot evidence: {path.name}")
+            candidates.append((stamp, device, payload["generated_at"]))
+        if not candidates:
+            return False
+        _, device, generated_at = max(candidates)
+        pointers[relative] = {"device_id": device, "generated_at": generated_at, "snapshot_file": f"{device}.json"}
+    for relative, pointer in pointers.items():
+        (target_repo / relative).write_text(json.dumps(pointer, indent=2), encoding="utf-8")
+    return run_git(target_repo, "add", "--", *sorted(conflicts)).returncode == 0
 
 
 def read_latest_snapshot(sync_dir: Path, source: str) -> dict[str, Any] | None:

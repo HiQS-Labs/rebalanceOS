@@ -103,6 +103,8 @@ def _write_git_stub(
             if len(args) >= 3 and args[0] == "-C":
                 repo_path = args[1]
                 repo_args = args[2:]
+                if repo_args[:2] == ["-c", "rebase.autoStash=false"]:
+                    repo_args = repo_args[2:]
 
                 if repo_args[:3] == ["rev-parse", "--verify", "HEAD"]:
                     if repo_path in unborn_repos:
@@ -112,6 +114,16 @@ def _write_git_stub(
                         raise SystemExit(128)
                     if repo_path in {{local_repo, sync_repo}}:
                         print("deadbeef")
+                        raise SystemExit(0)
+
+                if repo_path == sync_repo:
+                    if repo_args == ["rev-parse", "--absolute-git-dir"]:
+                        print(str(Path(sync_repo) / ".git"))
+                        raise SystemExit(0)
+                    if repo_args[:2] == ["symbolic-ref", "--quiet"]:
+                        print("refs/heads/main")
+                        raise SystemExit(0)
+                    if repo_args[0] in ("diff", "push"):
                         raise SystemExit(0)
 
                 if repo_path == local_repo and repo_args[:2] == ["log", "-g"]:
@@ -153,6 +165,9 @@ def _write_git_stub(
 
             if args[:2] == ["rev-parse", "--abbrev-ref"]:
                 print("origin/main")
+                raise SystemExit(0)
+
+            if args and args[0] == "merge-base":
                 raise SystemExit(0)
 
             if args and args[0] == "push":

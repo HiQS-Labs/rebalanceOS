@@ -2079,11 +2079,26 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         }
 
     import time
-    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock
+    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock, publication_state_error, run_git
 
     started = time.monotonic()
     try:
         with git_publish_lock(target_repo):
+            owned = [
+                f"{sync_subdir}/{source}/{name}.json"
+                for source in ("calendar", "email")
+                for name in (device_id, "latest")
+            ]
+            error = publication_state_error(target_repo, owned)
+            if error:
+                return {"scope": "sync", "dry_run": False, "error": error, "deferred": True}
+            pending = run_git(target_repo, "log", "--format=%H", "@{u}..HEAD", "--", *owned)
+            if pending.returncode == 0 and pending.stdout:
+                delivery = commit_and_push_sync(
+                    target_repo, sync_subdir, device_id=device_id, generated_at="pending", lock_acquired=True
+                )
+                if delivery.get("git_error"):
+                    return {"scope": "sync", "dry_run": False, "error": delivery["git_error"], "git": delivery}
             cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
             email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
 

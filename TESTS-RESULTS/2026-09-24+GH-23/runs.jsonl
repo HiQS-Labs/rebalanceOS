@@ -1,0 +1,5 @@
+{"schema_version": 1, "run_id": "baseline", "passed": 2760, "failed": 0, "skipped": 21, "xfailed": 11, "subtests": 143}
+{"schema_version": 1, "run_id": "red", "passed": 0, "failed": 9}
+{"schema_version": 1, "run_id": "contract", "passed": 11, "failed": 0}
+{"schema_version": 1, "run_id": "interim-full", "passed": 2767, "failed": 1, "note": "version bump overlapped loaded module; superseded by immutable final run"}
+{"schema_version": 1, "run_id": "final-full", "passed": 2770, "failed": 0, "skipped": 21, "xfailed": 11, "subtests": 143}

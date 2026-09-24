@@ -371,11 +371,11 @@ class TestLatestPointer(unittest.TestCase):
         data = json.loads((self.source_dir / "latest.json").read_text())
         self.assertEqual(data["device_id"], "studio")
 
-    def test_corrupt_latest_json_is_overwritten(self) -> None:
+    def test_corrupt_latest_json_is_preserved(self) -> None:
         (self.source_dir / "latest.json").write_text("not json", encoding="utf-8")
-        _update_latest_pointer(self.source_dir, "mac", "2026-06-01T10:00:00Z")
-        data = json.loads((self.source_dir / "latest.json").read_text())
-        self.assertEqual(data["device_id"], "mac")
+        with self.assertRaises(ValueError):
+            _update_latest_pointer(self.source_dir, "mac", "2026-06-01T10:00:00Z")
+        self.assertEqual((self.source_dir / "latest.json").read_text(), "not json")
 
 
 class TestReadLatestSnapshot(unittest.TestCase):

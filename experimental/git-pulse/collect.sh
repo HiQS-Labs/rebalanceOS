@@ -174,43 +174,34 @@ append_stage_path() {
     stage_paths+=("$path")
 }
 
-# Self-heal a wedged sync clone before we pull/stage. A detached HEAD or an
-# interrupted rebase silently halts ALL syncing (pulse files AND snapshot relay
-# files); recover by aborting the stale rebase and resetting the default branch
-# to origin so the sync becomes self-recovering instead of needing manual repair.
-self_heal_sync_repo() {
-    local repo_dir="$1"
-    local git_dir
-    local default_branch
-    local head_branch
-    local needs_heal=0
+# Refuse abnormal state. Recovery must never discard another writer's work.
+check_sync_repo() {
+    local state
+    state="$(git -C "$sync_repo_dir" rev-parse --absolute-git-dir)"
+    for operation in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+        if [ -e "$state/$operation" ]; then
+            echo "Publication blocked: existing $operation; preserve it for its owner." >&2
+            return 1
+        fi
+    done
+    git -C "$sync_repo_dir" symbolic-ref --quiet HEAD >/dev/null || {
+        echo "Publication blocked: detached HEAD; preserve local work." >&2
+        return 1
+    }
+}
 
-    git_dir="$(git -C "$repo_dir" rev-parse --git-dir 2>/dev/null)" || return 0
-    case "$git_dir" in
-        /*) ;;
-        *) git_dir="$repo_dir/$git_dir" ;;
-    esac
-
-    if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
-        needs_heal=1
-        git -C "$repo_dir" rebase --abort >/dev/null 2>&1 || true
-    fi
-
-    head_branch="$(git -C "$repo_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-    [ -n "$head_branch" ] || needs_heal=1
-
-    if [ "$needs_heal" -eq 0 ]; then
+pull_safely() {
+    check_sync_repo || return 1
+    if git -C "$sync_repo_dir" -c rebase.autoStash=false pull --quiet --rebase; then
         return 0
     fi
-
-    default_branch="$(git -C "$repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')" || default_branch=""
-    [ -n "$default_branch" ] || default_branch="main"
-
-    echo "Sync repo wedged (detached HEAD or in-progress rebase); resetting to origin/$default_branch." >&2
-    git -C "$repo_dir" fetch --quiet origin || true
-    git -C "$repo_dir" checkout --quiet -B "$default_branch" "origin/$default_branch" 2>/dev/null \
-        || git -C "$repo_dir" checkout --quiet "$default_branch" 2>/dev/null || true
-    git -C "$repo_dir" reset --quiet --hard "origin/$default_branch" || true
+    local state
+    state="$(git -C "$sync_repo_dir" rev-parse --absolute-git-dir)"
+    if [ -d "$state/rebase-merge" ] || [ -d "$state/rebase-apply" ]; then
+        git -C "$sync_repo_dir" rebase --abort || return 1
+    fi
+    echo "Publication pending: reconcile failed; local output preserved." >&2
+    return 1
 }
 
 migrate_legacy_device_identity() {
@@ -314,15 +305,28 @@ else
     device_id="$desired_device_id"
 fi
 
-LOCK_DIR="$CONFIG_DIR/collect.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo "Another git-pulse collector run is already in progress; skipping." >&2
-    exit 0
+# Same OS lock as Python publishers; inherited descriptor spans the entire run.
+# No Rebalance installation is required on a standalone collector device.
+if [ "${1:-}" != "--dry-run" ] && [ -z "${GIT_PULSE_LOCK_FD:-}" ]; then
+    exec python3 - "$sync_repo_dir" "$0" "$@" <<'LOCKPY'
+import fcntl
+import os
+import subprocess
+import sys
+from pathlib import Path
+repo, script, *args = sys.argv[1:]
+state = subprocess.check_output(["git", "-C", repo, "rev-parse", "--absolute-git-dir"], text=True).strip()
+fd = os.open(str(Path(state) / "rebalance-publish.lock"), os.O_CREAT | os.O_RDWR, 0o600)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    print("Publication deferred: another writer owns the checkout.", file=sys.stderr)
+    sys.exit(75)
+os.set_inheritable(fd, True)
+os.environ["GIT_PULSE_LOCK_FD"] = str(fd)
+os.execv("/bin/bash", ["bash", script, *args])
+LOCKPY
 fi
-cleanup() {
-    rmdir "$LOCK_DIR"
-}
-trap cleanup EXIT
 
 enter_safe_working_dir() {
     if [ -d "$HOME" ] && cd "$HOME" 2>/dev/null; then
@@ -472,13 +476,34 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
-# Recover a wedged clone (detached HEAD / interrupted rebase) before we pull or stage.
-self_heal_sync_repo "$sync_repo_dir"
-
-# Bring in any peer-machine updates before writing.
-if git -C "$sync_repo_dir" rev-parse --verify HEAD >/dev/null 2>&1; then
-    git -C "$sync_repo_dir" pull --quiet --rebase
-fi
+check_sync_repo
+# External snapshot producers leave owned output dirty. Preserve those exact paths
+# before pulling; refuse authored/foreign dirt rather than stashing or absorbing it.
+python3 - "$sync_repo_dir" "$device_id" "$configured_device_id" <<'PREPARE'
+import os
+import subprocess
+import sys
+repo, device, previous = sys.argv[1:]
+def git(*args):
+    return subprocess.check_output(["git", "-C", repo, *args], text=True)
+fd = int(os.environ["GIT_PULSE_LOCK_FD"])
+held = os.fstat(fd)
+lock = os.stat(os.path.join(git("rev-parse", "--absolute-git-dir").strip(), "rebalance-publish.lock"))
+if (held.st_dev, held.st_ino) != (lock.st_dev, lock.st_ino):
+    sys.exit("Publication blocked: invalid inherited lock")
+owned = {f"pulse-{d}.md" for d in (device, previous)} | {f"devices/{d}.yaml" for d in (device, previous)} | {f"pdda/registry-{device}.tsv"}
+changed = set(git("diff", "--name-only", "-z").split("\0")) | set(git("diff", "--cached", "--name-only", "-z").split("\0"))
+changed.discard("")
+foreign = {p for p in changed if p not in owned and not p.startswith("snapshots/")}
+if foreign:
+    sys.exit("Publication blocked: unrelated dirty paths: " + ", ".join(sorted(foreign)))
+if changed:
+    subprocess.run(["git", "-C", repo, "add", "--", *sorted(changed)], check=True)
+    subprocess.run(["git", "-C", repo, "commit", "--only", "-m", "fleet: preserve pending output", "--", *sorted(changed)], check=True)
+PREPARE
+pull_safely
+# Retry previous delivery before appending another heartbeat.
+git -C "$sync_repo_dir" push --quiet
 
 if [ "$DRY_RUN" -eq 0 ] && [ "$should_migrate_device_id" -eq 1 ] && [ -n "$configured_device_id" ]; then
     migrate_legacy_device_identity "$configured_device_id" "$desired_device_id"
@@ -570,21 +595,12 @@ append_stage_path "devices/$device_id.yaml"
 # per-device file, not the whole pdda/ dir, so the projection rides the normal pulse commit.
 [ -f "$sync_repo_dir/pdda/registry-$device_id.tsv" ] && append_stage_path "pdda/registry-$device_id.tsv"
 git add -A -- "${stage_paths[@]}"
-if git diff --cached --quiet; then
-    # Nothing actually staged (e.g. a same-second rerun that produced
-    # identical metadata heartbeat values). Nothing to push.
-    if [ "$repo_scan_failures" -eq 0 ]; then
-        echo "$scan_started" > "$LAST_RUN_FILE"
+if ! git diff --cached --quiet -- "${stage_paths[@]}"; then
+    if [ "${#new_entries[@]}" -gt 0 ]; then
+        git commit --quiet --only -m "pulse-$device_id: +${#new_entries[@]}" -- "${stage_paths[@]}"
     else
-        echo "Leaving $LAST_RUN_FILE unchanged because $repo_scan_failures repo scan(s) failed." >&2
+        git commit --quiet --only -m "pulse-$device_id: metadata refresh" -- "${stage_paths[@]}"
     fi
-    exit 0
-fi
-
-if [ "${#new_entries[@]}" -gt 0 ]; then
-    git commit --quiet -m "pulse-$device_id: +${#new_entries[@]}"
-else
-    git commit --quiet -m "pulse-$device_id: metadata refresh"
 fi
 
 push_current_branch() {
@@ -597,9 +613,15 @@ push_current_branch() {
 
 # One retry on push race (peer pushed between our pull and push).
 if ! push_current_branch 2>/dev/null; then
-    git pull --quiet --rebase
+    pull_safely
     push_current_branch
 fi
+
+# Do not acknowledge until this exact local history is visible upstream.
+git merge-base --is-ancestor HEAD '@{u}' || {
+    echo "Publication pending: upstream does not contain local HEAD." >&2
+    exit 1
+}
 
 # Only advance last-run when every watched repo scan succeeded.
 if [ "$repo_scan_failures" -eq 0 ]; then

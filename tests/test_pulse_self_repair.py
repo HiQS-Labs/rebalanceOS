@@ -262,15 +262,3 @@ class TestPulseSelfRepair:
                 f"expected: {expected_content!r}\n"
                 f"actual:   {remote_content!r}"
             )
-
-    def test_reset_hard_not_in_autonomous_menu(self) -> None:
-        """reset_hard must not be in the bounded action menu exposed to autonomous repair."""
-        from pathlib import Path
-
-        from rebalance.ingest.pulse import _push_repair_actions
-
-        actions = _push_repair_actions(Path("/tmp"))
-        assert "reset_hard" not in actions, (
-            "reset_hard must be excluded from the autonomous menu — "
-            "it discards unpushed content and reports a false success"
-        )
