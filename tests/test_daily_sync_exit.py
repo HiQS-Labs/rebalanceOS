@@ -17,7 +17,7 @@ SCRIPT = REPO / "scripts" / "daily_sync.sh"
 def _embedded_python() -> str:
     """Return the Python payload executed by the shell wrapper."""
     script = SCRIPT.read_text()
-    start = 'if "$PYTHON" - <<\'PY\' >> "$LOG_FILE" 2>&1\n'
+    start = "if rb_run_python_stdin <<'PY' >> \"$LOG_FILE\" 2>&1\n"
     return script.split(start, 1)[1].split("\nPY\nthen", 1)[0]
 
 

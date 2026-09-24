@@ -500,8 +500,30 @@ class StackScriptTests(unittest.TestCase):
         result = run_stack("nonsense-command", home=self.home)
         self.assertEqual(result.returncode, 2)
         usage = strip_ansi(result.stdout + result.stderr)
-        for cmd in ("up", "down", "restart", "status", "doctor", "verify", "purge"):
+        for cmd in ("up", "install", "down", "restart", "status", "doctor", "verify", "purge"):
             self.assertIn(cmd, usage)
+
+    def test_install_requires_a_job_name(self):
+        result = run_stack("install", home=self.home)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("install <job>", strip_ansi(result.stderr))
+
+    def test_install_rejects_an_unknown_job_before_touching_launchd(self):
+        result = run_stack("install", "no-such-job", home=self.home)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown job: no-such-job", strip_ansi(result.stderr))
+        self.assertFalse((self.home / "launchctl-calls.log").exists())
+
+    def test_install_guards_only_the_named_job_binding(self):
+        """A foreign binding on ANOTHER job must not block installing this one;
+        one on the named job must (the per-job installers had no guard, GH-36)."""
+        self.write_plist("github-sync", root="/some/other/checkout")
+        blocked = run_stack("install", "github-sync", home=self.home)
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("bound to a different checkout", strip_ansi(blocked.stderr))
+
+        other = run_stack("install", "pulse-sync", home=self.home)
+        self.assertNotIn("bound to a different checkout", strip_ansi(other.stderr))
 
 
 if __name__ == "__main__":

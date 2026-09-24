@@ -7,7 +7,7 @@
 # refresh_index tool exposes to interactive agents.
 #
 # Policy: SCHEDULER.md (job com.rebalance-os.daily-sync).
-# Install: see scripts/install_scheduler.sh
+# Install: bash scripts/stack.sh install daily-sync
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ log "=== rebalance daily sync starting ==="
 # DB path resolves via rebalance.paths.resolve_database_path() so we hit the
 # same canonical location the dashboard/MCP reads from — never a stale
 # project-tree rebalance.db left behind by an older script.
-if "$PYTHON" - <<'PY' >> "$LOG_FILE" 2>&1
+if rb_run_python_stdin <<'PY' >> "$LOG_FILE" 2>&1
 import json
 import sys
 from rebalance.ingest.index_ops import refresh_index

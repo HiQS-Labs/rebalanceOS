@@ -219,7 +219,7 @@ def onboard_cmd(
     else:
         typer.echo(
             "\nOptional next steps (skipped under --yes): Calendar/Gmail OAuth "
-            "(scripts/setup_*_oauth.py), scheduler fleet (scripts/install_scheduler.sh), "
+            "(scripts/setup_*_oauth.py), scheduler fleet (scripts/stack.sh up), "
             "first pulse (scripts/pulse_web_sync.sh)."
         )
 

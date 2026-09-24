@@ -7,6 +7,7 @@
 #
 # Usage:
 #   bash scripts/stack.sh up [--force]  # render, lint and load every policy job
+#   bash scripts/stack.sh install <job>... [--force]  # same flow, named jobs only
 #   bash scripts/stack.sh down          # unload every managed job (plists kept)
 #   bash scripts/stack.sh restart       # down, then up
 #   bash scripts/stack.sh status        # per-job PID / last exit / state
@@ -51,6 +52,9 @@ log_error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
 JOB_NAMES=()
 JOB_WRAPPERS=()
 JOB_MAX_RUNTIMES=()
+# Indices into JOB_NAMES that up/install/preflight act on. Every job by default;
+# `install <job>...` narrows it. status/down/purge always see the full fleet.
+TARGETS=()
 
 load_policy() {
     if [ ! -f "$POLICY_DOC" ]; then
@@ -87,6 +91,27 @@ load_policy() {
         JOB_WRAPPERS+=("$wrapper")
         JOB_MAX_RUNTIMES+=("$max_runtime")
     done <<< "$parsed"
+    TARGETS=("${!JOB_NAMES[@]}")
+}
+
+# Narrow TARGETS to the named jobs. Unknown names are an error, not a no-op:
+# a typo must not report success having installed nothing.
+select_targets() {
+    local want i found bad=0
+    TARGETS=()
+    for want in "$@"; do
+        found=""
+        for i in "${!JOB_NAMES[@]}"; do
+            [ "${JOB_NAMES[$i]}" = "$want" ] && { found="$i"; break; }
+        done
+        if [ -z "$found" ]; then
+            log_error "unknown job: $want (policy jobs: ${JOB_NAMES[*]})"
+            bad=1
+        else
+            TARGETS+=("$found")
+        fi
+    done
+    [ "$bad" -eq 0 ] && [ "${#TARGETS[@]}" -gt 0 ]
 }
 
 job_max_runtime() {
@@ -234,7 +259,7 @@ print(f'{src}:{len(token) if token else 0}')
     # Checking mere existence let a malformed template fail mid-apply, with the
     # jobs already processed left down (Codex branch review).
     local bad=0 name i
-    for i in "${!JOB_NAMES[@]}"; do
+    for i in "${TARGETS[@]}"; do
         name="${JOB_NAMES[$i]}"
         if ! out=$(RB_RENDER_CHECK=1 rb_install_launchd_job "${LABEL_PREFIX}$name" "${JOB_WRAPPERS[$i]}" 2>&1); then
             log_error "policy job $name will not render/lint:"
@@ -243,7 +268,7 @@ print(f'{src}:{len(token) if token else 0}')
         fi
     done
     if [ "$bad" -eq 0 ]; then
-        log_ok "All ${#JOB_NAMES[@]} policy jobs render and lint cleanly"
+        log_ok "All ${#TARGETS[@]} policy jobs render and lint cleanly"
     else
         errors=$((errors + bad))
     fi
@@ -265,8 +290,9 @@ check_target_root() {
     local force="$1" verb="${2:-adopt}"
     log_info "Target root: $REBALANCE_DIR"
 
-    local conflicts=() name root
-    for name in "${JOB_NAMES[@]}"; do
+    local conflicts=() name root i
+    for i in "${TARGETS[@]}"; do
+        name="${JOB_NAMES[$i]}"
         local dest
         dest=$(plist_path "$name")
         [ -f "$dest" ] || continue
@@ -328,27 +354,38 @@ stack_up() {
     run_preflight "$force" || exit 1
     echo
 
-    log_info "Installing and loading ${#JOB_NAMES[@]} LaunchAgents..."
-    local failed=0 loaded=0 i
-    for i in "${!JOB_NAMES[@]}"; do
+    log_info "Installing and loading ${#TARGETS[@]} LaunchAgents..."
+    local failed=0 loaded=0 skipped=0 i rc
+    for i in "${TARGETS[@]}"; do
         local name="${JOB_NAMES[$i]}" wrapper="${JOB_WRAPPERS[$i]}" out
         printf "  • %-28s " "$name"
-        if out=$(rb_install_launchd_job "${LABEL_PREFIX}$name" "$wrapper" 2>&1); then
+        rc=0
+        out=$(rb_install_launchd_job "${LABEL_PREFIX}$name" "$wrapper" 2>&1) || rc=$?
+        if [ "$rc" -eq 0 ]; then
             echo -e "\033[32mOK\033[0m"
             loaded=$((loaded + 1))
+        elif [ "$rc" -eq "$RB_INSTALL_SKIPPED" ]; then
+            echo -e "\033[90mSKIPPED\033[0m"
+            echo "$out" | /usr/bin/sed 's/^/      /'
+            skipped=$((skipped + 1))
+            continue
         else
             echo -e "\033[31mFAILED\033[0m"
             echo "$out" | /usr/bin/sed 's/^/      /' >&2
             failed=$((failed + 1))
+            continue
         fi
+        # Per-job notes on success (retired labels, dropped secrets, load
+        # warnings) — the per-job installers printed these; keep them visible.
+        { echo "$out" | /usr/bin/grep -E 'WARNING|Retired' || true; } | /usr/bin/sed 's/^/      /' >&2
     done
 
     echo
     if [ "$failed" -gt 0 ]; then
-        log_error "Stack bootstrap encountered $failed failure(s); $loaded job(s) loaded."
+        log_error "Stack bootstrap encountered $failed failure(s); $loaded job(s) loaded, $skipped skipped."
         exit 1
     fi
-    log_ok "Successfully bootstrapped $loaded job(s)."
+    log_ok "Successfully bootstrapped $loaded job(s); $skipped skipped."
     echo
     stack_status
 }
@@ -546,15 +583,31 @@ refresh_launchctl_cache
 cmd="${1:-status}"
 shift || true
 FORCE=0
+JOB_ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --force) FORCE=1 ;;
-        *) log_error "unknown option: $arg"; exit 2 ;;
+        -*) log_error "unknown option: $arg"; exit 2 ;;
+        *)
+            if [ "$cmd" = "install" ]; then
+                JOB_ARGS+=("$arg")
+            else
+                log_error "unknown option: $arg"; exit 2
+            fi
+            ;;
     esac
 done
 
 case "$cmd" in
     up|boot|start)  stack_up "$FORCE" ;;
+    install)
+        if [ "${#JOB_ARGS[@]}" -eq 0 ]; then
+            log_error "usage: $0 install <job>... [--force]  (jobs: ${JOB_NAMES[*]})"
+            exit 2
+        fi
+        select_targets "${JOB_ARGS[@]}" || exit 2
+        stack_up "$FORCE"
+        ;;
     down|stop)      stack_down 0 "$FORCE" ;;
     purge)          stack_down 1 "$FORCE" ;;
     restart|reload)
@@ -583,7 +636,7 @@ case "$cmd" in
         validate_environment
         ;;
     *)
-        echo "Usage: $0 {up [--force]|down|restart|status|drift|doctor|verify|purge}"
+        echo "Usage: $0 {up [--force]|install <job>... [--force]|down|restart|status|drift|doctor|verify|purge}"
         exit 2
         ;;
 esac

@@ -7,7 +7,8 @@ its machine-checkable columns against the actual artifacts in ``scripts/``:
   carries the right label, cadence, RunAtLoad/KeepAlive, and program paths
 - every wrapper script uses the shared runtime (``lib/scheduler_common.sh``)
   and encodes its policy scope / entry call verbatim
-- every installer uses the shared install flow (``lib/install_common.sh``)
+- every job installs through ONE flow (``lib/install_common.sh`` via ``stack.sh``),
+  and that flow carries the job-specific steps the retired per-job installers did
 - SCHEDULER.md documents every job with its cadence-defining tokens
 
 Everything runs hermetically: templates are rendered with dummy paths and
@@ -231,22 +232,6 @@ MAX_RUNTIME_SECONDS = {
     "daily-synthesis": 900,
 }
 
-INSTALLERS = {
-    "daily-sync": "install_scheduler.sh",
-    "obsidian-vault-embeddings": "install_obsidian_vault_embeddings_scheduler.sh",
-    "github-sync": "install_github_scheduler.sh",
-    "pulse-sync": "install_pulse_scheduler.sh",
-    "pulse-web-sync": "install_pulse_web_scheduler.sh",
-    "pulse-server": "install_pulse_server_scheduler.sh",
-    "pulse-warning-watch": "install_pulse_warning_watch_scheduler.sh",
-    "daily-work-synthesis": "install_daily_work_synthesis_scheduler.sh",
-    "health-check": "install_health_check_scheduler.sh",
-    "health-check-triage": "install_health_check_triage_scheduler.sh",
-    "obsidian-rollover": "install_obsidian_rollover_scheduler.sh",
-    "daily-synthesis": "install_daily_synthesis_scheduler.sh",
-    "hiqs-digest": "install_hiqs_digest_scheduler.sh",
-}
-
 
 def _label(job):
     return f"com.rebalance-os.{job}"
@@ -389,7 +374,7 @@ class TestWrapperScripts(unittest.TestCase):
     def test_wrappers_exist_and_pass_bash_syntax(self):
         shell = list((SCRIPTS / "lib").glob("*.sh"))
         shell += [REPO / s["wrapper"] for s in self._wrapper_jobs().values()]
-        shell += [SCRIPTS / name for name in INSTALLERS.values()]
+        shell.append(SCRIPTS / "stack.sh")
         for path in shell:
             self.assertTrue(path.is_file(), f"missing {path}")
             proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
@@ -475,61 +460,146 @@ class TestSchedulerCommonRuntime(unittest.TestCase):
             )
 
 
-class TestInstallers(unittest.TestCase):
-    def test_every_job_has_an_installer_using_shared_flow(self):
-        for job, name in INSTALLERS.items():
-            path = SCRIPTS / name
-            self.assertTrue(path.is_file(), f"{job}: missing installer {name}")
-            text = path.read_text()
-            self.assertIn(
-                "lib/install_common.sh",
-                text,
-                f"{job}: installer does not source install_common.sh",
-            )
-            self.assertIn(
-                f'rb_install_launchd_job "{_label(job)}"',
-                text,
-                f"{job}: installer does not install label {_label(job)}",
-            )
+def _install(label, *, root, home, wrapper="", env=None):
+    """Run rb_install_launchd_job hermetically.
 
-    def test_installers_have_no_inline_render_or_racy_unload(self):
-        for job, name in INSTALLERS.items():
-            text = (SCRIPTS / name).read_text()
-            self.assertNotIn("s/{{", text, f"{job}: inline sed render belongs in install_common.sh")
-            self.assertNotIn(
-                "if launchctl list",
-                text,
-                f"{job}: racy grep-conditional unload; install_common always unloads",
-            )
+    ``runtime-root`` under the sandbox HOME points REBALANCE_DIR at *root*, so
+    temp/ writes and the opt-in config lookup never touch this checkout. plutil
+    and launchctl are stubs: launchctl records its calls and reports every label
+    as registered except the retired vault-sync.
+    """
+    (home / ".config" / "rebalance").mkdir(parents=True, exist_ok=True)
+    (home / ".config" / "rebalance" / "runtime-root").write_text(f"{root}\n")
+    (home / "Library" / "LaunchAgents").mkdir(parents=True, exist_ok=True)
+    stubs = home / "stub-bin"
+    stubs.mkdir(exist_ok=True)
+    (stubs / "plutil").write_text("#!/bin/bash\nexit 0\n")
+    # The retired vault-sync reads as loaded exactly while its plist exists.
+    (stubs / "launchctl").write_text(
+        "#!/bin/bash\n"
+        'printf "%s\\n" "$*" >> "$HOME/launchctl-calls.log"\n'
+        'if [ "$1" = list ] && [ "$2" = com.rebalance-os.vault-sync ]; then\n'
+        '    [ -f "$HOME/Library/LaunchAgents/com.rebalance-os.vault-sync.plist" ]; exit $?\n'
+        "fi\n"
+        "exit 0\n"
+    )
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+    run_env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{stubs}:{os.environ['PATH']}",
+        "STACK_LAUNCHCTL_BIN": str(stubs / "launchctl"),
+        **(env or {}),
+    }
+    script = f'set -euo pipefail; source "{SCRIPTS}/lib/install_common.sh"; rb_install_launchd_job "$1" "$2"'
+    return subprocess.run(
+        ["bash", "-c", script, "install", label, wrapper],
+        capture_output=True,
+        text=True,
+        env=run_env,
+    )
 
-    def test_installers_are_executable_in_git(self):
-        """Every installer must be mode 100755 in the index, not just on disk.
 
-        Four of these shipped as 100644, so the documented
-        ``./scripts/install_*.sh`` invocation died with "permission denied" on
-        every fresh clone — a hard stop for anyone following UPGRADE.md. A local
-        ``chmod`` does not fix it for other people; the mode has to be in git,
-        which is what this asserts.
-        """
-        out = (
-            subprocess.run(
-                ["git", "ls-files", "-s", "--", "scripts/install_*.sh"],
-                cwd=REPO,
-                capture_output=True,
-                text=True,
-                check=True,
+class TestInstallFlow(unittest.TestCase):
+    """GH-255: one install path. The 13 per-job installers had drifted from
+    ``stack.sh up`` — each ran steps the fleet path skipped. Those steps now live
+    in install_common.sh; these tests pin that every path gets them."""
+
+    def setUp(self):
+        import tempfile
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.home = Path(tmp.name) / "home"
+        self.root = Path(tmp.name) / "root"
+        self.home.mkdir()
+        venv_python = self.root / ".venv" / "bin" / "python"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.write_text("#!/bin/sh\n")
+        venv_python.chmod(0o755)
+        self.agents = self.home / "Library" / "LaunchAgents"
+
+    def test_no_per_job_installers_remain(self):
+        leftovers = sorted(p.name for p in SCRIPTS.glob("install_*scheduler.sh"))
+        self.assertEqual(leftovers, [], "install through `stack.sh install <job>`, not a per-job script")
+
+    def test_stack_script_is_executable_in_git(self):
+        """The one documented entry point must be 100755 in the index — a local
+        chmod does not fix a fresh clone (four installers once shipped 100644)."""
+        out = subprocess.run(
+            ["git", "ls-files", "-s", "--", "scripts/stack.sh"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        self.assertTrue(out.startswith("100755"), f"scripts/stack.sh not executable in git: {out!r}")
+
+    def test_every_log_directory_in_the_plist_is_created(self):
+        """launchd does not create StandardOutPath parents; `stack.sh up` never
+        did either, so four jobs logged nowhere on a fresh machine."""
+        logging_elsewhere = [
+            job
+            for job in POLICY
+            if any(
+                str(_parse(job).get(k, "")).startswith(f"{FAKE_HOME}/Library/Logs/")
+                for k in ("StandardOutPath", "StandardErrorPath")
             )
-            .stdout.strip()
-            .splitlines()
+        ]
+        self.assertTrue(logging_elsewhere, "expected at least one job logging under ~/Library/Logs")
+        for job in logging_elsewhere:
+            proc = _install(_label(job), root=self.root, home=self.home)
+            if proc.returncode == 3:  # opt-in job skipped before any write
+                continue
+            self.assertEqual(proc.returncode, 0, f"{job}: {proc.stderr}")
+            self.assertTrue((self.home / "Library" / "Logs" / "rebalance-os").is_dir(), job)
+            self.assertTrue((self.root / "temp" / "logs").is_dir(), job)
+
+    def test_retired_vault_sync_is_unloaded_and_removed(self):
+        legacy = self.agents
+        legacy.mkdir(parents=True, exist_ok=True)
+        (legacy / "com.rebalance-os.vault-sync.plist").write_text("<plist/>")
+        proc = _install(_label("obsidian-vault-embeddings"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse((legacy / "com.rebalance-os.vault-sync.plist").exists())
+        calls = (self.home / "launchctl-calls.log").read_text()
+        self.assertIn("unload " + str(legacy / "com.rebalance-os.vault-sync.plist"), calls)
+        self.assertIn("Retired com.rebalance-os.vault-sync", proc.stdout)
+
+    def test_opt_in_job_is_skipped_without_its_config(self):
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 3, proc.stdout + proc.stderr)
+        self.assertIn("SKIPPED", proc.stdout)
+        self.assertFalse((self.agents / f"{_label('daily-work-synthesis')}.plist").exists())
+        self.assertFalse((self.home / "launchctl-calls.log").exists(), "a skipped job must not touch launchd")
+
+    def test_opt_in_job_installs_once_configured(self):
+        (self.root / "temp").mkdir()
+        (self.root / "temp" / "daily-work-synthesis.json").write_text("{}")
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue((self.agents / f"{_label('daily-work-synthesis')}.plist").is_file())
+
+    def test_render_check_ignores_the_opt_in_gate(self):
+        """Preflight must still prove the opt-in template renders."""
+        proc = _install(_label("daily-work-synthesis"), root=self.root, home=self.home, env={"RB_RENDER_CHECK": "1"})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_reinstall_warns_about_a_hand_added_secret(self):
+        self.agents.mkdir(parents=True, exist_ok=True)
+        dest = self.agents / f"{_label('hiqs-digest')}.plist"
+        dest.write_text(
+            "<dict><key>EnvironmentVariables</key><dict><key>GEMINI_API_KEY</key><string>x</string></dict></dict>"
         )
-        self.assertTrue(out, "no installers found in the git index")
+        proc = _install(_label("hiqs-digest"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("hand-added GEMINI_API_KEY", proc.stderr)
 
-        not_exec = [line.split("\t")[-1] for line in out if not line.startswith("100755")]
-        self.assertEqual(
-            not_exec,
-            [],
-            f"installer(s) not executable in git — `git update-index --chmod=+x` is required for: {not_exec}",
-        )
+    def test_fresh_install_has_no_secret_warning(self):
+        proc = _install(_label("hiqs-digest"), root=self.root, home=self.home)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertNotIn("hand-added", proc.stderr)
 
 
 class TestSchedulerDoc(unittest.TestCase):

@@ -74,8 +74,8 @@ Stage-specific notes:
   edits) to `confirm_projects`. Re-running discovery to re-review is always
   safe.
 - **After db_synced is done (graduation):** offer the scheduled fleet —
-  `bash scripts/install_scheduler.sh` (daily sync) plus the hourly jobs per
-  SCHEDULER.md, then run `bash scripts/pulse_web_sync.sh` and open
+  `bash scripts/stack.sh up` (every job in SCHEDULER.md; `stack.sh install
+  daily-sync` for just the daily sync), then run `bash scripts/pulse_web_sync.sh` and open
   `web/pulse.html` so the user sees their first pulse. Then hand over: point
   at SCHEDULER.md's runbook and the dashboard (`rebalance`).
 

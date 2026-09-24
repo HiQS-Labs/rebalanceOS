@@ -45,7 +45,7 @@ def test_policy_row_absent_from_stubbed_launchctl_warns_with_installer() -> None
     missing = {check.name: check for check in checks}["scheduler:future-job"]
     assert missing.status == WARN
     assert missing.detail == "scheduled job is not loaded on this device"
-    assert "scripts/install_future_job_scheduler.sh" in missing.hint
+    assert "scripts/stack.sh install future-job" in missing.hint
     assert "scheduler:daily-sync" not in {check.name for check in checks}
 
 

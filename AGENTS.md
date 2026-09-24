@@ -72,7 +72,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 
 **Background refresh.** A launchd job (`com.rebalance-os.daily-sync`) runs [scripts/daily_sync.sh](scripts/daily_sync.sh) at 6:30 AM daily and on boot. The script invokes the same `refresh_index(scope=["all"])` orchestration, so the cron and the MCP tool share one code path. If the index looks stale, check `temp/logs/daily_sync_YYYY-MM-DD.log` before manually re-running.
 
-**Hourly pulse publish.** A second launchd job (`com.rebalance-os.pulse-sync`) runs [scripts/pulse_sync.sh](scripts/pulse_sync.sh) on the hour, every hour from 6 AM to 11 PM local. It calls the same `publish_pulse()` orchestration the MCP tool exposes — render markdown, commit + push to the configured private pulse repo only when content actually changed. Logs in `temp/logs/pulse_sync_YYYY-MM-DD.log`. Install via `bash scripts/install_pulse_scheduler.sh`. Public users wanting to reuse this only need to populate the pulse keys in their own `temp/rbos.config` and point at their own private clone.
+**Hourly pulse publish.** A second launchd job (`com.rebalance-os.pulse-sync`) runs [scripts/pulse_sync.sh](scripts/pulse_sync.sh) on the hour, every hour from 6 AM to 11 PM local. It calls the same `publish_pulse()` orchestration the MCP tool exposes — render markdown, commit + push to the configured private pulse repo only when content actually changed. Logs in `temp/logs/pulse_sync_YYYY-MM-DD.log`. Install via `bash scripts/stack.sh install pulse-sync`. Public users wanting to reuse this only need to populate the pulse keys in their own `temp/rbos.config` and point at their own private clone.
 
 **Source of truth for the orchestration:** [src/rebalance/ingest/index_ops.py](src/rebalance/ingest/index_ops.py). Only edit there if you need to change refresh behavior — the MCP wrappers in `src/rebalance/mcp/` (25 tools across 7 domain modules; `mcp_server.py` is a 5-line backward-compat shim) and `daily_sync.sh` are thin and should stay that way.
 
@@ -91,9 +91,8 @@ solo operator running everything from one clone is fine, and `stack.sh status`'s
 pattern you use.
 
 The conventional name for this second checkout's path is `REBALANCE_RUNTIME_DIR`
-(documentation convention today, not yet consumed by the install scripts — they
-still derive their target from whichever checkout you run `install_<job>_scheduler.sh`
-from; see `SCHEDULER.md` § Shared mechanics for the current `{{REBALANCE_DIR}}`
+(documentation convention today, not yet consumed by `stack.sh` — it still derives
+its target from whichever checkout you run `stack.sh up`/`install` from; see `SCHEDULER.md` § Shared mechanics for the current `{{REBALANCE_DIR}}`
 templating). Record **your own** machine's actual path in your own gitignored
 `temp/RUNTIME.md` (repo root, `/temp` is already ignored) — never in a tracked file,
 since an absolute path leaks your local username/directory layout. `temp/RUNTIME.md`

@@ -37,6 +37,7 @@ goal: >
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed and ready for review in #231; human usefulness remains a release decision; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
 ### In progress
+- **One install path — per-job installers folded into `stack.sh`** ([#255](https://github.com/HiQS-Labs/rebalanceOS/issues/255)) — GH-241 follow-up; Phase 1 in review: fixes drift between `stack.sh up` and the 13 per-job installers, deletes them. rated 70/65/55/60 → [GH-255-ONE-INSTALL-PATH.md](PROJECT/2-WORKING/GH-255-ONE-INSTALL-PATH.md)
 - **Broken runtime virtualenv strands scheduler fleet at EX_CONFIG** ([#236](https://github.com/HiQS-Labs/rebalanceOS/issues/236)) — active one-phase repair: add one declared-runtime interpreter diagnosis, route status 78 through verify, and keep all remediation explicit. rated 90/90/50/80 → [GH-236-RUNTIME-VENV-DIAGNOSTICS.md](PROJECT/2-WORKING/GH-236-RUNTIME-VENV-DIAGNOSTICS.md)
 - **Daily established-work status reader** ([#233](https://github.com/HiQS-Labs/rebalanceOS/issues/233)) — implementation; XYZ646 producer landing required. rated 70/45/50/45 → [GH-233-DAILY-STATUS.md](PROJECT/2-WORKING/GH-233-DAILY-STATUS.md)
 - **CLIO first-prompt capture** ([#199](https://github.com/HiQS-Labs/rebalanceOS/issues/199)) — preserve initial no-history setup while capturing new root sessions before their first poll; exclude inherited child prompts. rated 85/80/50/70 → [GH-199-CLIO-FIRST-PROMPT.md](PROJECT/2-WORKING/GH-199-CLIO-FIRST-PROMPT.md)

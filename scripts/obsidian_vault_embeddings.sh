@@ -17,7 +17,7 @@ log "=== rebalance obsidian vault embeddings starting ==="
 # Freshness policy: "semantic" is included INTENTIONALLY as the follow-on
 # stage — vault ingest alone updates raw tables only; the semantic backfill+
 # embed is what makes edited notes searchable within the hour.
-if "$PYTHON" - <<'PY' >> "$LOG_FILE" 2>&1
+if rb_run_python_stdin <<'PY' >> "$LOG_FILE" 2>&1
 import json
 import sys
 from rebalance.ingest.index_ops import refresh_index

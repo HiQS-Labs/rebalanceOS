@@ -112,10 +112,16 @@ since GH-175 **no two jobs share a minute**:
   the persistent server and `fork()` in a finite wrapper; the same rendered jobs at standard
   priority reached their work promptly. Staggered cadences and the finite-job guards bound resource
   pressure without asking launchd to starve process startup.
-- Installers source `scripts/lib/install_common.sh`: chmod the wrapper,
-  always-unload, render the template (`{{REBALANCE_DIR}}`, `{{PYTHON}}`,
-  `{{HOME}}`), `plutil -lint`, load, poll-verify registration. Rendered plists
-  live in `~/Library/LaunchAgents/` (gitignored).
+- One install flow, `scripts/lib/install_common.sh`, driven only by `stack.sh`
+  (`up` or `install <job>...`): chmod the wrapper, render the template
+  (`{{REBALANCE_DIR}}`, `{{PYTHON}}`, `{{HOME}}`) and `plutil -lint` it, run the
+  job's precondition, retire any label it replaced, warn on dropped hand-added
+  secrets, create every directory the plist logs into, always-unload, load,
+  poll-verify registration. Job-specific install steps live there and nowhere
+  else — GH-255 retired the 13 per-job installers after they drifted from
+  `stack.sh up`. Rendered plists live in `~/Library/LaunchAgents/` (gitignored).
+- `daily-work-synthesis` is opt-in: `up` reports it SKIPPED until
+  `temp/daily-work-synthesis.json` exists (GH-210).
 - Python-direct jobs (no wrapper) log via launchd `StandardOutPath`/
   `StandardErrorPath` into `temp/logs/` instead of the dated wrapper logs;
   obsidian-rollover logs to `~/Library/Logs/rebalance-os/` because
@@ -138,12 +144,12 @@ is what keeps the deferred 3-Eyes plists safe (GH-59).
 | Health check | `bash scripts/stack.sh doctor` |
 | Preflight without changing anything | `bash scripts/stack.sh verify` |
 | Unload **and delete** managed plists | `bash scripts/stack.sh purge` |
-| Install / reinstall ONE job | `bash scripts/install_<job>_scheduler.sh` (daily-sync: `install_scheduler.sh`) |
+| Install / reinstall named jobs | `bash scripts/stack.sh install <job>...` (same flow and binding guard as `up`) |
 | Run a job now | `bash scripts/<job>.sh` |
 | Tail a job log | `cat temp/logs/<job_name>_$(date +%Y-%m-%d).log` |
 | Job lifecycle history | `temp/logs/auth_activity.jsonl` (also `rebalance serve` → /auth-log, the System Log page) |
 | Health-check state changes | same log, `source=health` — written on TRANSITION only by `rebalance.ingest.health_log`, never once per run |
-| Verify templates match installed plists | render with the installer substitutions and `diff` against `~/Library/LaunchAgents/` |
+| Verify templates match installed plists | render with the `install_common.sh` substitutions and `diff` against `~/Library/LaunchAgents/` |
 
 Plists pin absolute paths, so a job belongs to **one checkout**. `stack.sh up`
 prints the root it is about to bind to and refuses to move a fleet that is
@@ -151,9 +157,9 @@ bound somewhere else unless you pass `--force`; `status` shows the current
 binding in its `BOUND TO` column. Running `up` from the wrong clone is
 otherwise a silent fleet-wide migration (GH-36, GH-59).
 
-The per-job installers remain supported and are what `stack.sh` calls
-underneath. They stay until `stack.sh` has been proven on a second machine.
+`install <job>` applies the same guard to the named jobs only, so a job bound
+elsewhere blocks installing *that* job but not an unrelated one.
 
 Secrets: never put API keys in templates (tracked in git). The
 health-check-triage job reads `ANTHROPIC_API_KEY` from the rendered plist or
-keyring; reinstalling overwrites a hand-added key (the installer warns).
+keyring; reinstalling overwrites a hand-added key (`stack.sh` warns, naming the key).
