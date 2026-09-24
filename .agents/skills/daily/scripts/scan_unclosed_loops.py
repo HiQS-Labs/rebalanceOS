@@ -26,9 +26,9 @@ import zoneinfo
 
 
 KNOWN_ACTIVE_ROOTS = (
-    Path("/Users/noelsaw/Documents/GH Repos"),
-    Path("/Users/noelsaw/Local Sites"),
-    Path("/Users/noelsaw/marathon-clones"),
+    Path.home() / "Documents" / "GH Repos",
+    Path.home() / "Local Sites",
+    Path.home() / "marathon-clones",
 )
 
 PRIMARY_WATCHED_REPOS = [

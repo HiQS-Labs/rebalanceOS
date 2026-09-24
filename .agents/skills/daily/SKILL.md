@@ -44,7 +44,7 @@ Then begin work.
 ## Procedure (Every 15 Minutes)
 
 ### Step 1 — Read Recent Multi-Agent Prompts (Intent Signal)
-Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_prompts` table in `rebalance.db`).
+Inspect the top of `~/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_prompts` table in `rebalance.db`).
 - Extract prompts within the current 2-hour window.
 - Identify active repositories, tools/agents (Claude, Agy, Codex, ZCode), and explicit directives (e.g. PR reviews, feature builds, hotfixes, refactors).
 
