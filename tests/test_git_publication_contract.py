@@ -232,3 +232,32 @@ def test_replaceable_page_peer_race_delivers_without_authored_resolution(tmp_pat
     assert result["pushed"], result
     assert _git(["show", "HEAD:pulse.md"], cwd=remote).stdout == "current generated page\n"
     assert not (local / ".git/rebase-merge").exists()
+
+
+def test_malformed_pointer_defers_without_discarding_payload(tmp_path: Path, monkeypatch):
+    from test_sync_snapshot import _seed_calendar, _seed_email
+    from rebalance.ingest.index_ops import _refresh_sync
+
+    _remote, local = _make_repos(tmp_path)
+    database = tmp_path / "source.db"
+    _seed_calendar(database, [])
+    _seed_email(database, [])
+    pointer = local / "sync/calendar/latest.json"
+    pointer.parent.mkdir(parents=True)
+    pointer.write_text('{"device_id": "a"')
+    monkeypatch.setattr("rebalance.ingest.config.get_pulse_config", lambda: {"pulse_target_path": str(local)})
+    monkeypatch.setattr("rebalance.ingest.config.get_sync_subdir", lambda: "sync")
+    monkeypatch.setattr("rebalance.ingest.sync_snapshot.get_device_id", lambda: "device")
+    result = _refresh_sync(database, dry_run=False)
+    assert result["deferred"] and result["error"]
+    assert pointer.read_text() == '{"device_id": "a"'
+    assert json.loads((local / "sync/calendar/device.json").read_text())["device_id"] == "device"
+
+
+def test_owned_filename_is_literal_not_a_git_glob(tmp_path: Path):
+    remote, local = _make_repos(tmp_path)
+    (local / "page-authored.md").write_text("unrelated private draft\n")
+    result = _commit_and_push_if_changed(local, "page*.md", "generated\n", push=True, commit_message="literal path")
+    assert result["pushed"], result
+    assert "page-authored.md" not in _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
+    assert (local / "page-authored.md").read_text() == "unrelated private draft\n"

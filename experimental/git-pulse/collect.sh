@@ -305,6 +305,12 @@ else
     device_id="$desired_device_id"
 fi
 
+if [ ! -d "$sync_repo_dir/.git" ]; then
+    echo "Sync repo not found at $sync_repo_dir" >&2
+    echo "Run install.sh to clone it." >&2
+    exit 1
+fi
+
 # Same OS lock as Python publishers; inherited descriptor spans the entire run.
 # No Rebalance installation is required on a standalone collector device.
 if [ "${1:-}" != "--dry-run" ] && [ -z "${GIT_PULSE_LOCK_FD:-}" ]; then
@@ -342,11 +348,7 @@ if ! declare -p repos >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ ! -d "$sync_repo_dir/.git" ]; then
-    echo "Sync repo not found at $sync_repo_dir" >&2
-    echo "Run install.sh to clone it." >&2
-    exit 1
-fi
+
 
 DRY_RUN=0
 if [ "${1:-}" = "--dry-run" ]; then
@@ -480,6 +482,7 @@ check_sync_repo
 # External snapshot producers leave owned output dirty. Preserve those exact paths
 # before pulling; refuse authored/foreign dirt rather than stashing or absorbing it.
 python3 - "$sync_repo_dir" "$device_id" "$configured_device_id" <<'PREPARE'
+import fcntl
 import os
 import subprocess
 import sys
@@ -491,6 +494,7 @@ held = os.fstat(fd)
 lock = os.stat(os.path.join(git("rev-parse", "--absolute-git-dir").strip(), "rebalance-publish.lock"))
 if (held.st_dev, held.st_ino) != (lock.st_dev, lock.st_ino):
     sys.exit("Publication blocked: invalid inherited lock")
+fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 owned = {f"pulse-{d}.md" for d in (device, previous)} | {f"devices/{d}.yaml" for d in (device, previous)} | {f"pdda/registry-{device}.tsv"}
 changed = set(git("diff", "--name-only", "-z").split("\0")) | set(git("diff", "--cached", "--name-only", "-z").split("\0"))
 changed.discard("")

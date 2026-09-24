@@ -10,7 +10,8 @@ Date: 2026-09-24. Tracking: #23. Protocol: PROJECT/2-WORKING/GH-23-PUBLICATION-D
 - An interim full run overlapped the version bump and correctly reported one version mismatch (old imported constant versus updated packaging file); this is not counted as the final gate.
 - Final full run: 2770 passed, 21 skipped, 11 xfailed; 143 subtests. Production source was unchanged during this run. A test lambda received an equivalent default binding for lint compliance.
 - Ruff check/format, mypy (117 source files), shell syntax, five governance ratchets and the task-scoped frontmatter/status/roadmap checks pass. Repository-wide PDDA still reports unrelated pre-existing document debt.
-- Independent implementation QA is pending below.
+- Post-review malformed-pointer and literal-path controls: two failures before fixes; 135 focused tests pass after the review fixes (including thirteen contract controls). Ruff/mypy/shell checks pass again. Initial cloud CI passed on Python 3.12 and 3.13; the review-fix head is being rechecked.
+- Implementation QA round 1 textual PASS was rejected by the driver for transcript ordering; its verbatim thread is retained. Round 2 must supply attested approval.
 
 ## Reproduction
 

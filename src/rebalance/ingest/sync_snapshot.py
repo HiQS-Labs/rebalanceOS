@@ -237,14 +237,16 @@ def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) 
     if latest_path.exists():
         try:
             current = json.loads(latest_path.read_text(encoding="utf-8"))
+            if not isinstance(current, dict):
+                raise ValueError(f"invalid latest pointer: {latest_path}")
             current_stamp = parse_utc_iso(current.get("generated_at"))
             stamp = parse_utc_iso(generated_at)
             if current_stamp is None or stamp is None:
-                raise ValueError("invalid latest pointer timestamp")
+                raise ValueError(f"invalid latest pointer timestamp: {latest_path}")
             if (current_stamp, current["device_id"]) >= (stamp, device_id):
                 return
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
-            raise ValueError("invalid latest pointer") from exc
+            raise ValueError(f"invalid latest pointer: {latest_path}") from exc
 
     pointer = {
         "device_id": device_id,
@@ -311,13 +313,16 @@ def _resolve_pointer_conflicts(target_repo: Path, sync_subdir: str) -> bool:
         for path in files:
             if path.name == "latest.json":
                 continue
+            if path.is_symlink():
+                raise ValueError(f"invalid snapshot evidence: {path.name}")
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(payload, dict) or path.is_symlink():
+            if not isinstance(payload, dict):
                 raise ValueError(f"invalid snapshot evidence: {path.name}")
             stamp = parse_utc_iso(payload.get("generated_at"))
             device = payload.get("device_id")
             if (
                 stamp is None
+                or not isinstance(device, str)
                 or not device
                 or path.name != f"{device}.json"
                 or payload.get("source") != directory.name

@@ -417,15 +417,16 @@ def publish_git_paths(
     error = publication_state_error(repo_path, paths)
     if error:
         return {"committed": False, "pushed": False, "git_error": error}
-    proc = run_git(repo_path, "add", "--", *paths)
+    pathspecs = [f":(literal){path}" for path in paths]
+    proc = run_git(repo_path, "add", "--", *pathspecs)
     if proc.returncode:
         return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
-    diff = run_git(repo_path, "diff", "--cached", "--quiet", "--", *paths)
+    diff = run_git(repo_path, "diff", "--cached", "--quiet", "--", *pathspecs)
     committed = diff.returncode == 1
     if diff.returncode not in (0, 1):
         return {"committed": False, "pushed": False, "git_error": "cannot inspect staged output"}
     if committed:
-        proc = run_git(repo_path, "commit", "--only", "-m", message, "--", *paths)
+        proc = run_git(repo_path, "commit", "--only", "-m", message, "--", *pathspecs)
         if proc.returncode:
             return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
     result: dict[str, Any] = {"committed": committed, "pushed": False}

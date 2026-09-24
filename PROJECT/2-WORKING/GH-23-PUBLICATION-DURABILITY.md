@@ -211,3 +211,13 @@ snapshot pointers and the reminder export. The reminder export on the remote is 
 versus 13:00 UTC); both per-device snapshot histories and four missing dated digests are retained.
 No authored skill conflict needs resolution. No recovery push or live checkout change has yet
 been made. Final review must assess this preservation-first recovery procedure as well as code.
+
+### Final QA round 1 dispositions
+
+Textual PASS was not attested: the producer's marker placement caused the harness to reject the
+review ordering. The transcript is retained. Before round 2: structured malformed-pointer deferral
+preserves both payload and bad pointer; no device-only push bypasses the dirty-state contract.
+Literal Git pathspecs close an additional exact-ownership edge case. Missing-checkout diagnostics
+precede locking; symlink candidates are rejected before reading. Busy collector lock now returns
+exit 75 (temporary deferral), not a successful scan. It must not advance the cursor and is distinct
+from lost output. Freshness reconcile failure continues to be a scheduler-visible git_error.

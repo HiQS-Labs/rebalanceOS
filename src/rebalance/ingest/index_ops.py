@@ -2074,7 +2074,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"git add {sync_subdir}/ && git commit && git push → {target_repo}",
+                f"publish this device calendar/email files and latest pointers → {target_repo}",
             ],
         }
 
@@ -2112,12 +2112,12 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
                 generated_at=generated_at,
                 lock_acquired=True,
             )
-    except GitPublishLockBusy as exc:
+    except (GitPublishLockBusy, ValueError, OSError) as exc:
         return {
             "scope": "sync",
             "dry_run": False,
             "device_id": device_id,
-            "error": str(exc),
+            "error": f"snapshot publication deferred: {exc}; local output retained, inspect the reported pointer or checkout",
             "deferred": True,
             "elapsed_seconds": round(time.monotonic() - started, 2),
         }
