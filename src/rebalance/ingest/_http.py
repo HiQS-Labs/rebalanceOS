@@ -82,6 +82,7 @@ class _RequestAttribution:
         self.endpoint_attempt_counts: Counter[str] = Counter()
         self.logical_requests = 0
         self.attempts = 0
+        self.not_modified_count = 0
         self.rate_limit_first: dict[str, str | int] | None = None
         self.rate_limit_last: dict[str, str | int] | None = None
         self.rate_limit_reset_epochs: set[str] = set()
@@ -134,6 +135,9 @@ class _RequestAttribution:
             del self.slowest[_SLOWEST_KEPT:]
 
     def record_headers(self, status: int, attempt: int, headers: dict[str, str], url: str = "") -> None:
+        if status == 304:
+            with _ATTRIBUTION_LOCK:
+                self.not_modified_count += 1
         if not any(key.startswith("x-ratelimit-") for key in headers):
             return
         # Do not derive a per-job quota delta: this PAT can be shared and a
@@ -164,6 +168,7 @@ class _RequestAttribution:
                 "run_id": self.run_id,
                 "logical_requests": self.logical_requests,
                 "attempts": self.attempts,
+                "not_modified_requests": self.not_modified_count,
                 "endpoint_counts": dict(sorted(self.endpoint_counts.items())),
                 "endpoint_attempt_counts": dict(sorted(self.endpoint_attempt_counts.items())),
                 "total_seconds": round(self.total_seconds, 3),
@@ -311,7 +316,7 @@ class GitHubClient:
         # represented in one job total.
         self._attribution = _job_attribution(self.job_label, self.run_id)
 
-    def headers(self) -> dict[str, str]:
+    def headers(self, etag: str | None = None) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": self._user_agent,
@@ -319,16 +324,18 @@ class GitHubClient:
         }
         if self.token.strip():
             headers["Authorization"] = f"Bearer {self.token}"
+        if etag:
+            headers["If-None-Match"] = etag
         return headers
 
-    def _request(self, url: str) -> tuple[int, Any, dict[str, str], str]:
+    def _request(self, url: str, etag: str | None = None) -> tuple[int, Any, dict[str, str], str]:
         last_status = 0
         last_body = ""
         last_headers: dict[str, str] = {}
         self._attribution.record_request(url)
         for attempt in range(self.retries):
             self._attribution.record_attempt(url)
-            req = urllib.request.Request(url, headers=self.headers())
+            req = urllib.request.Request(url, headers=self.headers(etag=etag))
             # Spans the body read as well as the connect: the observed stall was inside
             # resp.read(), not in establishing the connection, so timing only urlopen()
             # would have measured the fast half of a slow request.
@@ -346,6 +353,9 @@ class GitHubClient:
                 last_status = exc.code
                 last_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
                 self._attribution.record_headers(last_status, attempt + 1, last_headers, url)
+                if last_status == 304:
+                    exc.close()
+                    return 304, None, last_headers, ""
                 try:
                     last_body = exc.read().decode() if exc.fp else ""
                 except Exception:  # noqa: BLE001 — body read can fail mid-stream
@@ -382,20 +392,20 @@ class GitHubClient:
         """Emit the current job summary now; process exit emits any pending one."""
         self._attribution.emit_summary()
 
-    def get(self, path_or_url: str) -> tuple[int, Any]:
+    def get(self, path_or_url: str, *, etag: str | None = None) -> tuple[int, Any]:
         """Return ``(status, parsed_json_or_None)``. Mirrors github_scan._get."""
         url = path_or_url if path_or_url.startswith("http") else f"{GITHUB_API}{path_or_url}"
-        status, data, _, _body = self._request(url)
+        status, data, _, _body = self._request(url, etag=etag)
         return status, data
 
-    def get_with_headers(self, path_or_url: str) -> tuple[int, Any, dict[str, str]]:
+    def get_with_headers(self, path_or_url: str, *, etag: str | None = None) -> tuple[int, Any, dict[str, str]]:
         """Return ``(status, parsed_json_or_None, response_headers)``.
 
         Use when the caller needs to read response headers (e.g.
-        ``X-OAuth-Scopes`` on ``/user``). Headers are lowercased.
+        ``X-OAuth-Scopes`` on ``/user``, ``ETag``). Headers are lowercased.
         """
         url = path_or_url if path_or_url.startswith("http") else f"{GITHUB_API}{path_or_url}"
-        status, data, headers, _body = self._request(url)
+        status, data, headers, _body = self._request(url, etag=etag)
         return status, data, headers
 
     def get_json(self, path_or_url: str) -> Any:

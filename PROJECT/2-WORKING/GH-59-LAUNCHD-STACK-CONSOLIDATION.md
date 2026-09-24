@@ -50,7 +50,7 @@ table, and nothing else does.
 | E2 | **8 loaded, 3 installed-but-never-loaded**: `health-check`, `health-check-triage`, `pulse-warning-watch`. | `launchctl list` |
 | E3 | **12** installer scripts — one per policy job. | `ls scripts/install_*.sh` |
 | E4 | `github-sync` and `pulse-sync` both report last exit `1`. | `launchctl list` |
-| E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `/Users/noelsaw/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. **Fixed and verified in Phase 0** — `reconcile_pulse_mirror` now returns OK and `publish_pulse` dry-run returns `ok=True`. | `temp/logs/pulse_sync_2026-08-17.log`, then re-run |
+| E5 | **`pulse-sync` root cause:** `pulse_target_path` points at `~/Documents/rebalance-OS/git-pulse-sync`, which no longer exists. The real mirror is `~/git-pulse-sync`. **Fixed and verified in Phase 0** — `reconcile_pulse_mirror` now returns OK and `publish_pulse` dry-run returns `ok=True`. | `temp/logs/pulse_sync_2026-08-17.log`, then re-run |
 | E6 | **`github-sync` fails on primary rate limiting.** Every failing run reports `remaining=0`. That much is certain. See the ledger below. | `temp/logs/github_sync_2026-08-17.log` |
 | E6a | ~~**Attribution measured, and it went against the premise.** 21 min of a real run consumed **≤24** REST requests against a 12-min idle baseline of **1**.~~ **WITHDRAWN 2026-08-18** — measured with `GET /rate_limit`, since shown not to report the bucket that gates requests (see the correction under Phase 3). The latency half survives: the runtime is spent blocked in `poll()` on SSL reads from `api.github.com`, observed directly in the process. | 30 s sampling of `GET /rate_limit` (invalid); `sample(1)` of the running process (valid) |
 | E7 | Rate limit at 21:32: `core` 4980/5000. The quota is burned and refilled, not permanently gone. | `GET /rate_limit` |
@@ -116,7 +116,7 @@ Small changes that fix the actual outage, plus the one measurement Phase 3 depen
 
 - [x] Commit and push `scripts/stack.sh`. It was 267 untracked lines living in one working tree with
       no backup behind it, and every later phase builds on it.
-- [x] Repoint `pulse_target_path` to `/Users/noelsaw/git-pulse-sync` (E5). One config value, in both
+- [x] Repoint `pulse_target_path` to `~/git-pulse-sync` (E5). One config value, in both
       checkouts. Verified: `reconcile_pulse_mirror` OK, `publish_pulse` dry-run `ok=True`.
 - [x] Load the 3 installed-but-unloaded agents (E2). Fleet is now 11 loaded, 0 dormant — this
       restores `health-check` today, before any refactor.

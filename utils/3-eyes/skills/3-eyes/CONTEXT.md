@@ -232,7 +232,7 @@ proof the hook is wired correctly — smoke-test it by piping a real payload wit
 ### Log entry format
 
 ```
-=== 2026-07-24T14:32:10-07:00 | device example-mac.local | session 823bc4b3 | cwd /Users/example/Projects/rebalance-OS ===
+=== 2026-07-24T14:32:10-07:00 | device example-mac.local | session 823bc4b3 | cwd /path/to/example/Projects/rebalance-OS ===
 REQUEST:
 <the user's actual prompt for that turn, clipped to ~2000 chars>
 

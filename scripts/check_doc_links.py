@@ -38,6 +38,7 @@ SKIP_DIRS = {
     "node_modules",
     "__pycache__",
     ".tick",
+    "temp",
     # Archived agent transcripts. They record what agents actually wrote at the time;
     # repointing their links would falsify the record (GH-88).
     "relay-system",

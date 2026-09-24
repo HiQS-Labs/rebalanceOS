@@ -44,7 +44,7 @@ Then begin work.
 ## Procedure (Every 15 Minutes)
 
 ### Step 1 — Read Recent Multi-Agent Prompts (Intent Signal)
-Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_prompts` table in `rebalance.db`).
+Inspect the top of `~/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_prompts` table in `rebalance.db`).
 - Extract prompts within the current 2-hour window.
 - Identify active repositories, tools/agents (Claude, Agy, Codex, ZCode), and explicit directives (e.g. PR reviews, feature builds, hotfixes, refactors).
 
@@ -108,7 +108,7 @@ Inspect the top of `/Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md` (or 
      - *Citation*: `[Trigger: Unclosed loop <repo:branch_or_pr> stalled for N cycles]`
    - **Runaway Compute Alert**:
      - *Trigger*: The CPU-health scanner flags the same PID as a runaway candidate for $\ge 2$ consecutive cycles, or any candidate with elapsed $\ge 24\text{h}$ on its first flag.
-     - *Nudge*: Name the process, its duty cycle and persistence span, and surface the ready `kill <pid>` command so the operator can stop it; never signal or kill the process yourself.
+     - *Nudge*: Name the process, its duty cycle and persistence span, and instruct the operator to verify the live process still matches the recorded `(pid, lstart)` before running `kill <pid>`, and surface the command for them; never signal or kill the process yourself.
      - *Citation*: `[Trigger: PID <n> runaway for N cycles, duty <d>%]`
 
 ---

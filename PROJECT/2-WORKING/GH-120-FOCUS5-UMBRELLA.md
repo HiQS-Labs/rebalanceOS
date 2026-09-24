@@ -50,8 +50,8 @@ at least six consecutive runs. Seven prompts have never been written and no run 
 stderr says why:
 
 ```
-grep: /Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md: Interrupted system call
-cat:  /Users/noelsaw/Documents/Noel Saw/0. Claude Prompts.md: Interrupted system call
+grep: ~/Documents/Noel Saw/0. Claude Prompts.md: Interrupted system call
+cat:  ~/Documents/Noel Saw/0. Claude Prompts.md: Interrupted system call
 ```
 
 Desktop & Documents iCloud sync is on, so the 1.3 MB target sits on a cloud-managed volume. While
