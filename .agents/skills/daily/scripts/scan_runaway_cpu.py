@@ -54,6 +54,7 @@ SERVICE_EXEMPTIONS = (
     "WindowServer",
 )
 
+
 def _find_repo_root() -> Path:
     # 4 levels up from this script: <repo_root>/.agents/skills/daily/scripts/...
     cand = Path(__file__).resolve().parents[4]
@@ -279,7 +280,15 @@ def main() -> int:
     processes = snapshot_processes()
     if processes is None:
         if args.json:
-            print(json.dumps({"summary_line": "- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)", "status": "degraded"}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "summary_line": "- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)",
+                        "status": "degraded",
+                    },
+                    indent=2,
+                )
+            )
         else:
             print("- **Machine CPU Health**: scanner degraded (ps unavailable this cycle)")
         return 0

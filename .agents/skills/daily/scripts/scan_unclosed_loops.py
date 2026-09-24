@@ -27,17 +27,18 @@ import zoneinfo
 
 def _default_scan_roots() -> tuple[Path, ...]:
     roots = []
-    # Current repo's parent directory
-    cur = Path(__file__).resolve().parents[4]
-    if cur.exists() and cur.parent.exists():
-        roots.append(cur.parent)
+    # Find current repo root first
+    cur = find_repo_root(Path(__file__).resolve())
+    if cur and cur != Path.home() and cur != Path("/") and cur.parent.exists():
+        if cur.parent != Path.home().parent and cur.parent != Path("/"):
+            roots.append(cur.parent)
     scan_env = os.environ.get("REBALANCE_REPO_SCAN_ROOTS")
     if scan_env:
         for r in scan_env.split(":"):
             p = Path(r).expanduser()
-            if p.exists() and p not in roots:
+            if p.exists() and p != Path.home() and p != Path("/") and p not in roots:
                 roots.append(p)
-    return tuple(roots) if roots else (Path.cwd().parent,)
+    return tuple(roots) if roots else (Path.cwd(),)
 
 
 KNOWN_ACTIVE_ROOTS = _default_scan_roots()

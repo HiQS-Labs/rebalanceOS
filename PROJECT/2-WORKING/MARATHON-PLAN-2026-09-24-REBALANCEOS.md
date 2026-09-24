@@ -6,7 +6,7 @@ updated: 2026-09-24
 owner: noel
 branch: development
 doc_type: project
-roadmap_pointer: ROADMAP.md (Governance & Data Plane Stabilization)
+roadmap_exempt: true
 reversibility: Easy — file-scoped feature branches, no destructive DB drops
 goal: >
   Execute high-value governance, script-sprawl, skill-path, and data-plane
@@ -65,8 +65,8 @@ goal: >
 ---
 
 ## Acceptance & Quality Checklist
-- [x] Every lane runs on a fresh task clone or audited feature branch.
+- [x] Every lane runs on an audited feature branch with disjoint write sets.
 - [x] Each lane includes a mechanical "Proof of Done" test artifact before merge.
 - [x] Wave Post-Build Codex QA Relay executed and recorded on disk.
 - [x] CI lint and ratchet checks pass cleanly.
-- [x] All ratchets ratchet downward permanently.
+- [ ] PR merged to `development` with post-merge lifecycle reconciliation.
