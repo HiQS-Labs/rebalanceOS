@@ -19,7 +19,9 @@ def test_machine_paths_negative_control(tmp_path: Path):
     # Init a mock git repository
     subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Tester"], cwd=str(tmp_path), check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(tmp_path), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=str(tmp_path), check=True, capture_output=True
+    )
 
     # Add a file with a hardcoded machine path
     bad_file = tmp_path / "script.py"
@@ -43,7 +45,9 @@ def test_machine_paths_pragma_exemption(tmp_path: Path):
     """Assert that MACHINE-LOCAL-OK pragma exempts the line from failing."""
     subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Tester"], cwd=str(tmp_path), check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(tmp_path), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=str(tmp_path), check=True, capture_output=True
+    )
 
     good_file = tmp_path / "script.py"
     good_file.write_text('path = "/Users/alice/projects/test.py"  # MACHINE-LOCAL-OK: tested\n', encoding="utf-8")
