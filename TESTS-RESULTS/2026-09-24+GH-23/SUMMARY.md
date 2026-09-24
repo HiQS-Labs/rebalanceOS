@@ -17,7 +17,7 @@ Date: 2026-09-24. Tracking: #23. Protocol: PROJECT/2-WORKING/GH-23-PUBLICATION-D
 Use the repository Python environment with PYTHONPATH=src:HiQS and PYTHONDONTWRITEBYTECODE=1.
 Run `python -m pytest tests/test_git_publication_contract.py -q` for real temporary-repository boundaries; `python -m pytest tests/ HiQS/tests/ -q` for the full suite. The deferred supervisor suite is deliberately excluded. No custom runner was introduced.
 
-Console copies redact machine-local home and temporary paths; assertions and result counts are unchanged. Fixtures contain synthetic data, not production exports.
+Console copies trim trailing whitespace and redact machine-local home and temporary paths; assertions and result counts are unchanged. Fixtures contain synthetic data, not production exports.
 
 ## Threats to validity
 

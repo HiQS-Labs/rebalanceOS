@@ -48,7 +48,7 @@ ____________________ test_runtime_version_matches_pyproject ____________________
         )
 E       AssertionError: pyproject says 0.95.1 but rebalance.__version__ is 0.95.0 — bump both together
 E       assert '0.95.0' == '0.95.1'
-E         
+E
 E         - 0.95.1
 E         ?      ^
 E         + 0.95.0
