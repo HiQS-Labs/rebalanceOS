@@ -1,0 +1,222 @@
+FFFFFFFFF                                                                [100%]
+=================================== FAILURES ===================================
+____________ test_reminder_refresh_never_changes_index_or_worktree _____________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_reminder_refresh_never_changes_index_or_worktree(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        source = local / "reminders.json"
+        source.write_text(json.dumps({"reminders": [], "revision": 1}))
+        _git(["add", "reminders.json"], cwd=local)
+        _git(["commit", "-m", "old export"], cwd=local)
+        _git(["push"], cwd=local)
+        peer = tmp_path / "peer"
+        _git(["clone", str(remote), str(peer)], cwd=tmp_path)
+        _git(["config", "user.name", "Test"], cwd=peer)
+        _git(["config", "user.email", "test@example.invalid"], cwd=peer)
+        (peer / "reminders.json").write_text(json.dumps({"reminders": [], "revision": 2}))
+        _git(["add", "reminders.json"], cwd=peer)
+        _git(["commit", "-m", "new export"], cwd=peer)
+        _git(["push"], cwd=peer)
+        before = source.read_bytes()
+        result = _refresh_file_source(source)
+>       assert source.read_bytes() == before
+E       assert b'{"reminders...revision": 2}' == b'{"reminders...revision": 1}'
+E
+E         At index 30 diff: b'2' != b'1'
+E         Use -v to get more diff
+
+tests/test_git_publication_contract.py:31: AssertionError
+____________ test_foreign_staged_content_is_preserved_not_committed ____________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_foreign_staged_content_is_preserved_not_committed(tmp_path: Path):
+        _remote, local = _make_repos(tmp_path)
+        (local / "authored.txt").write_text("precious staged work\n")
+        _git(["add", "authored.txt"], cwd=local)
+        head = _git(["rev-parse", "HEAD"], cwd=local).stdout
+        result = _commit_and_push_if_changed(local, "pulse.md", "new page\n", push=True, commit_message="page")
+>       assert result.get("git_error")
+E       AssertionError: assert None
+E        +  where None = <built-in method get of dict object at 0x107edeb40>('git_error')
+E        +    where <built-in method get of dict object at 0x107edeb40> = {'wrote_file': True, 'committed': True, 'pushed': True}.get
+
+tests/test_git_publication_contract.py:42: AssertionError
+_____________________ test_existing_rebase_is_not_aborted ______________________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_existing_rebase_is_not_aborted(tmp_path: Path):
+        _remote, local = _make_repos(tmp_path)
+        state = local / ".git" / "rebase-merge"
+        state.mkdir()
+        (state / "sentinel").write_text("other transaction")
+        result = git_pull_rebase_safe(local)
+>       assert result.returncode != 0
+E       AssertionError: assert 0 != 0
+E        +  where 0 = CompletedProcess(args=['git', '-C', '<TMP>', 'pull', '--rebase'], returncode=0, stdout='Already up to date.\n', stderr='').returncode
+
+tests/test_git_publication_contract.py:53: AssertionError
+________________ test_snapshot_commit_excludes_reminder_export _________________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_snapshot_commit_excludes_reminder_export(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        for source in ("calendar", "email"):
+            directory = local / "sync" / source
+            directory.mkdir(parents=True)
+            (directory / "device.json").write_text(
+                json.dumps({"device_id": "device", "source": source, "generated_at": "2026-09-24T12:00:00Z", "rows": []})
+            )
+            (directory / "latest.json").write_text(
+                json.dumps({"device_id": "device", "snapshot_file": "device.json", "generated_at": "2026-09-24T12:00:00Z"})
+            )
+        reminder = local / "sync/sleuth/reminders.json"
+        reminder.parent.mkdir()
+        reminder.write_text("foreign export\n")
+        result = commit_and_push_sync(local, "sync", device_id="device", generated_at="2026-09-24T12:00:00Z")
+        assert result.get("pushed") is True
+>       assert "sync/sleuth/reminders.json" not in _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
+E       AssertionError: assert 'sync/sleuth/reminders.json' not in 'pulse.md\ns...nders.json\n'
+E
+E         'sync/sleuth/reminders.json' is contained here:
+E           test.json
+E           sync/sleuth/reminders.json
+
+tests/test_git_publication_contract.py:73: AssertionError
+________________ test_offline_page_retry_does_not_grow_backlog _________________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_offline_page_retry_does_not_grow_backlog(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        offline = tmp_path / "offline"
+        remote.rename(offline)
+        first = _commit_and_push_if_changed(local, "pulse.md", "pending\n", push=True, commit_message="pending")
+        head = _git(["rev-parse", "HEAD"], cwd=local).stdout
+        retry = _commit_and_push_if_changed(local, "pulse.md", "next hourly page\n", push=True, commit_message="next")
+>       assert first.get("pending") and retry.get("pending")
+E       assert (None)
+E        +  where None = <built-in method get of dict object at 0x107ece6c0>('pending')
+E        +    where <built-in method get of dict object at 0x107ece6c0> = {'wrote_file': True, 'committed': True, 'pushed': False, 'git_error': "fatal: '<TMP> not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists."}.get
+
+tests/test_git_publication_contract.py:84: AssertionError
+__________________ test_shell_collector_defers_to_python_lock __________________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_shell_collector_defers_to_python_lock(tmp_path: Path):
+        import subprocess
+        from rebalance.lib.git_ops import git_publish_lock
+
+        _remote, local = _make_repos(tmp_path)
+        env, config = _collector_env(tmp_path, local)
+        script = Path(__file__).parents[1] / "experimental/git-pulse/collect.sh"
+        before = _git(["rev-parse", "HEAD"], cwd=local).stdout
+        with git_publish_lock(local):
+            blocked = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, timeout=15)
+>       assert blocked.returncode == 75, blocked.stderr
+E       AssertionError:
+E       assert 0 == 75
+E        +  where 0 = CompletedProcess(args=['bash', '<HOME>/marathon-clones/rebalance-gh23-checks/experimental/git-pulse/collect.sh'], returncode=0, stdout='', stderr='').returncode
+
+tests/test_git_publication_contract.py:114: AssertionError
+_____________ test_peer_pointer_conflict_preserves_both_snapshots ______________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_peer_pointer_conflict_preserves_both_snapshots(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        peer = tmp_path / "peer"
+        _git(["clone", str(remote), str(peer)], cwd=tmp_path)
+        _git(["config", "user.name", "Peer"], cwd=peer)
+        _git(["config", "user.email", "peer@example.invalid"], cwd=peer)
+
+        def snapshot(repo, device, stamp):
+            for source in ("calendar", "email"):
+                directory = repo / "sync" / source
+                directory.mkdir(parents=True)
+                (directory / f"{device}.json").write_text(
+                    json.dumps(
+                        {"schema_version": 1, "source": source, "device_id": device, "generated_at": stamp, "rows": []}
+                    )
+                )
+                (directory / "latest.json").write_text(
+                    json.dumps({"device_id": device, "generated_at": stamp, "snapshot_file": f"{device}.json"})
+                )
+
+        snapshot(peer, "peer", "2026-09-24T12:00:00Z")
+        assert commit_and_push_sync(peer, "sync", device_id="peer", generated_at="2026-09-24T12:00:00Z")["pushed"]
+        snapshot(local, "local", "2026-09-24T04:30:00-07:00")
+        result = commit_and_push_sync(local, "sync", device_id="local", generated_at="2026-09-24T04:30:00-07:00")
+>       assert result["pushed"], result
+E       AssertionError: {'committed': True, 'repair_log': ['attempt 1/2: pull_rebase', 'failed: From <TMP> 'git pull' before pushing again.
+E         hint: See the 'Note about fast-forwards' in 'git push --help' for details.", ...}
+E       assert False
+
+tests/test_git_publication_contract.py:147: AssertionError
+_______________ test_shell_lock_covers_push_and_releases_on_exit _______________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_shell_lock_covers_push_and_releases_on_exit(tmp_path: Path):
+        import subprocess
+        import time
+        from rebalance.lib.git_ops import git_publish_lock, GitPublishLockBusy
+        import pytest
+
+        remote, local = _make_repos(tmp_path)
+        env, config = _collector_env(tmp_path, local)
+        marker = tmp_path / "pushing"
+        release = tmp_path / "release"
+        hook = remote / "hooks/pre-receive"
+        hook.write_text(f'#!/bin/sh\ntouch "{marker}"\nwhile [ ! -e "{release}" ]; do sleep 0.1; done\n')
+        hook.chmod(0o700)
+        script = Path(__file__).parents[1] / "experimental/git-pulse/collect.sh"
+        proc = subprocess.Popen(["bash", str(script)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            deadline = time.monotonic() + 15
+            while not marker.exists() and proc.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.05)
+            assert marker.exists(), "collector did not reach push"
+>           with pytest.raises(GitPublishLockBusy):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE GitPublishLockBusy
+
+tests/test_git_publication_contract.py:174: Failed
+__________ test_conflict_preserves_commit_and_leaves_no_owned_rebase ___________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_conflict_preserves_commit_and_leaves_no_owned_rebase(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        peer = tmp_path / "peer"
+        _git(["clone", str(remote), str(peer)], cwd=tmp_path)
+        _git(["config", "user.name", "Peer"], cwd=peer)
+        _git(["config", "user.email", "peer@example.invalid"], cwd=peer)
+        assert _commit_and_push_if_changed(peer, "pulse.md", "peer authored content\n", push=True, commit_message="peer")[
+            "pushed"
+        ]
+        result = _commit_and_push_if_changed(
+            local, "pulse.md", "precious local content\n", push=True, commit_message="local"
+        )
+>       assert result.get("pending") and result.get("git_error")
+E       assert (None)
+E        +  where None = <built-in method get of dict object at 0x107ec9a40>('pending')
+E        +    where <built-in method get of dict object at 0x107ec9a40> = {'wrote_file': True, 'committed': True, 'repair_log': ['attempt 1/2: pull_rebase', 'failed: From <TMP> with\n', 'escalating to Gemini for action selection', "Gemini call failed: 'parts'", ...], 'pushed': False, ...}.get
+
+tests/test_git_publication_contract.py:198: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_git_publication_contract.py::test_reminder_refresh_never_changes_index_or_worktree
+FAILED tests/test_git_publication_contract.py::test_foreign_staged_content_is_preserved_not_committed
+FAILED tests/test_git_publication_contract.py::test_existing_rebase_is_not_aborted
+FAILED tests/test_git_publication_contract.py::test_snapshot_commit_excludes_reminder_export
+FAILED tests/test_git_publication_contract.py::test_offline_page_retry_does_not_grow_backlog
+FAILED tests/test_git_publication_contract.py::test_shell_collector_defers_to_python_lock
+FAILED tests/test_git_publication_contract.py::test_peer_pointer_conflict_preserves_both_snapshots
+FAILED tests/test_git_publication_contract.py::test_shell_lock_covers_push_and_releases_on_exit
+FAILED tests/test_git_publication_contract.py::test_conflict_preserves_commit_and_leaves_no_owned_rebase
+9 failed in 7.48s

@@ -1,0 +1,116 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_malformed_pointer_defers_without_discarding_payload ___________
+
+source_dir = PosixPath('<TMP>')
+device_id = 'device', generated_at = '2026-09-24T17:34:33.527165+00:00'
+
+    def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) -> None:
+        """Update ``source_dir/latest.json`` if this device's snapshot is the freshest."""
+        latest_path = source_dir / "latest.json"
+        if latest_path.exists():
+            try:
+>               current = json.loads(latest_path.read_text(encoding="utf-8"))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/rebalance/ingest/sync_snapshot.py:239:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.decoder.JSONDecoder object at 0x1007dfa10>, s = '{"device_id": "a"'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+
+        """
+        try:
+>           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           json.decoder.JSONDecodeError: Expecting ',' delimiter: line 1 column 18 (char 17)
+
+/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py:361: JSONDecodeError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('<TMP>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x105143100>
+
+    def test_malformed_pointer_defers_without_discarding_payload(tmp_path: Path, monkeypatch):
+        from test_sync_snapshot import _seed_calendar, _seed_email
+        from rebalance.ingest.index_ops import _refresh_sync
+        _remote, local = _make_repos(tmp_path)
+        database = tmp_path / 'source.db'
+        _seed_calendar(database, [])
+        _seed_email(database, [])
+        pointer = local / 'sync/calendar/latest.json'
+        pointer.parent.mkdir(parents=True)
+        pointer.write_text('{"device_id": "a"')
+        monkeypatch.setattr('rebalance.ingest.config.get_pulse_config', lambda: {'pulse_target_path': str(local)})
+        monkeypatch.setattr('rebalance.ingest.config.get_sync_subdir', lambda: 'sync')
+        monkeypatch.setattr('rebalance.ingest.sync_snapshot.get_device_id', lambda: 'device')
+>       result = _refresh_sync(database, dry_run=False)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_git_publication_contract.py:250:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/rebalance/ingest/index_ops.py:2102: in _refresh_sync
+    cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/rebalance/ingest/sync_snapshot.py:148: in export_calendar_snapshot
+    _update_latest_pointer(sync_dir / "calendar", dev_id, generated_at)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+source_dir = PosixPath('<TMP>')
+device_id = 'device', generated_at = '2026-09-24T17:34:33.527165+00:00'
+
+    def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) -> None:
+        """Update ``source_dir/latest.json`` if this device's snapshot is the freshest."""
+        latest_path = source_dir / "latest.json"
+        if latest_path.exists():
+            try:
+                current = json.loads(latest_path.read_text(encoding="utf-8"))
+                current_stamp = parse_utc_iso(current.get("generated_at"))
+                stamp = parse_utc_iso(generated_at)
+                if current_stamp is None or stamp is None:
+                    raise ValueError("invalid latest pointer timestamp")
+                if (current_stamp, current["device_id"]) >= (stamp, device_id):
+                    return
+            except (KeyError, TypeError, json.JSONDecodeError) as exc:
+>               raise ValueError("invalid latest pointer") from exc
+E               ValueError: invalid latest pointer
+
+src/rebalance/ingest/sync_snapshot.py:247: ValueError
+________________ test_owned_filename_is_literal_not_a_git_glob _________________
+
+tmp_path = PosixPath('<TMP>')
+
+    def test_owned_filename_is_literal_not_a_git_glob(tmp_path: Path):
+        remote, local = _make_repos(tmp_path)
+        (local / 'page-authored.md').write_text('unrelated private draft\n')
+        result = _commit_and_push_if_changed(local, 'page*.md', 'generated\n', push=True, commit_message='literal path')
+        assert result['pushed'], result
+>       assert 'page-authored.md' not in _git(['ls-tree', '-r', '--name-only', 'HEAD'], cwd=remote).stdout
+E       AssertionError: assert 'page-authored.md' not in 'page*.md\np...\npulse.md\n'
+E
+E         'page-authored.md' is contained here:
+E           page*.md
+E           page-authored.md
+E           pulse.md
+
+tests/test_git_publication_contract.py:261: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_git_publication_contract.py::test_malformed_pointer_defers_without_discarding_payload
+FAILED tests/test_git_publication_contract.py::test_owned_filename_is_literal_not_a_git_glob
+2 failed, 11 deselected in 1.42s

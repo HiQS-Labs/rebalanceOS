@@ -1,0 +1,68 @@
+........................................................................ [  2%]
+.......................xx.x.x..x.x..xxx................................. [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+.............................................................. [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................ [ 19%]
+.................................................................. [ 22%]
+........................................................... [ 24%]
+........................................................................ [ 26%]
+........................................................................ [ 29%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+...................................................................... [ 44%]
+.................................................................... [ 47%]
+........................................................................ [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+.............................................................................................................. [ 58%]
+........ssssssssssssssss................................................ [ 61%]
+........................................................................ [ 64%]
+................................x....................................... [ 66%]
+.................................................................. [ 68%]
+.................................................................... [ 71%]
+..................................................................... [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 81%]
+........................................................................ [ 84%]
+..................................................................................................... [ 87%]
+........................................................................ [ 90%]
+...................................................................... [ 92%]
+.....ssss.............................s................................. [ 95%]
+..x..................................................................... [ 98%]
+.......................................................                  [100%]
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <HOME>/marathon-clones/rebalance-gh23-checks/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] HiQS/tests/test_affinity.py:123: UNKNOWN, not pass: private_names.txt absent, so no name check ran. Create it (one lowercase name per line, gitignored) to enforce locally; the Phase 6 pre-extraction history scan remains the blocking gate.
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+2760 passed, 21 skipped, 11 xfailed, 1 warning, 143 subtests passed in 245.61s (0:04:05)

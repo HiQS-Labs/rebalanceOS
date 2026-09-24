@@ -2074,16 +2074,31 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"git add {sync_subdir}/ && git commit && git push → {target_repo}",
+                f"publish this device calendar/email files and latest pointers → {target_repo}",
             ],
         }
 
     import time
-    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock
+    from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock, publication_state_error, run_git
 
     started = time.monotonic()
     try:
         with git_publish_lock(target_repo):
+            owned = [
+                f"{sync_subdir}/{source}/{name}.json"
+                for source in ("calendar", "email")
+                for name in (device_id, "latest")
+            ]
+            error = publication_state_error(target_repo, owned)
+            if error:
+                return {"scope": "sync", "dry_run": False, "error": error, "deferred": True}
+            pending = run_git(target_repo, "log", "--format=%H", "@{u}..HEAD", "--", *owned)
+            if pending.returncode == 0 and pending.stdout:
+                delivery = commit_and_push_sync(
+                    target_repo, sync_subdir, device_id=device_id, generated_at="pending", lock_acquired=True
+                )
+                if delivery.get("git_error"):
+                    return {"scope": "sync", "dry_run": False, "error": delivery["git_error"], "git": delivery}
             cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
             email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
 
@@ -2097,12 +2112,12 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
                 generated_at=generated_at,
                 lock_acquired=True,
             )
-    except GitPublishLockBusy as exc:
+    except (GitPublishLockBusy, ValueError, OSError) as exc:
         return {
             "scope": "sync",
             "dry_run": False,
             "device_id": device_id,
-            "error": str(exc),
+            "error": f"snapshot publication deferred: {exc}; local output retained, inspect the reported pointer or checkout",
             "deferred": True,
             "elapsed_seconds": round(time.monotonic() - started, 2),
         }

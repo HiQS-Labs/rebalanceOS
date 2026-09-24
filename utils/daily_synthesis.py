@@ -440,7 +440,11 @@ def sync_to_clio(summary: str, now: datetime, dry_run: bool = False) -> dict:
         log(f"SKIP: zero-row rerun would clobber an existing non-empty summary ({file_rel})")
         return {"enabled": True, "ok": True, "skipped": "would_clobber"}
 
-    new_content = upsert_clio_block(existing, summary, now)
+    def new_content(current: str) -> str:
+        block = _extract_block_text(current, clio_start, clio_end)
+        if _would_clobber_real_summary(block, summary):
+            return current
+        return upsert_clio_block(current, summary, now)
 
     if dry_run:
         log(f"DRY RUN — would upsert CLIO block into {file_rel}:")

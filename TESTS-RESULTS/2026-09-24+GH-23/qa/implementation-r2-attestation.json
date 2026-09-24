@@ -1,0 +1,19 @@
+{
+  "added_len": 5041,
+  "added_sha256": "fd9a60176101242fbbd36ccded17d9316339ae9dcca95136742f360aa9565d0b",
+  "added_start": 13633,
+  "artifact_sha256": "ecad097f7c77c8b4717d689cb0b40bfc09bc9ea6bf8abf43b60df5c3a62aee2c",
+  "attested_at": "2026-09-24T17:40:37Z",
+  "driver_pid": 85049,
+  "isolated": true,
+  "relay_file": "<TASK_REPO>/.xyz/relay-system/2026-09-24/gh23-final.md",
+  "relay_file_rel": null,
+  "reviewed_head": "5a7b92f9a7ce1d0403410a168f2f0474fba6247e",
+  "reviewer": "claude-fable",
+  "schema": "relay-drive/attest@1",
+  "status": "Approved",
+  "target_repo": "<TASK_REPO>",
+  "task": "RELAY-gh23-final-r2",
+  "trailer_sha256": "9b4ad91d5cc6f59550ace583a68171fcc0116fa2ceb9061e96504a96c6822906",
+  "transcript_repo": "<TASK_REPO>"
+}

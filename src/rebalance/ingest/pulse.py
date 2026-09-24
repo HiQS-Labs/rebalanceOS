@@ -25,10 +25,9 @@ import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from rebalance.repair import RepairFSM, RepairResult, RepairStatus
 from rebalance.ingest._http import GitHubClient, GitHubHTTPError
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
 from rebalance.ingest.calendar_helpers import calendar_dt_utc, normalize_aware_utc
@@ -43,7 +42,14 @@ from rebalance.ingest.db import (
 from rebalance.ingest.slack_users import compact_sleuth_reminder
 from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
-from rebalance.lib.git_ops import GitPublishLockBusy, git_publish_lock, git_pull_rebase_safe, run_git
+from rebalance.lib.git_ops import (
+    GitPublishLockBusy,
+    git_publish_lock,
+    git_pull_rebase_safe,
+    run_git,
+    publication_state_error,
+    publish_git_paths,
+)
 
 
 # Author logins of known cloud-agent bots. Mirrors agent_tags.py — kept here
@@ -81,7 +87,11 @@ def reconcile_pulse_mirror(target_path: Path) -> None:
     # Defer to an operator's in-progress rebase rather than trampling it.
     if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
         raise PulseReconcileError(f"a git rebase is already in progress in {target_path}; deferring to operator")
-    proc = git_pull_rebase_safe(target_path)
+    try:
+        with git_publish_lock(target_path):
+            proc = git_pull_rebase_safe(target_path)
+    except GitPublishLockBusy as exc:
+        raise PulseReconcileError(str(exc)) from exc
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout).strip()
         raise PulseReconcileError(f"git pull --rebase failed (code {proc.returncode}) in {target_path}: {detail}")
@@ -797,10 +807,11 @@ def _render_section_today_sleuth(today: DayActivity, tz: ZoneInfo) -> str:
 def _commit_and_push_if_changed(
     target_repo: Path,
     file_rel: str,
-    new_content: str,
+    new_content: str | Callable[[str], str],
     *,
     push: bool,
     commit_message: str,
+    replaceable: bool = False,
 ) -> dict[str, Any]:
     """Serialize the full content-write-through-push transaction."""
     try:
@@ -811,6 +822,7 @@ def _commit_and_push_if_changed(
                 new_content,
                 push=push,
                 commit_message=commit_message,
+                replaceable=replaceable,
             )
     except GitPublishLockBusy as exc:
         return {
@@ -825,158 +837,66 @@ def _commit_and_push_if_changed(
 def _commit_and_push_if_changed_locked(
     target_repo: Path,
     file_rel: str,
-    new_content: str,
+    new_content: str | Callable[[str], str],
     *,
     push: bool,
     commit_message: str,
+    replaceable: bool = False,
 ) -> dict[str, Any]:
     """Write *new_content* to file_rel inside *target_repo*; commit+push only if changed."""
+    error = publication_state_error(target_repo, [file_rel])
+    if error:
+        return {"wrote_file": False, "committed": False, "pushed": False, "git_error": error}
     target_file = target_repo / file_rel
-    target_file.parent.mkdir(parents=True, exist_ok=True)
-
     existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
-    if existing == new_content:
-        status = run_git(target_repo, "status", "--porcelain", "--", file_rel)
-        if status.returncode != 0:
-            return {
-                "wrote_file": False,
-                "committed": False,
-                "pushed": False,
-                "git_error": status.stderr.strip() or status.stdout.strip(),
-            }
-        if not status.stdout.strip():
-            if not push or _verify_remote_content(target_repo, file_rel, new_content):
-                return {
-                    "wrote_file": False,
-                    "committed": False,
-                    "pushed": False,
-                    "reason": "no content change",
-                }
-            # The worktree is clean but HEAD has content its upstream does not.
-            # This is the other half of recovery from a prior publish failure:
-            # push the existing commit rather than claiming an identical file
-            # means there is nothing to do.
-            pushed = run_git(target_repo, "push")
-            if pushed.returncode != 0:
-                return {
-                    "wrote_file": False,
-                    "committed": False,
-                    "pushed": False,
-                    "git_error": pushed.stderr.strip() or pushed.stdout.strip(),
-                }
-            if not _verify_remote_content(target_repo, file_rel, new_content):
-                return {
-                    "wrote_file": False,
-                    "committed": False,
-                    "pushed": False,
-                    "git_error": "push succeeded but remote content does not match",
-                }
-            return {
-                "wrote_file": False,
-                "committed": False,
-                "pushed": True,
-                "reason": "pushed existing local commit",
-            }
-    else:
-        target_file.write_text(new_content, encoding="utf-8")
+    render_content = new_content
+    if callable(render_content):
+        new_content = render_content(existing)
+    status = run_git(target_repo, "status", "--porcelain", "--", file_rel)
+    if status.returncode:
+        return {"wrote_file": False, "committed": False, "pushed": False, "git_error": status.stderr}
+    if (
+        existing == new_content
+        and not status.stdout
+        and (not push or _verify_remote_content(target_repo, file_rel, existing))
+    ):
+        if push:
+            reconciled = git_pull_rebase_safe(target_repo)
+            if reconciled.returncode:
+                return {"wrote_file": False, "committed": False, "pushed": False, "git_error": reconciled.stderr}
+        return {"wrote_file": False, "committed": False, "pushed": False, "reason": "no content change"}
 
-    proc = run_git(target_repo, "add", file_rel)
-    if proc.returncode != 0:
-        return {
-            "wrote_file": True,
-            "committed": False,
-            "pushed": False,
-            "git_error": proc.stderr.strip() or proc.stdout.strip(),
-        }
+    def resolve_page() -> bool:
+        # This opt-in is used only for the generated live page. Never authorize
+        # an unrelated conflict or replay mixed/authored pending commits.
+        if not replaceable:
+            return False
+        changed = run_git(target_repo, "diff", "--name-only", "--diff-filter=U", "-z")
+        if changed.returncode or changed.stdout != file_rel + "\0":
+            return False
+        replay = run_git(target_repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "REBASE_HEAD")
+        if replay.returncode or replay.stdout.splitlines() != [file_rel]:
+            return False
+        target_file.write_text(existing, encoding="utf-8")
+        return run_git(target_repo, "add", "--", file_rel).returncode == 0
 
-    proc = run_git(target_repo, "status", "--porcelain", file_rel)
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return {"wrote_file": True, "committed": False, "pushed": False, "reason": "nothing staged"}
-
-    proc = run_git(target_repo, "commit", "-m", commit_message)
-    if proc.returncode != 0:
-        return {
-            "wrote_file": True,
-            "committed": False,
-            "pushed": False,
-            "git_error": proc.stderr.strip() or proc.stdout.strip(),
-        }
-
-    if not push:
-        return {"wrote_file": True, "committed": True, "pushed": False}
-
-    proc = run_git(target_repo, "push")
-    if proc.returncode != 0:
-        git_error = proc.stderr.strip() or proc.stdout.strip()
-        if "fetch first" in git_error or "rejected" in git_error:
-            fsm = RepairFSM(
-                actions=_push_repair_actions(target_repo),
-                action_descriptions=_PUSH_ACTION_DESCRIPTIONS,
-                error_context="git push to pulse target repo failed with non-fast-forward rejection",
-                preferred_action="pull_rebase",
-            )
-            repair_state = fsm.run(git_error)
-            base = {"wrote_file": True, "committed": True, "repair_log": repair_state.log}
-            if repair_state.status == RepairStatus.REPAIRED:
-                if not _verify_remote_content(target_repo, file_rel, new_content):
-                    return {
-                        **base,
-                        "pushed": False,
-                        "git_error": "repair reported success but remote content does not match",
-                        "repair_status": "content_mismatch",
-                    }
-                return {**base, "pushed": True, "repaired": True}
-            return {
-                **base,
-                "pushed": False,
-                "git_error": git_error,
-                "repair_status": repair_state.status.value,
-                "repair_error": repair_state.final_error,
-            }
-        return {"wrote_file": True, "committed": True, "pushed": False, "git_error": git_error}
-    return {"wrote_file": True, "committed": True, "pushed": True}
-
-
-# reset_hard is intentionally absent from the autonomous menu — it discards the
-# local commit that contains the new pulse content, producing a false "pushed=True"
-# while silently dropping the update. Destructive repairs require explicit operator action.
-_PUSH_ACTION_DESCRIPTIONS: dict[str, str] = {
-    "pull_rebase": "run git pull --rebase to integrate remote commits, then retry push",
-    "abort_rebase": "abort a stuck rebase with git rebase --abort, then pull --rebase and push",
-    "notify_only": "do not attempt further repair — report the failure and stop",
-}
-
-
-def _push_repair_actions(target_repo: Path) -> dict[str, Any]:
-    """Build the bounded action menu for autonomous push-failure repair.
-
-    reset_hard is excluded: it would discard the local commit containing the
-    new pulse content and report a false success. Operator must handle that case.
-    """
-
-    def pull_rebase() -> RepairResult:
-        proc = git_pull_rebase_safe(target_repo)
-        if proc.returncode != 0:
-            return RepairResult(ok=False, error=proc.stderr.strip())
-        proc = run_git(target_repo, "push")
-        return RepairResult(ok=proc.returncode == 0, error=proc.stderr.strip() if proc.returncode != 0 else "")
-
-    def abort_rebase() -> RepairResult:
-        run_git(target_repo, "rebase", "--abort")  # best-effort
-        proc = git_pull_rebase_safe(target_repo)
-        if proc.returncode != 0:
-            return RepairResult(ok=False, error=proc.stderr.strip())
-        proc = run_git(target_repo, "push")
-        return RepairResult(ok=proc.returncode == 0, error=proc.stderr.strip() if proc.returncode != 0 else "")
-
-    def notify_only() -> RepairResult:
-        return RepairResult(ok=False, error="notify_only: repair deferred to operator")
-
-    return {
-        "pull_rebase": pull_rebase,
-        "abort_rebase": abort_rebase,
-        "notify_only": notify_only,
-    }
+    # Deliver a pending revision before making another revision of the same file.
+    # Distinct dated digests have distinct paths and remain durable local commits.
+    pending = run_git(target_repo, "log", "--format=%H", "@{u}..HEAD", "--", file_rel)
+    if replaceable and push and (status.stdout or (pending.returncode == 0 and pending.stdout)):
+        result = publish_git_paths(target_repo, [file_rel], commit_message, resolve_conflicts=resolve_page)
+        if result.get("git_error"):
+            return {**result, "wrote_file": False}
+        existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
+        if callable(render_content):
+            new_content = render_content(existing)
+    assert isinstance(new_content, str)
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    wrote_file = existing != new_content
+    target_file.write_text(new_content, encoding="utf-8")
+    existing = new_content  # exact intended generated revision for a push-race resolver
+    result = publish_git_paths(target_repo, [file_rel], commit_message, push=push, resolve_conflicts=resolve_page)
+    return {**result, "wrote_file": wrote_file}
 
 
 def _verify_remote_content(target_repo: Path, file_rel: str, expected: str) -> bool:
@@ -1051,6 +971,7 @@ def publish_pulse(
     if not dry_run:
         commit_message = f"pulse: {snapshot.generated_at.strftime('%Y-%m-%d %H:%M %Z')} update"
         git_result = _commit_and_push_if_changed(
+            replaceable=True,
             target_repo=target_path,
             file_rel=cfg.get("pulse_filename") or "live-pulse.md",
             new_content=markdown,

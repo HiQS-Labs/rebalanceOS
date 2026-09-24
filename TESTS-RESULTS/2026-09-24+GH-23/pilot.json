@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_id": "single-device-pilot",
+  "runtime_version": "0.95.1",
+  "reviewed_source": "5a7b92f9a7ce1d0403410a168f2f0474fba6247e",
+  "collector_source_sha256": "43b6f9068e1784cd0ee324a0139acde48defc86c37fc0f41cc0983131ad6c092",
+  "preserved_local_commits": 45,
+  "recovered_digests": 4,
+  "remote_ancestry_verified": true,
+  "remote_pointer_blobs": {
+    "sync/calendar/latest.json": "63409ef33cfc29ac324ff16b9aca28f6c03c533e",
+    "sync/email/latest.json": "f7c2b5d0ca78e154d99a346de6f910321f0d2243"
+  },
+  "remote_digest_blobs_verified": true,
+  "collector": {
+    "launchd_exit": 0,
+    "scan_status": "ok",
+    "scan_failures": 0,
+    "remote_device_blob_sha256": "fe11a067f605a4540aa2d21520f80b4f221a51d4286de2f4880b87fd5731a0d7",
+    "installed_source_matches": true
+  },
+  "pulse": {
+    "launchd_exit": 0,
+    "committed": true,
+    "pushed": true,
+    "remote_page_sha256": "18875e30476ecfaff05f03c116394f39f7563ce834f9aacbc881a4897fb8b4f3"
+  },
+  "final_divergence": "0\t0",
+  "final_worktree_clean": true,
+  "other_devices_verified": false
+}

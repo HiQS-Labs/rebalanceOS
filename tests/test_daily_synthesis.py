@@ -234,7 +234,7 @@ def test_sync_to_clio_writes_and_commits(mock_get_cfg, mock_commit, tmp_path):
     mock_commit.assert_called_once()
     _, kwargs = mock_commit.call_args
     assert kwargs["file_rel"] == "CLIO/git-pulse-daily-log.md"
-    assert "Today's summary" in kwargs["new_content"]
+    assert "Today's summary" in kwargs["new_content"]("")
     assert kwargs["push"] is True
 
 
