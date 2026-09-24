@@ -22,7 +22,7 @@ reversibility: Costly — preserve outstanding output before changing deployed w
 
 | What was just completed | What's next |
 |---|---|
-| Fable low plan QA approved; transaction repair implemented | Full verification, Fable final QA, then reviewed deployment |
+| Fable low final QA attested; single-device recovery and deployment verified | Land reviewed PR; use existing installer for remaining devices |
 
 ## Table of contents
 - [Scope and recon](#scope-and-recon)
@@ -119,13 +119,13 @@ before fixes, same controls pass after. No speculative fuzzer or external live w
 
 ## Phase 2 — Verify and deliver
 
-- [ ] Focused suites: pulse reconcile/self-repair, sync snapshots, reminder file source, collector
+- [x] Focused suites: pulse reconcile/self-repair, sync snapshots, reminder file source, collector
   CLI, daily synthesis and orchestrator outcomes. Cover actual Python/shell lock interoperability.
-- [ ] Run root suite and HiQS suite in isolation, never deferred 3-Eyes. Lint/types, PDDA, script
+- [x] Run root suite and HiQS suite in isolation, never deferred 3-Eyes. Lint/types, PDDA, script
   inventory, relevant shell syntax. Preserve red/green results in TESTS-RESULTS per SOP.
-- [ ] Fable low final relay QA on committed diff and evidence; resolve boundedly (three rounds).
-- [ ] Version/changelog and deployment runbook; ready PR targeting development with exact checks.
-- [ ] Runtime recovery/deployment: preserve unique commits, files, staged/untracked state and refs;
+- [x] Fable low final relay QA on committed diff and evidence; resolve boundedly (three rounds).
+- [x] Version/changelog and deployment runbook; ready PR targeting development with exact checks.
+- [x] Runtime recovery/deployment: preserve unique commits, files, staged/untracked state and refs;
   pause only relevant existing writers, reconcile preserved content, update actual invoked
   executables and restart existing jobs. No force push/reset or deletion of original evidence.
   Verify remote content and scheduled outcome before calling the runtime recovered.
@@ -221,3 +221,16 @@ Literal Git pathspecs close an additional exact-ownership edge case. Missing-che
 precede locking; symlink candidates are rejected before reading. Busy collector lock now returns
 exit 75 (temporary deferral), not a successful scan. It must not advance the cursor and is distinct
 from lost output. Freshness reconcile failure continues to be a scheduler-visible git_error.
+
+### Pilot result and operational follow-up
+
+The reviewed runtime and installed collector match. Both existing LaunchAgents completed with
+exit 0; remote content, recovery ancestry, four digest blobs and the two pointer blobs were checked.
+The live checkout ended clean with zero ahead/behind. Evidence: TESTS-RESULTS/2026-09-24+GH-23/pilot.json.
+The original checkout, installed executable/config and full history remain backed up privately.
+
+Remaining-device rollout uses the existing collector installer; no new launchd label or service.
+Do not treat this pilot as proof those other executables were upgraded. For a collector blocked
+on sync/ dirt, inspect the sibling latest.json and last snapshot-refresh deferred error. A recurring
+permission error is persistent despite the deferred flag: correct the reported filesystem access;
+do not reset the checkout. The umbrella remains active for the remaining-device rollout.
