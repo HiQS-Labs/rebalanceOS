@@ -60,7 +60,7 @@ Root causes:
 ## Phase 1 — Operational resolution & launchd bootstrap
 
 - [ ] Abort or resolve in-flight merge conflicts in `sync_repo_dir` (`sync/calendar/latest.json`, `sync/email/latest.json`).
-- [ ] Run a manual test pass: `/Users/noelsaw/bin/git-pulse` or `bash experimental/git-pulse/collect.sh`.
+- [ ] Run a manual test pass: `~/bin/git-pulse` or `bash experimental/git-pulse/collect.sh`.
 - [ ] Bootstrap launchd job: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.git-pulse.plist`.
 - [ ] Verify job status in `launchctl list com.user.git-pulse`.
 

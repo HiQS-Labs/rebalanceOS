@@ -94,7 +94,7 @@ undone; it is the home, by operator decision of 2026-08-17.
 
 ## Phase 1 — Prepare the new clone (Day 0, ~30 min) — gitignore audit ✅, tests pending
 
-- [x] In `/Users/noelsaw/Documents/GH Repos/rebalanceOS`, extend `.gitignore` with
+- [x] In repo root, extend `.gitignore` with
       the private entries the public repo currently lacks. **Measured 2026-08-17**
       with `git check-ignore` over every carry-over row: `PARKED/`, `.venv/`,
       `test.db` (via `*.db`), `git-pulse-sync`, `reports`, `rebalance.db.*.bak`,

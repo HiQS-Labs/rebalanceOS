@@ -14,17 +14,23 @@ def test_daily_skills_identical():
     assert agents_daily.exists(), ".agents/skills/daily must exist"
     assert claude_daily.exists(), ".claude/skills/daily must exist"
 
-    # Compare all files in daily skill folder
-    for root, _, files in os.walk(agents_daily):
-        rel_dir = Path(root).relative_to(agents_daily)
-        claude_dir = claude_daily / rel_dir
-        for f in files:
-            if f.endswith(".pyc") or f == "__pycache__":
-                continue
-            agent_file = Path(root) / f
-            claude_file = claude_dir / f
-            assert claude_file.exists(), f"Missing mirrored file: {claude_file}"
-            assert filecmp.cmp(agent_file, claude_file, shallow=False), f"Divergence detected in skill file: {f}"
+    agents_files = {
+        p.relative_to(agents_daily)
+        for p in agents_daily.rglob("*")
+        if p.is_file() and not p.name.endswith(".pyc") and "__pycache__" not in p.parts
+    }
+    claude_files = {
+        p.relative_to(claude_daily)
+        for p in claude_daily.rglob("*")
+        if p.is_file() and not p.name.endswith(".pyc") and "__pycache__" not in p.parts
+    }
+
+    assert agents_files == claude_files, f"File set mismatch: {agents_files ^ claude_files}"
+
+    for rel_path in agents_files:
+        agent_file = agents_daily / rel_path
+        claude_file = claude_daily / rel_path
+        assert filecmp.cmp(agent_file, claude_file, shallow=False), f"Divergence detected in skill file: {rel_path}"
 
 
 def test_no_hardcoded_users_paths_in_skills():

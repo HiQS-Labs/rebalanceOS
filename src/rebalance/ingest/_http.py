@@ -354,6 +354,7 @@ class GitHubClient:
                 last_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
                 self._attribution.record_headers(last_status, attempt + 1, last_headers, url)
                 if last_status == 304:
+                    exc.close()
                     return 304, None, last_headers, ""
                 try:
                     last_body = exc.read().decode() if exc.fp else ""

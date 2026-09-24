@@ -27,11 +27,11 @@ EXCLUDED_PARTS = {
     "TESTS-RESULTS",
 }
 
-SCANNED_EXTENSIONS = {".py", ".sh", ".swift", ".md", ".json", ".yaml", ".yml", ".toml"}
+SCANNED_EXTENSIONS = {".py", ".sh", ".swift", ".md", ".txt", ".json", ".yaml", ".yml", ".toml"}
 
 import re
 
-MACHINE_PATH_RE = re.compile(r"/(Users|private/var|private/tmp)/[a-zA-Z0-9_.-]+/")
+MACHINE_PATH_RE = re.compile(r"/(Users|private/var|private/tmp|tmp)/[a-zA-Z0-9_.-]+/")
 
 
 def should_scan(path: Path) -> bool:
@@ -43,15 +43,15 @@ def should_scan(path: Path) -> bool:
 
 def scan_file(path: Path) -> list[tuple[int, str]]:
     findings = []
-    # Don't scan this scanner itself or check_doc_links
-    if path.name in ("check_machine_paths.py", "check_doc_links.py", "pdda.sh"):
+    # Don't scan this scanner itself or check_doc_links or tests for machine paths
+    if path.name in ("check_machine_paths.py", "check_doc_links.py", "pdda.sh", "test_machine_path_guard.py"):
         return findings
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return findings
     for line_no, line in enumerate(text.splitlines(), 1):
-        if "MACHINE-LOCAL-OK:" in line or "assert " in line or "<name>" in line or "example" in line:
+        if "MACHINE-LOCAL-OK:" in line or "<name>" in line or "<username>" in line or "<user>" in line:
             continue
         if MACHINE_PATH_RE.search(line):
             findings.append((line_no, line.strip()))
@@ -69,6 +69,7 @@ def main() -> int:
         REPO_ROOT / "src",
         REPO_ROOT / "scripts",
         REPO_ROOT / "utils",
+        REPO_ROOT / "PROJECT",
     ]
 
     total_findings = 0
