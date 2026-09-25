@@ -78,4 +78,5 @@ roadmap_exempt: true
 
 ## Lessons Learned (For Future Agents)
 
-_(fill in before moving to `PROJECT/3-COMPLETED`)_
+1. **Prune Stale Tool References at Deprecation Time:** When MCP tools or ingest routes are unified (e.g. `query_notes` and `query_github_context` into `semantic_query`), docs (`ARCHITECTURE.md`, `AGENTS.md`) and docstrings must be pruned in the same PR so agents do not attempt to invoke non-existent ghost tools (Issue #257, Lesson 4).
+2. **Remove Uncalled Helper Deadwood:** Dead functions retained "just in case" (like unreferenced template renderers) pollute test suites and distract audits. Deletions are permanent progress.

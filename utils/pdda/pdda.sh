@@ -619,6 +619,13 @@ check_issue_doc_sync() {
   # watching a doc at the exact moment it completes, so the `git mv` recommended above is what blinds
   # it (GH-27 leak 1).
   while IFS= read -r file; do
+    if grep -qF "fill in before moving to" "$file" || grep -qEi "\(fill in…\)|\(fill in\.\.\.\)" "$file"; then
+      pdda_record_finding error "$CHECK_NAME" "$file" 1 \
+        "doc is in 3-COMPLETED but still contains '(fill in...)' placeholder under Lessons Learned — fill or remove" \
+        "fill-lessons-learned"
+      rc=1
+    fi
+
     num="$(_pdda_doc_issue_number "$file")"
     [ -n "$num" ] || continue            # completed docs need not be issue-tracked; nothing to reconcile
 

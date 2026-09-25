@@ -2,7 +2,7 @@
 gh_issue: 25
 source: https://github.com/HiQS-Suite/rebalanceOS/issues/25
 title: "GH-25 Consolidate all timestamp handling through lib/time_ops"
-status: "Completed — shipped in the Build 0.73.0 Subsystem Unification marathon (phase su2) as PR #40 (0.73.0)"
+status: "Active (2-WORKING) — issue #25 remains open; 29 timestamp sites bypass time_ops"
 created: 2026-08-16
 updated: 2026-08-17
 owner: noel
