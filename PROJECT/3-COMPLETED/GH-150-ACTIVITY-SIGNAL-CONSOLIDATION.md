@@ -1,7 +1,8 @@
 ---
 title: "GH-150 Activity-Signal Read-Layer Consolidation — Audit"
-status: "Queued (issue filed, not started)"
+status: "Completed — shipped in v0.83.0 and v0.84.0 (PR #155 / PR #158)"
 created: 2026-09-02
+updated: 2026-09-24
 issue: "https://github.com/HiQS-Labs/rebalanceOS/issues/150"
 parent_plan: "PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/SCOPE.md (phase fe1)"
 trigger: "#147 — the org-mirror defect had to be hand-patched into three surfaces; this audit asked where else it lives"
@@ -94,3 +95,8 @@ Each phase lands independently; F1 is sequenced first because it is the only fin
 - No touching 3-Eyes (stood down per AGENTS.md).
 - Not the API burn rate (#148) — collector-side, separate effort.
 - Not merging git-pulse's device store into SQLite — cross-device by design; catalog only.
+
+## Lessons Learned (For Future Agents)
+
+1. **Canonicalize Upstream of Every Read Surface:** Hand-patching entity aliases (such as org mirrors) across five different UI and digest surfaces is fragile and guarantees regression. Centralizing repo identity normalization behind `db/queries.py` and canonical naming functions ensures every read path observes consistent, deduplicated counts (Issue #257, Lesson 7).
+2. **One Read Layer per Data Plane:** Having multiple collectors construct private SQL aggregations with subtly differing commit deduplication and window math produces conflicting reports across dashboard notes, digests, and pulse outputs. A unified query layer is as vital as a unified ingest registry.

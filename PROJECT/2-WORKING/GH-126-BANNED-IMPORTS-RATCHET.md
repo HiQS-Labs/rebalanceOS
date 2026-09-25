@@ -2,15 +2,15 @@
 gh_issue: 126
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/126
 title: "GH-126 — turn the datetime/subprocess banned-import warnings into an exact-baseline ratchet"
-status: "Proposed (2-WORKING — marathon lane 2026-09-05). Phases 2–3 of the issue; the exact-baseline design already exists for sqlite (#136) and is reused, not duplicated."
+status: "Active (2-WORKING) — Phases 2–3 (baseline ratchet, tests, and CI wiring) shipped in v0.84.0; Phase 1 (PR-template reuse proof) remains."
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-24
 owner: noel
 doc_type: hygiene
 rating: "pri/sev/appeal/effort 60/55/65/45 · calc 225"
-effort: 3
-complexity: 2
-risk: 2
+effort: 1
+complexity: 1
+risk: 1
 phases: 1
 ratings_provisional: false
 goal: >
@@ -18,7 +18,6 @@ goal: >
   exact, line-independent JSON baseline in the existing checker; additions and stale shrinks both
   fail in CI and in pdda.sh; a reasoned pragma exempts a reviewed import.
 non_goals:
-  - Phase 1 (PR template + ROUTER.md Reuse Proof wording) — docs/governance, separate lane.
   - Adding `json` to the ban (explicitly excluded by the issue).
   - A second validator. Extend utils/pdda/check_banned_imports.py; do not add a file beside it.
 ---
@@ -29,7 +28,7 @@ non_goals:
 
 | What was just completed | What's next |
 |---|---|
-| Capture for the 2026-09-05 marathon, scoped to Phases 2–3. `check_banned_imports.py` already implements the exact-baseline pattern for `sqlite3.connect` (`sqlite_connect_baseline.json`); this lane applies the same mechanism to the datetime/subprocess family. | Builder lane. |
+| Phases 2–3 shipped in v0.84.0: `utils/pdda/check_banned_imports.py` enforces `banned_imports_baseline.json`, tested by `tests/test_banned_imports_ratchet.py` and run as a named CI step. | Phase 1: PR template integration for prior-art reuse proof. |
 
 ## Acceptance
 

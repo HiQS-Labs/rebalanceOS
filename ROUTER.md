@@ -16,8 +16,9 @@
 >    you are about to write may exist in a package you were not looking at. A clean-room import
 >    gate (`HiQS/tests/test_clean_room.py`) was duplicated in 2026-08 by someone who never looked
 >    in `HiQS/`.
-> 4. **Run the full suite, including the parts CI skips** — `pytest tests/ utils/3-eyes/tests
->    HiQS/tests`. A test that exists but never runs will not tell you it already covers your idea.
+> 4. **Run the full suite, including the parts CI skips** — `pytest tests/ HiQS/tests`
+>    (note: `utils/3-eyes/tests` is deferred per `AGENTS.md`). A test that exists but never runs
+>    will not tell you it already covers your idea.
 >
 > If a thing exists and is inadequate, PDDA Phase 0 requires you to state **why extending it does
 > not work** before replacing it. "I did not know it was there" is the failure this block exists
@@ -89,17 +90,14 @@ For document hygiene:
 utils/pdda/pdda.sh run
 ```
 
-For local job health (3-Eyes — optional, inert unless activated on the device):
+For local job health and launchd status:
 
 ```bash
-cd utils/3-eyes && PYTHONPATH=$PWD python3 -m three_eyes status   # is it active, what is managed
-PYTHONPATH=$PWD python3 -m three_eyes health                      # fleet health (run UNSANDBOXED — see below)
-PYTHONPATH=$PWD python3 -m three_eyes catalog --check             # catalog drift vs the live machine
-PYTHONPATH=$PWD python3 -m three_eyes why <job>                   # why a job did/didn't run
+bash scripts/stack.sh status                                 # managed jobs, state, and bound checkout
+rebalance doctor                                             # operator-facing setup, health, and remediation
 ```
 
-`health` and `catalog` shell out to `launchctl list`; a sandboxed shell blocks it and every job
-reads back `not-loaded`. Re-run unsandboxed before believing a health result.
+*(Note: 3-Eyes under `utils/3-eyes/` is stood down / deferred per `AGENTS.md`; use `stack.sh status`, `rebalance doctor`, and `/launchd-triage` for all health and launchd triage).*
 
 For targeted PDDA debugging:
 
@@ -133,5 +131,5 @@ utils/pdda/pdda.sh help
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about installing PDDA into another repo, read `PDDA-INSTALL.md`.
 - If the task originates from a GitHub issue, capture it as `PROJECT/1-INBOX/GH-<number>-SHORT-DESCRIPTION.md`, then follow the normal `1-INBOX` → `2-WORKING` flow.
-- If the task is about job health, what is scheduled on this device, or adopting an automation under supervision, use the `/3-eyes` skill (`utils/3-eyes/`, `python -m three_eyes health|catalog|list`). For raw launchd triage below that layer, use `/launchd-triage`. 3-Eyes is **inert by default** — a clone with no gitignored `config/runtime.env` is a clean no-op, so "3-Eyes says nothing" on a fresh machine means *not activated*, not *nothing wrong*.
+- If the task is about job health, what is scheduled on this device, or fleet daemon triage, use `bash scripts/stack.sh status`, `rebalance doctor`, and the `/launchd-triage` skill. (3-Eyes under `utils/3-eyes/` is **deferred per `AGENTS.md`** — do not operate or wire it into health checks).
 - If the task is about where the scheduled fleet actually runs from (as opposed to the dev checkout you're editing in), the live answer is `bash scripts/stack.sh status` (`BOUND TO`); the pattern for keeping that checkout separate is `AGENTS.md` § "Deploy runtime folder", and each machine's own path lives in its own gitignored `temp/RUNTIME.md`, never in a tracked file.

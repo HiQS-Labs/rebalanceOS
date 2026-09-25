@@ -78,4 +78,5 @@ roadmap_exempt: true
 
 ## Lessons Learned (For Future Agents)
 
-_(fill in before moving to `PROJECT/3-COMPLETED`)_
+1. **Subprocess Error Handling Invariants:** Private `_git` variants handle return codes, stderr capture, and timeouts inconsistently (e.g. `check=True` throwing exceptions vs returning `None` vs silent suppression). Standardizing on `src/rebalance/lib/git_ops.py` guarantees uniform timeout ceilings and error reporting across all sync jobs (Issue #257, Lesson 5).
+2. **Safe Rebase Loops:** Encapsulating `git pull --rebase` with automatic `rebase --abort` inside a single library helper prevents background sync tasks from leaving git repositories in a dirty detached or rebase-in-progress state.

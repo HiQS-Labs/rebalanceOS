@@ -81,4 +81,5 @@ Collectors frequently copy-paste database persistence boilerplate:
 
 ## Lessons Learned (For Future Agents)
 
-_(fill in before moving to `PROJECT/3-COMPLETED`)_
+1. **Shared Database Helpers Must Be Enforced Mechanically:** Extracting `table_exists` and `db_connection_readonly` in `src/rebalance/ingest/db/connection.py` eliminated copy-pasted `sqlite3.connect` boilerplate, but as noted in Issue #257 (Lesson 4 & 5), mechanical AST ratchets are required to ensure bypasses do not re-accumulate over time.
+2. **Centralize Schema Write Paths:** Hand-rolled `INSERT OR REPLACE` loops across collectors cause schema drift and subtle column mismatches. Centralized persistence helpers enforce uniform conflict resolution and schema ownership.

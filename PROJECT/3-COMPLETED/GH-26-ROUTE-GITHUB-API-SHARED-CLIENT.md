@@ -76,4 +76,5 @@ Remaining tasks:
 
 ## Lessons Learned (For Future Agents)
 
-_(fill in before moving to `PROJECT/3-COMPLETED`)_
+1. **Single Client per External API:** Bypassing the shared `GitHubClient` to build ad-hoc `Authorization` headers or custom pagination loops created un-throttled API bursts and untracked rate-limit consumption (Issue #257, Lesson 5 & 11).
+2. **Contract Tests Prevent Architectural Drift:** Enforcing single-client contracts via AST/lint checks (asserting that raw GitHub `Authorization` header construction does not occur outside `_http.py`) prevents duplicate HTTP client implementations from re-emerging.

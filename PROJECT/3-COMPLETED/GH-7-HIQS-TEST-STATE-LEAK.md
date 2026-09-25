@@ -79,4 +79,5 @@ While CI runs them separately, the bug reveals unwanted coupling / state polluti
 
 ## Lessons Learned (For Future Agents)
 
-_(fill in before moving to `PROJECT/3-COMPLETED`)_
+1. **State Hermeticity Across Test Suites:** When sharing a single pytest process across sibling test suites (`tests/` and `HiQS/tests/`), tests that modify `os.environ`, log levels, or global singletons must strictly clean up via `monkeypatch` fixtures or explicit `try/finally` teardown.
+2. **Symptoms vs. Root Causes:** Separating test runner steps in CI can mask cross-suite state leakage; full integration test integrity requires that tests pass in any execution order and in a combined single process (Issue #257, Lesson 9).
