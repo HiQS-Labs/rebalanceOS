@@ -2,7 +2,7 @@
 gh_issue: 289
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/289
 title: "ci: development red since #280 — ShellExecutionTests exit 127 because scheduler_common.sh pins PYTHON to the repo .venv"
-status: "Approved via Codex Plan QA Relay (2026-09-27). Proceeding to implementation."
+status: Completed
 created: 2026-09-27
 updated: 2026-09-27
 owner: noel
@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Fresh full clone created (`rebalanceOS-gh289-ci-python-seam`), reproduction confirmed (5/5 ShellExecutionTests failing in fresh clone without `.venv`). Plan QA Relay approved by Codex (VERDICT: PASS). | Implement scheduler seam, update test harness, run comprehensive verification, record campaign evidence in `TESTS-RESULTS/`, and open PR. |
+| Implementation, test harness updates, and campaign documentation complete. Codex Plan QA and Implementation QA relays approved (VERDICT: PASS). All 11 CI checks green on PR #295. | Merge PR #295 and deploy to runtime on local device. |
 
 ## Why
 

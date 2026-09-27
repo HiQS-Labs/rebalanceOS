@@ -1,6 +1,6 @@
 # GH-289 Scheduler Python Interpreter Seam Test Campaign
 
-Date: 2026-09-27. Tracking: #289. Protocol: `PROJECT/1-INBOX/GH-289-CI-PYTHON-SEAM.md`, reviewed and approved by Codex Plan QA Relay (`gh289-plan-qa.md`, VERDICT: PASS).
+Date: 2026-09-27. Tracking: #289. Protocol: `PROJECT/3-COMPLETED/GH-289-CI-PYTHON-SEAM.md`, reviewed and approved by Codex Plan QA Relay (retained in `qa/gh289-plan-qa.md`, VERDICT: PASS) and Implementation QA Relay (retained in `qa/gh289-impl-qa.md`, VERDICT: PASS).
 
 ## Diagnosis & Ground-Truth Reproduction
 
@@ -17,11 +17,12 @@ Following PR #280 landing on `development`, GitHub Actions CI failed on `root-no
 2. **Invocation Guard (`rb_run_python_stdin`)**:
    - Added guard at entry of `rb_run_python_stdin` prior to temporary file allocation:
      ```bash
-     if [ ! -x "$PYTHON" ]; then
+     if ! command -v "$PYTHON" >/dev/null 2>&1; then
          echo "[$(date '+%Y-%m-%d %H:%M:%S')] interpreter unavailable or not executable: $PYTHON" >&2
          return 127
      fi
      ```
+   - Uses `command -v` to support both full paths (missing, non-executable, executable) and bare commands (`python3`).
    - Scoped strictly to `rb_run_python_stdin`. Lifecycle telemetry hooks (`rb_job_mark_started`, `_rb_job_exit`) remain untouched with `|| true` so telemetry never aborts jobs or violates no-venv policy tests.
 3. **Test Harness (`tests/test_daily_sync_exit.py`)**:
    - `_run_shell_refresh` exports `RB_PYTHON="{sys.executable}"` before sourcing `scheduler_common.sh`.
@@ -31,20 +32,22 @@ Following PR #280 landing on `development`, GitHub Actions CI failed on `root-no
    - `test_custom_override_resolution`: `RB_PYTHON="/custom/test/python"` resolves to `/custom/test/python`.
    - `test_rb_run_python_stdin_missing_guard`: Non-existent interpreter returns 127 and emits stderr diagnostic.
    - `test_rb_run_python_stdin_non_executable_guard`: Non-executable interpreter (`chmod 0o644`) returns 127 and emits stderr diagnostic.
+   - `test_rb_run_python_stdin_bare_command_name`: Bare command name (`python3`) successfully executes.
    - `test_rb_refresh_missing_interpreter_logs_diagnostic`: Missing interpreter path inside `rb_refresh` returns 127 and logs diagnostic into `LOG_FILE`.
    - `test_rb_refresh_non_executable_logs_diagnostic`: Present but non-executable interpreter (`chmod 0o644`) inside `rb_refresh` returns 127 and logs diagnostic into `LOG_FILE`.
 
 ## Results
 
-- `pytest tests/test_daily_sync_exit.py`: 24 passed in 0.82s.
+- `pytest tests/test_daily_sync_exit.py`: 25 passed in 0.84s.
 - `pytest tests/test_scheduler_policy.py`: 34 passed in 0.82s.
 - `pytest tests/test_script_inventory_ratchet.py`: 9 passed in 0.05s.
 - `pytest tests/test_stack_script.py`: 30 passed in 22.30s.
-- Total test suite: 97 passed (100% green).
+- Total test suite: 98 passed (100% green).
 - Ratchet check (`utils/pdda/check_script_inventory.py --check`): clean (matches baseline).
 - Linter & Formatter (`ruff check`, `ruff format --check`): clean across all touched files.
 - Shell syntax (`bash -n scripts/lib/scheduler_common.sh`): valid.
 
 ## Threats to Validity
 
-Local macOS testing was conducted in a fresh full clone lacking `.venv` to mirror the runner condition. Full GitHub Actions runner verification across Python 3.12 and 3.13 matrix will be attested upon PR push.
+Local macOS testing was conducted in a fresh full clone lacking `.venv` to mirror the runner condition. Full GitHub Actions runner verification across Python 3.12 and 3.13 matrix is attested on PR #295 (run 36339765108, all 11 checks green).
+

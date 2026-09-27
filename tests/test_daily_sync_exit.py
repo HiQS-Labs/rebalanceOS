@@ -379,6 +379,17 @@ PY
             self.assertEqual(res.returncode, 127)
             self.assertIn(f"interpreter unavailable or not executable: {tmp_path}", res.stderr)
 
+    def test_rb_run_python_stdin_bare_command_name(self) -> None:
+        cmd = f"""
+        export RB_PYTHON="python3"
+        source "{COMMON}"
+        rb_run_python_stdin <<'PY'
+print("bare_cmd_ok")
+PY
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+        self.assertIn("bare_cmd_ok", res.stdout)
+
     def test_rb_refresh_missing_interpreter_logs_diagnostic(self) -> None:
         missing_python = "/nonexistent/python/binary"
         with tempfile.NamedTemporaryFile() as tmp_log:

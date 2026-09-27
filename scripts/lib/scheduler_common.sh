@@ -108,7 +108,7 @@ _rb_is_bootstrap_eintr() {
 # Output from every attempt (including a failed retry) is emitted on stdout
 # so it still lands wherever the caller redirected, e.g. `>> "$LOG_FILE"`.
 rb_run_python_stdin() {
-    if [ ! -x "$PYTHON" ]; then
+    if ! command -v "$PYTHON" >/dev/null 2>&1; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] interpreter unavailable or not executable: $PYTHON" >&2
         return 127
     fi
