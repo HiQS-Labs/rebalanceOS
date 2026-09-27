@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.96.1] - 2026-09-27
+
+### Fixed
+
+- Scheduled runner environment now supports an overridable interpreter seam, allowing automated test suites in continuous integration environments without a local repository virtual environment to execute successfully.
+- Added invocation-time validation for the scheduled interpreter binary with explicit diagnostics, preventing silent failures while preserving non-breaking telemetry logging.
+
 ## [0.96.0] - 2026-09-27
 
 ### Changed
