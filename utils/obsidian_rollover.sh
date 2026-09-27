@@ -9,14 +9,13 @@
 
 set -euo pipefail
 
-REBALANCE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$(cd "$(dirname "$0")/.." && pwd)/scripts/lib/scheduler_common.sh"
+
 SCRIPT="$REBALANCE_DIR/utils/obsidian_daily_rollover.py"
 
-# Prefer the project venv; fall back to system python3 (script is stdlib-only).
-if [ -x "$REBALANCE_DIR/.venv/bin/python" ]; then
-    PYTHON="$REBALANCE_DIR/.venv/bin/python"
-else
-    PYTHON="/usr/bin/python3"
+if [ ! -x "$PYTHON" ]; then
+    echo "ERROR: rebalance venv not found at $PYTHON — obsidian-rollover needs it." >&2
+    exit 1
 fi
 
 exec "$PYTHON" "$SCRIPT" "$@"

@@ -113,7 +113,7 @@ rb_run_python_stdin() {
     capture="$(mktemp "${TMPDIR:-/tmp}/rb_py_out.XXXXXX")"
     cat > "$script"
     while :; do
-        if "$PYTHON" "$script" > "$capture" 2>&1; then
+        if "$PYTHON" "$script" "$@" > "$capture" 2>&1; then
             code=0
         else
             code=$?
@@ -131,4 +131,102 @@ rb_run_python_stdin() {
         rm -f "$script" "$capture"
         return "$code"
     done
+}
+
+# rb_refresh [scope_csv] [artifact_sync_days] [strict]
+# Consolidated scheduler refresh runner. Calls refresh_index via the shared
+# Python runtime with EINTR retry and classifies the sync outcome.
+rb_refresh() {
+    local scopes="${1:-}"
+    local days="${2:-}"
+    local strict="${3:-${RB_REFRESH_STRICT:-0}}"
+    export RB_SYNC_OUTCOME="unknown"
+    local outcome_file
+    outcome_file="$(mktemp "${TMPDIR:-/tmp}/rb_outcome.XXXXXX")"
+    export RB_OUTCOME_FILE="$outcome_file"
+
+    local code=0
+    if rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
+import json
+import os
+import sys
+from rebalance.ingest.index_ops import classify_sync_outcome, refresh_index
+from rebalance.paths import resolve_database_path
+
+db_path = resolve_database_path()
+print(f"database={db_path}")
+
+raw_scopes = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
+scope = [s.strip() for s in raw_scopes.split(",") if s.strip()] if raw_scopes else None
+
+days_arg = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+artifact_sync_days = None
+if days_arg:
+    try:
+        artifact_sync_days = int(days_arg)
+    except ValueError:
+        print(f"artifact_sync_days must be an integer, got {days_arg!r}", file=sys.stderr)
+        sys.exit(2)
+
+strict = len(sys.argv) > 3 and sys.argv[3] in ("1", "true", "strict", "True")
+
+kwargs = {}
+if scope is not None:
+    kwargs["scope"] = scope
+if artifact_sync_days is not None:
+    kwargs["artifact_sync_days"] = artifact_sync_days
+
+result = refresh_index(db_path, **kwargs)
+result["sync_outcome"], exit_code = classify_sync_outcome(result)
+
+outcome_file = os.environ.get("RB_OUTCOME_FILE")
+if outcome_file:
+    try:
+        with open(outcome_file, "w") as f:
+            f.write(result["sync_outcome"])
+    except Exception:
+        pass
+
+if strict and exit_code == 0 and result.get("errors"):
+    exit_code = 1
+print(json.dumps(result, indent=2, default=str))
+sys.exit(exit_code)
+PY
+    then
+        code=0
+    else
+        code=$?
+    fi
+
+    if [ -f "$outcome_file" ]; then
+        RB_SYNC_OUTCOME="$(cat "$outcome_file" 2>/dev/null || echo "unknown")"
+        rm -f "$outcome_file"
+    fi
+    unset RB_OUTCOME_FILE
+
+    return "$code"
+}
+
+# rb_log_sync_outcome <job_display_name> <exit_code>
+# Logs outcome based on this run's captured RB_SYNC_OUTCOME variable.
+rb_log_sync_outcome() {
+    local job_name="$1"
+    local code="$2"
+    local outcome="${RB_SYNC_OUTCOME:-unknown}"
+
+    if [ "$outcome" = "fatal" ]; then
+        log "=== $job_name failed fatally (see JSON above) ==="
+    elif [ "$code" -eq 0 ]; then
+        if [ "$outcome" = "degraded" ]; then
+            log "=== $job_name degraded; partial errors recorded (see JSON above) ==="
+        else
+            log "=== $job_name complete ==="
+        fi
+    else
+        if [ "$outcome" = "degraded" ]; then
+            log "=== $job_name degraded; finished with non-zero exit ($code) due to strict policy (see JSON above) ==="
+        else
+            log "=== $job_name failed fatally (see JSON above) ==="
+        fi
+    fi
 }

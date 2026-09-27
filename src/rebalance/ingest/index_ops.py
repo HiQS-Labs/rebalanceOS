@@ -1900,6 +1900,36 @@ def refresh_index(
     }
 
 
+def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
+    """Return the scheduler outcome and exit code without hiding source errors.
+
+    Outcomes:
+    - ("complete", 0): No errors encountered.
+    - ("degraded", 0): Partial non-migration errors occurred, but at least one stage
+      succeeded and did useful work (allows next run to self-heal).
+    - ("fatal", 1): A migration failure occurred (infrastructure failure) or all attempted
+      stages failed or were skipped.
+    """
+    errors = result.get("errors") or []
+    if not errors:
+        return "complete", 0
+
+    # A migration failure means no collector can safely write to the database.
+    # It is an infrastructure failure, rather than a degraded source refresh.
+    if any(error.get("scope") == "migrations" for error in errors):
+        return "fatal", 1
+
+    # A non-migration error is only fatal when every attempted stage failed or
+    # was skipped. Otherwise the scheduler completed useful work and should
+    # allow the next run to self-heal the degraded source.
+    successful_results = [
+        entry for entry in result.get("results", []) if not entry.get("skipped") and not entry.get("error")
+    ]
+    if not successful_results:
+        return "fatal", 1
+    return "degraded", 0
+
+
 # ---------------------------------------------------------------------------
 # Built-in collectors
 # ---------------------------------------------------------------------------

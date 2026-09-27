@@ -66,11 +66,17 @@ never an independent fallback for the shared flow — which weakens the GH-59 re
 - [x] `check_script_inventory.py --check`, `ruff check`, `ruff format --check`
 - [ ] On macOS (second machine, via the GH-211 runbook): `bash scripts/stack.sh verify`, then `bash scripts/stack.sh install pulse-server` on the runtime checkout, then `status`. Record the result here.
 
-## Phase 2 — wrapper consolidation
+## Phase 2 — wrapper consolidation (this PR)
 
-- [ ] Collapse the three `refresh_index` heredoc wrappers (`daily_sync`, `github_sync`, `obsidian_vault_embeddings`) onto one `rb_refresh <scope...>` helper or the `rebalance refresh` CLI — one exit-code contract instead of three copies
-- [ ] Move `utils/obsidian_rollover.sh` and `utils/daily_synthesis.sh` onto `scheduler_common.sh` (they differ on venv fallback: one silently uses system python, one fails)
-- [ ] Re-audit `scripts/spike_*.py` and `*_write_spike*` Swift files for deletion (spikes whose findings are recorded)
+- [x] Collapse the three `refresh_index` heredoc wrappers (`daily_sync`, `github_sync`, `obsidian_vault_embeddings`) onto one `rb_refresh <scopes> [days]` helper in `scheduler_common.sh` backed by canonical `classify_sync_outcome` in `index_ops.py` — one exit-code contract instead of three copies
+- [x] Move `utils/obsidian_rollover.sh` and `utils/daily_synthesis.sh` onto `scheduler_common.sh` (removed silent fallback to system python; fails loudly with clear diagnostic if `.venv` Python missing)
+- [x] Re-audit `scripts/spike_*.py` and `*_write_spike*` Swift files for deletion (deleted 7 obsolete spike files: `spike_morning_brief.py`, `spike_welcome_status.py`, `apple_reminders_write_spike*`, `build_apple_reminders_write_spike_app.sh`; ratcheted `script_inventory_baseline.json` from 37 to 32 scripts)
+
+### QA gate 2
+- [x] `pytest tests/test_scheduler_policy.py tests/test_daily_sync_exit.py tests/test_script_inventory_ratchet.py`
+- [x] `python3 utils/pdda/check_script_inventory.py --check`
+- [x] `bash -n` on all modified wrappers
+- [x] `ruff check` and `ruff format --check`
 
 ## GH-59 gate — resolved
 
