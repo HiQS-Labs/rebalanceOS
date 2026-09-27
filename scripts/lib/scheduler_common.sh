@@ -11,7 +11,7 @@
 #
 # Sourcing bootstraps the environment every job needs:
 #   REBALANCE_DIR — repo root (derived from this file's location)
-#   PYTHON        — the project virtualenv python (never system python)
+#   PYTHON        — explicit $RB_PYTHON override if set, else repo virtualenv python
 #   PYTHONPATH    — src/ prepended so `from rebalance...` imports work
 #   LOG_DIR       — temp/logs (created), and cwd moves to REBALANCE_DIR
 #
@@ -25,7 +25,7 @@
 
 RB_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBALANCE_DIR="$(cd "$RB_LIB_DIR/../.." && pwd)"
-PYTHON="$REBALANCE_DIR/.venv/bin/python"
+PYTHON="${RB_PYTHON:-$REBALANCE_DIR/.venv/bin/python}"
 export PYTHONPATH="$REBALANCE_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 LOG_DIR="$REBALANCE_DIR/temp/logs"
 
@@ -108,6 +108,10 @@ _rb_is_bootstrap_eintr() {
 # Output from every attempt (including a failed retry) is emitted on stdout
 # so it still lands wherever the caller redirected, e.g. `>> "$LOG_FILE"`.
 rb_run_python_stdin() {
+    if ! command -v "$PYTHON" >/dev/null 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] interpreter unavailable or not executable: $PYTHON" >&2
+        return 127
+    fi
     local script capture attempt=0 code
     script="$(mktemp "${TMPDIR:-/tmp}/rb_py_src.XXXXXX")"
     capture="$(mktemp "${TMPDIR:-/tmp}/rb_py_out.XXXXXX")"

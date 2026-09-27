@@ -265,6 +265,7 @@ class ShellExecutionTests(unittest.TestCase):
     ) -> tuple[int, str, str]:
         cmd = f"""
         set -eu
+        export RB_PYTHON="{sys.executable}"
         source "{COMMON}"
         export PYTHONPATH="{self.stub_dir}:$PYTHONPATH"
         export TEST_OUTCOME="{outcome}"
@@ -307,6 +308,124 @@ class ShellExecutionTests(unittest.TestCase):
     def test_shell_invalid_days_exits_2(self) -> None:
         code, outcome, _ = self._run_shell_refresh("complete", days="not_an_int")
         self.assertEqual(code, 2)
+
+
+class SchedulerInterpreterSeamTests(unittest.TestCase):
+    """Direct tests for the RB_PYTHON interpreter seam and execution guards (GH-289)."""
+
+    def test_default_resolution_unset(self) -> None:
+        cmd = f"""
+        set -eu
+        unset RB_PYTHON || true
+        source "{COMMON}"
+        echo "RESOLVED_PYTHON=$PYTHON"
+        """
+        res = subprocess.run(
+            ["env", "-u", "RB_PYTHON", "bash", "-c", cmd],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        expected = str(REPO / ".venv" / "bin" / "python")
+        self.assertIn(f"RESOLVED_PYTHON={expected}", res.stdout)
+
+    def test_default_resolution_empty(self) -> None:
+        cmd = f"""
+        set -eu
+        export RB_PYTHON=""
+        source "{COMMON}"
+        echo "RESOLVED_PYTHON=$PYTHON"
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+        expected = str(REPO / ".venv" / "bin" / "python")
+        self.assertIn(f"RESOLVED_PYTHON={expected}", res.stdout)
+
+    def test_custom_override_resolution(self) -> None:
+        custom_python = "/custom/test/python"
+        cmd = f"""
+        set -eu
+        export RB_PYTHON="{custom_python}"
+        source "{COMMON}"
+        echo "RESOLVED_PYTHON=$PYTHON"
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+        self.assertIn(f"RESOLVED_PYTHON={custom_python}", res.stdout)
+
+    def test_rb_run_python_stdin_missing_guard(self) -> None:
+        missing_python = "/nonexistent/python/binary"
+        cmd = f"""
+        export RB_PYTHON="{missing_python}"
+        source "{COMMON}"
+        rb_run_python_stdin <<'PY'
+print("hello")
+PY
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 127)
+        self.assertIn(f"interpreter unavailable or not executable: {missing_python}", res.stderr)
+
+    def test_rb_run_python_stdin_non_executable_guard(self) -> None:
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp_path = Path(tmp.name)
+            tmp_path.chmod(0o644)
+            cmd = f"""
+            export RB_PYTHON="{tmp_path}"
+            source "{COMMON}"
+            rb_run_python_stdin <<'PY'
+print("hello")
+PY
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 127)
+            self.assertIn(f"interpreter unavailable or not executable: {tmp_path}", res.stderr)
+
+    def test_rb_run_python_stdin_bare_command_name(self) -> None:
+        cmd = f"""
+        export RB_PYTHON="python3"
+        source "{COMMON}"
+        rb_run_python_stdin <<'PY'
+print("bare_cmd_ok")
+PY
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+        self.assertIn("bare_cmd_ok", res.stdout)
+
+    def test_rb_refresh_missing_interpreter_logs_diagnostic(self) -> None:
+        missing_python = "/nonexistent/python/binary"
+        with tempfile.NamedTemporaryFile() as tmp_log:
+            log_path = Path(tmp_log.name)
+            cmd = f"""
+            export RB_PYTHON="{missing_python}"
+            export LOG_FILE="{log_path}"
+            source "{COMMON}"
+            if rb_refresh "" "" "0"; then code=0; else code=$?; fi
+            echo "EXIT_CODE=$code"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            lines = res.stdout.strip().splitlines()
+            exit_code = int([line for line in lines if line.startswith("EXIT_CODE=")][0].split("=")[1])
+            self.assertEqual(exit_code, 127)
+            log_content = log_path.read_text()
+            self.assertIn(f"interpreter unavailable or not executable: {missing_python}", log_content)
+
+    def test_rb_refresh_non_executable_logs_diagnostic(self) -> None:
+        with tempfile.NamedTemporaryFile() as tmp_py, tempfile.NamedTemporaryFile() as tmp_log:
+            py_path = Path(tmp_py.name)
+            py_path.chmod(0o644)
+            log_path = Path(tmp_log.name)
+            cmd = f"""
+            export RB_PYTHON="{py_path}"
+            export LOG_FILE="{log_path}"
+            source "{COMMON}"
+            if rb_refresh "" "" "0"; then code=0; else code=$?; fi
+            echo "EXIT_CODE=$code"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            lines = res.stdout.strip().splitlines()
+            exit_code = int([line for line in lines if line.startswith("EXIT_CODE=")][0].split("=")[1])
+            self.assertEqual(exit_code, 127)
+            log_content = log_path.read_text()
+            self.assertIn(f"interpreter unavailable or not executable: {py_path}", log_content)
 
 
 if __name__ == "__main__":
