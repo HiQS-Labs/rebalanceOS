@@ -144,7 +144,7 @@ rb_refresh() {
     export RB_OUTCOME_FILE="$outcome_file"
 
     local code=0
-    if ! rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
+    if rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
 import json
 import os
 import sys
@@ -191,6 +191,8 @@ print(json.dumps(result, indent=2, default=str))
 sys.exit(exit_code)
 PY
     then
+        code=0
+    else
         code=$?
     fi
 
@@ -210,7 +212,9 @@ rb_log_sync_outcome() {
     local code="$2"
     local outcome="${RB_SYNC_OUTCOME:-unknown}"
 
-    if [ "$code" -eq 0 ]; then
+    if [ "$outcome" = "fatal" ]; then
+        log "=== $job_name failed fatally (see JSON above) ==="
+    elif [ "$code" -eq 0 ]; then
         if [ "$outcome" = "degraded" ]; then
             log "=== $job_name degraded; partial errors recorded (see JSON above) ==="
         else

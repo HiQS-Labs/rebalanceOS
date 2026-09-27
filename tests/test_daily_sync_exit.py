@@ -3,7 +3,9 @@
 import contextlib
 import io
 import json
+import subprocess
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -219,6 +221,87 @@ class ArgvMappingTests(unittest.TestCase):
         )
         self.assertEqual(code, 2)
         self.assertEqual(kwargs, {})
+
+
+class ShellExecutionTests(unittest.TestCase):
+    """Direct subprocess execution tests for rb_refresh in scheduler_common.sh."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tempdir = tempfile.TemporaryDirectory()
+        cls.stub_dir = Path(cls._tempdir.name) / "stub"
+        (cls.stub_dir / "rebalance" / "ingest").mkdir(parents=True)
+        (cls.stub_dir / "rebalance" / "paths").mkdir(parents=True)
+        (cls.stub_dir / "rebalance" / "__init__.py").write_text("")
+        (cls.stub_dir / "rebalance" / "paths" / "__init__.py").write_text(
+            'def resolve_database_path(): return ":memory:"\n'
+        )
+        (cls.stub_dir / "rebalance" / "ingest" / "__init__.py").write_text("")
+        (cls.stub_dir / "rebalance" / "ingest" / "index_ops.py").write_text(
+            "import os\n"
+            "def classify_sync_outcome(res):\n"
+            '    outcome = res.get("sync_outcome", "complete")\n'
+            '    return outcome, (0 if outcome != "fatal" else 1)\n'
+            "\n"
+            "def refresh_index(db, **kw):\n"
+            '    mode = os.environ.get("TEST_OUTCOME", "complete")\n'
+            '    if mode == "degraded":\n'
+            '        return {"sync_outcome": "degraded", "errors": [{"scope": "github", "error": "rate limit"}], "results": []}\n'
+            '    elif mode == "fatal":\n'
+            '        return {"sync_outcome": "fatal", "errors": [{"scope": "all", "error": "fatal"}], "results": []}\n'
+            '    return {"sync_outcome": "complete", "errors": [], "results": [{"scope": "all"}]}\n'
+        )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._tempdir.cleanup()
+
+    def _run_shell_refresh(
+        self,
+        outcome: str,
+        scopes: str = "github",
+        days: str = "7",
+        strict: str = "0",
+    ) -> tuple[int, str]:
+        cmd = f"""
+        set -eu
+        source "{COMMON}"
+        export PYTHONPATH="{self.stub_dir}:$PYTHONPATH"
+        export TEST_OUTCOME="{outcome}"
+        if rb_refresh "{scopes}" "{days}" "{strict}"; then code=0; else code=$?; fi
+        echo "EXIT_CODE=$code"
+        echo "OUTCOME=$RB_SYNC_OUTCOME"
+        rb_log_sync_outcome "test-job" "$code"
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+        lines = res.stdout.strip().splitlines()
+        exit_code = int([line for line in lines if line.startswith("EXIT_CODE=")][0].split("=")[1])
+        logged_line = lines[-1]
+        return exit_code, logged_line
+
+    def test_shell_degraded_strict_exits_1(self) -> None:
+        code, log_line = self._run_shell_refresh("degraded", strict="1")
+        self.assertEqual(code, 1)
+        self.assertIn("degraded; finished with non-zero exit (1) due to strict policy", log_line)
+
+    def test_shell_degraded_nonstrict_exits_0(self) -> None:
+        code, log_line = self._run_shell_refresh("degraded", strict="0")
+        self.assertEqual(code, 0)
+        self.assertIn("degraded; partial errors recorded", log_line)
+
+    def test_shell_fatal_exits_1(self) -> None:
+        code, log_line = self._run_shell_refresh("fatal", strict="0")
+        self.assertEqual(code, 1)
+        self.assertIn("failed fatally", log_line)
+
+    def test_shell_complete_exits_0(self) -> None:
+        code, log_line = self._run_shell_refresh("complete", strict="1")
+        self.assertEqual(code, 0)
+        self.assertIn("complete", log_line)
+
+    def test_shell_invalid_days_exits_2(self) -> None:
+        code, _ = self._run_shell_refresh("complete", days="not_an_int")
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":
