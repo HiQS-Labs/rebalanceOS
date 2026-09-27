@@ -395,3 +395,10 @@ Studio follow-through (0.97.2): source and package metadata can disagree in an e
 4. Preview and run the existing named CLIO refresh and selected nonembedding semantic maintenance facade. Reconcile eligible keys and every origin reference, and compare prior consumer IDs and prompt payloads to the backup.
 5. Verify Daily citations, same-note/header preservation and delivered transport. For the optional XYZ seam, use existing explicit roots and prove the ledger is unchanged; retain the partial flag.
 6. Observe normal guarded jobs before declaring scheduled consumer readiness. On rollback, restore the previous approved runtime and package metadata; restore only the changed config keys. Additive provenance columns are compatible with the previous reader. Use the verified consumer backup only for an observed data regression, with consumer writers paused; never rewind canonical CLIO history to undo a projection change.
+
+## 9. CI churn recovery
+
+> **When CI is repeatedly red or merges stall, stop patching failures one at a time and run a bounded recovery.**
+
+The procedure is a draft SOP for now: [#293](https://github.com/HiQS-Labs/rebalanceOS/issues/293) (when to declare, a time-boxed window, exit gates).
+This pointer will be replaced by the landed doc path once #293 lands.
