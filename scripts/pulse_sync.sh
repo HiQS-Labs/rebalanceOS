@@ -60,8 +60,10 @@ try:
 
     sys.exit(0)
 except Exception as exc:
+    import traceback
     print(f"uncaught error during pulse sync: {exc}", file=sys.stderr)
-    sys.exit(3)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(70)
 PY
 then
     EXIT_CODE=0
@@ -73,7 +75,7 @@ case $EXIT_CODE in
     0) log "=== pulse sync complete ===" ;;
     1) log "=== pulse sync FAILED (config error — see JSON) ===" ;;
     2) log "=== pulse sync FAILED (git error — see JSON) ===" ;;
-    3) log "=== pulse sync FAILED (render or runtime error) ===" ;;
+    70) log "=== pulse sync FAILED (render or runtime error) ===" ;;
     75) log "=== pulse sync SKIPPED (lock busy or temp deferral) ===" ;;
     *) log "=== pulse sync exited with code $EXIT_CODE ===" ;;
 esac

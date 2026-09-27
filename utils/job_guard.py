@@ -1077,11 +1077,14 @@ def run_guarded(
         log(f"{name!r} finished with exit {final_code}; peak tree footprint {_fmt_gb(ceiling.peak_footprint)}")
         record_peak_footprint(name, ceiling, started=started, exit_code=final_code)
         if lifecycle_job:
-            from rebalance.ingest.auth_log import log_job_completed, log_job_failed
+            from rebalance.ingest.auth_log import log_job_completed, log_job_failed, log_job_skipped
 
             elapsed = time.monotonic() - started
-            if final_code in (0, EXIT_REFUSED_TO_START):
+            if final_code == 0:
                 log_job_completed(lifecycle_job, elapsed)
+            elif final_code in DEFERRED_EXIT_CODES:
+                reason = "instance_conflict" if final_code == EXIT_INSTANCE_CONFLICT else "refused_to_start"
+                log_job_skipped(lifecycle_job, final_code, elapsed, reason=reason)
             else:
                 if timed_out:
                     reason = "wall_clock_timeout"

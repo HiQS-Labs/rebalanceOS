@@ -20,15 +20,23 @@ __all__ = [
     "git_publish_lock",
     "publication_state_error",
     "publish_git_paths",
+    "GitPublishLockError",
     "GitPublishLockBusy",
+    "GitSubprocessError",
     "parse_github_remote_url",
     "peek_remote_refs",
     "run_git",
     "should_descend",
 ]
 
+GitSubprocessError = (subprocess.SubprocessError, subprocess.TimeoutExpired)
 
-class GitPublishLockBusy(RuntimeError):
+
+class GitPublishLockError(RuntimeError):
+    """Base error for git publication lock failures."""
+
+
+class GitPublishLockBusy(GitPublishLockError):
     """Another Rebalance publisher owns the target checkout."""
 
 
@@ -37,7 +45,7 @@ def git_publish_lock(repo_path: Path) -> Iterator[TextIO]:
     """Hold the one non-blocking advisory lock shared by Rebalance publishers."""
     result = run_git(repo_path, "rev-parse", "--absolute-git-dir")
     if result.returncode != 0 or not result.stdout.strip():
-        raise RuntimeError(result.stderr.strip() or "cannot resolve git directory")
+        raise GitPublishLockError(result.stderr.strip() or "cannot resolve git directory")
     lock_path = Path(result.stdout.strip()) / "rebalance-publish.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+", encoding="utf-8")
@@ -391,26 +399,37 @@ def git_pull_rebase_safe(
     refuse all other conflicts. The bound prevents replaying an arbitrary backlog.
     """
     effective_timeout = _default_git_timeout(120.0) if timeout is None else timeout
-    try:
-        error = publication_state_error(repo_path)
-        if error:
-            return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", error)
-        result = run_git(repo_path, "-c", "rebase.autoStash=false", "pull", "--rebase", timeout=effective_timeout)
-        for _ in range(3):
-            if result.returncode == 0 or resolve_conflicts is None or not resolve_conflicts():
-                break
-            result = run_git(repo_path, "-c", "core.editor=true", "rebase", "--continue", timeout=effective_timeout)
-        if result.returncode != 0:
+    error = publication_state_error(repo_path)
+    if error:
+        return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", error)
+
+    def _cleanup_failed_rebase() -> str:
+        try:
             git_dir = run_git(repo_path, "rev-parse", "--absolute-git-dir", timeout=effective_timeout)
             if git_dir.returncode == 0:
                 state = Path(git_dir.stdout.strip())
                 if any((state / name).exists() for name in ("rebase-merge", "rebase-apply")):
                     aborted = run_git(repo_path, "rebase", "--abort", timeout=effective_timeout)
                     if aborted.returncode:
-                        result.stderr += "\nRebase abort failed; preserve checkout and inspect manually."
+                        return "\nRebase abort failed; preserve checkout and inspect manually."
+        except Exception:
+            return "\nRebase abort check encountered an error."
+        return ""
+
+    try:
+        result = run_git(repo_path, "-c", "rebase.autoStash=false", "pull", "--rebase", timeout=effective_timeout)
+        for _ in range(3):
+            if result.returncode == 0 or resolve_conflicts is None or not resolve_conflicts():
+                break
+            result = run_git(repo_path, "-c", "core.editor=true", "rebase", "--continue", timeout=effective_timeout)
+        if result.returncode != 0:
+            extra = _cleanup_failed_rebase()
+            if extra:
+                result.stderr += extra
         return result
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", str(exc))
+        extra = _cleanup_failed_rebase()
+        return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", str(exc) + extra)
 
 
 def publish_git_paths(

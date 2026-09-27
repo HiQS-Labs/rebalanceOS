@@ -2,21 +2,21 @@
 gh_issue: 282
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/282
 title: "GH-282 pulse delivery pipeline: reliable writes, honest liveness, and one owner per path"
-status: "Proposed (1-INBOX — not yet active). Rated 2026-09-26."
+status: "Active (Phase 1 implemented in PR #283). Rated 2026-09-26."
 created: 2026-09-26
 updated: 2026-09-26
 owner: noel
 doc_type: architecture
 goal: >
   Harden the Git Pulse sync delivery pipeline across fleet Macs: establish an honest exit code
-  taxonomy (0=OK, 1=Config, 2=Git Error, 3=Render Error, 75=Busy/Skip), add explicit push/pull timeouts,
+  taxonomy (0=OK, 1=Config, 2=Git Error, 70=Render Error, 75=Busy/Skip), add explicit push/pull timeouts,
   replace silent UTC fallback with local Pacific timezone resolution, add bounded jittered retries,
   and transition to disjoint per-device namespaces (`devices/<id>/...`) with reader aggregation.
 effort: 65
 complexity: 3
 risk: 2
 phases: 3
-ratings_provisional: false
+ratings_provisional: true
 roadmap_exempt: false
 ---
 
@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Live diagnosis across fleet Macs on 2026-09-26 identified hourly collisions on shared `live-pulse.md`, mislabeled git timeouts (Exit 1), lock busy treated as failures (Exit 2), and liveness masking in `pulse_health.py`. AgentChorus #132026 reached full consensus between Gemini 3.7 Flash High and Grok Bot on a 3-phase rollout roadmap. | Implement Phase 1: honest exit code taxonomy, 120s git timeouts, timezone resolution fix, and doctor exit 75 handling. Pilot on MacBook Pro 14". |
+| Phase 1 implemented in PR #283: honest exit taxonomy (0/1/2/70/75), bounded 120s git timeouts, timezone fallback defaulting to local host timezone, rebase cleanup, and launchd exit 75 skip logging. | Land PR #283, deploy to MacBook Pro 14", then proceed with Phase 2 (bounded jittered retry and per-device namespaces). |
 
 ## Why
 
@@ -47,7 +47,7 @@ Rated 2026-09-26 per consensus in AgentChorus #132026.
 
 ### Phase 1: Diagnostic Honesty & Resilience (Current Scope)
 1. **Exit Code Taxonomy**:
-   - Update `scripts/pulse_sync.sh` to classify exits cleanly: Exit 0 (OK/no-change), Exit 1 (Config error only), Exit 2 (Git error after retries/timeout), Exit 3 (Render/Python exception), Exit 75 (Busy lock / skip).
+   - Update `scripts/pulse_sync.sh` to classify exits cleanly: Exit 0 (OK/no-change), Exit 1 (Config error only), Exit 2 (Git error after retries/timeout), Exit 70 (Render/Python exception), Exit 75 (Busy lock / skip).
 2. **Git Timeout & Error Handling**:
    - Update `src/rebalance/lib/git_ops.py` to catch `subprocess.TimeoutExpired` / `OSError` in `publish_git_paths` and return `git_error` + `pending=True`.
    - Add configurable timeout (default 120s, env `REBALANCE_GIT_TIMEOUT`) for `publish_git_paths` and `git_pull_rebase_safe`.
