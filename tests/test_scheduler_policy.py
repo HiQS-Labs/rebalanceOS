@@ -56,7 +56,7 @@ POLICY = {
             'rb_job_init "daily-sync" 30',
             "rb_refresh",
         ],
-        "doc_tokens": ["daily 06:30", "refresh_index(db_path)"],
+        "doc_tokens": ["daily 06:30", "refresh_index(db_path)", "non-strict exit 0 on degraded"],
     },
     "obsidian-vault-embeddings": {
         "calendar": _hourly(15),
@@ -67,7 +67,7 @@ POLICY = {
             'rb_job_init "obsidian-vault-embeddings" 14',
             'rb_refresh "vault,semantic"',
         ],
-        "doc_tokens": ["hourly at :15", '["vault", "semantic"]'],
+        "doc_tokens": ["hourly at :15", '["vault", "semantic"]', "strict exit 1 on partial failure"],
     },
     "github-sync": {
         "calendar": _hourly(45),
@@ -79,7 +79,7 @@ POLICY = {
             # Focus 5 piggybacks this hourly cadence (no standalone launchd job).
             'rb_refresh "github,focus5" 7',
         ],
-        "doc_tokens": ["hourly at :45", '["github", "focus5"]'],
+        "doc_tokens": ["hourly at :45", '["github", "focus5"]', "strict exit 1 on partial failure"],
     },
     "pulse-sync": {
         "calendar": _hourly(0),

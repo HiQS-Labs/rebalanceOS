@@ -262,7 +262,7 @@ class ShellExecutionTests(unittest.TestCase):
         scopes: str = "github",
         days: str = "7",
         strict: str = "0",
-    ) -> tuple[int, str]:
+    ) -> tuple[int, str, str]:
         cmd = f"""
         set -eu
         source "{COMMON}"
@@ -276,31 +276,36 @@ class ShellExecutionTests(unittest.TestCase):
         res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
         lines = res.stdout.strip().splitlines()
         exit_code = int([line for line in lines if line.startswith("EXIT_CODE=")][0].split("=")[1])
+        captured_outcome = [line for line in lines if line.startswith("OUTCOME=")][0].split("=")[1]
         logged_line = lines[-1]
-        return exit_code, logged_line
+        return exit_code, captured_outcome, logged_line
 
     def test_shell_degraded_strict_exits_1(self) -> None:
-        code, log_line = self._run_shell_refresh("degraded", strict="1")
+        code, outcome, log_line = self._run_shell_refresh("degraded", strict="1")
         self.assertEqual(code, 1)
+        self.assertEqual(outcome, "degraded")
         self.assertIn("degraded; finished with non-zero exit (1) due to strict policy", log_line)
 
     def test_shell_degraded_nonstrict_exits_0(self) -> None:
-        code, log_line = self._run_shell_refresh("degraded", strict="0")
+        code, outcome, log_line = self._run_shell_refresh("degraded", strict="0")
         self.assertEqual(code, 0)
+        self.assertEqual(outcome, "degraded")
         self.assertIn("degraded; partial errors recorded", log_line)
 
     def test_shell_fatal_exits_1(self) -> None:
-        code, log_line = self._run_shell_refresh("fatal", strict="0")
+        code, outcome, log_line = self._run_shell_refresh("fatal", strict="0")
         self.assertEqual(code, 1)
+        self.assertEqual(outcome, "fatal")
         self.assertIn("failed fatally", log_line)
 
     def test_shell_complete_exits_0(self) -> None:
-        code, log_line = self._run_shell_refresh("complete", strict="1")
+        code, outcome, log_line = self._run_shell_refresh("complete", strict="1")
         self.assertEqual(code, 0)
+        self.assertEqual(outcome, "complete")
         self.assertIn("complete", log_line)
 
     def test_shell_invalid_days_exits_2(self) -> None:
-        code, _ = self._run_shell_refresh("complete", days="not_an_int")
+        code, outcome, _ = self._run_shell_refresh("complete", days="not_an_int")
         self.assertEqual(code, 2)
 
 
