@@ -49,6 +49,8 @@ _rb_job_exit() {
     local _elapsed=$(( $(date +%s) - _RB_JOB_START_TS ))
     if [ "$_code" -eq 0 ]; then
         "$PYTHON" -c "from rebalance.ingest.auth_log import log_job_completed; log_job_completed('$RB_JOB_NAME', $_elapsed)" 2>/dev/null || true
+    elif [ "$_code" -eq 75 ] || [ "$_code" -eq 3 ]; then
+        "$PYTHON" -c "from rebalance.ingest.auth_log import log_job_skipped; log_job_skipped('$RB_JOB_NAME', $_code, $_elapsed)" 2>/dev/null || true
     else
         "$PYTHON" -c "from rebalance.ingest.auth_log import log_job_failed; log_job_failed('$RB_JOB_NAME', $_code, $_elapsed)" 2>/dev/null || true
     fi

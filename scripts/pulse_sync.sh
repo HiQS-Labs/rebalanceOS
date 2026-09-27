@@ -27,32 +27,43 @@ if rb_run_python_stdin <<'PY' >> "$LOG_FILE" 2>&1
 import json
 import os
 import sys
-from rebalance.ingest.pulse import publish_pulse
-from rebalance.paths import resolve_database_path
 
-db_path = resolve_database_path()
-print(f"database={db_path}")
-# Push is on by default. A device can opt out (render + commit locally only,
-# letting the git-pulse collector own the push) by setting PULSE_PUSH=false in
-# its launchd plist — this avoids redundant push conflicts on the shared
-# live-pulse.md when origin advances between runs.
-push = os.environ.get("PULSE_PUSH", "true").strip().lower() not in ("0", "false", "no", "off")
-print(f"push={push} (PULSE_PUSH={os.environ.get('PULSE_PUSH', 'unset')})")
+try:
+    from rebalance.ingest.pulse import publish_pulse
+    from rebalance.paths import resolve_database_path
 
-# Publication owns reconciliation under the common checkout lock.
-result = publish_pulse(db_path, dry_run=False, push=push)
-# Drop the rendered markdown from the log to keep it readable; the file on
-# disk is the artifact.
-result.pop("markdown", None)
-print(json.dumps(result, indent=2, default=str))
+    db_path = resolve_database_path()
+    print(f"database={db_path}")
+    # Push is on by default. A device can opt out (render + commit locally only,
+    # letting the git-pulse collector own the push) by setting PULSE_PUSH=false in
+    # its launchd plist — this avoids redundant push conflicts on the shared
+    # live-pulse.md when origin advances between runs.
+    push = os.environ.get("PULSE_PUSH", "true").strip().lower() not in ("0", "false", "no", "off")
+    print(f"push={push} (PULSE_PUSH={os.environ.get('PULSE_PUSH', 'unset')})")
 
-if not result.get("ok"):
-    sys.exit(1)
+    # Publication owns reconciliation under the common checkout lock.
+    result = publish_pulse(db_path, dry_run=False, push=push)
+    # Drop the rendered markdown from the log to keep it readable; the file on
+    # disk is the artifact.
+    result.pop("markdown", None)
+    print(json.dumps(result, indent=2, default=str))
 
-git = result.get("git") or {}
-if git.get("git_error"):
-    sys.exit(2)
-sys.exit(0)
+    if not result.get("ok"):
+        sys.exit(1)
+
+    git = result.get("git") or {}
+    if git.get("deferred"):
+        sys.exit(75)
+
+    if git.get("git_error"):
+        sys.exit(2)
+
+    sys.exit(0)
+except Exception as exc:
+    import traceback
+    print(f"uncaught error during pulse sync: {exc}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(70)
 PY
 then
     EXIT_CODE=0
@@ -62,8 +73,10 @@ fi
 
 case $EXIT_CODE in
     0) log "=== pulse sync complete ===" ;;
-    1) log "=== pulse sync FAILED (config or render error) ===" ;;
+    1) log "=== pulse sync FAILED (config error — see JSON) ===" ;;
     2) log "=== pulse sync FAILED (git error — see JSON) ===" ;;
+    70) log "=== pulse sync FAILED (render or runtime error) ===" ;;
+    75) log "=== pulse sync SKIPPED (lock busy or temp deferral) ===" ;;
     *) log "=== pulse sync exited with code $EXIT_CODE ===" ;;
 esac
 

@@ -365,6 +365,24 @@ def log_job_failed(
     _append("launchd", "job_failed", detail)
 
 
+def log_job_skipped(
+    job: str,
+    exit_code: int = 75,
+    elapsed: float | None = None,
+    *,
+    reason: str | None = None,
+) -> None:
+    """Emit a job_skipped event (e.g. exit 75 EX_TEMPFAIL or lock deferral)."""
+    if _lifecycle_suppressed():
+        return
+    detail: dict[str, Any] = {"job": job, "exit_code": exit_code}
+    if elapsed is not None:
+        detail["elapsed_seconds"] = round(elapsed, 2)
+    if reason is not None:
+        detail["reason"] = reason
+    _append("launchd", "job_skipped", detail)
+
+
 # ---------------------------------------------------------------------------
 # Watch-list coverage guard
 # ---------------------------------------------------------------------------

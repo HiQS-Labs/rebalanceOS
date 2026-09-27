@@ -211,3 +211,12 @@ def test_scheduler_liveness_unavailable(mock_run: Mock, tmp_path: Path) -> None:
     assert len(checks) == 1
     assert checks[0].name == "scheduler state"
     assert checks[0].status == WARN
+
+
+def test_doctor_launchd_status_75_is_ok_skipped(tmp_path: Path):
+    sample_output = "-\t75\tcom.rebalance-os.pulse-sync\n84396\t0\tcom.rebalance-os.pulse-server\n"
+    checks = _check_launchd(launchctl_output=sample_output, log_dir=tmp_path)
+    pulse_check = next((c for c in checks if c.name == "launchd:pulse-sync"), None)
+    assert pulse_check is not None
+    assert pulse_check.status == OK
+    assert "skipped (75)" in pulse_check.detail
