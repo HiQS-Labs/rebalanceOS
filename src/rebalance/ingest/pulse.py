@@ -962,7 +962,7 @@ def publish_pulse(
         database_path=Path(database_path).expanduser().resolve(),
         github_login=cfg["github_login"],
         slack_user_id=cfg.get("slack_user_id"),
-        timezone_name=cfg.get("pulse_timezone") or "UTC",
+        timezone_name=cfg.get("pulse_timezone") or None,
         github_token=get_github_token(),
     )
     markdown = render_pulse_markdown(snapshot)

@@ -261,3 +261,44 @@ def test_owned_filename_is_literal_not_a_git_glob(tmp_path: Path):
     assert result["pushed"], result
     assert "page-authored.md" not in _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
     assert (local / "page-authored.md").read_text() == "unrelated private draft\n"
+
+
+def test_publish_git_paths_handles_timeout_as_git_error(tmp_path: Path, monkeypatch):
+    import subprocess
+    from rebalance.lib.git_ops import publish_git_paths, run_git
+
+    _remote, local = _make_repos(tmp_path)
+    (local / "pulse.md").write_text("content\n")
+
+    def mock_run_git(repo_path, *args, **kwargs):
+        if args and args[0] == "push":
+            raise subprocess.TimeoutExpired(cmd=["git", "push"], timeout=120.0)
+        return run_git(repo_path, *args, **kwargs)
+
+    monkeypatch.setattr("rebalance.lib.git_ops.run_git", mock_run_git)
+    result = publish_git_paths(local, ["pulse.md"], "test message", push=True)
+    assert result.get("pushed") is False
+    assert result.get("pending") is True
+    assert "git operation failed" in result.get("git_error", "")
+    assert "timed out after 120.0 seconds" in result.get("git_error", "")
+
+
+def test_publish_git_paths_custom_timeout_env(tmp_path: Path, monkeypatch):
+    from rebalance.lib.git_ops import _default_git_timeout
+
+    assert _default_git_timeout(120.0) == 120.0
+    monkeypatch.setenv("REBALANCE_GIT_TIMEOUT", "45.5")
+    assert _default_git_timeout(120.0) == 45.5
+    monkeypatch.setenv("REBALANCE_GIT_TIMEOUT", "invalid")
+    assert _default_git_timeout(120.0) == 120.0
+
+
+def test_doctor_launchd_status_75_is_ok_skipped():
+    from rebalance.doctor import _check_launchd, OK
+
+    sample_output = "-	75	com.rebalance-os.pulse-sync\n84396	0	com.rebalance-os.pulse-server\n"
+    checks = _check_launchd(launchctl_output=sample_output)
+    pulse_check = next((c for c in checks if c.name == "launchd:pulse-sync"), None)
+    assert pulse_check is not None
+    assert pulse_check.status == OK
+    assert "skipped (75)" in pulse_check.detail

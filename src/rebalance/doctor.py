@@ -1266,7 +1266,7 @@ def _check_launchd(
         except ValueError:
             pass
 
-        is_ok_status = status_val in ("0", "-") or is_negative_signal
+        is_ok_status = status_val in ("0", "75", "-") or is_negative_signal
         # A genuine crash exit: live now, but the exit that produced this
         # snapshot was neither clean (0) nor a signal (GH-146 Root cause B).
         is_crash_exit = has_live_pid and not is_ok_status
@@ -1306,7 +1306,12 @@ def _check_launchd(
                 )
             )
         elif has_live_pid or is_ok_status:
-            running = "running" if has_live_pid else "idle, last run ok"
+            if has_live_pid:
+                running = "running"
+            elif status_val == "75":
+                running = "idle, skipped (75)"
+            else:
+                running = "idle, last run ok"
             checks.append(Check(f"launchd:{short}", OK, running, severity=NOTICE))
         else:
             # FAIL, not WARN (GH-59). github-sync and pulse-sync sat at exit 1
