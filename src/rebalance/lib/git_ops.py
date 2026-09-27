@@ -391,25 +391,26 @@ def git_pull_rebase_safe(
     refuse all other conflicts. The bound prevents replaying an arbitrary backlog.
     """
     effective_timeout = _default_git_timeout(120.0) if timeout is None else timeout
-    error = publication_state_error(repo_path)
-    if error:
-        return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", error)
     try:
+        error = publication_state_error(repo_path)
+        if error:
+            return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", error)
         result = run_git(repo_path, "-c", "rebase.autoStash=false", "pull", "--rebase", timeout=effective_timeout)
         for _ in range(3):
             if result.returncode == 0 or resolve_conflicts is None or not resolve_conflicts():
                 break
             result = run_git(repo_path, "-c", "core.editor=true", "rebase", "--continue", timeout=effective_timeout)
+        if result.returncode != 0:
+            git_dir = run_git(repo_path, "rev-parse", "--absolute-git-dir", timeout=effective_timeout)
+            if git_dir.returncode == 0:
+                state = Path(git_dir.stdout.strip())
+                if any((state / name).exists() for name in ("rebase-merge", "rebase-apply")):
+                    aborted = run_git(repo_path, "rebase", "--abort", timeout=effective_timeout)
+                    if aborted.returncode:
+                        result.stderr += "\nRebase abort failed; preserve checkout and inspect manually."
+        return result
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        result = subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", str(exc))
-    if result.returncode != 0:
-        git_dir = run_git(repo_path, "rev-parse", "--absolute-git-dir", timeout=effective_timeout)
-        state = Path(git_dir.stdout.strip())
-        if any((state / name).exists() for name in ("rebase-merge", "rebase-apply")):
-            aborted = run_git(repo_path, "rebase", "--abort", timeout=effective_timeout)
-            if aborted.returncode:
-                result.stderr += "\nRebase abort failed; preserve checkout and inspect manually."
-    return result
+        return subprocess.CompletedProcess(["git", "pull", "--rebase"], 1, "", str(exc))
 
 
 def publish_git_paths(
@@ -431,21 +432,22 @@ def publish_git_paths(
     if error:
         return {"committed": False, "pushed": False, "git_error": error}
     pathspecs = [f":(literal){path}" for path in paths]
-    proc = run_git(repo_path, "add", "--", *pathspecs, timeout=effective_timeout)
-    if proc.returncode:
-        return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
-    diff = run_git(repo_path, "diff", "--cached", "--quiet", "--", *pathspecs, timeout=effective_timeout)
-    committed = diff.returncode == 1
-    if diff.returncode not in (0, 1):
-        return {"committed": False, "pushed": False, "git_error": "cannot inspect staged output"}
-    if committed:
-        proc = run_git(repo_path, "commit", "--only", "-m", message, "--", *pathspecs, timeout=effective_timeout)
+    committed = False
+    try:
+        proc = run_git(repo_path, "add", "--", *pathspecs, timeout=effective_timeout)
         if proc.returncode:
             return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
-    result: dict[str, Any] = {"committed": committed, "pushed": False}
-    if not push:
-        return result
-    try:
+        diff = run_git(repo_path, "diff", "--cached", "--quiet", "--", *pathspecs, timeout=effective_timeout)
+        committed = diff.returncode == 1
+        if diff.returncode not in (0, 1):
+            return {"committed": False, "pushed": False, "git_error": "cannot inspect staged output"}
+        if committed:
+            proc = run_git(repo_path, "commit", "--only", "-m", message, "--", *pathspecs, timeout=effective_timeout)
+            if proc.returncode:
+                return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
+        result: dict[str, Any] = {"committed": committed, "pushed": False}
+        if not push:
+            return result
         proc = run_git(repo_path, "push", timeout=effective_timeout)
         if proc.returncode and ("rejected" in proc.stderr or "fetch first" in proc.stderr):
             result["repair_log"] = ["one bounded pull/rebase and push retry"]
@@ -453,23 +455,22 @@ def publish_git_paths(
             if proc.returncode == 0:
                 proc = run_git(repo_path, "push", timeout=effective_timeout)
                 result["repaired"] = proc.returncode == 0
-    except (subprocess.TimeoutExpired, OSError, subprocess.SubprocessError) as exc:
-        result.update(git_error=f"git operation failed: {exc}", pending=True)
-        return result
-    if proc.returncode:
-        result.update(git_error=proc.stderr.strip() or proc.stdout.strip(), pending=True)
-        return result
-    # A successful push must attest the exact committed blobs on the configured upstream.
-    for path in paths:
-        local = run_git(repo_path, "rev-parse", f"HEAD:{path}", timeout=effective_timeout)
-        remote = run_git(repo_path, "rev-parse", f"@{{u}}:{path}", timeout=effective_timeout)
-        if local.returncode or remote.returncode or local.stdout != remote.stdout:
-            result["git_error"] = f"remote output verification failed: {path}"
+        if proc.returncode:
+            result.update(git_error=proc.stderr.strip() or proc.stdout.strip(), pending=True)
             return result
-    result["pushed"] = True
-    if not committed:
-        result["reason"] = "no content change"
-    return result
+        # A successful push must attest the exact committed blobs on the configured upstream.
+        for path in paths:
+            local = run_git(repo_path, "rev-parse", f"HEAD:{path}", timeout=effective_timeout)
+            remote = run_git(repo_path, "rev-parse", f"@{{u}}:{path}", timeout=effective_timeout)
+            if local.returncode or remote.returncode or local.stdout != remote.stdout:
+                result["git_error"] = f"remote output verification failed: {path}"
+                return result
+        result["pushed"] = True
+        if not committed:
+            result["reason"] = "no content change"
+        return result
+    except (subprocess.TimeoutExpired, OSError, subprocess.SubprocessError) as exc:
+        return {"committed": committed, "pushed": False, "git_error": f"git operation failed: {exc}", "pending": True}
 
 
 def _git(repo_path: Path, *args: str, timeout: float = 30.0) -> str | None:

@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.95.2] - 2026-09-26
+
+### Fixed
+
+- Git Pulse sync exit codes are now classified honestly across `pulse_sync.sh` (0=OK, 1=Config, 2=Git Error, 3=Render Error, 75=Busy/Skip).
+- Git push and pull operations in `publish_git_paths()` and `git_pull_rebase_safe()` now catch timeouts and system exceptions, returning `git_error` and preserving pending delivery with a configurable 120s timeout (`REBALANCE_GIT_TIMEOUT`).
+- Timezone fallback in `publish_pulse()` now defaults to the host machine's local timezone (`local_tz()`) rather than silently hardcoding UTC.
+- Launchd job runner (`job_guard.py`) and health diagnostics (`doctor.py`) now treat exit status 75 (lock busy / temp deferral) as a benign skip rather than a failure.
+
 ## [0.95.1] - 2026-09-24
 
 ### Fixed

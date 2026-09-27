@@ -1080,7 +1080,7 @@ def run_guarded(
             from rebalance.ingest.auth_log import log_job_completed, log_job_failed
 
             elapsed = time.monotonic() - started
-            if final_code == 0:
+            if final_code in (0, EXIT_REFUSED_TO_START):
                 log_job_completed(lifecycle_job, elapsed)
             else:
                 if timed_out:

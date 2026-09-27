@@ -49,10 +49,7 @@ try:
     print(json.dumps(result, indent=2, default=str))
 
     if not result.get("ok"):
-        error_msg = str(result.get("error", ""))
-        if "pulse config missing" in error_msg or "not a git repo" in error_msg:
-            sys.exit(1)
-        sys.exit(3)
+        sys.exit(1)
 
     git = result.get("git") or {}
     if git.get("deferred"):

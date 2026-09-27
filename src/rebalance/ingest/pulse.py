@@ -528,7 +528,7 @@ def collect_pulse_snapshot(
 
     return PulseSnapshot(
         generated_at=now,
-        timezone_name=timezone_name,
+        timezone_name=tz.key,
         github_login=github_login,
         today=today,
         yesterday=yesterday,
@@ -955,6 +955,15 @@ def publish_pulse(
         return {
             "ok": False,
             "error": f"pulse_target_path is not a git repo: {target_path}",
+            "config": cfg,
+        }
+
+    try:
+        _resolve_timezone(cfg.get("pulse_timezone"))
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"invalid pulse_timezone: {exc}",
             "config": cfg,
         }
 

@@ -293,12 +293,48 @@ def test_publish_git_paths_custom_timeout_env(tmp_path: Path, monkeypatch):
     assert _default_git_timeout(120.0) == 120.0
 
 
-def test_doctor_launchd_status_75_is_ok_skipped():
+def test_doctor_launchd_status_75_is_ok_skipped(tmp_path: Path):
     from rebalance.doctor import _check_launchd, OK
 
     sample_output = "-	75	com.rebalance-os.pulse-sync\n84396	0	com.rebalance-os.pulse-server\n"
-    checks = _check_launchd(launchctl_output=sample_output)
+    checks = _check_launchd(launchctl_output=sample_output, log_dir=tmp_path)
     pulse_check = next((c for c in checks if c.name == "launchd:pulse-sync"), None)
     assert pulse_check is not None
     assert pulse_check.status == OK
     assert "skipped (75)" in pulse_check.detail
+
+
+def test_publish_pulse_timezone_resolution(tmp_path: Path, monkeypatch):
+    from rebalance.ingest.db import db_connection, ensure_baseline_schema
+    from rebalance.ingest.pulse import publish_pulse
+
+    remote, local = _make_repos(tmp_path)
+    database = tmp_path / "test.db"
+    with db_connection(database) as conn:
+        ensure_baseline_schema(conn)
+
+    monkeypatch.setattr(
+        "rebalance.ingest.pulse.get_pulse_config",
+        lambda: {
+            "github_login": "testuser",
+            "pulse_target_path": str(local),
+            "pulse_timezone": "America/Los_Angeles",
+        },
+    )
+    monkeypatch.setattr("rebalance.ingest.pulse.get_github_token", lambda: None)
+    result = publish_pulse(database, dry_run=True)
+    assert result["ok"] is True
+    assert result["timezone"] == "America/Los_Angeles"
+
+    # Test invalid timezone returns config error (ok=False)
+    monkeypatch.setattr(
+        "rebalance.ingest.pulse.get_pulse_config",
+        lambda: {
+            "github_login": "testuser",
+            "pulse_target_path": str(local),
+            "pulse_timezone": "Invalid/Timezone_Name",
+        },
+    )
+    invalid_result = publish_pulse(database, dry_run=True)
+    assert invalid_result["ok"] is False
+    assert "invalid pulse_timezone" in invalid_result["error"]
