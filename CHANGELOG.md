@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.95.2] - 2026-09-26
+
+### Fixed
+
+- The hourly pulse publish now reports distinct outcomes for config errors, git delivery failures, internal runtime errors, and skipped runs.
+- Git delivery operations now bound push and pull attempts with timeouts, contain system errors, clean up interrupted rebases, and preserve pending local commits instead of failing uncaught.
+- Timezone fallback now defaults to the host machine's local timezone with a visible warning and log note when unset, rather than silently falling back to UTC.
+- Scheduled job execution and health diagnostics now record skipped runs and lock deferrals separately from job failures.
+
 ## [0.95.1] - 2026-09-24
 
 ### Fixed

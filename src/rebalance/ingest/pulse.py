@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import time
 import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from rebalance.ingest._http import GitHubClient, GitHubHTTPError
 from rebalance.ingest.calendar_config import OPERATOR_CALENDAR_ID
@@ -44,6 +45,8 @@ from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
 from rebalance.lib.time_ops import _parse_iso
 from rebalance.lib.git_ops import (
     GitPublishLockBusy,
+    GitPublishLockError,
+    GitSubprocessError,
     git_publish_lock,
     git_pull_rebase_safe,
     run_git,
@@ -463,7 +466,7 @@ def collect_pulse_snapshot(
     *,
     github_login: str,
     slack_user_id: str | None,
-    timezone_name: str,
+    timezone_name: str | None = None,
     github_token: str | None,
     now: datetime | None = None,
 ) -> PulseSnapshot:
@@ -528,7 +531,7 @@ def collect_pulse_snapshot(
 
     return PulseSnapshot(
         generated_at=now,
-        timezone_name=timezone_name,
+        timezone_name=tz.key,
         github_login=github_login,
         today=today,
         yesterday=yesterday,
@@ -832,6 +835,13 @@ def _commit_and_push_if_changed(
             "deferred": True,
             "git_error": str(exc),
         }
+    except (GitPublishLockError, OSError, *GitSubprocessError) as exc:
+        return {
+            "wrote_file": False,
+            "committed": False,
+            "pushed": False,
+            "git_error": f"git delivery failed: {exc}",
+        }
 
 
 def _commit_and_push_if_changed_locked(
@@ -958,13 +968,29 @@ def publish_pulse(
             "config": cfg,
         }
 
+    raw_tz = cfg.get("pulse_timezone")
+    if not raw_tz:
+        host_tz = local_tz()
+        sys.stderr.write(f"WARNING: pulse_timezone unset in config; defaulting to host timezone {host_tz.key}\n")
+    else:
+        try:
+            _resolve_timezone(raw_tz)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            return {
+                "ok": False,
+                "error": f"invalid pulse_timezone: {exc}",
+                "config": cfg,
+            }
+
     snapshot = collect_pulse_snapshot(
         database_path=Path(database_path).expanduser().resolve(),
         github_login=cfg["github_login"],
         slack_user_id=cfg.get("slack_user_id"),
-        timezone_name=cfg.get("pulse_timezone") or "UTC",
+        timezone_name=raw_tz or None,
         github_token=get_github_token(),
     )
+    if not raw_tz:
+        snapshot.notes.append(f"pulse_timezone unset in config; defaulting to host timezone {snapshot.timezone_name}")
     markdown = render_pulse_markdown(snapshot)
 
     git_result: dict[str, Any] = {"skipped_dry_run": True}

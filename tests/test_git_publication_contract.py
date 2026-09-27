@@ -261,3 +261,119 @@ def test_owned_filename_is_literal_not_a_git_glob(tmp_path: Path):
     assert result["pushed"], result
     assert "page-authored.md" not in _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
     assert (local / "page-authored.md").read_text() == "unrelated private draft\n"
+
+
+def test_publish_git_paths_handles_timeout_as_git_error(tmp_path: Path, monkeypatch):
+    import subprocess
+    from rebalance.lib.git_ops import publish_git_paths, run_git
+
+    _remote, local = _make_repos(tmp_path)
+    (local / "pulse.md").write_text("content\n")
+
+    def mock_run_git(repo_path, *args, **kwargs):
+        if args and args[0] == "push":
+            raise subprocess.TimeoutExpired(cmd=["git", "push"], timeout=120.0)
+        return run_git(repo_path, *args, **kwargs)
+
+    monkeypatch.setattr("rebalance.lib.git_ops.run_git", mock_run_git)
+    result = publish_git_paths(local, ["pulse.md"], "test message", push=True)
+    assert result.get("pushed") is False
+    assert result.get("pending") is True
+    assert "git operation failed" in result.get("git_error", "")
+    assert "timed out after 120.0 seconds" in result.get("git_error", "")
+
+
+def test_publish_git_paths_custom_timeout_env(tmp_path: Path, monkeypatch):
+    from rebalance.lib.git_ops import _default_git_timeout
+
+    assert _default_git_timeout(120.0) == 120.0
+    monkeypatch.setenv("REBALANCE_GIT_TIMEOUT", "45.5")
+    assert _default_git_timeout(120.0) == 45.5
+    monkeypatch.setenv("REBALANCE_GIT_TIMEOUT", "invalid")
+    assert _default_git_timeout(120.0) == 120.0
+
+
+def test_rebase_timeout_aborts_cleanly_leaving_no_rebase_merge(tmp_path: Path, monkeypatch):
+    import subprocess
+    from test_pulse_self_repair import _git
+    from rebalance.lib.git_ops import git_pull_rebase_safe, run_git
+
+    remote, local = _make_repos(tmp_path)
+    (local / "file.txt").write_text("local content\n")
+    _git(["add", "file.txt"], cwd=local)
+    _git(["commit", "-m", "local commit"], cwd=local)
+
+    # Make conflicting remote commit
+    peer = tmp_path / "peer"
+    _git(["clone", str(remote), str(peer)], cwd=tmp_path)
+    _git(["config", "user.name", "Test"], cwd=peer)
+    _git(["config", "user.email", "test@example.invalid"], cwd=peer)
+    (peer / "file.txt").write_text("remote conflicting content\n")
+    _git(["add", "file.txt"], cwd=peer)
+    _git(["commit", "-m", "remote commit"], cwd=peer)
+    _git(["push"], cwd=peer)
+
+    # Monkeypatch run_git so that rebase --continue raises TimeoutExpired
+    orig_run_git = run_git
+
+    def flaky_run_git(repo_path, *args, **kwargs):
+        if "rebase" in args and "--continue" in args:
+            raise subprocess.TimeoutExpired(cmd=["git", "rebase", "--continue"], timeout=0.1)
+        return orig_run_git(repo_path, *args, **kwargs)
+
+    monkeypatch.setattr("rebalance.lib.git_ops.run_git", flaky_run_git)
+
+    # Resolver that always tries to continue
+    res = git_pull_rebase_safe(local, resolve_conflicts=lambda: True)
+    assert res.returncode != 0
+    assert not (local / ".git" / "rebase-merge").exists()
+    assert not (local / ".git" / "rebase-apply").exists()
+
+
+def test_publish_pulse_timezone_resolution(tmp_path: Path, monkeypatch):
+    from rebalance.ingest.db import db_connection, ensure_baseline_schema
+    from rebalance.ingest.pulse import publish_pulse
+
+    remote, local = _make_repos(tmp_path)
+    database = tmp_path / "test.db"
+    with db_connection(database) as conn:
+        ensure_baseline_schema(conn)
+
+    monkeypatch.setattr(
+        "rebalance.ingest.pulse.get_pulse_config",
+        lambda: {
+            "github_login": "testuser",
+            "pulse_target_path": str(local),
+            "pulse_timezone": "America/Los_Angeles",
+        },
+    )
+    monkeypatch.setattr("rebalance.ingest.pulse.get_github_token", lambda: None)
+    result = publish_pulse(database, dry_run=True)
+    assert result["ok"] is True
+    assert result["timezone"] == "America/Los_Angeles"
+
+    # Test missing timezone falls back to local_tz with note in snapshot
+    monkeypatch.setattr(
+        "rebalance.ingest.pulse.get_pulse_config",
+        lambda: {
+            "github_login": "testuser",
+            "pulse_target_path": str(local),
+            "pulse_timezone": None,
+        },
+    )
+    unset_result = publish_pulse(database, dry_run=True)
+    assert unset_result["ok"] is True
+    assert any("pulse_timezone unset in config" in note for note in unset_result["notes"])
+
+    # Test invalid timezone returns config error (ok=False)
+    monkeypatch.setattr(
+        "rebalance.ingest.pulse.get_pulse_config",
+        lambda: {
+            "github_login": "testuser",
+            "pulse_target_path": str(local),
+            "pulse_timezone": "Invalid/Timezone_Name",
+        },
+    )
+    invalid_result = publish_pulse(database, dry_run=True)
+    assert invalid_result["ok"] is False
+    assert "invalid pulse_timezone" in invalid_result["error"]
