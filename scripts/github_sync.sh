@@ -23,17 +23,13 @@ log "=== rebalance hourly github sync starting ==="
 # unattended. It does NOT need the GitHub token — a github error won't skip it
 # (refresh_index runs each scope independently), and the non-blocking page from
 # PR #72 is untouched (this is the background writer the page reads from).
-if rb_refresh "github,focus5" 7; then
+if rb_refresh "github,focus5" 7 1; then
     EXIT_CODE=0
 else
     EXIT_CODE=$?
 fi
 
-if [ $EXIT_CODE -eq 0 ]; then
-    log "=== rebalance hourly github sync complete ==="
-else
-    log "=== rebalance hourly github sync finished with errors ==="
-fi
+rb_log_sync_outcome "rebalance hourly github sync" "$EXIT_CODE"
 
 rb_trim_logs
 

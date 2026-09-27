@@ -131,13 +131,14 @@ rb_run_python_stdin() {
     done
 }
 
-# rb_refresh [scope_csv] [artifact_sync_days]
+# rb_refresh [scope_csv] [artifact_sync_days] [strict]
 # Consolidated scheduler refresh runner. Calls refresh_index via the shared
 # Python runtime with EINTR retry and classifies the sync outcome.
 rb_refresh() {
     local scopes="${1:-}"
     local days="${2:-}"
-    rb_run_python_stdin "$scopes" "$days" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
+    local strict="${3:-${RB_REFRESH_STRICT:-0}}"
+    rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
 import json
 import sys
 from rebalance.ingest.index_ops import classify_sync_outcome, refresh_index
@@ -150,7 +151,15 @@ raw_scopes = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
 scope = [s.strip() for s in raw_scopes.split(",") if s.strip()] if raw_scopes else None
 
 days_arg = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
-artifact_sync_days = int(days_arg) if days_arg else None
+artifact_sync_days = None
+if days_arg:
+    try:
+        artifact_sync_days = int(days_arg)
+    except ValueError:
+        print(f"artifact_sync_days must be an integer, got {days_arg!r}", file=sys.stderr)
+        sys.exit(2)
+
+strict = len(sys.argv) > 3 and sys.argv[3] in ("1", "true", "strict", "True")
 
 kwargs = {}
 if scope is not None:
@@ -160,7 +169,34 @@ if artifact_sync_days is not None:
 
 result = refresh_index(db_path, **kwargs)
 result["sync_outcome"], exit_code = classify_sync_outcome(result)
+if strict and exit_code == 0 and result.get("errors"):
+    exit_code = 1
 print(json.dumps(result, indent=2, default=str))
 sys.exit(exit_code)
 PY
+}
+
+# rb_log_sync_outcome <job_display_name> <exit_code>
+# Scopes outcome logging to the tail of the current run's log output.
+rb_log_sync_outcome() {
+    local job_name="$1"
+    local code="$2"
+    local is_degraded=0
+    if [ -f "${LOG_FILE:-}" ] && tail -n 150 "${LOG_FILE:-/dev/null}" | grep -Fq '"sync_outcome": "degraded"'; then
+        is_degraded=1
+    fi
+
+    if [ "$code" -eq 0 ]; then
+        if [ "$is_degraded" -eq 1 ]; then
+            log "=== $job_name degraded; partial errors recorded (see JSON above) ==="
+        else
+            log "=== $job_name complete ==="
+        fi
+    else
+        if [ "$is_degraded" -eq 1 ]; then
+            log "=== $job_name degraded; finished with non-zero exit ($code) due to strict policy (see JSON above) ==="
+        else
+            log "=== $job_name failed fatally (see JSON above) ==="
+        fi
+    fi
 }

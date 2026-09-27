@@ -17,7 +17,7 @@ COMMON = REPO / "scripts" / "lib" / "scheduler_common.sh"
 def _embedded_python() -> str:
     """Return the Python payload executed by rb_refresh in scheduler_common.sh."""
     script = COMMON.read_text()
-    start = 'rb_run_python_stdin "$scopes" "$days" <<\'PY\' >> "${LOG_FILE:-/dev/null}" 2>&1\n'
+    start = 'rb_run_python_stdin "$scopes" "$days" "$strict" <<\'PY\' >> "${LOG_FILE:-/dev/null}" 2>&1\n'
     return script.split(start, 1)[1].split("\nPY\n}", 1)[0]
 
 
@@ -139,6 +139,80 @@ class ClassifySyncOutcomeDirectTests(unittest.TestCase):
         )
         self.assertEqual(outcome, "fatal")
         self.assertEqual(code, 1)
+
+
+class ArgvMappingTests(unittest.TestCase):
+    """Tests verifying rb_refresh maps sys.argv to refresh_index kwargs and respects strict mode."""
+
+    def _execute_with_argv(self, argv: list[str], payload: dict) -> tuple[int, dict]:
+        from rebalance.ingest.index_ops import classify_sync_outcome as real_classify
+
+        captured_kwargs: dict = {}
+
+        def fake_refresh(_db_path, **kw):
+            captured_kwargs.update(kw)
+            return payload
+
+        rebalance = types.ModuleType("rebalance")
+        ingest = types.ModuleType("rebalance.ingest")
+        index_ops = types.ModuleType("rebalance.ingest.index_ops")
+        paths = types.ModuleType("rebalance.paths")
+        index_ops.refresh_index = fake_refresh
+        index_ops.classify_sync_outcome = real_classify
+        paths.resolve_database_path = lambda: "/tmp/rebalance.db"
+        modules = {
+            "rebalance": rebalance,
+            "rebalance.ingest": ingest,
+            "rebalance.ingest.index_ops": index_ops,
+            "rebalance.paths": paths,
+        }
+        output = io.StringIO()
+        with (
+            patch.dict(sys.modules, modules),
+            patch.object(sys, "argv", argv),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(output),
+        ):
+            with unittest.TestCase().assertRaises(SystemExit) as raised:
+                exec(compile(_embedded_python(), str(COMMON), "exec"), {})
+
+        return raised.exception.code, captured_kwargs
+
+    def test_argv_maps_scopes_and_days(self) -> None:
+        code, kwargs = self._execute_with_argv(
+            ["script", "github, focus5", "7"],
+            {"results": [{"scope": "github"}]},
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(kwargs, {"scope": ["github", "focus5"], "artifact_sync_days": 7})
+
+    def test_argv_maps_empty_args_to_no_kwargs(self) -> None:
+        code, kwargs = self._execute_with_argv(
+            ["script", "", ""],
+            {"results": [{"scope": "all"}]},
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(kwargs, {})
+
+    def test_argv_strict_mode_forces_exit_1_on_degraded(self) -> None:
+        degraded_payload = {
+            "errors": [{"scope": "github", "error": "rate limit"}],
+            "results": [{"scope": "focus5"}],
+        }
+        # Non-strict (default): degraded returns exit 0
+        code, _ = self._execute_with_argv(["script", "github,focus5", "7", "0"], degraded_payload)
+        self.assertEqual(code, 0)
+
+        # Strict mode (1): degraded returns exit 1 for alert visibility
+        strict_code, _ = self._execute_with_argv(["script", "github,focus5", "7", "1"], degraded_payload)
+        self.assertEqual(strict_code, 1)
+
+    def test_argv_invalid_days_exits_2(self) -> None:
+        code, _ = self._execute_with_argv(
+            ["script", "github", "invalid_number"],
+            {"results": []},
+        )
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

@@ -17,17 +17,13 @@ log "=== rebalance obsidian vault embeddings starting ==="
 # Freshness policy: "semantic" is included INTENTIONALLY as the follow-on
 # stage — vault ingest alone updates raw tables only; the semantic backfill+
 # embed is what makes edited notes searchable within the hour.
-if rb_refresh "vault,semantic"; then
+if rb_refresh "vault,semantic" "" 1; then
     EXIT_CODE=0
 else
     EXIT_CODE=$?
 fi
 
-if [ $EXIT_CODE -eq 0 ]; then
-    log "=== rebalance obsidian vault embeddings complete ==="
-else
-    log "=== rebalance obsidian vault embeddings finished with errors (see JSON above) ==="
-fi
+rb_log_sync_outcome "rebalance obsidian vault embeddings" "$EXIT_CODE"
 
 rb_trim_logs
 

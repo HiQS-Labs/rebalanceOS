@@ -25,15 +25,7 @@ else
     EXIT_CODE=$?
 fi
 
-if [ $EXIT_CODE -eq 0 ]; then
-    if grep -Fq '"sync_outcome": "degraded"' "$LOG_FILE"; then
-        log "=== rebalance daily sync degraded; partial errors recorded (see JSON above) ==="
-    else
-        log "=== rebalance daily sync complete ==="
-    fi
-else
-    log "=== rebalance daily sync failed fatally (see JSON above) ==="
-fi
+rb_log_sync_outcome "rebalance daily sync" "$EXIT_CODE"
 
 rb_trim_logs
 

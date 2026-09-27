@@ -10,6 +10,15 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.96.0] - 2026-09-27
+
+### Changed
+
+- Scheduled background refresh execution is now consolidated onto one shared runner and standardized exit classification contract, eliminating duplicate embedded logic across background sync jobs.
+- Hourly background jobs enforce strict exit-on-error behavior so partial failures surface accurately in health reporting, while the daily morning synchronization retains self-healing non-zero tolerance.
+- Background tasks now use the unified scheduler runtime environment, removing legacy system Python fallback in favor of direct virtual environment enforcement.
+- Pruned disposable developer spike scripts and reduced script inventory baseline counts.
+
 ## [0.95.1] - 2026-09-24
 
 ### Fixed
