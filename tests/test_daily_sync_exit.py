@@ -18,7 +18,12 @@ def _embedded_python() -> str:
     """Return the Python payload executed by rb_refresh in scheduler_common.sh."""
     script = COMMON.read_text()
     start = 'rb_run_python_stdin "$scopes" "$days" "$strict" <<\'PY\' >> "${LOG_FILE:-/dev/null}" 2>&1\n'
-    return script.split(start, 1)[1].split("\nPY\n}", 1)[0]
+    if start not in script:
+        raise ValueError("Could not find start marker in scheduler_common.sh")
+    extracted = script.split(start, 1)[1].split("\nPY\n", 1)[0]
+    if not extracted.strip():
+        raise ValueError("Extracted Python payload is empty")
+    return extracted
 
 
 def _run_refresh_payload(payload: dict) -> tuple[int, dict]:
@@ -208,11 +213,12 @@ class ArgvMappingTests(unittest.TestCase):
         self.assertEqual(strict_code, 1)
 
     def test_argv_invalid_days_exits_2(self) -> None:
-        code, _ = self._execute_with_argv(
+        code, kwargs = self._execute_with_argv(
             ["script", "github", "invalid_number"],
-            {"results": []},
+            {"results": [], "errors": []},
         )
         self.assertEqual(code, 2)
+        self.assertEqual(kwargs, {})
 
 
 if __name__ == "__main__":

@@ -138,8 +138,15 @@ rb_refresh() {
     local scopes="${1:-}"
     local days="${2:-}"
     local strict="${3:-${RB_REFRESH_STRICT:-0}}"
-    rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
+    export RB_SYNC_OUTCOME="unknown"
+    local outcome_file
+    outcome_file="$(mktemp "${TMPDIR:-/tmp}/rb_outcome.XXXXXX")"
+    export RB_OUTCOME_FILE="$outcome_file"
+
+    local code=0
+    if ! rb_run_python_stdin "$scopes" "$days" "$strict" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
 import json
+import os
 import sys
 from rebalance.ingest.index_ops import classify_sync_outcome, refresh_index
 from rebalance.paths import resolve_database_path
@@ -169,31 +176,48 @@ if artifact_sync_days is not None:
 
 result = refresh_index(db_path, **kwargs)
 result["sync_outcome"], exit_code = classify_sync_outcome(result)
+
+outcome_file = os.environ.get("RB_OUTCOME_FILE")
+if outcome_file:
+    try:
+        with open(outcome_file, "w") as f:
+            f.write(result["sync_outcome"])
+    except Exception:
+        pass
+
 if strict and exit_code == 0 and result.get("errors"):
     exit_code = 1
 print(json.dumps(result, indent=2, default=str))
 sys.exit(exit_code)
 PY
+    then
+        code=$?
+    fi
+
+    if [ -f "$outcome_file" ]; then
+        RB_SYNC_OUTCOME="$(cat "$outcome_file" 2>/dev/null || echo "unknown")"
+        rm -f "$outcome_file"
+    fi
+    unset RB_OUTCOME_FILE
+
+    return "$code"
 }
 
 # rb_log_sync_outcome <job_display_name> <exit_code>
-# Scopes outcome logging to the tail of the current run's log output.
+# Logs outcome based on this run's captured RB_SYNC_OUTCOME variable.
 rb_log_sync_outcome() {
     local job_name="$1"
     local code="$2"
-    local is_degraded=0
-    if [ -f "${LOG_FILE:-}" ] && tail -n 150 "${LOG_FILE:-/dev/null}" | grep -Fq '"sync_outcome": "degraded"'; then
-        is_degraded=1
-    fi
+    local outcome="${RB_SYNC_OUTCOME:-unknown}"
 
     if [ "$code" -eq 0 ]; then
-        if [ "$is_degraded" -eq 1 ]; then
+        if [ "$outcome" = "degraded" ]; then
             log "=== $job_name degraded; partial errors recorded (see JSON above) ==="
         else
             log "=== $job_name complete ==="
         fi
     else
-        if [ "$is_degraded" -eq 1 ]; then
+        if [ "$outcome" = "degraded" ]; then
             log "=== $job_name degraded; finished with non-zero exit ($code) due to strict policy (see JSON above) ==="
         else
             log "=== $job_name failed fatally (see JSON above) ==="
