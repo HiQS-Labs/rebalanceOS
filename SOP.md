@@ -312,3 +312,10 @@ on the repo is monitored through the registry, so it no longer ages out. See
 **Enforcement.** `tests/test_watched_repos.py::test_participation_only_does_not_auto_watch_repo`
 pins that a repo with only issues, comments and reviews stays out while a repo with a
 single pull request comes in.
+
+## 9. CI churn recovery
+
+> **When CI is repeatedly red or merges stall, stop patching failures one at a time and run a bounded recovery.**
+
+The procedure is a draft SOP for now: [#293](https://github.com/HiQS-Labs/rebalanceOS/issues/293) (when to declare, a time-boxed window, exit gates).
+This pointer will be replaced by the landed doc path once #293 lands.
