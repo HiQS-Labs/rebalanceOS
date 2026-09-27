@@ -278,8 +278,6 @@ baseline references become violations.
 | Claude Cloud signal grade | utils/claude_cloud_daily_grade.py | daily | ingest/claude_cloud sessions API | none | Obsidian block | — |
 | Claude Cloud jobs POC | scripts/cc_cloud_jobs.py | manual | api.anthropic.com fetch (R2-baseline: scripts/cc_cloud_jobs.py) + gh | none | stdout + temp/ | Claude Cloud signal grade |
 | Web dashboard data | scripts/dashboard.py | manual | own SQL (R1-baseline: scripts/dashboard.py) | none | dashboard payload | — |
-| Morning brief spike | scripts/spike_morning_brief.py | manual | spike harness | none | stdout | — |
-| Welcome status spike | scripts/spike_welcome_status.py | manual | spike harness | none | stdout | — |
 | Chat eval | scripts/chat_eval.py | manual | eval corpus | none | stdout | — |
 | Module audit | scripts/audit_modules.py | manual / MCP | repo tree + docs | none | audit report | — |
 | Doc link check | scripts/check_doc_links.py | manual | repo docs | none | stdout | — |
@@ -710,8 +708,6 @@ scripts/                   — Operator entry points (not part of the importable
                               browser mirror of the dashboard) from the same SQLite
                               knowledge base; atomic via tmp+replace; supports --watch
   _bootstrap.py            — single sys.path shim for directly-run scripts (src/ + scripts/)
-  spike_welcome_status.py  — disposable Phase 6 spike: drives the lifecycle status
-                              contract (sandbox walkthrough + --real "where am I")
   lib/scheduler_common.sh  — shared launchd job runtime: env bootstrap, dated logs,
                               job-lifecycle events, retention (sourced by *_sync.sh)
   lib/install_common.sh    — shared installer flow: always-unload, render template,

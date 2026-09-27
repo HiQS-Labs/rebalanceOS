@@ -54,7 +54,7 @@ POLICY = {
         "wrapper": "scripts/daily_sync.sh",
         "wrapper_must_contain": [
             'rb_job_init "daily-sync" 30',
-            "result = refresh_index(db_path)",
+            "rb_refresh",
         ],
         "doc_tokens": ["daily 06:30", "refresh_index(db_path)"],
     },
@@ -65,7 +65,7 @@ POLICY = {
         "wrapper": "scripts/obsidian_vault_embeddings.sh",
         "wrapper_must_contain": [
             'rb_job_init "obsidian-vault-embeddings" 14',
-            'scope=["vault", "semantic"]',
+            'rb_refresh "vault,semantic"',
         ],
         "doc_tokens": ["hourly at :15", '["vault", "semantic"]'],
     },
@@ -77,7 +77,7 @@ POLICY = {
         "wrapper_must_contain": [
             'rb_job_init "github-sync" 14',
             # Focus 5 piggybacks this hourly cadence (no standalone launchd job).
-            'scope=["github", "focus5"]',
+            'rb_refresh "github,focus5" 7',
         ],
         "doc_tokens": ["hourly at :45", '["github", "focus5"]'],
     },
@@ -381,11 +381,8 @@ class TestWrapperScripts(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, f"{path}: {proc.stderr}")
 
     def test_scheduled_wrappers_use_shared_runtime(self):
-        # scripts/-resident wrappers must source the shared lib; the
-        # utils/ rollover wrapper predates it and is exec-only by design.
+        # All scheduled wrappers must source the shared lib.
         for job, spec in self._wrapper_jobs().items():
-            if not spec["wrapper"].startswith("scripts/"):
-                continue
             text = (REPO / spec["wrapper"]).read_text()
             self.assertIn(
                 "lib/scheduler_common.sh",

@@ -14,9 +14,9 @@
 
 set -euo pipefail
 
-REBALANCE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$(cd "$(dirname "$0")/.." && pwd)/scripts/lib/scheduler_common.sh"
+
 SCRIPT="$REBALANCE_DIR/utils/daily_synthesis.py"
-PYTHON="$REBALANCE_DIR/.venv/bin/python"
 
 if [ ! -x "$PYTHON" ]; then
     echo "ERROR: rebalance venv not found at $PYTHON — daily-synthesis needs it." >&2

@@ -111,7 +111,7 @@ rb_run_python_stdin() {
     capture="$(mktemp "${TMPDIR:-/tmp}/rb_py_out.XXXXXX")"
     cat > "$script"
     while :; do
-        if "$PYTHON" "$script" > "$capture" 2>&1; then
+        if "$PYTHON" "$script" "$@" > "$capture" 2>&1; then
             code=0
         else
             code=$?
@@ -129,4 +129,38 @@ rb_run_python_stdin() {
         rm -f "$script" "$capture"
         return "$code"
     done
+}
+
+# rb_refresh [scope_csv] [artifact_sync_days]
+# Consolidated scheduler refresh runner. Calls refresh_index via the shared
+# Python runtime with EINTR retry and classifies the sync outcome.
+rb_refresh() {
+    local scopes="${1:-}"
+    local days="${2:-}"
+    rb_run_python_stdin "$scopes" "$days" <<'PY' >> "${LOG_FILE:-/dev/null}" 2>&1
+import json
+import sys
+from rebalance.ingest.index_ops import classify_sync_outcome, refresh_index
+from rebalance.paths import resolve_database_path
+
+db_path = resolve_database_path()
+print(f"database={db_path}")
+
+raw_scopes = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
+scope = [s.strip() for s in raw_scopes.split(",") if s.strip()] if raw_scopes else None
+
+days_arg = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+artifact_sync_days = int(days_arg) if days_arg else None
+
+kwargs = {}
+if scope is not None:
+    kwargs["scope"] = scope
+if artifact_sync_days is not None:
+    kwargs["artifact_sync_days"] = artifact_sync_days
+
+result = refresh_index(db_path, **kwargs)
+result["sync_outcome"], exit_code = classify_sync_outcome(result)
+print(json.dumps(result, indent=2, default=str))
+sys.exit(exit_code)
+PY
 }
