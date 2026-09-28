@@ -259,7 +259,7 @@ def guard_settings(warn=None) -> dict:
         if raw is not None:
             try:
                 value = float(raw)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):  # JSON 1e400-sized ints overflow
                 value = None
             if value is None or isinstance(raw, bool) or not _valid_gb(value):
                 warn(f"invalid {key} {raw!r} from {source}; expected a positive number of GB, using default")

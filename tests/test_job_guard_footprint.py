@@ -814,3 +814,18 @@ def test_memory_guard_accepts_json_bool_int_and_null(isolated_guard, monkeypatch
     """JSON false/0/"off" switch the checks off; true/1/"on" on; null means unset (default on)."""
     _write_device_config(isolated_guard, monkeypatch, {"memory_guard": raw})
     assert job_guard.guard_settings()["memory_guard"]["value"] is expected
+
+
+@pytest.mark.parametrize("key", ["swap_distress_gb", "min_available_gb", "max_compressor_gb"])
+@pytest.mark.parametrize("memory_guard", ["on", "off"])
+def test_an_overflowing_json_integer_falls_back_instead_of_crashing(isolated_guard, monkeypatch, key, memory_guard):
+    """GH-296 final QA r3 F1: a valid JSON integer too large for a float must not crash."""
+    path = isolated_guard / "rbos.config"
+    path.write_text(json.dumps({"job_guard": {key: 10**400, "memory_guard": memory_guard}}), encoding="utf-8")
+    monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+    warnings: list[str] = []
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05, log=warnings.append)  # must not raise
+    assert ceiling.settings[key] == {"value": None, "source": "default"}
+    assert any(key in w and "using default" in w for w in warnings)
+    report, _ = job_guard.settings_report()
+    assert report

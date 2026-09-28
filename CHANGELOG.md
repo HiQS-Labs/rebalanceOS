@@ -15,7 +15,7 @@
 ### Fixed
 
 - The scheduled-job memory guard no longer refuses healthy runs on Macs with a small swap file. It treated any swap above 1 GB as proof of memory distress, which a laptop with a 2 GB swap file carries permanently, so every job was refused while half the memory sat free. Swap now confirms distress only when it also fills three quarters of the swap file; an unreadable swap size keeps the old rule.
-- When the guard postpones the embedding step, the run is no longer reported as a hard failure. The work each stage already did (note ingest, GitHub sync, document backfill) is kept and reported, the run is marked partially complete, and the embedding catches up on the next schedule.
+- When the guard postpones the embedding step, the run is no longer reported as a hard failure. The work each stage already did (note ingest, document backfill, dashboard update) is kept and reported, the run is marked partially complete, and the embedding catches up on the next schedule.
 - A job skipped because another copy was still running is no longer shown as a failure in the health check.
 
 ### Added

@@ -397,10 +397,11 @@ above and check that `python3 --version` really was 3.12+.
 
 > **Embedding runs under a memory guard (GH-172).** Embedding is the heaviest
 > local job in this project — it loads a Qwen model and holds vectors resident.
-> Every embedding pass therefore takes a **single-instance lock** and runs under a
+> Every vault, semantic and dashboard embedding pass therefore takes a **single-instance lock** and runs under a
 > **memory ceiling** (default: 12.5% of physical RAM), so a second run cannot stack
 > on a first and exhaust the machine. This is on by default with nothing to
 > install.
+> GitHub document embedding is not behind the guard yet (tracked in #297).
 >
 > If a run exits with "job 'rebalance-embed' is already running", that is the
 > guard working — another embed (often a scheduled `daily-sync`) holds the lock.
