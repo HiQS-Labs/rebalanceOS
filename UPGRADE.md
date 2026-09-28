@@ -257,7 +257,7 @@ shipped and GH-172 had to fix — a guard with zero callers):
 | Condition | Behaviour |
 |---|---|
 | Another embedding run holds the lock | `InstanceConflict` — the second run refuses and exits. **This is the GH-172 fix.** |
-| Job exceeds 35% of physical RAM | `MemoryCeilingExceeded` — SIGTERM, then SIGKILL after grace |
+| Job exceeds 12.5% of physical RAM (or the configured footprint ceiling) | `MemoryCeilingExceeded` — SIGTERM, then SIGKILL after grace |
 | Machine available memory below floor | Refuses to *start* (`preflight`), rather than dying at minute two |
 | Guard module missing | Warns loudly on stderr, runs **unguarded** — see below |
 

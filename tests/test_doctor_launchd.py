@@ -285,7 +285,7 @@ def test_doctor_reports_the_wrappers_env_footprint_ceiling(tmp_path: Path, monke
     monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "6.5")
     check = _job_guard_check(tmp_path, monkeypatch, {})
 
-    assert "per-job footprint ceiling (wrapper and embedding) 6.5 GB (env)" in check.detail
+    assert "per-job footprint ceiling (wrapper and embedding; mid-run on main thread only) 6.5 GB (env)" in check.detail
 
 
 def test_doctor_warns_when_the_test_only_guard_bypass_is_set(tmp_path: Path, monkeypatch) -> None:
@@ -304,5 +304,5 @@ def test_doctor_survives_an_invalid_footprint_override(tmp_path: Path, monkeypat
     check = _job_guard_check(tmp_path, monkeypatch, {})
 
     assert "could not read" not in check.detail
-    assert "per-job footprint ceiling (wrapper and embedding)" in check.detail
+    assert "per-job footprint ceiling (wrapper and embedding; mid-run on main thread only)" in check.detail
     assert "default: 12.5% of RAM" in check.detail

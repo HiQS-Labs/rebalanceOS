@@ -281,7 +281,9 @@ EXIT_WALL_CLOCK_TIMEOUT = 124  # conventional timeout(1) status
 # defer to the guard when it is set. Imported lazily alongside log_job_started.
 
 #: The codes that mean "did not run; not the job's fault". Supervisors should
-#: leave their failure counters untouched for these.
+#: leave their failure counters untouched for these. Contract: a guarded job's
+#: own payload must not exit 3 or 75, because launchd records only the final
+#: status — the wrapper and doctor read these codes as the guard's (GH-296).
 DEFERRED_EXIT_CODES = frozenset({EXIT_INSTANCE_CONFLICT, EXIT_REFUSED_TO_START})
 
 #: Per-process ceiling override, in GB. The guard measures ``phys_footprint``
@@ -1073,7 +1075,7 @@ def settings_report() -> tuple[str, list[str]]:
         f"compressor ceiling {_fmt_gb(ceiling.max_compressor or 0)} ({_src('max_compressor_gb')}), "
         f"swap distress bar {_fmt_gb(ceiling.swap_distress_bar())} ({swap_src}), "
         f"available floor {_fmt_gb(ceiling.min_available or 0)} ({_src('min_available_gb')}), "
-        f"per-job footprint ceiling (wrapper and embedding) {_fmt_gb(ceiling.max_footprint or 0)} "
+        f"per-job footprint ceiling (wrapper and embedding; mid-run on main thread only) {_fmt_gb(ceiling.max_footprint or 0)} "
         f"({'env' if env_footprint else f'default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.1%} of RAM'})"
     )
     return text, warnings
