@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Spike on the MacBook Pro 14" (24 GB, 2 GB swap): the old guard refused all 5 small jobs at ~50% free; the proposed rule ran all 5. Remediation plan written as the issue body and approved by an agy relay (2 rounds). | Implement Phases 1–4 on this branch, full suite, final relay QA, PR. |
+| Phases 1–4 implemented on `fix/gh296-job-guard-swap-scaling`: swap bar scaled to the swap file, inner refusals deferred, per-device settings, doctor line. Full suite green (2829 passed). On the 14" the fixed guard ran 3/3 jobs the old guard refused in the same minute. Evidence: [TESTS-RESULTS/2026-09-27+GH-296](../../TESTS-RESULTS/2026-09-27+GH-296/SUMMARY.md). | Final relay QA, PR. After merge: 5.2 full re-embed, 5.3 48 h soak, 5.4 7-day check. |
 
 ## Canonical plan
 

@@ -849,6 +849,7 @@ class MemoryCeiling:
         )
         self.max_compressor = _gb("max_compressor_gb") or int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
         self.swap_distress_override = _gb("swap_distress_gb")
+        self._ambient_logged = False
         self.poll_seconds = poll_seconds
         self.on_trip = on_trip
         self.tripped_reason: str | None = None
@@ -914,6 +915,11 @@ class MemoryCeiling:
         elif swap is None and not available:
             corroboration = "corroborating signals unreadable; failing closed"
         else:
+            # Once per run: the mid-run check repeats this every poll, and on a Mac
+            # that idles above the ceiling it was 39 identical lines per job (GH-296).
+            if self._ambient_logged:
+                return None
+            self._ambient_logged = True
             self.log(
                 f"memory compressor holds {_fmt_gb(compressor)} (ceiling {_fmt_gb(self.max_compressor)}) "
                 f"but the machine is not in distress: swap "

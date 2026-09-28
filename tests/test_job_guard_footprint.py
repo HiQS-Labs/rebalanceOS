@@ -769,3 +769,14 @@ def test_device_config_path_is_the_guards_own_checkout_by_default(monkeypatch):
     monkeypatch.delenv("REBALANCE_CONFIG", raising=False)
     monkeypatch.chdir("/")
     assert job_guard.device_config_path() == _REPO_ROOT / "temp" / "rbos.config"
+
+
+def test_ambient_pressure_is_logged_once_per_run_not_every_poll(isolated_guard, monkeypatch):
+    """GH-296: a 194 s run on the 14\" wrote the same "not in distress" line 39 times."""
+    _laptop_14in(monkeypatch)
+    lines: list[str] = []
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05, log=lines.append)
+    ceiling.preflight()
+    for _ in range(5):
+        assert ceiling._check() is None
+    assert sum("not in distress" in line for line in lines) == 1
