@@ -74,6 +74,7 @@ Operator reference: UPGRADE.md § "Embedding job guard (GH-172)".
 from __future__ import annotations
 
 import argparse
+import math
 import ctypes
 import ctypes.util
 import errno
@@ -251,7 +252,9 @@ def guard_settings(warn=None) -> dict:
                 value = float(raw)
             except (TypeError, ValueError):
                 value = None
-            if value is None or value <= 0 or isinstance(raw, bool):
+            # Finite and at most 1 PB: nan/inf/1e308 would crash the byte conversion
+            # in the job this setting was meant to protect (GH-296 final QA F1).
+            if value is None or isinstance(raw, bool) or not math.isfinite(value) or not 0 < value <= 1_000_000:
                 warn(f"invalid {key} {raw!r} from {source}; expected a positive number of GB, using default")
                 value, source = None, "default"
         settings[key] = {"value": value, "source": source}
@@ -1032,7 +1035,13 @@ def settings_report() -> tuple[str, list[str]]:
     can never describe the guard differently.
     """
     warnings: list[str] = []
-    ceiling = MemoryCeiling(log=warnings.append)
+    # Resolve the footprint ceiling exactly as run_guarded does, so the report
+    # matches what the launchd wrapper enforces (GH-296 final QA F3).
+    env_footprint = env_max_footprint_gb(warn=warnings.append)
+    ceiling = MemoryCeiling(
+        max_footprint_bytes=int(env_footprint * GIB) if env_footprint else None,
+        log=warnings.append,
+    )
     settings = ceiling.settings
     if not ceiling.memory_checks:
         return (
@@ -1054,7 +1063,8 @@ def settings_report() -> tuple[str, list[str]]:
         f"compressor ceiling {_fmt_gb(ceiling.max_compressor or 0)} ({_src('max_compressor_gb')}), "
         f"swap distress bar {_fmt_gb(ceiling.swap_distress_bar())} ({swap_src}), "
         f"available floor {_fmt_gb(ceiling.min_available or 0)} ({_src('min_available_gb')}), "
-        f"per-job footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)}"
+        f"per-job footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)} "
+        f"({'env' if env_footprint else f'default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.1%} of RAM'})"
     )
     return text, warnings
 

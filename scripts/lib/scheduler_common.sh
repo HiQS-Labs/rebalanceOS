@@ -220,8 +220,6 @@ rb_log_sync_outcome() {
 
     if [ "$outcome" = "fatal" ]; then
         log "=== $job_name failed fatally (see JSON above) ==="
-    elif [ "$outcome" = "deferred" ]; then
-        log "=== $job_name deferred by the job guard; nothing ran, will retry next run (see JSON above) ==="
     elif [ "$code" -eq 0 ]; then
         if [ "$outcome" = "degraded" ]; then
             log "=== $job_name degraded; partial errors recorded (see JSON above) ==="

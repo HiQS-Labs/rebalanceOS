@@ -914,10 +914,6 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
             if status != "0":
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
-        if outcome == "deferred":
-            # GH-296: the job guard deferred every stage (lock held or memory
-            # pressure) — nothing ran and nothing is broken; the next run retries.
-            return Check("launchd:daily-sync", OK, f"{source} deferred by the job guard; retries next run")
         if outcome == "fatal":
             # FAIL (GH-59). This is the high-confidence branch: daily-sync's own
             # structured result says it failed. The missing-contract fallback
@@ -1270,7 +1266,9 @@ def _check_launchd(
         except ValueError:
             pass
 
-        is_ok_status = status_val in ("0", "75", "-") or is_negative_signal
+        # 3 and 75 are the job guard's deferred codes (lock held / refused to
+        # start): nothing ran and nothing is broken (GH-296 final QA F5).
+        is_ok_status = status_val in ("0", "3", "75", "-") or is_negative_signal
         # A genuine crash exit: live now, but the exit that produced this
         # snapshot was neither clean (0) nor a signal (GH-146 Root cause B).
         is_crash_exit = has_live_pid and not is_ok_status
@@ -1312,8 +1310,8 @@ def _check_launchd(
         elif has_live_pid or is_ok_status:
             if has_live_pid:
                 running = "running"
-            elif status_val == "75":
-                running = "idle, skipped (75)"
+            elif status_val in ("3", "75"):
+                running = f"idle, skipped ({status_val})"
             else:
                 running = "idle, last run ok"
             checks.append(Check(f"launchd:{short}", OK, running, severity=NOTICE))

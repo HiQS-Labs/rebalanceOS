@@ -222,13 +222,12 @@ def test_doctor_launchd_status_75_is_ok_skipped(tmp_path: Path):
     assert "skipped (75)" in pulse_check.detail
 
 
-def test_recent_deferred_run_is_ok_not_a_failure(tmp_path: Path) -> None:
-    """GH-296: every stage deferred by the job guard — nothing ran, retry next run."""
-    check = _daily_check(tmp_path, "deferred")
+def test_guard_lock_conflict_exit_3_is_a_skip_not_a_failure(tmp_path: Path) -> None:
+    """GH-296 final QA F5: 3 (lock held) is a deferred code, like 75."""
+    checks = _check_launchd("-\t3\tcom.rebalance-os.github-sync\n", log_dir=tmp_path / "logs", now=NOW)
 
-    assert check.status == OK
-    assert "deferred" in check.detail
-    assert "failed" not in check.detail
+    assert checks[0].status == OK
+    assert "skipped (3)" in checks[0].detail
 
 
 def _job_guard_check(tmp_path: Path, monkeypatch, section) -> object:
@@ -274,3 +273,11 @@ def test_doctor_warns_on_an_invalid_job_guard_value(tmp_path: Path, monkeypatch)
     assert check.status == WARN
     assert "invalid memory_guard" in check.detail
     assert "memory checks on" in check.detail, "an invalid value must fall back to on"
+
+
+def test_doctor_reports_the_wrappers_env_footprint_ceiling(tmp_path: Path, monkeypatch) -> None:
+    """GH-296 final QA F3: the report must match what run_guarded enforces."""
+    monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "6.5")
+    check = _job_guard_check(tmp_path, monkeypatch, {})
+
+    assert "per-job footprint ceiling 6.5 GB (env)" in check.detail

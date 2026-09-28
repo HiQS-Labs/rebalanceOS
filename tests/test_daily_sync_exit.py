@@ -111,39 +111,24 @@ class ClassifySyncOutcomeDirectTests(unittest.TestCase):
         self.assertEqual(outcome, "complete")
         self.assertEqual(code, 0)
 
-    def test_guard_deferring_every_scope_is_deferred_75(self) -> None:
-        """GH-296: the job guard refused before any work, so nothing ran — retry later."""
+    def test_embedding_deferred_by_guard_is_degraded_not_skipped(self) -> None:
+        """GH-296: the collector ingested, then the guard deferred its embedding step.
+
+        The work that ran must never be reported as skipped (no exit 75) nor as a
+        failure (no exit 1): the run is partial.
+        """
         from rebalance.ingest.index_ops import classify_sync_outcome
 
         outcome, code = classify_sync_outcome(
-            {"results": [{"scope": "vault", "skipped": True, "deferred": True, "reason": "refusing to start"}]}
-        )
-        self.assertEqual((outcome, code), ("deferred", 75))
-
-    def test_guard_deferral_after_real_work_is_degraded_not_deferred(self) -> None:
-        """GH-296: completed work must never be reported as a skipped run."""
-        from rebalance.ingest.index_ops import classify_sync_outcome
-
-        outcome, code = classify_sync_outcome(
-            {
-                "results": [
-                    {"scope": "vault", "synced": 3},
-                    {"scope": "semantic", "skipped": True, "deferred": True, "reason": "refusing to start"},
-                ]
-            }
+            {"results": [{"scope": "vault", "ingest": {"new_files": 2}, "embedding_deferred": "refusing to start"}]}
         )
         self.assertEqual((outcome, code), ("degraded", 0))
 
-    def test_guard_deferral_with_a_real_error_stays_fatal(self) -> None:
+    def test_no_embedding_deferral_stays_complete(self) -> None:
         from rebalance.ingest.index_ops import classify_sync_outcome
 
-        outcome, code = classify_sync_outcome(
-            {
-                "errors": [{"scope": "github", "error": "boom"}],
-                "results": [{"scope": "semantic", "skipped": True, "deferred": True, "reason": "refusing to start"}],
-            }
-        )
-        self.assertEqual((outcome, code), ("fatal", 1))
+        outcome, code = classify_sync_outcome({"results": [{"scope": "vault", "embedding_deferred": None}]})
+        self.assertEqual((outcome, code), ("complete", 0))
 
     def test_migration_error_is_fatal(self) -> None:
         from rebalance.ingest.index_ops import classify_sync_outcome

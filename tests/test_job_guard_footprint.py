@@ -780,3 +780,27 @@ def test_ambient_pressure_is_logged_once_per_run_not_every_poll(isolated_guard, 
     for _ in range(5):
         assert ceiling._check() is None
     assert sum("not in distress" in line for line in lines) == 1
+
+
+@pytest.mark.parametrize("via_env", [True, False])
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "1e308"])
+def test_non_finite_or_huge_values_fall_back_instead_of_crashing(isolated_guard, monkeypatch, via_env, raw):
+    """GH-296 final QA F1: a bad number must warn and use the default, never crash the job."""
+    if via_env:
+        monkeypatch.setenv("REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB", raw)
+        section = {"min_available_gb": raw}
+    else:
+        section = {"swap_distress_gb": raw, "min_available_gb": raw, "max_compressor_gb": raw}
+    _write_device_config(isolated_guard, monkeypatch, section)
+    warnings: list[str] = []
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05, log=warnings.append)  # must not raise
+    assert ceiling.swap_distress_override is None
+    assert ceiling.min_available == max(int(FAKE_TOTAL_RAM * 0.12), job_guard.MIN_AVAILABLE_FLOOR)
+    assert any("using default" in w for w in warnings)
+
+
+def test_a_valid_finite_override_still_applies(isolated_guard, monkeypatch):
+    _write_device_config(isolated_guard, monkeypatch, {"swap_distress_gb": 1.5, "min_available_gb": 2})
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    assert ceiling.swap_distress_override == int(1.5 * GIB)
+    assert ceiling.min_available == 2 * GIB
