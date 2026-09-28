@@ -57,6 +57,18 @@ failure.
 **6. Log noise.** In run 3 the "not in distress, proceeding" line repeated on every 5 s poll: 39
 lines in one 194 s github-sync run. The branch now logs it once per run.
 
+## Branch verification
+
+- **Full suite** (`pytest tests/ HiQS/tests`) on `82e7417`: 2870 passed, 6 failed, 21 skipped, 11 xfailed.
+  - All 6 failures are end-to-end embedding tests that fail identically on untouched `origin/development` (4349ff5) while this laptop is on battery (`pmset`: "Battery Power"). They don't pin `power_defer`, so battery deferral skips the embedding.
+  - The failing tests: `test_dashboard_refresh_integration::test_real_chain_writes_note_reingests_and_embeds`, `test_embedder::test_embed_vault_chunks_end_to_end`, `test_figma_source_module::test_backfill_embed_query_end_to_end`, `test_github_knowledge::test_embed_and_query_local_github_corpus`, and `test_semantic_index` ×2.
+  - Hosted CI (Linux, no battery) is the tie-breaker.
+- **Static gates:** clean. That's ruff check/format, the sqlite/banned-import, script-inventory, machine-path, read-layer and near-duplicate ratchets, doc links, frontdoor, and mypy.
+- **QA:**
+  - Plan: agy relay, approved in round 2 (`qa/gh296-plan-qa.md`).
+  - Implementation: Codex relay, 5 rounds (`qa/gh296-impl-qa.md`), closed **Escalated** on one accepted limitation. Off the main thread (the terminal dashboard's background GitHub refresh) a mid-run memory trip is raised after the batch rather than interrupting it; lock and preflight still apply. The operator chose to open the PR with this documented; the follow-up is in #297.
+- **Red controls** were observed failing before their fix: the swap rule (`red-control-at-9204aeb.txt`) and the three worker-thread tests (on `aeb6c5e`, recorded in the relay).
+
 ## Threats to validity
 
 - **Not the 48 h soak.** These are short manual runs, not a 48-hour soak, and don't satisfy #296 AC 5.3.

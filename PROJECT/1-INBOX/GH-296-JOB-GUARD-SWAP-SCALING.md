@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phases 1–4 implemented on `fix/gh296-job-guard-swap-scaling`: swap bar scaled to the swap file, inner refusals deferred, per-device settings, doctor line. Full suite green (2829 passed). On the 14" the fixed guard ran 3/3 jobs the old guard refused in the same minute. Evidence: [TESTS-RESULTS/2026-09-27+GH-296](../../TESTS-RESULTS/2026-09-27+GH-296/SUMMARY.md). | Final relay QA, PR. After merge: 5.2 full re-embed, 5.3 48 h soak, 5.4 7-day check. |
+| Phases 1–4 implemented, plus the #297 items the operator pulled in (GitHub embedding guarded; returned collector errors classified). Full suite 2870 passed (6 battery-only failures, pre-existing). On the 14" the fixed guard ran 3/3 jobs the old guard refused. QA: agy plan relay approved; Codex implementation relay closed Escalated on one accepted, documented limitation (the worker-thread guard can't interrupt mid-run). Evidence: [TESTS-RESULTS/2026-09-27+GH-296](../../TESTS-RESULTS/2026-09-27+GH-296/SUMMARY.md). | PR open, awaiting review and merge. After merge: 5.2 full re-embed, 5.3 48 h soak, 5.4 7-day check; dashboard subprocess follow-up in #297. |
 
 ## Canonical plan
 

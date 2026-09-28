@@ -589,6 +589,11 @@ class GitHubKnowledgeTests(unittest.TestCase):
                 "JOB_GUARD_LOCK_DIR": str(Path(tmpdir) / "locks"),
                 "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB": "999",
                 "REBALANCE_CONFIG": str(Path(tmpdir) / "no-rbos.config"),
+                # Host-independent: this test is about signals off the main thread, so
+                # the memory checks must not depend on how busy the machine is, and
+                # peak telemetry must not land in the real temp/logs/job_rss.jsonl.
+                "REBALANCE_JOB_GUARD_MEMORY": "off",
+                "JOB_GUARD_RSS_LOG": str(Path(tmpdir) / "job_rss.jsonl"),
             }
             outcome: dict[str, object] = {}
 
