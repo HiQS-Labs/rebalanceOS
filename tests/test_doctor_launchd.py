@@ -220,3 +220,57 @@ def test_doctor_launchd_status_75_is_ok_skipped(tmp_path: Path):
     assert pulse_check is not None
     assert pulse_check.status == OK
     assert "skipped (75)" in pulse_check.detail
+
+
+def test_recent_deferred_run_is_ok_not_a_failure(tmp_path: Path) -> None:
+    """GH-296: every stage deferred by the job guard — nothing ran, retry next run."""
+    check = _daily_check(tmp_path, "deferred")
+
+    assert check.status == OK
+    assert "deferred" in check.detail
+    assert "failed" not in check.detail
+
+
+def _job_guard_check(tmp_path: Path, monkeypatch, section) -> object:
+    from rebalance.doctor import _check_job_guard
+
+    config = tmp_path / "rbos.config"
+    config.write_text(json.dumps({"job_guard": section}), encoding="utf-8")
+    monkeypatch.setenv("REBALANCE_CONFIG", str(config))
+    for name in (
+        "REBALANCE_JOB_GUARD_MEMORY",
+        "REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB",
+        "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    return _check_job_guard()
+
+
+def test_doctor_reports_job_guard_off_and_its_source(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "off"})
+
+    assert check.status == OK
+    assert "memory checks OFF" in check.detail
+    assert "rbos.config" in check.detail, "the source of the setting must be named"
+    assert "lock and timeout still active" in check.detail
+
+
+def test_doctor_reports_each_threshold_and_its_source(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"swap_distress_gb": 1.5})
+
+    assert check.status == OK
+    for label in (
+        "compressor ceiling",
+        "swap distress bar 1.5 GB (device config",
+        "available floor",
+        "footprint ceiling",
+    ):
+        assert label in check.detail, f"doctor omitted {label!r}: {check.detail}"
+
+
+def test_doctor_warns_on_an_invalid_job_guard_value(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "sometimes"})
+
+    assert check.status == WARN
+    assert "invalid memory_guard" in check.detail
+    assert "memory checks on" in check.detail, "an invalid value must fall back to on"

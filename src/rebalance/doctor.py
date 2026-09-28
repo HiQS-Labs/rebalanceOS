@@ -914,6 +914,10 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
             if status != "0":
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
+        if outcome == "deferred":
+            # GH-296: the job guard deferred every stage (lock held or memory
+            # pressure) — nothing ran and nothing is broken; the next run retries.
+            return Check("launchd:daily-sync", OK, f"{source} deferred by the job guard; retries next run")
         if outcome == "fatal":
             # FAIL (GH-59). This is the high-confidence branch: daily-sync's own
             # structured result says it failed. The missing-contract fallback
@@ -2184,6 +2188,32 @@ def _check_pulse() -> Check:
     return Check("pulse", OK, f"configured ({target})")
 
 
+def _check_job_guard() -> Check:
+    """Effective job-guard memory settings for this Mac, with their sources (GH-296)."""
+    from rebalance.ingest import _job_guard  # noqa: PLC0415
+
+    mod = _job_guard.load_job_guard()
+    if mod is None:
+        return Check(
+            "job-guard",
+            WARN,
+            f"job guard unavailable at {_job_guard.module_path()}; embedding runs are unguarded",
+            "set JOB_GUARD_MODULE to a vendored copy of utils/job_guard.py",
+        )
+    try:
+        report, warnings = mod.settings_report()
+    except Exception as exc:  # noqa: BLE001 — a probe failure must not break doctor
+        return Check("job-guard", WARN, f"could not read job guard settings: {exc}")
+    if warnings:
+        return Check(
+            "job-guard",
+            WARN,
+            f"{report}; {'; '.join(warnings)}",
+            f"fix the job_guard section in {mod.device_config_path()}",
+        )
+    return Check("job-guard", OK, report, severity=NOTICE)
+
+
 def _check_deep_work_stalls(db_path: Path) -> Check:
     """Observe-only Phase 1 signal: projects that went quiet with open work."""
     try:
@@ -2514,6 +2544,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_commit_coverage(db_path))
     report.checks.append(_check_xyz_pin())
     report.checks.append(_check_pulse())
+    report.checks.append(_check_job_guard())
 
     # Auth-event log — last deauth/auth failure per integration (calendar,
     # github, gmail), read from the unified temp/logs/auth_activity.jsonl.

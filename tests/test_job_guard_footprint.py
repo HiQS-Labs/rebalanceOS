@@ -54,6 +54,13 @@ def isolated_guard(tmp_path, monkeypatch):
     # signal confirms real distress (#157), so the fixture has to state which
     # machine it is describing rather than leave it to the host sysctl.
     monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 0)
+    # GH-296: the swap bar scales with the swap file, and settings come from the
+    # device config. Pin both so no host swap size or real rbos.config leaks in:
+    # an unreadable total keeps the legacy 1 GiB bar, and the config file is absent.
+    monkeypatch.setattr(job_guard, "swap_total_bytes", lambda: None, raising=False)
+    monkeypatch.setenv("REBALANCE_CONFIG", str(tmp_path / "no-rbos.config"))
+    for name in ("REBALANCE_JOB_GUARD_MEMORY", "REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB"):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv(job_guard.ENV_MAX_COMPRESSOR_GB, raising=False)
     return tmp_path
 
@@ -508,6 +515,50 @@ def test_a_high_compressor_still_trips_when_availability_is_gone(isolated_guard,
     assert "below floor" in str(exc.value)
 
 
+def _laptop_14in(monkeypatch, *, swap_used=1.2 * GIB, swap_total=2 * GIB):
+    """The MacBook Pro 14\" measured on 2026-09-27 (GH-296): 24 GB RAM, 2 GB swap file.
+
+    ~50% free, swap flat at ~1.2 GB for hours (residual, not growing), compressor
+    9.3 GB against a 6.0 GB ceiling. Every guarded job was refused on this state.
+    """
+    monkeypatch.setattr(job_guard, "total_memory_bytes", lambda: 24 * GIB)
+    monkeypatch.setattr(job_guard, "compressor_bytes", lambda: int(9.3 * GIB))
+    monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 6 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: int(swap_used))
+    monkeypatch.setattr(job_guard, "swap_total_bytes", lambda: int(swap_total), raising=False)
+
+
+def test_residual_swap_on_a_small_swap_file_is_not_distress(isolated_guard, monkeypatch):
+    """GH-296: the absolute 1 GiB swap bar is always true on a 2 GB swap file.
+
+    1.2 GB of static residual swap "confirmed" a compressor reading that the machine
+    had absorbed, so preflight refused and the mid-run check would kill. The bar now
+    scales with the swap file: 1.2 of 2.0 GB is below 75% and is not distress.
+    """
+    _laptop_14in(monkeypatch)
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    ceiling.preflight()  # must not raise
+    assert ceiling._compressor_trip() is None, "the mid-run check must agree with preflight"
+
+
+def test_a_nearly_full_swap_file_still_confirms_distress(isolated_guard, monkeypatch):
+    """The scaled bar still refuses when the swap file is actually filling up."""
+    _laptop_14in(monkeypatch, swap_used=1.8 * GIB)  # 90% of a 2 GB file
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.MemoryCeilingExceeded) as exc:
+        ceiling.preflight()
+    assert "swap in use" in str(exc.value)
+
+
+def test_unreadable_swap_total_keeps_the_legacy_bar(isolated_guard, monkeypatch):
+    """#156: an unreadable swap total must not loosen the rule — 1 GiB still applies."""
+    _laptop_14in(monkeypatch)
+    monkeypatch.setattr(job_guard, "swap_total_bytes", lambda: None, raising=False)
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.MemoryCeilingExceeded):
+        ceiling.preflight()
+
+
 def test_unreadable_corroboration_fails_closed(isolated_guard, monkeypatch):
     """A blind probe must never be the thing that grants permission (#156)."""
     monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 30 * GIB)
@@ -607,3 +658,114 @@ def test_available_memory_counts_reclaimable_pages_not_just_free(monkeypatch):
         f"a healthy machine reads as starved: {available / GIB:.2f} GB < "
         f"{floor / GIB:.2f} GB floor — the guard would refuse every job"
     )
+
+
+# --------------------------------------------------------------------------- #
+# GH-296: per-device settings (memory checks only; lock and timeout always on)
+# --------------------------------------------------------------------------- #
+
+
+def _write_device_config(tmp_path, monkeypatch, section) -> Path:
+    path = tmp_path / "rbos.config"
+    path.write_text(json.dumps({"vault_path": "/x", "job_guard": section}), encoding="utf-8")
+    monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+    return path
+
+
+def _starved(monkeypatch):
+    """A machine every memory check would refuse: paging hard, nothing available."""
+    monkeypatch.setattr(job_guard, "compressor_bytes", lambda: 30 * GIB)
+    monkeypatch.setattr(job_guard, "swap_used_bytes", lambda: 20 * GIB)
+    monkeypatch.setattr(job_guard, "available_memory_bytes", lambda: 1 * GIB)
+
+
+def test_settings_default_to_on_with_no_overrides(isolated_guard):
+    settings = job_guard.guard_settings()
+    assert settings["memory_guard"] == {"value": True, "source": "default"}
+    assert all(settings[k]["value"] is None for k in ("max_compressor_gb", "swap_distress_gb", "min_available_gb"))
+
+
+def test_memory_guard_off_skips_memory_checks_and_says_so(isolated_guard, monkeypatch):
+    _write_device_config(isolated_guard, monkeypatch, {"memory_guard": "off"})
+    _starved(monkeypatch)
+    lines: list[str] = []
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05, log=lines.append)
+    ceiling.preflight()  # must not raise
+    assert ceiling._check() is None, "no mid-run trip either"
+    assert any("memory checks disabled by device config" in m and "lock and timeout still active" in m for m in lines)
+
+
+def test_memory_guard_off_keeps_the_single_instance_lock(isolated_guard, monkeypatch):
+    """The lock is the GH-172 defence; turning memory checks off must not touch it."""
+    _write_device_config(isolated_guard, monkeypatch, {"memory_guard": "off"})
+    with job_guard.guard("gh296-lock", poll_seconds=0.05, log=lambda m: None):
+        with pytest.raises(job_guard.InstanceConflict):
+            with job_guard.guard("gh296-lock", poll_seconds=0.05, log=lambda m: None):
+                pass
+
+
+def test_memory_guard_off_keeps_the_wall_clock_timeout_and_logs_off(isolated_guard, monkeypatch):
+    _write_device_config(isolated_guard, monkeypatch, {"memory_guard": "off"})
+    _starved(monkeypatch)
+    code = job_guard.run_guarded(
+        "gh296-timeout",
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        poll_seconds=0.05,
+        grace_seconds=0.2,
+        max_runtime_seconds=0.5,
+    )
+    assert code == job_guard.EXIT_WALL_CLOCK_TIMEOUT
+    rows = [json.loads(line) for line in (isolated_guard / "job_rss.jsonl").read_text().splitlines()]
+    assert rows[-1]["memory_guard"] == "off", "job_rss.jsonl must record that the run was unguarded"
+
+
+def test_device_swap_distress_override_applies(isolated_guard, monkeypatch):
+    """An explicit per-device swap bar replaces the scaled one."""
+    _laptop_14in(monkeypatch)  # 1.2 GB used of 2 GB: passes the scaled bar
+    _write_device_config(isolated_guard, monkeypatch, {"swap_distress_gb": 1.0})
+    ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+    with pytest.raises(job_guard.RefusedToStart):
+        ceiling.preflight()
+
+
+def test_env_wins_over_device_config(isolated_guard, monkeypatch):
+    _write_device_config(isolated_guard, monkeypatch, {"memory_guard": "off", "max_compressor_gb": 3})
+    monkeypatch.setenv("REBALANCE_JOB_GUARD_MEMORY", "on")
+    monkeypatch.setenv(job_guard.ENV_MAX_COMPRESSOR_GB, "7")
+    settings = job_guard.guard_settings()
+    assert settings["memory_guard"] == {"value": True, "source": "env REBALANCE_JOB_GUARD_MEMORY"}
+    assert settings["max_compressor_gb"]["value"] == 7.0
+    assert settings["max_compressor_gb"]["source"].startswith("env ")
+
+
+@pytest.mark.parametrize(
+    "section, key",
+    [
+        ({"memory_guard": "sometimes"}, "memory_guard"),
+        ({"swap_distress_gb": "lots"}, "swap_distress_gb"),
+        ({"min_available_gb": -2}, "min_available_gb"),
+        ({"max_compressor_gb": True}, "max_compressor_gb"),
+    ],
+)
+def test_invalid_values_fall_back_to_default_loudly(isolated_guard, monkeypatch, section, key):
+    _write_device_config(isolated_guard, monkeypatch, section)
+    warnings: list[str] = []
+    settings = job_guard.guard_settings(warn=warnings.append)
+    assert settings[key]["source"] == "default"
+    assert settings["memory_guard"]["value"] is True, "an invalid value must never switch checks off"
+    assert any(key in w and "using default" in w for w in warnings)
+
+
+def test_a_non_object_section_is_ignored_loudly(isolated_guard, monkeypatch):
+    _write_device_config(isolated_guard, monkeypatch, "off")
+    warnings: list[str] = []
+    settings = job_guard.guard_settings(warn=warnings.append)
+    assert settings["memory_guard"]["value"] is True
+    assert any("expected an object" in w for w in warnings)
+
+
+def test_device_config_path_is_the_guards_own_checkout_by_default(monkeypatch):
+    """Not cwd-based: agent-spawned runs from any directory resolve the same file."""
+    monkeypatch.delenv("REBALANCE_CONFIG", raising=False)
+    monkeypatch.chdir("/")
+    assert job_guard.device_config_path() == _REPO_ROOT / "temp" / "rbos.config"

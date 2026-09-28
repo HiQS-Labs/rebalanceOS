@@ -111,6 +111,40 @@ class ClassifySyncOutcomeDirectTests(unittest.TestCase):
         self.assertEqual(outcome, "complete")
         self.assertEqual(code, 0)
 
+    def test_guard_deferring_every_scope_is_deferred_75(self) -> None:
+        """GH-296: the job guard refused before any work, so nothing ran — retry later."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault", "skipped": True, "deferred": True, "reason": "refusing to start"}]}
+        )
+        self.assertEqual((outcome, code), ("deferred", 75))
+
+    def test_guard_deferral_after_real_work_is_degraded_not_deferred(self) -> None:
+        """GH-296: completed work must never be reported as a skipped run."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {
+                "results": [
+                    {"scope": "vault", "synced": 3},
+                    {"scope": "semantic", "skipped": True, "deferred": True, "reason": "refusing to start"},
+                ]
+            }
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_guard_deferral_with_a_real_error_stays_fatal(self) -> None:
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {
+                "errors": [{"scope": "github", "error": "boom"}],
+                "results": [{"scope": "semantic", "skipped": True, "deferred": True, "reason": "refusing to start"}],
+            }
+        )
+        self.assertEqual((outcome, code), ("fatal", 1))
+
     def test_migration_error_is_fatal(self) -> None:
         from rebalance.ingest.index_ops import classify_sync_outcome
 

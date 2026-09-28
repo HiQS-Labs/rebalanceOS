@@ -139,10 +139,10 @@ MIN_AVAILABLE_FLOOR = 4 * GIB
 #: it, and with ambient pressure from other software the gate had no path back to
 #: healthy. See :meth:`MemoryCeiling._compressor_trip` for the corroboration rule
 #: that replaces the bare threshold. Raising this number was explicitly rejected —
-#: it would weaken the check for every guarded job, including the Qwen-class ones
-#: (14.32 GiB, stopped only by MPS's own watermark) the 0.25 figure was correctly
-#: derived for. One global fraction cannot serve jobs three orders of magnitude
-#: apart in footprint; the fix is a better predicate, not a looser one.
+#: it would weaken the check for every guarded job. (The "14.32 GiB Qwen" run once
+#: cited here was an unbounded-chunk bug in a one-off HiQS evaluation, fixed in
+#: 0.68.4 — peak 2.16 GiB after — not a scheduled job; measured scheduled-job peaks
+#: are <= 1.85 GB, GH-296.) The fix is a better predicate, not a looser one.
 DEFAULT_MAX_COMPRESSOR_FRACTION = 0.25
 
 #: Swap actually in use, above which a high compressor reading is CONFIRMED as real
@@ -154,8 +154,109 @@ DEFAULT_MAX_COMPRESSOR_FRACTION = 0.25
 #: 0.00M used, 64% of memory free, no paging — the refusal had no distress behind it.
 SWAP_DISTRESS_BYTES = 1 * GIB
 
+#: GH-296: the absolute bar above is ALWAYS true on a Mac whose swap file is small.
+#: Measured on a MacBook Pro 14" (24 GB RAM, 2 GB swap file) on 2026-09-27: ~1.2 GB
+#: of static residual swap for hours at ~50% free, so every compressor reading over
+#: the ceiling became a refusal — 5 of 5 small jobs refused, one killed mid-run.
+#: Swap now confirms distress only when it ALSO fills this fraction of the swap
+#: file. An unreadable total keeps the absolute bar: a blind probe never loosens
+#: the rule (#156). macOS grows swap files on demand, so on a machine that is
+#: genuinely paging the available-memory floor remains the second corroborator.
+SWAP_DISTRESS_FRACTION = 0.75
+
 #: Override for the compressor pressure ceiling, in GB.
 ENV_MAX_COMPRESSOR_GB = "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB"
+
+#: GH-296 per-device settings. They switch or tune the MEMORY checks only; the
+#: single-instance lock and the wall-clock timeout are never configurable, since
+#: the lock is the direct defence against the GH-172 stacked-run kernel panic.
+ENV_MEMORY_GUARD = "REBALANCE_JOB_GUARD_MEMORY"
+ENV_SWAP_DISTRESS_GB = "REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB"
+CONFIG_SECTION = "job_guard"
+_ON_WORDS = {"on", "1", "true", "yes"}
+_OFF_WORDS = {"off", "0", "false", "no"}
+
+
+def device_config_path() -> Path:
+    """The per-device config file the guard reads (GH-296).
+
+    ``$REBALANCE_CONFIG`` when set (the same variable ``rebalance.ingest.config``
+    honours), else ``temp/rbos.config`` in the checkout this file lives in. It is
+    deliberately neither cwd-based nor handed down by :func:`run_guarded`: the
+    in-process embedding guard loads this same module, so launchd, CLI, MCP and
+    agent-spawned runs all resolve one file. #281 moves the location; this is the
+    one place to change it.
+    """
+    override = os.environ.get("REBALANCE_CONFIG", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve().parents[1] / "temp" / "rbos.config"
+
+
+def guard_settings(warn=None) -> dict:
+    """Effective memory-check settings, each as ``{"value": ..., "source": ...}``.
+
+    Precedence: environment variable > device config ``job_guard`` section >
+    built-in default. Explicit CLI flags and call arguments still win over all of
+    these where they exist. An invalid value is reported in one warning line and
+    falls back to the default — it never crashes the job it was meant to protect.
+
+    Keys: ``memory_guard`` (bool), ``max_compressor_gb``, ``swap_distress_gb``,
+    ``min_available_gb`` (positive float or ``None`` for "use the default").
+    """
+    warn = warn or (lambda msg: print(f"[job-guard] {msg}", file=sys.stderr))
+    path = device_config_path()
+    section: dict = {}
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            raw_section = data.get(CONFIG_SECTION, {}) if isinstance(data, dict) else {}
+            if isinstance(raw_section, dict):
+                section = raw_section
+            else:
+                warn(f"ignoring {CONFIG_SECTION!r} in {path}: expected an object; using defaults")
+        except (OSError, ValueError) as exc:
+            warn(f"could not read {path} ({exc}); job guard using defaults")
+
+    def _pick(key: str, env_name: str | None):
+        raw = os.environ.get(env_name, "").strip() if env_name else ""
+        if raw:
+            return raw, f"env {env_name}"
+        if key in section:
+            return section[key], f"device config {path}"
+        return None, "default"
+
+    settings: dict = {}
+    raw, source = _pick("memory_guard", ENV_MEMORY_GUARD)
+    word = str(raw).strip().lower() if raw is not None else ""
+    if raw is None:
+        settings["memory_guard"] = {"value": True, "source": "default"}
+    elif raw is True or raw is False:
+        settings["memory_guard"] = {"value": raw, "source": source}
+    elif word in _ON_WORDS | _OFF_WORDS:
+        settings["memory_guard"] = {"value": word in _ON_WORDS, "source": source}
+    else:
+        warn(f"invalid memory_guard {raw!r} from {source}; expected on/off, using default (on)")
+        settings["memory_guard"] = {"value": True, "source": "default"}
+
+    for key, env_name in (
+        ("max_compressor_gb", ENV_MAX_COMPRESSOR_GB),
+        ("swap_distress_gb", ENV_SWAP_DISTRESS_GB),
+        ("min_available_gb", None),
+    ):
+        raw, source = _pick(key, env_name)
+        value = None
+        if raw is not None:
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                value = None
+            if value is None or value <= 0 or isinstance(raw, bool):
+                warn(f"invalid {key} {raw!r} from {source}; expected a positive number of GB, using default")
+                value, source = None, "default"
+        settings[key] = {"value": value, "source": source}
+    return settings
+
 
 #: Wrapper-mode exit codes. Named so a supervisor can branch on *why* a run did
 #: not succeed instead of pattern-matching integers. The distinction that matters:
@@ -235,6 +336,15 @@ class InstanceConflict(GuardError):
 
 class MemoryCeilingExceeded(GuardError):
     """The job tripped the footprint ceiling, the available floor, or compressor pressure."""
+
+
+class RefusedToStart(MemoryCeilingExceeded):
+    """Preflight refused before any work ran — deferred, not failed (GH-296).
+
+    A subclass so every existing ``except MemoryCeilingExceeded`` still catches it,
+    while a caller that must tell "never started" from "tripped mid-run" (the ingest
+    orchestrator classifying a scope as deferred) can do so without parsing text.
+    """
 
 
 class _Evicted(BaseException):
@@ -397,6 +507,19 @@ def swap_used_bytes() -> int | None:
     granting permission, because a guard that stops constraining when a probe fails is
     #156's defect class.
     """
+    return _swapusage_field("used")
+
+
+def swap_total_bytes() -> int | None:
+    """Size of the swap file(s) in bytes, or ``None`` when undeterminable (GH-296).
+
+    Same ``None``-is-no-evidence contract as :func:`swap_used_bytes`: an unreadable
+    total keeps the absolute :data:`SWAP_DISTRESS_BYTES` bar rather than loosening it.
+    """
+    return _swapusage_field("total")
+
+
+def _swapusage_field(field: str) -> int | None:
     if sys.platform != "darwin":
         return None
     try:
@@ -407,7 +530,7 @@ def swap_used_bytes() -> int | None:
         return None
     # "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)" — the unit travels with
     # the number and is not always M, so parse both rather than assuming megabytes.
-    match = re.search(r"used\s*=\s*([\d.]+)([KMGT])", out.stdout)
+    match = re.search(field + r"\s*=\s*([\d.]+)([KMGT])", out.stdout)
     if not match:
         return None
     scale = {"K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}[match.group(2)]
@@ -705,28 +828,46 @@ class MemoryCeiling:
         total = total_memory_bytes()
         self.pid = pid or os.getpid()
         self.total = total
+        self.log = log or (lambda msg: print(f"[job-guard] {msg}", file=sys.stderr))
+
+        # GH-296: one resolver for both guard layers (launchd wrapper and the
+        # in-process embedding guard). Explicit arguments still win over it.
+        self.settings = guard_settings(warn=self.log)
+        self.memory_checks = bool(self.settings["memory_guard"]["value"])
+
+        def _gb(key: str) -> int | None:
+            value = self.settings[key]["value"]
+            return int(value * GIB) if value else None
 
         ceiling = max_footprint_bytes or max_rss_bytes
         self.max_footprint = ceiling or int(total * DEFAULT_MAX_FOOTPRINT_FRACTION) or None
         self.min_available = (
             min_available_bytes
+            or _gb("min_available_gb")
             or max(int(total * DEFAULT_MIN_AVAILABLE_FRACTION), MIN_AVAILABLE_FLOOR if total else 0)
             or None
         )
-        env_comp = os.environ.get(ENV_MAX_COMPRESSOR_GB, "").strip()
-        try:
-            self.max_compressor = (
-                int(float(env_comp) * GIB) if env_comp else int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
-            )
-        except ValueError:
-            self.max_compressor = int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
+        self.max_compressor = _gb("max_compressor_gb") or int(total * DEFAULT_MAX_COMPRESSOR_FRACTION) or None
+        self.swap_distress_override = _gb("swap_distress_gb")
         self.poll_seconds = poll_seconds
         self.on_trip = on_trip
-        self.log = log or (lambda msg: print(f"[job-guard] {msg}", file=sys.stderr))
         self.tripped_reason: str | None = None
         self.peak_footprint = 0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+
+    def swap_distress_bar(self) -> int:
+        """Swap in use above which a high compressor counts as real distress (GH-296).
+
+        A device-config/env override wins; otherwise ``max(1 GiB, 75% of the swap
+        file)``. An unreadable swap total keeps the 1 GiB bar (#156).
+        """
+        if self.swap_distress_override:
+            return self.swap_distress_override
+        total = swap_total_bytes()
+        if not total:
+            return SWAP_DISTRESS_BYTES
+        return max(SWAP_DISTRESS_BYTES, int(total * SWAP_DISTRESS_FRACTION))
 
     def _compressor_trip(self) -> str | None:
         """The compressor verdict, corroborated. ``None`` means do not trip (GH-157).
@@ -765,8 +906,9 @@ class MemoryCeiling:
 
         swap = swap_used_bytes()
         available = available_memory_bytes()
-        if swap is not None and swap > SWAP_DISTRESS_BYTES:
-            corroboration = f"swap in use {_fmt_gb(swap)}"
+        swap_bar = self.swap_distress_bar()
+        if swap is not None and swap > swap_bar:
+            corroboration = f"swap in use {_fmt_gb(swap)} (distress bar {_fmt_gb(swap_bar)})"
         elif available and self.min_available and available < self.min_available:
             corroboration = f"available {_fmt_gb(available)} below floor {_fmt_gb(self.min_available)}"
         elif swap is None and not available:
@@ -799,8 +941,15 @@ class MemoryCeiling:
         # genuinely well-behaved one — and #157's measurements would be unreliable
         # for exactly that reason. Refuse instead: EX_TEMPFAIL is deferred, so a
         # supervisor retries rather than counting it as a job failure (#156).
+        if not self.memory_checks:
+            # GH-296: an unguarded run must never look like a guarded one, so say
+            # so on every run. The lock and the wall-clock timeout are unaffected.
+            self.log(
+                f"memory checks disabled by {self.settings['memory_guard']['source']} (lock and timeout still active)"
+            )
+            return
         if not self.total:
-            raise MemoryCeilingExceeded(
+            raise RefusedToStart(
                 "refusing to start: cannot determine physical RAM, so no memory ceiling "
                 "can be enforced (an unguarded run must not masquerade as a guarded one)"
             )
@@ -808,13 +957,13 @@ class MemoryCeiling:
         # Compressor pressure first: it stays honest when "available" does not.
         reason = self._compressor_trip()
         if reason:
-            raise MemoryCeilingExceeded(f"refusing to start: {reason}")
+            raise RefusedToStart(f"refusing to start: {reason}")
 
         if not self.min_available:
             return
         available = available_memory_bytes()
         if available and available < self.min_available:
-            raise MemoryCeilingExceeded(
+            raise RefusedToStart(
                 f"refusing to start: only {_fmt_gb(available)} available, floor is {_fmt_gb(self.min_available)}"
             )
 
@@ -838,6 +987,8 @@ class MemoryCeiling:
     def _check(self) -> str | None:
         footprint, is_fallback, unreadable = tree_footprint_bytes(self.pid)
         self.peak_footprint = max(self.peak_footprint, footprint)
+        if not self.memory_checks:
+            return None  # GH-296: still measured for job_rss.jsonl, never enforced
         metric = "RSS (fallback)" if is_fallback else "phys_footprint"
         unr_msg = f" (skipped {unreadable} unreadable pids)" if unreadable else ""
 
@@ -866,6 +1017,40 @@ class MemoryCeiling:
         if self._thread is not None:
             self._thread.join(timeout=self.poll_seconds + 1)
             self._thread = None
+
+
+def settings_report() -> tuple[str, list[str]]:
+    """One line of effective memory-check settings with their sources, plus warnings.
+
+    Shared by ``job_guard.py --status`` and ``rebalance doctor`` (GH-296) so the two
+    can never describe the guard differently.
+    """
+    warnings: list[str] = []
+    ceiling = MemoryCeiling(log=warnings.append)
+    settings = ceiling.settings
+    if not ceiling.memory_checks:
+        return (
+            f"memory checks OFF ({settings['memory_guard']['source']}); lock and timeout still active",
+            warnings,
+        )
+    swap_total = swap_total_bytes()
+
+    def _src(key: str) -> str:
+        return settings[key]["source"]
+
+    swap_src = (
+        _src("swap_distress_gb")
+        if ceiling.swap_distress_override
+        else f"default: max(1 GB, {SWAP_DISTRESS_FRACTION:.0%} of {_fmt_gb(swap_total) if swap_total else 'unreadable'} swap)"
+    )
+    text = (
+        f"memory checks on ({_src('memory_guard')}); "
+        f"compressor ceiling {_fmt_gb(ceiling.max_compressor or 0)} ({_src('max_compressor_gb')}), "
+        f"swap distress bar {_fmt_gb(ceiling.swap_distress_bar())} ({swap_src}), "
+        f"available floor {_fmt_gb(ceiling.min_available or 0)} ({_src('min_available_gb')}), "
+        f"per-job footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)}"
+    )
+    return text, warnings
 
 
 # --------------------------------------------------------------------------- #
@@ -897,6 +1082,7 @@ def record_peak_footprint(
             "total_memory_gb": round((ceiling.total or 0) / GIB, 1),
             "max_footprint_gb": round((ceiling.max_footprint or 0) / GIB, 3) if ceiling.max_footprint else None,
             "tripped_reason": ceiling.tripped_reason,
+            "memory_guard": "on" if getattr(ceiling, "memory_checks", True) else "off",
             "exit_code": exit_code,
             "duration_s": round(time.monotonic() - started, 1) if started else None,
         }
@@ -1015,10 +1201,13 @@ def run_guarded(
             log(str(exc))
             return EXIT_REFUSED_TO_START
 
-        log(
-            f"starting {name!r}: footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)}, "
-            f"available floor {_fmt_gb(ceiling.min_available or 0)}"
-        )
+        if ceiling.memory_checks:
+            log(
+                f"starting {name!r}: footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)}, "
+                f"available floor {_fmt_gb(ceiling.min_available or 0)}"
+            )
+        else:
+            log(f"starting {name!r}: memory checks off")
 
         child_env = None
         if lifecycle_job:
@@ -1204,6 +1393,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"holder:    {holder if holder else 'none'}")
         print(f"total RAM: {_fmt_gb(total)}")
         print(f"available: {_fmt_gb(available_memory_bytes())}")
+        report, warnings = settings_report()
+        print(f"settings:  {report}")
+        for warning in warnings:
+            print(f"warning:   {warning}")
         if holder:
             footprint, is_fallback, unr = tree_footprint_bytes(holder)
             metric = "RSS (fallback)" if is_fallback else "phys_footprint"

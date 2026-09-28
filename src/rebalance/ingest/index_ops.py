@@ -1808,7 +1808,16 @@ def refresh_index(
         try:
             results.append(collector.refresh(db_path, **collector_opts))
         except Exception as e:  # noqa: BLE001 — error envelope mirrors legacy contract
-            errors.append({"scope": s, "error": str(e)})
+            from rebalance.ingest._job_guard import is_deferral  # noqa: PLC0415
+
+            if is_deferral(e):
+                # GH-296: the job guard refused before any work (lock held, or the
+                # machine under memory pressure). That is "retry later", not a
+                # failure — recorded as a deferred skip so the scheduler exits 75
+                # instead of reporting the whole run as fatal.
+                results.append({"scope": s, "dry_run": False, "skipped": True, "deferred": True, "reason": str(e)})
+            else:
+                errors.append({"scope": s, "error": str(e)})
 
     # Precompute the P2 v0.5 "what should we work on next" ranked list now that
     # the collectors above have refreshed the signal. This is the NETWORK-ALLOWED
@@ -1909,9 +1918,17 @@ def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
       succeeded and did useful work (allows next run to self-heal).
     - ("fatal", 1): A migration failure occurred (infrastructure failure) or all attempted
       stages failed or were skipped.
+    - ("deferred", 75): No errors, and the job guard deferred every stage that would
+      otherwise have run (GH-296) — nothing ran, nothing is broken, retry later. When
+      another stage did succeed the run is ("degraded", 0) instead, so completed work
+      is never reported as skipped.
     """
     errors = result.get("errors") or []
     if not errors:
+        results = result.get("results", [])
+        if any(entry.get("skipped") and entry.get("deferred") for entry in results):
+            ran = [entry for entry in results if not entry.get("skipped") and not entry.get("error")]
+            return ("degraded", 0) if ran else ("deferred", 75)
         return "complete", 0
 
     # A migration failure means no collector can safely write to the database.

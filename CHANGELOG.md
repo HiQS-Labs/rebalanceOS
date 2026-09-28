@@ -10,6 +10,18 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.97.0] - 2026-09-27
+
+### Fixed
+
+- The scheduled-job memory guard no longer refuses healthy runs on Macs with a small swap file. It treated any swap above 1 GB as proof of memory distress, which a laptop with a 2 GB swap file carries permanently, so every job was refused while half the memory sat free. Swap now confirms distress only when it also fills three quarters of the swap file; an unreadable swap size keeps the old rule.
+- The same false refusal inside the embedding step no longer reports the whole run as a hard failure. When the guard defers every stage before any work, the run is reported as deferred and retried on the next schedule; when other stages already ran, it is reported as partially complete, so finished work is never recorded as skipped.
+
+### Added
+
+- Each Mac can turn the guard's memory checks off, or set its own compressor, swap and free-memory thresholds, from its local configuration, with no scheduler edits. The one-run-at-a-time lock and the run-time limit always stay on, every run logs when the memory checks are off, and invalid values fall back to the defaults with a warning.
+- The health check reports the guard's effective memory settings on each Mac and where each value came from.
+
 ## [0.96.1] - 2026-09-27
 
 ### Fixed

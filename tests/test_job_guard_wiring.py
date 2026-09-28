@@ -40,6 +40,10 @@ def _enable_guard(monkeypatch, tmp_path):
     # A test that means to exercise the ceiling should set this to a value that trips it, rather
     # than relying on whatever the host happens to be doing.
     monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB", "999")
+    # GH-296: settings also come from the device config; never read the real one.
+    monkeypatch.setenv("REBALANCE_CONFIG", str(tmp_path / "no-rbos.config"))
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_MEMORY", raising=False)
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB", raising=False)
     # The module caches its load; drop it so LOCK_DIR is re-read per test.
     _job_guard._module = None
     _job_guard._load_attempted = False
@@ -218,3 +222,29 @@ def test_lock_is_released_after_guard_exits(tmp_path):
         lock = guard_mod.SingleInstanceLock("rebalance-embed", lock_dir=lock_dir)
         lock.acquire(on_conflict="refuse")
         lock.release()
+
+
+def test_inner_guard_does_not_refuse_a_small_swap_laptop(monkeypatch):
+    """GH-296: the second (in-process) guard shares MemoryCeiling, so the swap fix reaches it.
+
+    Before the fix the embedding leaves refused on this exact state even with the
+    launchd wrapper removed, and the run was reported ``fatal`` (exit 1).
+    """
+    mod = _job_guard.load_job_guard()
+    GIB = 1024**3
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB")  # use the real 25% ceiling
+    monkeypatch.setattr(mod, "total_memory_bytes", lambda: 24 * GIB)
+    monkeypatch.setattr(mod, "compressor_bytes", lambda: int(9.3 * GIB))
+    monkeypatch.setattr(mod, "available_memory_bytes", lambda: 6 * GIB)
+    monkeypatch.setattr(mod, "swap_used_bytes", lambda: int(1.2 * GIB))
+    monkeypatch.setattr(mod, "swap_total_bytes", lambda: 2 * GIB)
+    with _job_guard.embedding_guard():
+        pass  # must not raise
+
+
+def test_is_deferral_separates_never_started_from_tripped():
+    mod = _job_guard.load_job_guard()
+    assert _job_guard.is_deferral(mod.RefusedToStart("refusing to start: x"))
+    assert _job_guard.is_deferral(mod.InstanceConflict("held"))
+    assert not _job_guard.is_deferral(mod.MemoryCeilingExceeded("tripped mid-run"))
+    assert not _job_guard.is_deferral(RuntimeError("unrelated"))

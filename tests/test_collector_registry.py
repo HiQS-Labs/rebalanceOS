@@ -119,6 +119,37 @@ class CollectorRegistryTests(unittest.TestCase):
             finally:
                 COLLECTORS.pop("smoke_test", None)
 
+    def test_guard_refusal_is_recorded_as_a_deferred_scope(self) -> None:
+        """GH-296: a preflight refusal inside a collector is deferred, not an error."""
+        from rebalance.ingest import _job_guard
+
+        mod = _job_guard.load_job_guard()
+        self.assertIsNotNone(mod)
+
+        def _refused(db: Path, **opts: Any) -> dict[str, Any]:
+            raise mod.RefusedToStart("refusing to start: memory compressor holds 9.3 GB")
+
+        def _tripped(db: Path, **opts: Any) -> dict[str, Any]:
+            raise mod.MemoryCeilingExceeded("process tree holds 5 GB, ceiling is 3 GB")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "test.db"
+            try:
+                register_collector(Collector("gh296_refused", _refused, included_in_all=False))
+                register_collector(Collector("gh296_tripped", _tripped, included_in_all=False))
+                result = refresh_index(
+                    db_path, scope=["gh296_refused", "gh296_tripped"], dry_run=False, update_dashboard_note=False
+                )
+            finally:
+                COLLECTORS.pop("gh296_refused", None)
+                COLLECTORS.pop("gh296_tripped", None)
+        deferred = [r for r in result["results"] if r.get("scope") == "gh296_refused"]
+        self.assertEqual(len(deferred), 1)
+        self.assertTrue(deferred[0]["skipped"] and deferred[0]["deferred"])
+        self.assertNotIn("gh296_refused", [e["scope"] for e in result.get("errors", [])])
+        # A ceiling tripped mid-run is a real failure and stays an error.
+        self.assertIn("gh296_tripped", [e["scope"] for e in result.get("errors", [])])
+
 
 if __name__ == "__main__":
     unittest.main()
