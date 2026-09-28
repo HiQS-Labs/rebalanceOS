@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from rebalance.doctor import ERROR, FAIL, OK, WARN, _check_launchd, _check_scheduler_liveness
 
 NOW = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
@@ -230,8 +232,11 @@ def test_guard_lock_conflict_exit_3_is_a_skip_not_a_failure(tmp_path: Path) -> N
     assert "skipped (3)" in checks[0].detail
 
 
-def _job_guard_check(tmp_path: Path, monkeypatch, section) -> object:
+def _job_guard_check(tmp_path: Path, monkeypatch, section, *, bypass: bool = False) -> object:
     from rebalance.doctor import _check_job_guard
+
+    # conftest disables the guard suite-wide; doctor must see it as an operator would.
+    monkeypatch.setenv("REBALANCE_JOB_GUARD", "0" if bypass else "1")
 
     config = tmp_path / "rbos.config"
     config.write_text(json.dumps({"job_guard": section}), encoding="utf-8")
@@ -280,4 +285,24 @@ def test_doctor_reports_the_wrappers_env_footprint_ceiling(tmp_path: Path, monke
     monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "6.5")
     check = _job_guard_check(tmp_path, monkeypatch, {})
 
-    assert "per-job footprint ceiling 6.5 GB (env)" in check.detail
+    assert "per-job footprint ceiling (wrapper and embedding) 6.5 GB (env)" in check.detail
+
+
+def test_doctor_warns_when_the_test_only_guard_bypass_is_set(tmp_path: Path, monkeypatch) -> None:
+    """GH-296 final QA F3: REBALANCE_JOB_GUARD=0 drops the embedding lock too — say so."""
+    check = _job_guard_check(tmp_path, monkeypatch, {}, bypass=True)
+
+    assert check.status == WARN
+    assert "REBALANCE_JOB_GUARD=0" in check.detail
+
+
+@pytest.mark.parametrize("name", ["REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "REBALANCE_JOB_GUARD_MAX_RSS_GB"])
+@pytest.mark.parametrize("raw", ["nan", "inf", "-1", "1e308"])
+def test_doctor_survives_an_invalid_footprint_override(tmp_path: Path, monkeypatch, name, raw) -> None:
+    """GH-296 final QA F7: an invalid footprint variable warns; it must not break the report."""
+    monkeypatch.setenv(name, raw)
+    check = _job_guard_check(tmp_path, monkeypatch, {})
+
+    assert "could not read" not in check.detail
+    assert "per-job footprint ceiling (wrapper and embedding)" in check.detail
+    assert "default: 12.5% of RAM" in check.detail

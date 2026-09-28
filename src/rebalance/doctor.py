@@ -910,7 +910,7 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
         if outcome == "degraded":
-            detail = f"{source} degraded (partial source errors recorded)"
+            detail = f"{source} degraded (partial source errors or deferred embedding recorded)"
             if status != "0":
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
@@ -2202,6 +2202,8 @@ def _check_job_guard() -> Check:
         report, warnings = mod.settings_report()
     except Exception as exc:  # noqa: BLE001 — a probe failure must not break doctor
         return Check("job-guard", WARN, f"could not read job guard settings: {exc}")
+    if not _job_guard.enabled():
+        warnings.append("REBALANCE_JOB_GUARD=0 is set: the embedding guard, including its lock, is OFF (test-only)")
     if warnings:
         return Check(
             "job-guard",

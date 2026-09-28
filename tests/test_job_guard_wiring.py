@@ -248,3 +248,35 @@ def test_is_deferral_separates_never_started_from_tripped():
     assert _job_guard.is_deferral(mod.InstanceConflict("held"))
     assert not _job_guard.is_deferral(mod.MemoryCeilingExceeded("tripped mid-run"))
     assert not _job_guard.is_deferral(RuntimeError("unrelated"))
+
+
+@pytest.mark.parametrize(
+    "env, expected",
+    [
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "6.5"}, 6.5),
+        ({"REBALANCE_JOB_GUARD_MAX_RSS_GB": "5"}, 5.0),
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "6.5", "REBALANCE_JOB_GUARD_MAX_RSS_GB": "5"}, 6.5),
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "nan"}, None),
+    ],
+)
+def test_inner_guard_resolves_the_footprint_ceiling_like_the_wrapper(monkeypatch, env, expected):
+    """GH-296 final QA F3: the bridge read only the RSS alias, so the layers disagreed."""
+    mod = _job_guard.load_job_guard()
+    for name in ("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "REBALANCE_JOB_GUARD_MAX_RSS_GB"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    seen = {}
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _fake_guard(name, **kwargs):
+        seen.update(kwargs)
+        yield
+
+    monkeypatch.setattr(mod, "guard", _fake_guard)
+    with _job_guard.embedding_guard():
+        pass
+    assert seen["max_rss_gb"] == expected
+    assert (mod.env_max_footprint_gb(warn=lambda m: None)) == expected

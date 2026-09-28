@@ -880,9 +880,10 @@ def _refresh_vault(
 class _EmbeddingDeferred:
     """Stand-in embed result when the job guard defers an embedding leaf (GH-296).
 
-    Every collector that embeds does real work first (vault ingest, GitHub sync,
+    Every collector that calls a guarded leaf does real work first (vault ingest,
     semantic backfill, dashboard write), so a guard refusal at the leaf must not
     discard that work or report the scope as skipped. Zero counts, plus the reason.
+    (GitHub embedding is not behind the guard today — a follow-up, not this fix.)
     """
 
     total_chunks = embedded_chunks = total_docs = embedded_docs = skipped_unchanged = 0
@@ -1230,7 +1231,7 @@ def _refresh_github(
 
     from rebalance.ingest.github_knowledge import embed_github_documents
 
-    gh_embed = _embed_or_defer(embed_github_documents, database_path=database_path, power_defer=power_defer)
+    gh_embed = embed_github_documents(database_path=database_path, power_defer=power_defer)
 
     # Coverage guard: snapshot the resolved watched set and alarm on a silent
     # reduction. Runs LAST, only on a clean sync (an earlier raise never reaches
@@ -1298,7 +1299,6 @@ def _refresh_github(
         },
         "artifact_sync": repo_results,
         "watched_activity": watched_activity,
-        "embedding_deferred": _embedding_deferred(gh_embed),
         "github_embed": {
             "total": gh_embed.total_docs,
             "embedded": gh_embed.embedded_docs,

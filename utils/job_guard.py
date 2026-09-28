@@ -178,6 +178,15 @@ _ON_WORDS = {"on", "1", "true", "yes"}
 _OFF_WORDS = {"off", "0", "false", "no"}
 
 
+def _valid_gb(value: float) -> bool:
+    """Positive, finite and at most 1 PB (GH-296 final QA F1/F7).
+
+    nan, inf or 1e308 would otherwise crash the GB-to-bytes conversion inside the
+    very job the setting was meant to protect.
+    """
+    return math.isfinite(value) and 0 < value <= 1_000_000
+
+
 def device_config_path() -> Path:
     """The per-device config file the guard reads (GH-296).
 
@@ -252,9 +261,7 @@ def guard_settings(warn=None) -> dict:
                 value = float(raw)
             except (TypeError, ValueError):
                 value = None
-            # Finite and at most 1 PB: nan/inf/1e308 would crash the byte conversion
-            # in the job this setting was meant to protect (GH-296 final QA F1).
-            if value is None or isinstance(raw, bool) or not math.isfinite(value) or not 0 < value <= 1_000_000:
+            if value is None or isinstance(raw, bool) or not _valid_gb(value):
                 warn(f"invalid {key} {raw!r} from {source}; expected a positive number of GB, using default")
                 value, source = None, "default"
         settings[key] = {"value": value, "source": source}
@@ -307,6 +314,9 @@ def env_max_footprint_gb(warn=None) -> float | None:
             value = float(raw)
         except ValueError:
             warn(f"ignoring non-numeric {name}={raw!r}")
+            continue
+        if not _valid_gb(value):
+            warn(f"ignoring {name}={raw!r}: expected a positive finite number of GB")
             continue
         if deprecated:
             warn(f"{name} is deprecated (the guard measures phys_footprint, not RSS); use {ENV_MAX_FOOTPRINT_GB}")
@@ -1063,7 +1073,7 @@ def settings_report() -> tuple[str, list[str]]:
         f"compressor ceiling {_fmt_gb(ceiling.max_compressor or 0)} ({_src('max_compressor_gb')}), "
         f"swap distress bar {_fmt_gb(ceiling.swap_distress_bar())} ({swap_src}), "
         f"available floor {_fmt_gb(ceiling.min_available or 0)} ({_src('min_available_gb')}), "
-        f"per-job footprint ceiling {_fmt_gb(ceiling.max_footprint or 0)} "
+        f"per-job footprint ceiling (wrapper and embedding) {_fmt_gb(ceiling.max_footprint or 0)} "
         f"({'env' if env_footprint else f'default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.1%} of RAM'})"
     )
     return text, warnings

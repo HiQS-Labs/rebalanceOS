@@ -310,7 +310,7 @@ class ShellExecutionTests(unittest.TestCase):
         code, outcome, log_line = self._run_shell_refresh("degraded", strict="0")
         self.assertEqual(code, 0)
         self.assertEqual(outcome, "degraded")
-        self.assertIn("degraded; partial errors recorded", log_line)
+        self.assertIn("degraded; partial errors or deferred steps recorded", log_line)
 
     def test_shell_fatal_exits_1(self) -> None:
         code, outcome, log_line = self._run_shell_refresh("fatal", strict="0")

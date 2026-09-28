@@ -804,3 +804,13 @@ def test_a_valid_finite_override_still_applies(isolated_guard, monkeypatch):
     ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
     assert ceiling.swap_distress_override == int(1.5 * GIB)
     assert ceiling.min_available == 2 * GIB
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [(False, False), (True, True), (0, False), (1, True), (None, True), ("OFF", False), ("on", True)],
+)
+def test_memory_guard_accepts_json_bool_int_and_null(isolated_guard, monkeypatch, raw, expected):
+    """JSON false/0/"off" switch the checks off; true/1/"on" on; null means unset (default on)."""
+    _write_device_config(isolated_guard, monkeypatch, {"memory_guard": raw})
+    assert job_guard.guard_settings()["memory_guard"]["value"] is expected

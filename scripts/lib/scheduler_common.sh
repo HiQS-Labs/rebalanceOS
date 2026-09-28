@@ -222,7 +222,7 @@ rb_log_sync_outcome() {
         log "=== $job_name failed fatally (see JSON above) ==="
     elif [ "$code" -eq 0 ]; then
         if [ "$outcome" = "degraded" ]; then
-            log "=== $job_name degraded; partial errors recorded (see JSON above) ==="
+            log "=== $job_name degraded; partial errors or deferred steps recorded (see JSON above) ==="
         else
             log "=== $job_name complete ==="
         fi

@@ -58,7 +58,6 @@ EMBEDDING_LOCK = "rebalance-embed"
 
 _ENV_ENABLED = "REBALANCE_JOB_GUARD"
 _ENV_ON_CONFLICT = "REBALANCE_JOB_GUARD_ON_CONFLICT"
-_ENV_MAX_RSS_GB = "REBALANCE_JOB_GUARD_MAX_RSS_GB"
 _ENV_MODULE = "JOB_GUARD_MODULE"
 
 _FALSEY = {"0", "false", "no", "off", ""}
@@ -156,12 +155,10 @@ def embedding_guard(
         return
 
     if max_rss_gb is None:
-        raw = os.environ.get(_ENV_MAX_RSS_GB, "").strip()
-        if raw:
-            try:
-                max_rss_gb = float(raw)
-            except ValueError:
-                _warn_once(f"ignoring non-numeric {_ENV_MAX_RSS_GB}={raw!r}")
+        # The same resolver as the launchd wrapper (canonical footprint variable,
+        # then the deprecated RSS alias), so both layers and the doctor report
+        # agree on the ceiling (GH-296 final QA F3).
+        max_rss_gb = mod.env_max_footprint_gb(warn=_warn_once)
 
     resolved_conflict = on_conflict or os.environ.get(_ENV_ON_CONFLICT, "refuse").strip()
 
