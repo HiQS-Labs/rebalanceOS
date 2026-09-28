@@ -25,6 +25,7 @@ from rebalance.ingest.db import db_connection, ensure_github_schema, ensure_sema
 from rebalance.ingest.db import github as gh
 from rebalance.ingest.db import semantic as sem
 from rebalance.ingest._http import GITHUB_API, GitHubClient
+from rebalance.ingest._job_guard import guarded_embedding
 from rebalance.ingest.embedder import (
     DEFAULT_MODEL as DEFAULT_EMBED_MODEL,
     EMBEDDING_DIM,
@@ -899,6 +900,7 @@ def refresh_github_embeddings(
     )
 
 
+@guarded_embedding  # GH-296 / #297: GitHub embedding shares the rebalance-embed lock and ceiling
 def embed_github_documents(
     database_path: Path,
     *,

@@ -852,7 +852,7 @@ def _refresh_vault(
         exclude_patterns=[".obsidian/*", ".trash/*", "node_modules/*", ".git/*", ".venv/*", "*/.venv/*"],
         dry_run=False,
     )
-    embed_result = _embed_or_defer(embed_chunks, database_path=database_path, power_defer=power_defer)
+    embed_result = _embed_or_defer(lambda: embed_chunks(database_path=database_path, power_defer=power_defer))
 
     return {
         "scope": "vault",
@@ -881,9 +881,8 @@ class _EmbeddingDeferred:
     """Stand-in embed result when the job guard defers an embedding leaf (GH-296).
 
     Every collector that calls a guarded leaf does real work first (vault ingest,
-    semantic backfill, dashboard write), so a guard refusal at the leaf must not
-    discard that work or report the scope as skipped. Zero counts, plus the reason.
-    (GitHub embedding is not behind the guard today — a follow-up, not this fix.)
+    GitHub sync, semantic backfill, dashboard write), so a guard refusal at the leaf
+    must not discard that work or report the scope as skipped. Zero counts, plus the reason.
     """
 
     total_chunks = embedded_chunks = total_docs = embedded_docs = skipped_unchanged = 0
@@ -894,16 +893,18 @@ class _EmbeddingDeferred:
         self.reason = reason
 
 
-def _embed_or_defer(leaf: Any, *args: Any, **kwargs: Any) -> Any:
-    """Call a guarded embedding leaf; a job-guard deferral returns :class:`_EmbeddingDeferred`.
+def _embed_or_defer(call: Callable[[], Any]) -> Any:
+    """Run a guarded embedding leaf call; a job-guard deferral returns :class:`_EmbeddingDeferred`.
 
-    Deferral means "never started, retry next run" (lock held or a preflight memory
-    refusal). A ceiling tripped mid-run, or any other error, still raises.
+    Takes a zero-argument callable (``lambda: <leaf>(...)``) so each leaf keeps
+    exactly one literal call site, which the collector contract tests pin. Deferral
+    means "never started, retry next run" (lock held or a preflight memory refusal).
+    A ceiling tripped mid-run, or any other error, still raises.
     """
     from rebalance.ingest._job_guard import is_deferral  # noqa: PLC0415
 
     try:
-        return leaf(*args, **kwargs)
+        return call()
     except Exception as exc:  # noqa: BLE001 — re-raised unless it is a guard deferral
         if is_deferral(exc):
             return _EmbeddingDeferred(str(exc))
@@ -1231,7 +1232,7 @@ def _refresh_github(
 
     from rebalance.ingest.github_knowledge import embed_github_documents
 
-    gh_embed = embed_github_documents(database_path=database_path, power_defer=power_defer)
+    gh_embed = _embed_or_defer(lambda: embed_github_documents(database_path=database_path, power_defer=power_defer))
 
     # Coverage guard: snapshot the resolved watched set and alarm on a silent
     # reduction. Runs LAST, only on a clean sync (an earlier raise never reaches
@@ -1299,6 +1300,7 @@ def _refresh_github(
         },
         "artifact_sync": repo_results,
         "watched_activity": watched_activity,
+        "embedding_deferred": _embedding_deferred(gh_embed),
         "github_embed": {
             "total": gh_embed.total_docs,
             "embedded": gh_embed.embedded_docs,
@@ -1604,7 +1606,7 @@ def _refresh_semantic_only(
         source_types=sources,
         use_registry_providers=True,
     )
-    sem_embed = _embed_or_defer(embed_pending, database_path, source_types=sources, power_defer=power_defer)
+    sem_embed = _embed_or_defer(lambda: embed_pending(database_path, source_types=sources, power_defer=power_defer))
     return {
         "scope": "semantic",
         "dry_run": False,
@@ -1666,7 +1668,7 @@ def _refresh_dashboard_note(
     )
     note_file = write_dashboard_note(output_path, markdown)
     ingest_result = ingest_vault(vault_path=vault_path, database_path=database_path)
-    embed_result = _embed_or_defer(embed_chunks, database_path=database_path, power_defer=power_defer)
+    embed_result = _embed_or_defer(lambda: embed_chunks(database_path=database_path, power_defer=power_defer))
 
     return {
         "scope": "dashboard",
@@ -1950,26 +1952,30 @@ def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
     - ("fatal", 1): A migration failure occurred (infrastructure failure) or all attempted
       stages failed or were skipped.
 
-    A stage whose embedding step the job guard deferred (``embedding_deferred``,
-    GH-296) did its other work, so the run is ("degraded", 0), never skipped.
+    A collector can fail by *returning* ``{"error": ...}`` (Gmail auth, missing pulse
+    config) rather than raising; those count as failures too (#297). The one
+    deliberate exception is the ``next_actions`` precompute note, which is non-fatal
+    by design. A stage whose embedding step the job guard deferred
+    (``embedding_deferred``, GH-296) did its other work: degraded, never skipped.
     """
-    errors = result.get("errors") or []
-    if not errors:
-        if any(entry.get("embedding_deferred") for entry in result.get("results", [])):
+    results = result.get("results", [])
+    failures = (result.get("errors") or []) + [
+        entry for entry in results if entry.get("error") and entry.get("scope") != "next_actions"
+    ]
+    if not failures:
+        if any(entry.get("embedding_deferred") for entry in results):
             return "degraded", 0
         return "complete", 0
 
     # A migration failure means no collector can safely write to the database.
     # It is an infrastructure failure, rather than a degraded source refresh.
-    if any(error.get("scope") == "migrations" for error in errors):
+    if any(error.get("scope") == "migrations" for error in failures):
         return "fatal", 1
 
     # A non-migration error is only fatal when every attempted stage failed or
     # was skipped. Otherwise the scheduler completed useful work and should
     # allow the next run to self-heal the degraded source.
-    successful_results = [
-        entry for entry in result.get("results", []) if not entry.get("skipped") and not entry.get("error")
-    ]
+    successful_results = [entry for entry in results if not entry.get("skipped") and not entry.get("error")]
     if not successful_results:
         return "fatal", 1
     return "degraded", 0

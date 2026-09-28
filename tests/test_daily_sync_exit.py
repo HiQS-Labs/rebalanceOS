@@ -130,6 +130,44 @@ class ClassifySyncOutcomeDirectTests(unittest.TestCase):
         outcome, code = classify_sync_outcome({"results": [{"scope": "vault", "embedding_deferred": None}]})
         self.assertEqual((outcome, code), ("complete", 0))
 
+    def test_sole_returned_collector_error_is_fatal(self) -> None:
+        """#297 / GH-296 QA F2: an error returned inside a result is a failure, not complete."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome({"errors": [], "results": [{"scope": "email", "error": "invalid_grant"}]})
+        self.assertEqual((outcome, code), ("fatal", 1))
+
+    def test_returned_collector_error_beside_a_success_is_degraded(self) -> None:
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault", "synced": 3}, {"scope": "email", "error": "invalid_grant"}]}
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_returned_error_beside_a_deferred_embedding_scope_is_degraded(self) -> None:
+        """A deferred-embedding scope did real work, so it counts as a (partial) success."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {
+                "results": [
+                    {"scope": "semantic", "embedding_deferred": "refusing to start"},
+                    {"scope": "sync", "error": "pulse_target_path not configured"},
+                ]
+            }
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_next_actions_note_stays_non_fatal(self) -> None:
+        """The next-actions precompute note is non-fatal by design (index_ops refresh_index)."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault"}, {"scope": "next_actions", "skipped": True, "error": "gemini down"}]}
+        )
+        self.assertEqual((outcome, code), ("complete", 0))
+
     def test_migration_error_is_fatal(self) -> None:
         from rebalance.ingest.index_ops import classify_sync_outcome
 

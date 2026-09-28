@@ -67,9 +67,10 @@ def test_embed_leaves_are_decorated():
     This is the regression test for the #174 gap — a guard with no callers.
     """
     from rebalance.ingest.embedder import embed_chunks
+    from rebalance.ingest.github_knowledge import embed_github_documents
     from rebalance.ingest.semantic_index import embed_pending
 
-    for fn in (embed_chunks, embed_pending):
+    for fn in (embed_chunks, embed_pending, embed_github_documents):
         assert hasattr(fn, "__wrapped__"), f"{fn.__name__} is not guarded — GH-172 crash path is open again"
 
 
@@ -80,9 +81,10 @@ def test_facades_delegate_and_are_not_double_guarded():
     take the same ``flock`` twice in one process and self-deadlock.
     """
     from rebalance.ingest.embedder import embed_vault_chunks
+    from rebalance.ingest.github_knowledge import refresh_github_embeddings
     from rebalance.ingest.semantic_index import embed_semantic_pending
 
-    for fn in (embed_vault_chunks, embed_semantic_pending):
+    for fn in (embed_vault_chunks, embed_semantic_pending, refresh_github_embeddings):
         assert not hasattr(fn, "__wrapped__"), (
             f"{fn.__name__} is double-guarded; it delegates to a guarded leaf and would deadlock on the shared flock"
         )
@@ -280,3 +282,29 @@ def test_inner_guard_resolves_the_footprint_ceiling_like_the_wrapper(monkeypatch
         pass
     assert seen["max_rss_gb"] == expected
     assert (mod.env_max_footprint_gb(warn=lambda m: None)) == expected
+
+
+def test_github_embedding_waits_for_the_shared_embedding_lock(tmp_path):
+    """#297 / GH-296 QA F6: GitHub embedding used to encode without the rebalance-embed lock.
+
+    With another embedding run holding the lock, the leaf must refuse before any
+    model work, and the collector's call site must turn that into a deferral.
+    """
+    from rebalance.ingest.github_knowledge import embed_github_documents
+    from rebalance.ingest.index_ops import _embed_or_defer, _embedding_deferred
+
+    mod = _job_guard.load_job_guard()
+    model_calls: list[int] = []
+
+    def _model(texts, model_name):
+        model_calls.append(len(texts))
+        return [[0.0] * 1024 for _ in texts]
+
+    with mod.guard(_job_guard.EMBEDDING_LOCK, log=lambda m: None):
+        with pytest.raises(mod.InstanceConflict):
+            embed_github_documents(tmp_path / "x.db", embed_texts=_model, power_defer=False)
+        deferred = _embed_or_defer(
+            lambda: embed_github_documents(tmp_path / "x.db", embed_texts=_model, power_defer=False)
+        )
+    assert model_calls == [], "model work ran while another embedding run held the lock"
+    assert "already running" in _embedding_deferred(deferred)
