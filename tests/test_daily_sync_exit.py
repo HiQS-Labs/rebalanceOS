@@ -94,6 +94,27 @@ class DailySyncExitTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(result["sync_outcome"], "fatal")
 
+    def test_wrapper_sole_returned_error_exits_one_and_keeps_details(self) -> None:
+        """GH-296 final QA F2, through the real wrapper payload."""
+        payload = {"errors": [], "results": [{"scope": "email", "error": "invalid_grant"}]}
+
+        exit_code, result = _run_refresh_payload(payload)
+
+        self.assertEqual((exit_code, result["sync_outcome"]), (1, "fatal"))
+        self.assertEqual(result["results"][0]["error"], "invalid_grant")
+
+    def test_wrapper_deferred_embedding_exits_zero_and_keeps_reason(self) -> None:
+        """GH-296: ingest ran, embedding deferred by the guard — partial, reason retained."""
+        payload = {
+            "errors": [],
+            "results": [{"scope": "vault", "ingest": {"new_files": 2}, "embedding_deferred": "refusing to start"}],
+        }
+
+        exit_code, result = _run_refresh_payload(payload)
+
+        self.assertEqual((exit_code, result["sync_outcome"]), (0, "degraded"))
+        self.assertEqual(result["results"][0]["embedding_deferred"], "refusing to start")
+
     def test_clean_run_exits_zero(self) -> None:
         exit_code, result = _run_refresh_payload({"errors": [], "results": [{"scope": "vault"}]})
 

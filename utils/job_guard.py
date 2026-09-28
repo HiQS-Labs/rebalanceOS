@@ -1135,6 +1135,13 @@ def guard(
     thread via ``signal.SIGTERM`` -> handler, so ``finally`` blocks still run and
     partial work is flushed. If the main thread is wedged inside a C extension
     and ignores it, the process is SIGKILLed after the grace period.
+
+    Off the main thread (GH-296 final QA F8 — e.g. the terminal dashboard's
+    background GitHub refresh) Python cannot install a signal handler, and a
+    SIGTERM would hit the host process, not the work. There the lock and the
+    preflight still apply in full; the watchdog still measures and records a
+    trip, and the guard raises :class:`MemoryCeilingExceeded` when the body
+    returns rather than interrupting it. It never signals the host process.
     """
     lock = SingleInstanceLock(name)
     lock.acquire(on_conflict=on_conflict)
@@ -1145,6 +1152,7 @@ def guard(
         poll_seconds=poll_seconds,
         log=log,
     )
+    in_main_thread = threading.current_thread() is threading.main_thread()
 
     def _on_trip(reason: str) -> None:
         os.kill(os.getpid(), signal.SIGTERM)
@@ -1153,9 +1161,10 @@ def guard(
         time.sleep(DEFAULT_GRACE_SECONDS)
         os.kill(os.getpid(), signal.SIGKILL)
 
-    ceiling.on_trip = _on_trip
+    # Off the main thread: record only (the watchdog logs the trip); raised below.
+    ceiling.on_trip = _on_trip if in_main_thread else None
 
-    previous = signal.getsignal(signal.SIGTERM)
+    previous = signal.getsignal(signal.SIGTERM) if in_main_thread else None
 
     def _handler(signum, frame):
         raise MemoryCeilingExceeded(ceiling.tripped_reason or "terminated by job guard")
@@ -1163,15 +1172,19 @@ def guard(
     started = time.monotonic()
     try:
         ceiling.preflight()
-        signal.signal(signal.SIGTERM, _handler)
+        if in_main_thread:
+            signal.signal(signal.SIGTERM, _handler)
         ceiling.start()
         yield ceiling
+        if ceiling.tripped_reason:
+            raise MemoryCeilingExceeded(ceiling.tripped_reason)
     finally:
         ceiling.stop()
-        try:
-            signal.signal(signal.SIGTERM, previous)
-        except (ValueError, TypeError):
-            pass
+        if in_main_thread:
+            try:
+                signal.signal(signal.SIGTERM, previous)
+            except (ValueError, TypeError):
+                pass
         # Written on EVERY exit path — clean, raised, or ceiling-tripped. The
         # tripped run is precisely the one worth having a record of.
         record_peak_footprint(name, ceiling, started=started)

@@ -565,6 +565,59 @@ class GitHubKnowledgeTests(unittest.TestCase):
             self.assertEqual(semantic_docs, 0)
             self.assertEqual(semantic_rows, 0)
 
+    def test_guarded_github_embedding_works_from_a_worker_thread(self) -> None:
+        """GH-296 final QA F8: the terminal dashboard refreshes GitHub on a background thread.
+
+        Guarding the GitHub leaf must not break that caller: Python refuses signal
+        handlers off the main thread, so the guard runs lock + preflight there and
+        never touches signals. Pending documents must still be embedded.
+        """
+        import os
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            sync_github_repo(
+                database_path=db_path,
+                repo_full_name="AcmeOrg/sample-child-theme-oct-2024",
+                token="ghp_test",
+                since_days=30,
+                api_get_json=_fake_github_api,
+            )
+            env = {
+                "REBALANCE_JOB_GUARD": "1",
+                "JOB_GUARD_LOCK_DIR": str(Path(tmpdir) / "locks"),
+                "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB": "999",
+                "REBALANCE_CONFIG": str(Path(tmpdir) / "no-rbos.config"),
+            }
+            outcome: dict[str, object] = {}
+
+            def _worker() -> None:
+                try:
+                    outcome["result"] = embed_github_documents(
+                        database_path=db_path,
+                        model_name="fake-model",
+                        batch_size=4,
+                        embed_texts=_fake_embed_texts,
+                        power_defer=False,
+                    )
+                except Exception as exc:  # noqa: BLE001 — surfaced by the assertion below
+                    outcome["error"] = repr(exc)
+
+            with mock.patch.dict(os.environ, env):
+                from rebalance.ingest import _job_guard
+
+                _job_guard._module = None
+                _job_guard._load_attempted = False
+                thread = threading.Thread(target=_worker)
+                thread.start()
+                thread.join(timeout=60)
+                _job_guard._module = None
+                _job_guard._load_attempted = False
+
+            self.assertNotIn("error", outcome, outcome.get("error"))
+            self.assertGreater(outcome["result"].embedded_docs, 0)
+
     def test_embed_and_query_local_github_corpus(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "rebalance.db"

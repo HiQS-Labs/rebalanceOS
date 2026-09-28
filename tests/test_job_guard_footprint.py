@@ -829,3 +829,44 @@ def test_an_overflowing_json_integer_falls_back_instead_of_crashing(isolated_gua
     assert any(key in w and "using default" in w for w in warnings)
     report, _ = job_guard.settings_report()
     assert report
+
+
+def test_guard_off_the_main_thread_uses_no_signals_and_still_locks(isolated_guard):
+    """GH-296 final QA F8: signal.signal raises ValueError off the main thread."""
+    outcome: dict[str, object] = {}
+
+    def _worker():
+        try:
+            with job_guard.guard("gh296-thread", poll_seconds=0.05, log=lambda m: None):
+                outcome["ran"] = True
+                with pytest.raises(job_guard.InstanceConflict):
+                    with job_guard.guard("gh296-thread", poll_seconds=0.05, log=lambda m: None):
+                        pass
+        except Exception as exc:  # noqa: BLE001 — surfaced by the assertion below
+            outcome["error"] = repr(exc)
+
+    thread = threading.Thread(target=_worker)
+    thread.start()
+    thread.join(timeout=10)
+    assert outcome == {"ran": True}
+
+
+def test_a_trip_off_the_main_thread_is_raised_when_the_work_returns(isolated_guard, monkeypatch):
+    """Off the main thread the trip cannot interrupt, but it must never pass silently."""
+    monkeypatch.setattr(job_guard, "tree_footprint_bytes", lambda pid: (10 * GIB, False, 0))
+    signals: list[int] = []
+    monkeypatch.setattr(job_guard.os, "kill", lambda pid, sig: signals.append(sig))
+    outcome: dict[str, object] = {}
+
+    def _worker():
+        try:
+            with job_guard.guard("gh296-trip", max_footprint_gb=1, poll_seconds=0.02, log=lambda m: None):
+                time.sleep(0.3)
+        except job_guard.MemoryCeilingExceeded as exc:
+            outcome["raised"] = str(exc)
+
+    thread = threading.Thread(target=_worker)
+    thread.start()
+    thread.join(timeout=10)
+    assert "ceiling is 1.0 GB" in outcome.get("raised", "")
+    assert signals == [], "the guard must never signal the host process from a worker thread"
