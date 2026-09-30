@@ -32,7 +32,8 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — explicit mentions and confirmed delivery links built; bounded implementation review PASS; three history/list comparisons await operator feedback; automated relay/app gates incomplete; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
+- **GPT 6 Luna High held-out storyline trial** ([#300](https://github.com/HiQS-Labs/rebalanceOS/issues/300)) — separately registered after #232; three unseen cases selected and corrected evidence/citation controls to be frozen before inference; [plan](PROJECT/2-WORKING/GH-300-LUNA-HELDOUT-TRIAL.md).
+- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — first Luna trial finished; operator preferred Luna in all three blinded cases, but a factual overstatement and unlabeled gap citations failed promotion; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md).
 
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed and ready for review in #231; human usefulness remains a release decision; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
