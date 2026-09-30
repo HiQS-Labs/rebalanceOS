@@ -17,9 +17,9 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| GPT 6 Luna High's bounded three-case trial technically completed on a new frozen dataset; factual gate found one overstatement and incomplete gap citations | Present private A/B/C views for operator usefulness review; keep narrative promotion and Daily integration off. Issue #232 owns any new experiment decision. |
+| GPT 6 Luna High's bounded three-case trial completed; operator preferred Luna in all three blinded comparisons; factual gate found one overstatement and incomplete gap citations | Keep narrative promotion and Daily integration off; issue #232 owns any separately registered corrected experiment or simpler notebook decision. |
 
-The [September 30 Luna campaign](../../TESTS-RESULTS/2026-09-30+GH-232-LUNA/SUMMARY.md) supersedes the historical next steps below for the model trial. Six real samples and one synthetic probe ran; all outputs are retained without repair. #623 repeat 2 overstates “restarted” versus “re-prompted,” and the packet's uncertainty list lacked citation IDs. The predefined factual gate therefore does not advance Luna to a held-out trial. Operator usefulness remains unjudged. The private dataset and blinded review files are in Git Pulse Sync's `experiments/gh232-luna-2026-09-30/` folder. No comparison with the missing earlier enriched results is planned.
+The [September 30 Luna campaign](../../TESTS-RESULTS/2026-09-30+GH-232-LUNA/SUMMARY.md) supersedes the historical next steps below for the model trial. Six real samples and one synthetic probe ran; all outputs are retained without repair. The operator selected the Luna view for all three cases. #623 repeat 2 overstates “restarted” versus “re-prompted,” and the packet's uncertainty list lacked citation IDs. The predefined factual gate therefore does not advance Luna to a held-out trial. The private dataset, blinded review files and feedback are in Git Pulse Sync's `experiments/gh232-luna-2026-09-30/` folder. No comparison with the missing earlier enriched results is planned.
 
 ## Table of contents
 

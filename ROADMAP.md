@@ -32,7 +32,7 @@ goal: >
 
 ## Ledger
 
-- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — Luna High's bounded three-case trial completed on a newly frozen dataset; one factual overstatement and incomplete gap citations block promotion; private A/B/C views await operator usefulness review. No Daily integration; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md), [campaign](TESTS-RESULTS/2026-09-30+GH-232-LUNA/SUMMARY.md).
+- **CLIO journey follow-up** ([#232](https://github.com/HiQS-Labs/rebalanceOS/issues/232)) — operator preferred Luna in all three blinded cases, but one factual overstatement and incomplete gap citations block promotion from the bounded trial. No Daily integration; [plan](PROJECT/2-WORKING/GH-232-OUTCOME-PLAN.md), [campaign](TESTS-RESULTS/2026-09-30+GH-232-LUNA/SUMMARY.md).
 
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed and ready for review in #231; human usefulness remains a release decision; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 

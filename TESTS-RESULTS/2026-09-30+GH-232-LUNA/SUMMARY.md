@@ -2,7 +2,7 @@
 
 ## Result
 
-The authorized three-case trial ran as a **newly composed dataset**, with the recovered September 16 CLIO capture and one September 30 read-only GitHub observation. It did not compare against the missing earlier enriched run. The private dataset, six unedited candidate samples, both deterministic controls per case, full audit and blinded review views are in the [private Git Pulse Sync trial folder](https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse/tree/d475db03/experiments/gh232-luna-2026-09-30). The dataset was committed before inference at `f8d8b6e8`; outputs and receipts landed at `d475db03`. Operator usefulness is pending.
+The authorized three-case trial ran as a **newly composed dataset**, with the recovered September 16 CLIO capture and one September 30 read-only GitHub observation. It did not compare against the missing earlier enriched run. The private dataset, six unedited candidate samples, both deterministic controls per case, full audit, blinded review views and [operator feedback](https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse/blob/3c7fbe24/experiments/gh232-luna-2026-09-30/FEEDBACK.md) are in the private Git Pulse Sync trial folder. The dataset was committed before inference at `f8d8b6e8`; outputs and receipts landed at `d475db03`; feedback landed at `3c7fbe24`.
 
 | Case | Frozen packet | Critical evidence in both repeats | Factual audit |
 |---|---|---|---|
@@ -22,6 +22,6 @@ The candidate cited the packet's unlabeled `gaps` array in every case. Those unc
 
 ## Decision and review
 
-The private `review-508.md`, `review-568.md` and `review-623.md` present anonymized A/B/C views; the candidate's **both** repeats are shown. The operator can still judge which view helps explain and resume each case and flag misleading language. That feedback does not override the factual gate. A corrected citation-bearing packet or prompt would require a separately registered experiment; this run remains frozen. No production adoption is recommended from these three cases.
+The private `review-508.md`, `review-568.md` and `review-623.md` presented anonymized A/B/C views; the candidate's **both** repeats were shown. The operator selected View 2 for #508, View 3 for #568, and View 1 for #623. The frozen blind map reveals that **all three selected views were Luna**. This records preference over both controls in three cases, not a reason for each preference; the operator did not separately answer whether any wording was misleading. The preference does not override the factual gate. A corrected citation-bearing packet or prompt would require a separately registered experiment; this run remains frozen. No production adoption is recommended from these three cases.
 
 Current verification commands/results are recorded in [QA.md](QA.md). Detailed trial decisions and subsequent scope remain in [issue #232](https://github.com/HiQS-Labs/rebalanceOS/issues/232).
