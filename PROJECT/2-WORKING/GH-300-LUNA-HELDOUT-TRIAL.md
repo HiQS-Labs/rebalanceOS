@@ -17,7 +17,9 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| Trial registered in #300; held-out #589/#605/#567 dataset and controls committed privately before inference; altered citation, missing relationship and missing gap rejected | Run the synthetic probe, then six bounded fresh Luna High calls and independent source audit |
+| Bounded probe and six held-out Luna High samples completed; source audit found both #567 repeats omit supporting `U*` citations, so the factual promotion gate failed | Present private A/B/C views for operator preference; keep Daily off and retain the frozen trial result |
+
+The [sanitized campaign](../../TESTS-RESULTS/2026-09-30+GH-300-LUNA-HELDOUT/SUMMARY.md) records exact limits and results. The private Git Pulse Sync folder `experiments/gh300-luna-heldout-2026-09-30/` holds all packets, controls, candidate repeats and raw run receipts. No source status or runtime code was changed. The first GH-232 results were not rescored or compared to this held-out trial.
 
 ## Table of contents
 
@@ -58,27 +60,27 @@ doc_type: research
 
 **Goal:** one probe and six fresh, unedited real outputs within the issue's envelope.
 
-- [ ] Synthetic probe tests re-prompt versus restart, wrong-repo same-number, merged-without-deployment and embedded instruction; stop on unsupported join/completion/action.
-- [ ] Run two independent Luna High sessions per case from identical frozen input. One transport-only retry maximum; eight attempts total. 180 seconds/call, 30 minutes phase, reported 30K input/4K output per call where enforceable, estimated API-equivalent <=$0.25. Record CLI version, exact requested/returned identity status, effort, token/cache/reasoning usage, UTC, wall time, exit, tool events and cost estimate versus billed unknown.
-- [ ] Manually audit every material claim against source IDs for both repeats. One invented join, unsupported completion/deployment, erased critical boundary or re-prompt/restart conflation fails promotion. No candidate self-grading or output repair.
+- [x] Synthetic probe tests re-prompt versus restart, wrong-repo same-number, merged-without-deployment and embedded instruction; it preserved all boundaries with no tool events.
+- [x] Run two independent Luna High sessions per case from identical frozen input. No retry; all six were within 180 seconds/call, reported 30K input/4K output per call and estimated API-equivalent <=$0.25. CLI version, requested identity/effort, returned-identity absence, usage/cache/reasoning, UTC, wall time, exit, tool events and estimated versus billed-unknown cost retained.
+- [x] Manually audit every material claim against source IDs for both repeats. No candidate self-grading or output repair. Both #567 repeats lack the `U*` IDs that support their bare-mention details; this fails citation completeness.
 
 ### Phase 2 — QA checklist
 
-- [ ] Probe and witnessed negative controls retained; six samples or explicit incomplete coverage.
-- [ ] Both repeats preserve attempt boundaries, observation time and uncertainty; all factual claims have valid `[[ID]]` citations.
-- [ ] Every run and any failure receipt retained; no hidden retry or model substitution.
+- [x] Probe and witnessed negative controls retained; six samples completed.
+- [ ] Both repeats preserve attempt boundaries, observation time and uncertainty, but the #567 bare-mention detail is not cited to `U1778`/`U1785` in either repeat. Factual citation gate failed.
+- [x] Every run and failure receipt retained; no hidden retry or model substitution. Server-returned model identity is unavailable from CLI JSON events and explicitly recorded as unknown.
 
 ## Phase 3 — publish and ask
 
 **Goal:** private readable comparison and public-safe audit, with operator preference separate from factual quality.
 
-- [ ] Retain both repeats and A/B/C views in a new Git Pulse Sync folder, with a frozen blind map. Ask the operator which view helps explain and resume each case and what misleads; never infer a missing answer.
-- [ ] Publish sanitized protocol, counts/hashes, claim audit, per-run latency/usage/API-equivalent cost, gates and limits under `TESTS-RESULTS/2026-09-30+GH-300-LUNA-HELDOUT/`; link this issue and #232.
-- [ ] Run fresh focused and full repository checks plus doctor/doc checks, report pass/fail separately, and leave Daily and source systems untouched.
+- [x] Retain both repeats and A/B/C views in a new Git Pulse Sync folder, with a frozen blind map. Operator preference and misleading-details answer remain pending.
+- [x] Publish sanitized protocol, counts/hashes, claim audit, per-run latency/usage/API-equivalent cost, gates and limits under `TESTS-RESULTS/2026-09-30+GH-300-LUNA-HELDOUT/`; link this issue and #232.
+- [x] Run fresh focused and full repository checks plus doctor/doc checks, report pass/fail separately, and leave Daily and source systems untouched.
 
 ### Phase 3 — QA checklist
 
-- [ ] Public campaign and issue agree; private views show all six outputs without cherry-picking.
-- [ ] Fact gate and human preference recorded independently; no Daily adoption or broader superiority claim from three cases.
+- [x] Public campaign and issue agree; private views show all six outputs without cherry-picking.
+- [ ] Fact gate failed and is recorded independently; human preference is pending. No Daily adoption or broader superiority claim from three cases.
 
 The issue's current body is the authoritative plan. If this document and the issue diverge, correct this document before inference. No earlier result is rescored or compared to this run.
