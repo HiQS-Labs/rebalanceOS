@@ -6,3 +6,5 @@
 {"event": "independent-qa", "reviewer": "claude-fable-5-1", "effort": "high", "models": ["claude-fable-5-1"], "reviewed_head": "072adb2898b870f3aca807f061b6b03104ea4397", "result": "approved", "artifact": "QA/gh305-studio-fable-r2.md"}
 {"event": "scheduled-core-observation", "artifact": "scheduled-observation.json", "result": "26 complete normal exports; consumer scheduling still guard-deferred"}
 {"event": "private-rehearsal", "artifact": "rehearsal.json", "result": "all eligible references retained; no live destination or embedding writes"}
+{"event": "broad-existing-suite", "source": "fe78517376fe8ca890a07e223eca8a6d7e4518ac", "command": "pytest tests/ HiQS/tests -q", "isolation": "separate disposable full clone", "identity_intact": true, "passed": 2807, "skipped": 21, "xfailed": 11, "warnings": 2, "subtests_passed": 146, "exit": 0, "artifact": "full-suite.log"}
+{"event": "runtime-health", "source": "535bb7a", "artifact": "doctor-before.json", "result": "passed-with-warnings; resource deferrals remain"}
