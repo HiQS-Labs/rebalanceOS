@@ -40,6 +40,8 @@ def ensure_clio_schema(conn: Any) -> None:
     columns = {col[1] for col in conn.execute("PRAGMA table_info(clio_prompts)").fetchall()}
     if "repo" not in columns:
         conn.execute("ALTER TABLE clio_prompts ADD COLUMN repo TEXT")
+    if "source_records" not in columns:
+        conn.execute("ALTER TABLE clio_prompts ADD COLUMN source_records TEXT NOT NULL DEFAULT '[]'")
 
 
 def filter_prompt_metadata(prompt: str) -> str:
@@ -65,14 +67,16 @@ def load_recent_clio_prompts(database_path: Path, cutoff_iso: str, limit: int = 
     """Return recent persisted CLIO prompts without refreshing or mutating the source."""
     try:
         with db_connection_readonly(database_path) as conn:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(clio_prompts)")}
+            sources = "source_records" if "source_records" in columns else "'[]' AS source_records"
             rows = conn.execute(
-                "SELECT id,timestamp,prompt,agent,repo FROM clio_prompts "
+                f"SELECT id,timestamp,prompt,agent,repo,{sources} FROM clio_prompts "
                 "WHERE julianday(timestamp) >= julianday(?) ORDER BY timestamp DESC LIMIT ?",
                 (cutoff_iso, int(limit)),
             ).fetchall()
     except Exception:  # noqa: BLE001 — absent/not-yet-migrated DB is an empty read surface
         return []
-    return [dict(row) for row in rows]
+    return [dict(row) | {"source_records": json.loads(row["source_records"])} for row in rows]
 
 
 @dataclass(frozen=True)
@@ -99,7 +103,9 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
         ensure_clio_schema(conn)
 
         # Load all existing IDs to avoid expensive upserts if not needed
-        existing = {row[0] for row in conn.execute("SELECT id FROM clio_prompts").fetchall()}
+        existing = {
+            row[0]: json.loads(row[1]) for row in conn.execute("SELECT id, source_records FROM clio_prompts").fetchall()
+        }
 
         with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -136,17 +142,35 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
 
                 prompts_fetched += 1
 
+                # Keep the existing projection key: adopting canonical keys here
+                # would duplicate previously indexed history. Multiple canonical
+                # records may project to one filtered prompt, so retain every link.
+                sources = existing.get(record_id, []).copy()
+                source_id, origin = data.get("record_id"), data.get("origin_id")
+                if isinstance(source_id, str) and source_id and isinstance(origin, str) and origin:
+                    reference = {"record_id": source_id, "origin_id": origin}
+                    if reference not in sources:
+                        sources.append(reference)
+                        sources.sort(key=lambda item: (item["record_id"], item["origin_id"]))
+
                 if record_id in existing:
+                    if sources != existing[record_id]:
+                        conn.execute(
+                            "UPDATE clio_prompts SET source_records=?, synced_at=? WHERE id=?",
+                            (json.dumps(sources), synced_at, record_id),
+                        )
+                        existing[record_id] = sources
                     unchanged += 1
                     continue
 
                 conn.execute(
                     """
-                    INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, repo, synced_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO clio_prompts (id, timestamp, session_id, prompt, agent, repo, synced_at, source_records)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (record_id, ts, session_id, prompt, agent, repo, synced_at),
+                    (record_id, ts, session_id, prompt, agent, repo, synced_at, json.dumps(sources)),
                 )
+                existing[record_id] = sources
                 inserted += 1
 
         conn.commit()
@@ -168,7 +192,7 @@ def clio_semantic_docs(conn: Any) -> "Iterator[SemanticDoc]":
     ensure_clio_schema(conn)
     rows = conn.execute(
         """
-        SELECT id, timestamp, session_id, prompt, agent, repo, synced_at
+        SELECT id, timestamp, session_id, prompt, agent, repo, synced_at, source_records
         FROM clio_prompts
         """
     ).fetchall()
@@ -192,6 +216,7 @@ def clio_semantic_docs(conn: Any) -> "Iterator[SemanticDoc]":
                 "timestamp": row["timestamp"],
                 "agent": row["agent"] or "",
                 "repo": row["repo"] or "",
+                "source_records": json.loads(row["source_records"]),
             },
             created_at=row["timestamp"],
             updated_at=row["synced_at"],

@@ -382,3 +382,7 @@ health after this first check-in, not before it. Test missing/mismatched setting
 configuration: a refusal must return a structured error or doctor configuration failure, with no
 Git writes. Briefly unload only loaded local delivery jobs, then restore the identical plists.
 Keep capture and same-note export running, and verify preserved record payloads as well as counts.
+
+### CLIO fleet consumer qualification
+
+The canonical CLIO SQLite remains authoritative; the existing configured compatibility export contains full history across known origins. Verify the resolved source before adding a second reader. Raw history totals differ from filtered consumer totals: reconcile eligible projection keys and canonical source references, including multiple origins sharing one filtered prompt. JSONL records are separated by LF, not Unicode line separators. Preserve existing consumer keys and attach provenance additively. Use the existing semantic maintenance facade for selected, nonembedding projection; neither an empty result nor a guard skip proves consumer readiness. Keep scheduled memory deferral separate from delivery failure and never relax the whole stack to obtain a green receipt.

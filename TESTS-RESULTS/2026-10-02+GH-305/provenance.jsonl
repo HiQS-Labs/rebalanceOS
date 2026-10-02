@@ -1,0 +1,2 @@
+{"event":"manual-red-control","source":"535bb7a65537dacc3619a4108cbdddbea1c72e92","artifact":"controls-initial-base.log","controls":4,"failed":4,"data":"synthetic; no live prompt injection"}
+{"event":"core-recheck","artifact":"core-recheck.json","source":"535bb7a65537dacc3619a4108cbdddbea1c72e92","scope":"Studio capture, preserved SQLite history/header, existing owner-only delivery and same-note render; not four-device qualification"}
