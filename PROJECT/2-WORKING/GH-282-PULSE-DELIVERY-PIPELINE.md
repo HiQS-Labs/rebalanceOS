@@ -2,7 +2,7 @@
 gh_issue: 282
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/282
 title: "GH-282 pulse delivery pipeline: reliable writes, honest liveness, and one owner per path"
-status: "Active: implementation merged in #303 and locally deployed; review hardening and fleet qualification remain."
+status: "Active: implementation and hardening merged/deployed locally; fleet operational qualification remains."
 created: 2026-09-26
 updated: 2026-10-02
 owner: noel
@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 #283 and fleet implementation #303 merged; Fable high QA approved; Studio render/delivery/reconcile/same-note activation verified. | Land configuration-error hardening and its deployment receipt; qualify actual four-Mac rollout, external hooks, offline/rejoin and seven-day results. |
+| Phase 1 #283, implementation #303 and review hardening #304 merged; Studio runtime 0.97.1 verified with native Fable-high approval, CI and actual capture/render/delivery/reconcile/same-note checks. | Qualify other-Mac installation/source inventory, external hook locks, actual offline/rejoin/Sync/archive capacity and seven-day delivery results. |
 
 ## Why
 
@@ -163,3 +163,5 @@ CLIO #5 landed at 6a53a38; Rebalance #303 landed at bb84cd0. The stable runtime 
 Late advisory review identified five reproducible configuration-error escapes (missing target, publication mismatch, sync identity, scheduler doctor and fleet doctor). A bounded follow-up centralizes target validation and returns structured errors without writing data; deadline initialization also fails explicitly. These are error-path fixes, not a new delivery system. The initial pre-delivery health check saw legacy ALIVE because the old heartbeat did not yet advertise fleet mode; after the first collector delivered the marker, the queued/delivered transition was verified. Manual immediate runs do not qualify three scheduled intervals or fleet offline/rejoin.
 
 Follow-up Fable round 1 dispositions: F1 restore the changelog template and bracketed release heading; F2 preserve unscoped scheduler liveness on invalid identity; F3 capture the deadline forcing command and both exit codes; F4 exercise real collector configuration rather than injected exceptions; F5 distinct scheduler/fleet failure names; F6 truthful fleet dry-run text; F7 sanitize public log paths with raw hashes retained privately. All addressed without new runtime components.
+
+Final local recheck: Rebalance #304 landed at 8cba6de and runtime 0.97.1 is deployed. All seven tested source hashes match; the copied collector is updated and existing Pulse Server restarted. Final receipt deployment-recheck.json records actual owner-only delivery, ALIVE health, SQLite integrity, all backup records/payloads, natural capture after helper upgrade and the same note/header. All five delivery jobs are loaded with unchanged plists; capture/export schedules are unchanged. Source/runtime implementation is complete locally; the operational gates above remain open.
