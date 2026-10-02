@@ -950,6 +950,7 @@ def publish(content: str, now: datetime, slot: str, *, dry_run: bool, push: bool
     if not _is_safe_subdir(subdir):
         return {"ok": False, "reason": f"HIQS_DIGEST_SUBDIR is not a relative path inside the repo: {subdir!r}"}
     from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+
     file_rel = fleet_output_path(cfg, f"{subdir}/hiqs-{now:%Y-%m-%d}-{slot}.md")
     if fleet_settings(cfg):
         push = False

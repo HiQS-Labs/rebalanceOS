@@ -430,6 +430,7 @@ def sync_to_clio(summary: str, now: datetime, dry_run: bool = False) -> dict:
     subdir = cfg.get("git_pulse_clio_subdir") or "CLIO"
     filename = cfg.get("git_pulse_clio_filename") or "git-pulse-daily-log.md"
     from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+
     file_rel = fleet_output_path(cfg, f"{subdir}/{filename}")
     fleet = fleet_settings(cfg)
 
@@ -583,6 +584,7 @@ def show_status() -> int:
         filename = cfg.get("git_pulse_clio_filename") or "git-pulse-daily-log.md"
         if target_path:
             from rebalance.lib.git_ops import fleet_output_path
+
             clio_file = Path(target_path).expanduser().resolve() / fleet_output_path(cfg, f"{subdir}/{filename}")
             log(f"CLIO target: {clio_file} (exists: {clio_file.exists()})")
         else:

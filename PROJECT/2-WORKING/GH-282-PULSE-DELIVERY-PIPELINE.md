@@ -26,11 +26,11 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 implemented in PR #283: honest exit taxonomy (0/1/2/70/75), bounded 120s git timeouts, timezone fallback defaulting to local host timezone, rebase cleanup, and launchd exit 75 skip logging. | PR #283 is merged. Complete fleet-mode namespaces, sole collector delivery, independent Claude Fable high-effort QA, and Studio deployment; qualify the other Macs separately. |
+| Phase 1 merged in #283. Fleet code implemented; 2804 tests and 143 subtests green; concurrent four-clone delivery/owner-only CLIO/render-failure/lock/timeout probe passed. | Complete final candidate verification and Claude Fable high-effort implementation QA, publish/merge the follow-up PR, and deploy on this Studio. Real four-Mac/seven-day qualification remains open. |
 
 ## Why
 
-Hourly delivery fails on multiple Macs due to push collisions on shared files, lock contention, and uncaught timeouts. Currently, git timeouts and exceptions are swallowed and logged as Exit 1 ("config or render error"), and busy locks exit 2 (counted as failure). Furthermore, `pulse_health.py` reports devices as ALIVE even when pulse delivery has failed for days because it only inspects the collector heartbeat.
+Hourly delivery fails on multiple Macs due to push collisions on shared files, lock contention, and uncaught timeouts. At issue intake on September 26, git timeouts and exceptions were swallowed and logged as Exit 1 ("config or render error"), and busy locks exit 2 (counted as failure). Furthermore, `pulse_health.py` reports devices as ALIVE even when pulse delivery has failed for days because it only inspects the collector heartbeat.
 
 ## Ratings, with reasons
 
@@ -118,3 +118,24 @@ Run mutation-heavy tests in a separate full clone; a linked worktree shares Git 
 4. Implemented: canonical CLIO owner export is exactly devices/<configured-CLIO-UUID>/clio.jsonl. Imported history remains solely in the private SQLite DB outside the Git checkout; the helper never writes imported origins under snapshots/. The legacy snapshots/ transport remains for its existing hook, explicitly outside CLIO's owner export. No broad devices/ staging.
 5. Implemented: collector YAML carries fleet_mode=true only for opted-in devices. Legacy/unmarked collector devices keep existing ALIVE classification. The live-pulse producer records an owned status with last attempt, last render success and last exit; fleet health distinguishes render failure/staleness and pending delivery using committed upstream status rather than trusting dirty local output. Failure visibility requires a successful delivery of that status; offline peers can only age the last delivered evidence.
 6–10. Implemented/clarified: no new reader daemon; old pointer retained but ignored; existing PULSE_PUSH precedence explicit; old plan superseded; no-upstream/early-network taxonomy covered. Rollback requires a clean private checkout and no unpushed fleet commits; otherwise preserve it and retain the new collector until pending data is reconciled.
+
+
+## Implementation checkpoint
+Fleet mode uses `devices/<id>/status/pulse-sync.json`; the page and attempt status each commit under
+the same non-blocking common lock. They are separate transactions; a collector intervening between
+them may deliver a page before its matching status. Health conservatively waits for matching upstream
+status/page evidence and never labels a merely queued render delivered. Status records preserve the
+last good render timestamp/hash after failure. Busy and identity-refused runs cannot write a status;
+staleness remains their observable signal. `pulse.fleet_view` extends the existing publish result.
+
+The canonical helper's post-pull owner destination is rechecked for symlinks/escape, and prior owner
+snapshot identities cannot disappear. Existing legacy snapshots/PDDA producers are not rewritten in
+this repository: their exact common-lock participation still needs per-installation verification (B4).
+This is an explicit remaining qualification, not a claim that external hooks were audited exhaustively.
+
+Red control: a normally configured device initially missed the fleet marker because it was inserted
+only in the migration metadata block. The forced render-failure probe stayed ALIVE; adding the marker
+to the regular metadata block made the same assertion pass. Timeout verification must compare pending
+working bytes: a failed git-add can leave newer generated files dirty, and PREPARE correctly commits
+those bytes before another push. Freezing the old committed heartbeat/snapshot timestamps is an
+incorrect preservation oracle. No source prompt text is included in committed evidence.
