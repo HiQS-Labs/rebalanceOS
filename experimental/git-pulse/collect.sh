@@ -661,6 +661,7 @@ if [ "$repo_scan_failures" -gt 0 ]; then
 fi
 cat > "$DEVICE_METADATA_FILE" <<METADATA
 schema_version: 2
+fleet_mode: "$fleet_mode"
 device_id: "$device_id"
 hardware_uuid: "$(yaml_escape "$hardware_uuid")"
 device_name: "$(yaml_escape "$device_name")"
