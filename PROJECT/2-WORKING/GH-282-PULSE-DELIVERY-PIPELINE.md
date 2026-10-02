@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phase 1 merged in #283. Fleet code implemented; 2804 tests and 143 subtests green; concurrent four-clone delivery/owner-only CLIO/render-failure/lock/timeout probe passed. | Complete final candidate verification and Claude Fable high-effort implementation QA, publish/merge the follow-up PR, and deploy on this Studio. Real four-Mac/seven-day qualification remains open. |
+| Phase 1 merged in #283. Fleet code implemented; 2807 tests and 146 subtests green; concurrent four-clone delivery/owner-only CLIO/render-failure/lock/timeout probe passed. | Complete final candidate verification and Claude Fable high-effort implementation QA, publish/merge the follow-up PR, and deploy on this Studio. Real four-Mac/seven-day qualification remains open. |
 
 ## Why
 
@@ -152,3 +152,6 @@ incorrect preservation oracle. No source prompt text is included in committed ev
    page in this scope. No new binary Git API or payload schema is introduced for a speculative case.
 Existing pulse-health tests now cover 80/190-minute healthy delivery, the 10-hour boundary, just
 past it, and distinct queued/failed reasons. These tests went red against the previous candidate.
+
+## Implementation QA — final approval
+Claude Fable 5.1 high-effort round 2 approved the candidate through the native relay (driver exit 0; reviewed head 9719f95). A temporary doctor WARN while a successful render awaits the existing collector is expected; observe this across three actual intervals during rollout before changing alert policy. Remaining text-only nits (generic attempt versus render failure wording and legacy health-check exit-code docstring) do not change delivery correctness and are deferred.

@@ -368,3 +368,8 @@ stopped renderer can take that long to age out. Doctor/health detail distinguish
 (exit N), unavailable proof and old delivered output. A CLIO export/validation fault deliberately
 stops that Mac's collector before a new heartbeat; preserve the previous snapshot, inspect the
 backup/DB and cumulative guard, then rerun the existing collector after repair.
+
+A successful local render waiting for the next collector delivery intentionally reports a temporary
+doctor WARN (`queued, awaiting collector`). Warning-level health triage may report it during that
+window. Observe the installed collector phase across three real intervals before changing alert
+policy; this warning does not mean the render failed or its queued commit was lost.
