@@ -762,7 +762,7 @@ push_with_retry || exit 2
 # Do not acknowledge until this exact local history is visible upstream.
 git merge-base --is-ancestor HEAD '@{u}' || {
     echo "Publication pending: upstream does not contain local HEAD." >&2
-    exit 1
+    exit 2
 }
 
 # Only advance last-run when every watched repo scan succeeded.

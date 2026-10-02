@@ -307,6 +307,8 @@ def main() -> int:
             health = fleet_health.get(status.device_id)
             if health and health.fleet_mode:
                 status.fleet_delivery_problem = health.state == "ALIVE_NOT_PUBLISHING"
+                if health.pulse_delivery_reason:
+                    status.notes.append(health.pulse_delivery_reason)
     except ImportError:
         # Standalone collectors remain supported. An opted-in fleet requires the
         # canonical reader; never report healthy delivery without that evidence.

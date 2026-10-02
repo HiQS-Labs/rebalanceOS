@@ -1930,6 +1930,8 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         _status, raw_severity, phrase = _map_pulse_state(state)
         qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
         detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
+        if health.pulse_delivery_reason:
+            detail += f", {health.pulse_delivery_reason}"
         if health.repo_scan_failures:
             detail += f", {health.repo_scan_failures} repo scan failures"
             if health.scan_failure_examples:

@@ -496,7 +496,7 @@ def publish_git_paths(
     timeout: float | None = None,
     resolve_conflicts: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
-    """Commit exact owned paths, deliver once plus one race retry, under caller lock.
+    """Commit exact owned paths, deliver with at most three attempts, under caller lock.
 
     Git commits are the durable pending output. No model, stash or reset is used.
     Foreign staged changes are refused even though --only also bounds the commit.

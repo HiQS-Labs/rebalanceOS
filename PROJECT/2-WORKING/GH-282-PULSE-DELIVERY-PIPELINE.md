@@ -139,3 +139,16 @@ to the regular metadata block made the same assertion pass. Timeout verification
 working bytes: a failed git-add can leave newer generated files dirty, and PREPARE correctly commits
 those bytes before another push. Freezing the old committed heartbeat/snapshot timestamps is an
 incorrect preservation oracle. No source prompt text is included in committed evidence.
+
+## Implementation QA dispositions — Fable high, round 1
+1. Implemented: named 10-hour render age bound respects the scheduled overnight gap, DST,
+   producer budget and collector delivery grace; explicit failures/queues remain immediate.
+2. Implemented: doctor and health-check carry reasons for queued, failed, unavailable and aged
+   evidence. A queued local failed attempt exposes its own exit while retaining delivered proof.
+3/5/6. Implemented: documented CLIO-only collector halt; corrected retry/state documentation and
+   redundant import; status-write errors are classified rather than silently exited 0; final Git proof
+   failure exits 2.
+4. Retained: text-mode page comparison is a pre-existing limitation with no observed CR-bearing
+   page in this scope. No new binary Git API or payload schema is introduced for a speculative case.
+Existing pulse-health tests now cover 80/190-minute healthy delivery, the 10-hour boundary, just
+past it, and distinct queued/failed reasons. These tests went red against the previous candidate.

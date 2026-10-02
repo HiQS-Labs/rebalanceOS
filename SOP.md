@@ -360,3 +360,11 @@ Lessons: a merged PR is not a deployed runtime; a copied collector is a second d
 Python hostname IDs and collector IDs were different; an inherited-lock re-exec must not repeat the
 stagger inside the lock. Empty repository inventories must work under macOS Bash 3.2. Preserve
 pending commits and use exact owner paths; a heartbeat alone never attests application output.
+
+Fleet render aging uses a named 10-hour bound: 7 hours of scheduled overnight pause, one hour
+for fall-back DST, the producer's half-hour budget, one collector interval and half-hour network/
+stagger grace. Explicit failed attempts and queued output are visible immediately; a silently
+stopped renderer can take that long to age out. Doctor/health detail distinguishes queued, failed
+(exit N), unavailable proof and old delivered output. A CLIO export/validation fault deliberately
+stops that Mac's collector before a new heartbeat; preserve the previous snapshot, inspect the
+backup/DB and cumulative guard, then rerun the existing collector after repair.

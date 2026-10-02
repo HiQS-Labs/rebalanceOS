@@ -1091,6 +1091,10 @@ def publish_pulse(database_path: Path, *, dry_run: bool = False, push: bool = Tr
                 result.setdefault("git", {}).update(receipt)
     except (GitPublishLockError, OSError, ValueError, *GitSubprocessError) as exc:
         result["status_error"] = str(exc)
+        if isinstance(exc, GitPublishLockBusy):
+            result.setdefault("git", {}).update(deferred=True, git_error=str(exc))
+        else:
+            result.setdefault("git", {}).update(git_error=f"pulse status failed: {exc}", pending=True)
     try:
         result["fleet_markdown"] = fleet_view(target)
     except (ValueError, OSError, *GitSubprocessError):
