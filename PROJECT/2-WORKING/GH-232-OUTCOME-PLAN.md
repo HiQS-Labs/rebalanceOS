@@ -4,7 +4,7 @@ status: In progress
 owner: Codex
 goal: Decide whether explicit CLIO and GitHub evidence can produce a useful repeatable work-history companion.
 created: 2026-09-16
-updated: 2026-09-16
+updated: 2026-09-30
 reversibility: Easy — optional private read-only projections; sources remain unchanged
 gh_issue: 232
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/232
@@ -17,7 +17,9 @@ doc_type: research
 
 | What was just completed | What's next |
 |---|---|
-| Phase 2 delivery composition independently reviewed PASS; three A/B cases prepared | Phase 3 operator judgments; ending and repeat sample remain unconfirmed; app gates blocked |
+| GPT 6 Luna High's bounded three-case trial completed; operator preferred Luna in all three blinded comparisons; factual gate found one overstatement and incomplete gap citations | Keep narrative promotion and Daily integration off; issue #232 owns any separately registered corrected experiment or simpler notebook decision. |
+
+The [September 30 Luna campaign](../../TESTS-RESULTS/2026-09-30+GH-232-LUNA/SUMMARY.md) supersedes the historical next steps below for the model trial. Six real samples and one synthetic probe ran; all outputs are retained without repair. The operator selected the Luna view for all three cases. #623 repeat 2 overstates “restarted” versus “re-prompted,” and the packet's uncertainty list lacked citation IDs. The predefined factual gate therefore does not advance Luna to a held-out trial. The private dataset, blinded review files and feedback are in Git Pulse Sync's `experiments/gh232-luna-2026-09-30/` folder. No comparison with the missing earlier enriched results is planned.
 
 ## Table of contents
 
