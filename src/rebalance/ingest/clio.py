@@ -87,6 +87,7 @@ class ClioSyncResult:
     elapsed_seconds: float
     skipped: bool = False
     reason: str = ""
+    prompts_updated: int = 0
 
 
 def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
@@ -97,7 +98,7 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
         return ClioSyncResult(0, 0, 0, round(time.monotonic() - start, 2), skipped=True, reason="no prompt-log found")
 
     synced_at = now_iso()
-    prompts_fetched = inserted = unchanged = 0
+    prompts_fetched = inserted = unchanged = updated = 0
 
     with db_connection(database_path) as conn:
         ensure_clio_schema(conn)
@@ -160,7 +161,9 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
                             (json.dumps(sources), synced_at, record_id),
                         )
                         existing[record_id] = sources
-                    unchanged += 1
+                        updated += 1
+                    else:
+                        unchanged += 1
                     continue
 
                 conn.execute(
@@ -180,6 +183,7 @@ def sync_clio_prompts(database_path: Path) -> ClioSyncResult:
         prompts_inserted=inserted,
         prompts_unchanged=unchanged,
         elapsed_seconds=round(time.monotonic() - start, 2),
+        prompts_updated=updated,
     )
 
 

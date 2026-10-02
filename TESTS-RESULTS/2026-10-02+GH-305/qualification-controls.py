@@ -51,4 +51,14 @@ with tempfile.TemporaryDirectory() as t:
  dws.recent_prompt_rows=original_reader
  try:assert len(dws.recent_prompt_rows(datetime.fromisoformat('2026-10-02T21:00:00+00:00')))==2
  except AssertionError:failures.append('all three Unicode separators remain in LF-delimited records')
-print(json.dumps({'checks':7,'failures':failures,'passed':7-len(failures)}));sys.exit(bool(failures))
+with tempfile.TemporaryDirectory() as t:
+ root=Path(t);now=datetime.fromisoformat('2026-10-02T22:01:00+00:00')
+ cached={'id':'legacy-key','timestamp':'2026-10-02T22:00:00Z','prompt':'cached prompt','agent':'codex','repo':'x','source_records':[{'record_id':'clio1-synthetic-a','origin_id':'synthetic-origin-a'}]}
+ dws.recent_prompt_rows=lambda *a:[cached];p=dws.collect_packet(root/'missing.db',now,root,cfg={})
+ try:assert any(x['id']=='clio:clio1-synthetic-a' for x in p['evidence'])
+ except AssertionError:failures.append('cached single-origin citation matches canonical live citation')
+ legacy={'timestamp':'2026-10-02T22:00:00Z','session_id':'legacy','prompt':'metadata-free prompt'}
+ dws.recent_prompt_rows=lambda *a:[legacy];p=dws.collect_packet(root/'missing.db',now,root,cfg={})
+ try:assert len([x for x in p['evidence'] if x['kind']=='intent'])==1
+ except AssertionError:failures.append('legacy records without agent/repo retained')
+print(json.dumps({'checks':9,'failures':failures,'passed':9-len(failures)}));sys.exit(bool(failures))
