@@ -594,7 +594,8 @@ for base in ([f"devices/{device}"] if fleet else []) + ([f"devices/{owner}"] if 
             sys.exit("Publication blocked: symlink in owned namespace")
     if current.exists() and any(p.is_symlink() for p in current.rglob("*")):
         sys.exit("Publication blocked: symlink in owned namespace")
-changed.update(p for p in git("ls-files", "--others", "--exclude-standard", "-z").split("\0") if p and is_owned(p))
+if fleet:
+    changed.update(p for p in git("ls-files", "--others", "--exclude-standard", "-z").split("\0") if p and is_owned(p))
 foreign = {p for p in changed if not is_owned(p)}
 for path in changed:
     if not (Path(repo) / path).resolve().is_relative_to(Path(repo).resolve()):
