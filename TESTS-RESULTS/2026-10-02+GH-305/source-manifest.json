@@ -1,0 +1,12 @@
+{
+  "code_commit": "fe78517",
+  "files": {
+    "src/rebalance/ingest/clio.py": "37d5e206806b1ad2755417285ac5ec9c591b95e6d909bc465cd5bca119db46b2",
+    "src/rebalance/ingest/index_ops.py": "4c610c2d4d33d84e27c17b920971aadb531cbe7763fd6ec9d19f4b48d25cde36",
+    "src/rebalance/ingest/semantic_index.py": "8ad2061bbc706f630a6b3db350e326115035c229cf21d54e133c30404fc1a5fb",
+    "utils/daily_work_synthesis.py": "5b24afcd51ba02e02c2e548872fdd34bbb2734e96ca7919464c60d386db36ae8",
+    "manifest.json": "33ec640b0cf770cc382418b2c378edf91b9e45c5c73e89774ab9ab4972b8926a",
+    "pyproject.toml": "b52be57fd90aa9fa1589afdf8baf88a015a5ef7deed3ca924db547cde4f3fc6a",
+    "src/rebalance/__init__.py": "9bbf749c45939a0112c35625e33d02b13d1b0f1db258a6ddcf90006660d08f0a"
+  }
+}

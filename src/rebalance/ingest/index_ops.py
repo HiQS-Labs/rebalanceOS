@@ -2052,6 +2052,7 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         "prompts_fetched": res.prompts_fetched,
         "prompts_inserted": res.prompts_inserted,
         "prompts_unchanged": res.prompts_unchanged,
+        "prompts_updated": res.prompts_updated,
         "steps_executed": ["sync_clio_prompts"],
     }
 

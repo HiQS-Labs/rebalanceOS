@@ -1,0 +1,10 @@
+{
+  "configured_roots_preview": 1,
+  "facts": 20,
+  "partial": true,
+  "errors": [
+    "invalid-owned-identity"
+  ],
+  "ledger_bytes_unchanged_during_read": true,
+  "live_config_mutated": false
+}

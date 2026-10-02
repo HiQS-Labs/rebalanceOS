@@ -1,0 +1,1 @@
+{"checks": 4, "failures": ["LF-only JSONL boundary", "stable canonical Daily evidence ID", "canonical provenance retained idempotently", "multiple origin references preserved without duplicate consumer IDs"], "passed": 0}

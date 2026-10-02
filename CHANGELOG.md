@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.97.2] - 2026-10-02
+
+### Fixed
+
+- Daily CLIO evidence preserves Unicode JSONL content and stable source citations. Consumer keys remain unchanged while canonical record/origin references are retained additively in the existing semantic projection, including repeated and colliding imports.
+- The semantic maintenance facade now enables selected registry providers, allowing nonembedding CLIO backfill. Studio qualification reuses the full-history compatibility export; memory guards and fleet schedules remain unchanged.
+
 ## [0.97.1] - 2026-10-02
 
 ### Fixed
