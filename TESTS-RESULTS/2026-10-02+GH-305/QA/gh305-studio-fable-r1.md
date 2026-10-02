@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-02.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 4
 
@@ -75,5 +75,50 @@ Read complete touched functions/directcallers and TESTS-RESULTS/2026-10-02+GH-30
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 (claude)
+
+Reviewed candidate `d94fe15` vs base `535bb7a` (`git diff --stat 535bb7a..HEAD`: 19 files, 246+/13-; code limited to `clio.py`, `semantic_index.py`, `daily_work_synthesis.py`, version files). Read the complete touched functions, direct callers (`cli/semantic.py:57-71`, `index_ops.py:1555-1567`, `collect_packet`), PROTOCOL.md, all three controls logs, provenance.jsonl, core-recheck.json and qualification-controls.py. Probes ran from the review worktree with output under `.relay-scratch/tmp/probe.txt`; no suite, validate.sh or fixture was executed here.
+
+swept file: yes
+
+**Findings**
+
+- `[Blocker]` **manifest.json version not bumped — CI front-door gate fails.** `pyproject.toml:7` and `src/rebalance/__init__.py:31` moved to `0.97.2`; `manifest.json:5` still reads `"version": "0.97.1"`. Base `535bb7a` had both at `0.97.1` (`git show 535bb7a:manifest.json`), so this patch introduces the drift. `utils/frontdoor-check.sh:52-135` compares the two and emits `report 3 "version 0.97.1 != pyproject 0.97.2"`, which sets `fired=1` and exits 1 (`frontdoor-check.sh:15,267`); `.github/workflows/ci.yml:72` runs that script as the "Front-door health board" job. The recorded `static.log` is ruff only, so the "static gate" receipt in provenance.jsonl did not cover this.
+  - Observed input: probe re-ran the script's embedded Python → `DRIFT: version 0.97.1 != pyproject 0.97.2`.
+  - Affected scope: every push of this branch; CI red regardless of code correctness.
+  - Falsifier: `manifest.json` at `0.97.2` → the probe prints `DRIFT: none` and the job passes.
+  - Fix: set `manifest.json` `"version"` to `0.97.2`; re-run `bash utils/frontdoor-check.sh` in the full clone and record its output alongside static.log.
+
+- `[Should]` **Daily fallback citation differs from live citation for the same prompt.** `utils/daily_work_synthesis.py:350` uses `record_id or id`. Live JSONL rows carry `record_id` → `clio:<canonical>`. Rows served by the DB fallback (`clio.py:73,79`) carry only the consumer `id` plus `source_records`, so the same prompt cites `clio:<session>_<ts>_<hash16>`. Packet claims "stable Daily canonical IDs" and names fallback cites as in scope; the two paths are not joinable.
+  - Observed input: synthetic row `{"record_id":"clio1-a","origin_id":"origin-a",…}` synced to a scratch DB, then `collect_packet` run once per path → `LIVE ids: ['clio:clio1-a']`, `DB-FALLBACK ids: ['clio:session_2026-10-02T22:00:00Z_ba9c736f19e7f60b']`.
+  - Affected scope: DB-fallback rows whose `source_records` holds exactly one reference (the single-origin common case). Multi-origin rows may legitimately keep the consumer key.
+  - Falsifier: a fixture asserting both paths yield the same evidence id for a single-origin row; if downstream never compares Daily ids across regenerations, Producer may disposition as documented divergence instead.
+  - Fix: in `collect_packet`, when `row.get("source_records")` has length 1, cite its `record_id`; otherwise keep the consumer key. Keep `source_records` attached either way.
+
+- `[Nit]` `prompts_unchanged` now also counts rows whose `source_records` were rewritten (`clio.py:157-163`); `ClioSyncResult` has no updated counter, so a provenance backfill pass reports as a no-op. Fix: add `prompts_updated` (default 0) or log the count.
+
+- `[Nit]` Pre-existing, in the touched function: live rows lacking `agent`/`repo` keys raise `KeyError` at `daily_work_synthesis.py:360-361` and are dropped before the new hash fallback (`:351-353`) can cite them. Probe: legacy row `{"timestamp","session_id","prompt"}` only → `LEGACY(no agent/repo) ids: []`. The CHANGELOG/packet wording "metadata-free legacy records use stable hash" holds only for rows that carry `agent`/`repo` (post GH-139). Optional fix `row.get("agent", "")` / `row.get("repo", "")`; falsifier: a 2-hour log tail where every row has both keys makes it moot.
+
+- `[Nit]` `mypy.log` "2 source files" matches `ci.yml:86` (`mypy src/`): `utils/daily_work_synthesis.py` is outside the typecheck scope. Claim is accurate as worded; just do not read it as covering the Daily script.
+
+**Verified claims (cited)**
+
+- `[Pass]` LF framing: `daily_work_synthesis.py:110` `raw.split("\n")` replaces `splitlines()`; the sync path (`clio.py:111`) iterates a text-mode file, which never split on U+2028/U+2029/U+0085, so it needed no change.
+- `[Pass]` DDL additive only: `clio.py:43-44` `ALTER TABLE clio_prompts ADD COLUMN source_records TEXT NOT NULL DEFAULT '[]'`; CREATE TABLE and index unchanged (`clio.py:23-37`).
+- `[Pass]` Primary IDs and semantic keys unchanged: `record_id = f"{session_id}_{ts}_{content_hash}"` (`clio.py:140-141`) untouched; `source_pk=row["id"]` (`clio.py:210`).
+- `[Pass]` Provenance idempotence, multi-origin union, same-pass collision, reordered replay: `clio.py:148-164` unions sorted refs and only UPDATEs on change; `existing[record_id]` is refreshed after INSERT (`:173`) so a second same-pass record hits the UPDATE branch.
+- `[Pass]` Read-only loader tolerates an unmigrated DB: `clio.py:70-71` substitutes `'[]' AS source_records`.
+- `[Pass]` Facade respects selection and does not embed: `semantic_index.py:615` passes `use_registry_providers=True`; `normalize_sources` maps `all`/None to `WORK_SOURCES` (`:242-250`), so `clio`/`figma` only run when named; the registry loop (`:683-713`) only calls `upsert_document`. Embedding selection keys on `embedded_hash != content_hash` (`db/semantic.py:349-355`), so the metadata-only "updated" state does not queue re-embeds. Expect the first post-deploy `--source clio` backfill to report every existing CLIO doc as `updated` (row rewrite, not re-embed).
+- `[Pass]` No guard/plist/schedule change: the 19-file diff stat lists no launchd, guard or schedule file.
+- `[Pass]` Docs consistent: CHANGELOG 0.97.2, SOP "CLIO fleet consumer qualification", PROJECT doc "Studio follow-through" all disclose no live consumer refresh, guard deferral, and no other devices enabled; matches code.
+- `[Unverified — needs clone run]` `controls-green.log` (7/7), `controls-base.log` (0/7), `focused.log` (41 passed), `mypy.log`, `static.log`. qualification-controls.py was read: its 7 checks match the seven claimed controls and the assertions are meaningful (idempotent insert count, 2-ref union, facade `total_documents==1` with 2 refs). Not executed in this worktree per protocol.
+
+Pre-existing defects in touched files beyond the two Nits above: none found (`import hashlib` inside the loop at `clio.py:138` and the broad `except Exception` at `clio.py:77` are stylistic and already commented).
+
+**VERDICT: FAIL**
+**Basis:** The code change is sound and every packet claim I could measure holds, but the version bump is incomplete: `manifest.json` stays at 0.97.1 and the CI front-door gate fails on that drift. One-line fix, then re-review.
+
+Handing off to Producer — go to the Producer window and say 'take your turn': bump manifest.json, disposition the [Should] and the Nits, record the frontdoor-check receipt.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
