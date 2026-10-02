@@ -2110,7 +2110,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"publish this device calendar/email files and latest pointers → {target_repo}",
+                f"publish this device calendar/email files{'' if fleet else ' and latest pointers'} → {target_repo}",
             ],
         }
 

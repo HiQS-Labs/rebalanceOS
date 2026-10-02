@@ -1,5 +1,5 @@
 PASS real missing target returns config result
 PASS real collector identity mismatch refuses before Git
 PASS real sync identity mismatch returns structured error
-PASS real scheduler identity error preserves unloaded-job failure
+FAIL real scheduler identity error preserves unloaded-job failure: AssertionError
 PASS real missing collector file yields doctor config failure

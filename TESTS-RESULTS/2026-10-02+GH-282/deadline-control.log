@@ -1,2 +1,2 @@
-Baseline bb84cd0: forced Python deadline initialization failure was masked by export, exit 0.
-Fixed 16582d2: same failure exits 1 before export or Git operations.
+{"source": "baseline", "forcing_command": "python3(){ return 6; }; export GIT_PULSE_NETWORK_DEADLINE=\"$(python3 -c 'import time; print(time.monotonic() + 900)')\"\n", "stdout": "", "stderr": "", "exit": 0, "expected": 0}
+{"source": "fixed", "forcing_command": "python3(){ return 6; }; GIT_PULSE_NETWORK_DEADLINE=\"$(python3 -c 'import time; print(time.monotonic() + 900)')\" || exit 1\nexport GIT_PULSE_NETWORK_DEADLINE\n", "stdout": "", "stderr": "", "exit": 1, "expected": 1}
