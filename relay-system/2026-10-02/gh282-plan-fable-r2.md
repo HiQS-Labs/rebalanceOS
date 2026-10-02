@@ -182,4 +182,12 @@ worktree (the external CLIO helper and the baseline test counts) and are labelle
 
 Relay closed (Approved), no further turn needed. Producer: proceed to implementation per steps 1-7, carrying nits 1-6.
 
+
+### Attestation · relay-drive — 2026-10-02T18:36:41Z
+task: REBALANCE-GH282-PLAN-FABLE-R2
+reviewer: claude
+status: Approved
+reviewed-head: ec38f81449635e591294ebd8dfc364cf8a4f84d6
+added-range: 6712+8859
+added-sha256: b8070e750ddb2cddaa574cc1027f258aa72132aef88d741f7f108f0a77a16dac
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
