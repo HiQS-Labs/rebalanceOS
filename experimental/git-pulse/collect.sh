@@ -383,7 +383,8 @@ if not 0 <= maximum <= 240:
 time.sleep(int(hashlib.sha256(device.encode()).hexdigest()[:8], 16) % (maximum + 1))
 STAGGER
 fi
-export GIT_PULSE_NETWORK_DEADLINE="$(python3 -c 'import time; print(time.monotonic() + 900)')"
+GIT_PULSE_NETWORK_DEADLINE="$(python3 -c 'import time; print(time.monotonic() + 900)')" || exit 1
+export GIT_PULSE_NETWORK_DEADLINE
 export GIT_PULSE_FLEET_MODE="$fleet_mode" GIT_PULSE_FLEET_SYNC_SUBDIR="$fleet_sync_subdir"
 export GIT_PULSE_CLIO_OWNER="${clio_owner_uuid:-}"
 

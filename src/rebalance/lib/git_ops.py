@@ -41,6 +41,9 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
         config = get_pulse_config()
     if not config.get("pulse_fleet_enabled"):
         return None
+    target_path = config.get("pulse_target_path")
+    if not isinstance(target_path, (str, Path)) or not str(target_path).strip():
+        raise ValueError("pulse_target_path required for fleet publication")
     directory = Path(
         os.environ.get("GIT_PULSE_CONFIG_DIR")
         or os.environ.get("GIT_HISTORY_CONFIG_DIR")
@@ -69,7 +72,7 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
         raise ValueError("fleet snapshot subdirectory missing, unsafe or different from collector")
     target = str(values.get("sync_repo_dir") or directory / "repo")
     target = target.replace("${CONFIG_DIR}", str(directory)).replace("$CONFIG_DIR", str(directory))
-    if "$" in target or Path(target).expanduser().resolve() != Path(config["pulse_target_path"]).expanduser().resolve():
+    if "$" in target or Path(target).expanduser().resolve() != Path(target_path).expanduser().resolve():
         raise ValueError("fleet collector checkout differs from pulse_target_path")
     return {"device_id": device, "sync_subdir": subdir}
 
@@ -505,12 +508,17 @@ def publish_git_paths(
     from rebalance.ingest.config import get_pulse_config
 
     cfg = get_pulse_config()
-    fleet = (
-        fleet_settings(cfg)
-        if cfg.get("pulse_fleet_enabled")
-        and Path(cfg.get("pulse_target_path") or "").expanduser().resolve() == repo_path.resolve()
-        else None
-    )
+    try:
+        if cfg.get("pulse_fleet_enabled") and not cfg.get("pulse_target_path"):
+            raise ValueError("pulse_target_path required for fleet publication")
+        fleet = (
+            fleet_settings(cfg)
+            if cfg.get("pulse_fleet_enabled")
+            and Path(cfg["pulse_target_path"]).expanduser().resolve() == repo_path.resolve()
+            else None
+        )
+    except (ValueError, OSError) as exc:
+        return {"committed": False, "pushed": False, "git_error": f"fleet configuration invalid: {exc}"}
     if fleet:
         push = False
     error = publication_state_error(repo_path, paths)

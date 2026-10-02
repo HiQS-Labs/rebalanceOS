@@ -7,3 +7,4 @@
 {"artifact": "schedule-red.log", "exit": 0, "fixed_head": "df2acf87d52519d34f865786cb45ffe7aedb722d", "kind": "schedule-red-control", "observed": "five failures before fix; 54 cases and three subtests pass after", "old_head": "9e49275"}
 {"artifact": "static.log", "exit": 0, "head": "df2acf87d52519d34f865786cb45ffe7aedb722d", "kind": "static", "mypy_source_files": 117}
 {"kind": "independent-implementation-qa", "artifact": "QA/gh282-implementation-fable-r2.md", "model": "claude-fable-5-1", "effort": "high", "reviewed_head": "9719f95e2fa389f45866b1f5e0b0024a5498a101", "driver_exit": 0, "status": "Approved"}
+{"kind": "local-deployment", "artifact": "deployment.json", "runtime_head": "bb84cd0b2d23bfea6cf86e5a1a6d112d2b0a337c", "clio_head": "6a53a38a0be7541fe6c6b95c9e45ef2e6ef9622e", "result": "verified local render/delivery/reconcile/same-note; jobs restored", "live_fleet_qualification": false}

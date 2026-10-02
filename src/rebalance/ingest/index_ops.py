@@ -2095,10 +2095,13 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     target_repo = Path(pulse_target).expanduser().resolve()
     sync_subdir = get_sync_subdir()
     sync_dir = target_repo / sync_subdir
-    device_id = get_device_id()
     from rebalance.lib.git_ops import fleet_settings
 
-    fleet = fleet_settings(cfg)
+    try:
+        device_id = get_device_id()
+        fleet = fleet_settings(cfg)
+    except (ValueError, OSError) as exc:
+        return {"scope": "sync", "dry_run": dry_run, "error": f"fleet configuration invalid: {exc}"}
 
     if dry_run:
         return {

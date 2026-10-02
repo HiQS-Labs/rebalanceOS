@@ -6,7 +6,11 @@
 
 > **Maintainers — there is no `[Unreleased]` section in this project.** Every fix
 > or feature takes a version bump at commit/merge time (semver: MAJOR = breaking ·
-> MINOR = feature · PATCH = fix) under a `## [x.y.z] - YYYY-MM-DD` heading. Do
+> MINOR = feature · PATCH = fix) under a `## 0.97.1 — 2026-10-02
+
+Fleet configuration failures now return structured errors from publishing and sync, and doctor reports invalid identity/configuration instead of raising. Missing publication targets fail validation before any write. The collector refuses a failed network-budget initialization. These post-landing review fixes preserve valid fleet delivery behavior; the Studio deployment receipt and lessons are recorded under GH-282.
+
+## [x.y.z] - YYYY-MM-DD` heading. Do
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
