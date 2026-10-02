@@ -8,3 +8,9 @@
 {"event": "private-rehearsal", "artifact": "rehearsal.json", "result": "all eligible references retained; no live destination or embedding writes"}
 {"event": "broad-existing-suite", "source": "fe78517376fe8ca890a07e223eca8a6d7e4518ac", "command": "pytest tests/ HiQS/tests -q", "isolation": "separate disposable full clone", "identity_intact": true, "passed": 2807, "skipped": 21, "xfailed": 11, "warnings": 2, "subtests_passed": 146, "exit": 0, "artifact": "full-suite.log"}
 {"event": "runtime-health", "source": "535bb7a", "artifact": "doctor-before.json", "result": "passed-with-warnings; resource deferrals remain"}
+{"event": "studio-live-consumer", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "live-consumer.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
+{"event": "readonly-ledger-activation", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "ledger-live.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
+{"event": "post-deploy-core", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "core-after.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
+{"event": "post-deploy-health", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "doctor-after.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
+{"event": "deployment", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "deployment.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
+{"event": "deployment-doc-hygiene", "artifact": "doc-checks.json", "baseline": "535bb7a", "source": "5f55020", "result": "machine path clean; unchanged pre-existing frontmatter/status findings; changelog clean"}

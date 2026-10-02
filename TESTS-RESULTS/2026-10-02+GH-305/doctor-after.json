@@ -1,0 +1,22 @@
+{
+  "result": "passed-with-warnings",
+  "schema_version": 9,
+  "database_opened": true,
+  "runtime_interpreters_healthy": true,
+  "runtime_root_consistent": true,
+  "pulse_configured": true,
+  "scheduled_guard_deferrals_visible": true,
+  "warnings": [
+    "ambient data freshness/coverage",
+    "daily-sync exit75",
+    "scheduled resource deferrals"
+  ],
+  "not_claimed": [
+    "warning-free overall health",
+    "scheduled consumer soak"
+  ],
+  "runtime_version": "0.97.2",
+  "installed_metadata_version": "0.97.2",
+  "pulse_server_restarted": true,
+  "pulse_server_running": true
+}

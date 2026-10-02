@@ -1,0 +1,21 @@
+{
+  "utc": "2026-10-02T23:08:30.153235+00:00",
+  "pr": 306,
+  "code_source": "5f550201511d05ca2baface0f8141c6568142175",
+  "version": "0.97.2",
+  "installed_metadata_version": "0.97.2",
+  "source_manifest_matches": true,
+  "database_backup_verified": true,
+  "daily_config_backup_exists": true,
+  "owned_long_running_server_restarted": true,
+  "exporter_seconds": 300,
+  "collector_seconds": 3600,
+  "pulse_sync_plist_unchanged": true,
+  "memory_policy_changed": false,
+  "guarded_jobs_forced": false,
+  "other_devices_enabled": false,
+  "cloud_or_embedding_work_started": false,
+  "scheduled_consumer_soak_complete": false,
+  "full_fleet_complete": false,
+  "private_evidence_retained": true
+}
