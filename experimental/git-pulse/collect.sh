@@ -367,7 +367,7 @@ if [ ! -d "$sync_repo_dir/.git" ]; then
     exit 1
 fi
 
-if [ "$fleet_mode" = true ]; then
+if [ "$fleet_mode" = true ] && [ "${1:-}" != "--dry-run" ] && [ -z "${GIT_PULSE_LOCK_FD:-}" ]; then
     # Delay BEFORE taking the shared lock, so local renderers can still commit.
     python3 - "$device_id" "${fleet_stagger_max_seconds:-240}" "$fleet_sync_subdir" <<'STAGGER'
 import hashlib, re, sys, time
@@ -450,7 +450,7 @@ repos_skipped_unborn=0
 repo_scan_failures=0
 failed_repos=()
 
-for repo_path in "${repos[@]}"; do
+for repo_path in ${repos[@]+"${repos[@]}"}; do
     repo_count=$((repo_count + 1))
     if [ ! -d "$repo_path/.git" ]; then
         echo "Skipping $repo_path: not a git repo" >&2
@@ -598,6 +598,11 @@ if fleet:
     changed.update(p for p in git("ls-files", "--others", "--exclude-standard", "-z").split("\0") if p and is_owned(p))
 foreign = {p for p in changed if not is_owned(p)}
 for path in changed:
+    current = Path(repo)
+    for part in Path(path).parts:
+        current = current / part
+        if current.is_symlink():
+            sys.exit("Publication blocked: symlink in owned output")
     if not (Path(repo) / path).resolve().is_relative_to(Path(repo).resolve()):
         sys.exit("Publication blocked: owned output escapes checkout")
 if foreign:
