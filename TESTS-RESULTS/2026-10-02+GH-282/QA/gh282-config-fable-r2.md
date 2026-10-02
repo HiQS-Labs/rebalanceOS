@@ -179,4 +179,12 @@ non-blocking nits.
 
 Relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-02T20:20:21Z
+task: REBALANCE-GH282-CONFIG-FABLE-R2
+reviewer: claude
+status: Approved
+reviewed-head: 7ccbd54cca8739556149c327dcf38add09467330
+added-range: 8019+7547
+added-sha256: 63f30c087db0fe6a8ec7961279846a601561621a152a67549ff88108a73f202a
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
