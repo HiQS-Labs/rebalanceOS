@@ -1,6 +1,6 @@
 # GH-282 verification — 2026-10-02
 
-Baseline and final candidate: 2804 passed, 143 subtests passed, 21 skipped, 11 known xfails.
+Baseline: 2804 passed, 143 subtests. Final candidate: 2807 passed, 146 subtests, 21 skipped, 11 known xfails.
 Final code identity is pinned in source-manifest.json. Tests run only in a disposable full clone;
 Git identity checked (non-bare, expected local origin and HEAD) before attributing results.
 
@@ -26,3 +26,5 @@ implementation attestation. Final implementation QA uses this tracked evidence d
 Still open: real four-Mac rollout, shared-note recovery/source inventory/archive capacity pilot,
 three actual Pulse intervals including disconnected/rejoin, external hook/PDDA lock participation,
 and seven-day failure-rate qualification. Other Macs remain disabled. No source-gap recovery required.
+
+Implementation review round 1 found premature overnight aging and ambiguous queue/failure output. Fixed scheduled silence allowance to 10 hours (including DST and existing delivery budgets); explicit failures and pending work still warn immediately. Three added methods in the existing health suite went red against the old source (five failures including subtests), then all 54 focused cases and three subtests passed. Status commit errors and failed delivery proof now return Git exit 2; CLIO failure conservatively stops before a new heartbeat. A pre-existing text-mode CR normalization edge remains unobserved and is not redesigned.
