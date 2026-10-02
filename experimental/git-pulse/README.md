@@ -342,3 +342,14 @@ pip install "rebalance-os[gcp]"
 - **Bounded action set.** Gemini picks from a named list defined in code — it cannot execute arbitrary shell commands.
 - **Single LLM call.** The FSM calls Gemini at most once per push failure (configurable via `max_llm_attempts`).
 - **No key in shell env or zshrc.** The key is pulled at runtime from Secret Manager or a process-level env var — never written to a dotfile where background agents could pick it up.
+
+
+## Fleet mode and runtime deployment
+
+Opt-in fleet mode is documented in the main SOP's GH-282 section. The existing collector stays the
+sole scheduled pusher; Rebalance writers queue device-owned commits. Configure canonical device ID,
+matching sync subdirectory and explicit canonical CLIO helper/database/owner UUID per installation.
+Do not copy a hostname into CLIO's origin inventory. Update installed collector copies as well as the
+stable runtime, with verified private backups. Existing launchd cadence and same-note renderer remain.
+Other Macs can stay disabled during a local pilot. A concurrent-clone probe is not evidence that the
+real fleet has completed offline/rejoin or seven-day qualification.

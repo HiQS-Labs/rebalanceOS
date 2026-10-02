@@ -2097,6 +2097,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     sync_dir = target_repo / sync_subdir
     device_id = get_device_id()
     from rebalance.lib.git_ops import fleet_settings
+
     fleet = fleet_settings(cfg)
 
     if dry_run:

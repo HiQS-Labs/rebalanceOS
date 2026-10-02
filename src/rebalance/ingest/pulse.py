@@ -856,6 +856,7 @@ def _commit_and_push_if_changed_locked(
 ) -> dict[str, Any]:
     """Write *new_content* to file_rel inside *target_repo*; commit+push only if changed."""
     from rebalance.lib.git_ops import fleet_settings
+
     if fleet_settings():
         push = False
     error = publication_state_error(target_repo, [file_rel])
@@ -957,6 +958,7 @@ def _publish_pulse(
     started = time.monotonic()
     cfg = get_pulse_config()
     from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+
     fleet = fleet_settings(cfg)
     file_rel = fleet_output_path(cfg, "live-pulse.md") if fleet else cfg.get("pulse_filename") or "live-pulse.md"
     if fleet:
@@ -1044,6 +1046,7 @@ def publish_pulse(database_path: Path, *, dry_run: bool = False, push: bool = Tr
     """Render/queue the device page and record its attempt under the common lock."""
     from rebalance.lib.git_ops import fleet_settings
     from rebalance.lib.time_ops import now_iso
+
     cfg = get_pulse_config()
     try:
         fleet = fleet_settings(cfg)
@@ -1065,12 +1068,19 @@ def publish_pulse(database_path: Path, *, dry_run: bool = False, push: bool = Tr
         with git_publish_lock(target):
             status_path = target / relative
             previous = json.loads(status_path.read_text()) if status_path.exists() else {}
+            if not isinstance(previous, dict):
+                raise ValueError("invalid owned pulse status; retained for repair")
             stamp = now_iso()
-            status = {"schema_version": 1, "device_id": fleet["device_id"], "job": "pulse-sync",
-                      "last_attempt_utc": stamp, "last_exit": exit_code,
-                      "last_render_success_utc": stamp if exit_code == 0 else previous.get("last_render_success_utc"),
-                      "payload_path": f"devices/{fleet['device_id']}/live-pulse.md",
-                      "payload_sha256": result.get("markdown_sha256") if exit_code == 0 else previous.get("payload_sha256")}
+            status = {
+                "schema_version": 1,
+                "device_id": fleet["device_id"],
+                "job": "pulse-sync",
+                "last_attempt_utc": stamp,
+                "last_exit": exit_code,
+                "last_render_success_utc": stamp if exit_code == 0 else previous.get("last_render_success_utc"),
+                "payload_path": f"devices/{fleet['device_id']}/live-pulse.md",
+                "payload_sha256": result.get("markdown_sha256") if exit_code == 0 else previous.get("payload_sha256"),
+            }
             error = publication_state_error(target, [relative])
             if error:
                 raise ValueError(error)
@@ -1093,7 +1103,9 @@ def fleet_view(target_repo: Path) -> str:
     listing = run_git(target_repo, "ls-tree", "-r", "--name-only", "@{u}", "--", "devices", timeout=5)
     if listing.returncode:
         raise ValueError("fleet upstream unavailable")
-    pages = sorted(p for p in listing.stdout.splitlines() if re.fullmatch(r"devices/[a-z0-9][a-z0-9-]{0,63}/live-pulse\.md", p))
+    pages = sorted(
+        p for p in listing.stdout.splitlines() if re.fullmatch(r"devices/[a-z0-9][a-z0-9-]{0,63}/live-pulse\.md", p)
+    )
     if len(pages) > 32:
         raise ValueError("fleet page limit exceeded")
     blocks = ["# Fleet live pulse"]

@@ -29,6 +29,7 @@ __all__ = [
     "should_descend",
 ]
 
+
 def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | None:
     """Validate fleet ownership against the existing collector's literal config.
 
@@ -36,11 +37,15 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
     """
     if config is None:
         from rebalance.ingest.config import get_pulse_config
+
         config = get_pulse_config()
     if not config.get("pulse_fleet_enabled"):
         return None
-    directory = Path(os.environ.get("GIT_PULSE_CONFIG_DIR") or os.environ.get("GIT_HISTORY_CONFIG_DIR") or
-                     (Path.home() / ".config/git-pulse"))
+    directory = Path(
+        os.environ.get("GIT_PULSE_CONFIG_DIR")
+        or os.environ.get("GIT_HISTORY_CONFIG_DIR")
+        or (Path.home() / ".config/git-pulse")
+    )
     values = {}
     for line in (directory / "config.sh").read_text().splitlines():
         match = re.fullmatch(r"\s*(?:export\s+)?(device_id|fleet_mode|fleet_sync_subdir|sync_repo_dir)=(.*)", line)
@@ -55,8 +60,12 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
     if values.get("fleet_mode") != "true":
         raise ValueError("fleet collector mode must be enabled before Python producers")
     subdir = str(config.get("sync_subdir") or "sync")
-    if (Path(subdir).is_absolute() or any(part in (".", "..") for part in subdir.split("/"))
-            or not subdir or values.get("fleet_sync_subdir", "sync") != subdir):
+    if (
+        Path(subdir).is_absolute()
+        or any(part in (".", "..") for part in subdir.split("/"))
+        or not subdir
+        or values.get("fleet_sync_subdir", "sync") != subdir
+    ):
         raise ValueError("fleet snapshot subdirectory missing, unsafe or different from collector")
     target = str(values.get("sync_repo_dir") or directory / "repo")
     target = target.replace("${CONFIG_DIR}", str(directory)).replace("$CONFIG_DIR", str(directory))
@@ -494,8 +503,14 @@ def publish_git_paths(
     """
     effective_timeout = _default_git_timeout(120.0) if timeout is None else timeout
     from rebalance.ingest.config import get_pulse_config
+
     cfg = get_pulse_config()
-    fleet = fleet_settings(cfg) if cfg.get("pulse_fleet_enabled") and Path(cfg.get("pulse_target_path") or "").expanduser().resolve() == repo_path.resolve() else None
+    fleet = (
+        fleet_settings(cfg)
+        if cfg.get("pulse_fleet_enabled")
+        and Path(cfg.get("pulse_target_path") or "").expanduser().resolve() == repo_path.resolve()
+        else None
+    )
     if fleet:
         push = False
     error = publication_state_error(repo_path, paths)
@@ -521,6 +536,7 @@ def publish_git_paths(
                 result["queued"] = True
             return result
         import random
+
         for attempt in range(3):
             proc = run_git(repo_path, "push", timeout=effective_timeout)
             if proc.returncode == 0:

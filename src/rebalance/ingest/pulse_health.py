@@ -166,9 +166,12 @@ def classify(
         health.state, health.priority = "ALERT", 1
     elif hours > warn_hours:
         health.state, health.priority = "STALE", 2
-    elif health.fleet_mode and (health.pulse_delivery_pending or health.last_pulse_exit != 0
-            or health.last_pulse_publish_utc is None
-            or not -1 / 60 <= (now - health.last_pulse_publish_utc).total_seconds() / 3600 <= 1.25):
+    elif health.fleet_mode and (
+        health.pulse_delivery_pending
+        or health.last_pulse_exit != 0
+        or health.last_pulse_publish_utc is None
+        or not -1 / 60 <= (now - health.last_pulse_publish_utc).total_seconds() / 3600 <= 1.25
+    ):
         health.state, health.priority = "ALIVE_NOT_PUBLISHING", 2
     else:
         health.state, health.priority = "ALIVE", 3
@@ -211,17 +214,23 @@ def read_collector_health(
             # Only local Git object reads, each bounded to five seconds. Upstream
             # evidence cannot be replaced by a dirty/queued local success.
             from rebalance.lib.git_ops import run_git
+
             relative = f"devices/{device_id}/status/pulse-sync.json"
             try:
                 import re
+
                 if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", device_id):
                     raise ValueError("unsafe fleet device identity")
                 delivered = run_git(Path(sync_repo_dir), "show", f"@{{u}}:{relative}", timeout=5)
                 if delivered.returncode or len(delivered.stdout) > 65536:
                     raise ValueError("upstream status unavailable")
                 status = json.loads(delivered.stdout)
-                if (status.get("device_id") != device_id or status.get("job") != "pulse-sync"
-                        or status.get("schema_version") != 1 or type(status.get("last_exit")) is not int):
+                if (
+                    status.get("device_id") != device_id
+                    or status.get("job") != "pulse-sync"
+                    or status.get("schema_version") != 1
+                    or type(status.get("last_exit")) is not int
+                ):
                     raise ValueError("invalid delivered status")
                 health.last_pulse_exit = status["last_exit"]
                 health.last_pulse_publish_utc = parse_utc_iso(status.get("last_render_success_utc"))
@@ -229,7 +238,9 @@ def read_collector_health(
                 if status.get("payload_path") != payload_path:
                     raise ValueError("invalid delivered payload path")
                 payload = run_git(Path(sync_repo_dir), "show", f"@{{u}}:{payload_path}", timeout=5)
-                if payload.returncode or hashlib.sha256(payload.stdout.encode()).hexdigest() != status.get("payload_sha256"):
+                if payload.returncode or hashlib.sha256(payload.stdout.encode()).hexdigest() != status.get(
+                    "payload_sha256"
+                ):
                     raise ValueError("delivered page and status do not match")
                 local = Path(sync_repo_dir) / relative
                 if local.is_symlink():

@@ -632,6 +632,15 @@ with tempfile.TemporaryDirectory(prefix="clio-export-", dir=private_dir) as scra
     raw = output.read_bytes()
     _, rows = module.snapshot_records(raw, expected_owner=owner)
     target = Path(repo) / "devices" / owner / "clio.jsonl"
+    current = Path(repo)
+    for part in target.relative_to(Path(repo)).parts:
+        current = current / part
+        if current.is_symlink():
+            sys.exit("CLIO publication blocked: symlink in owner output")
+    if not target.resolve().is_relative_to(Path(repo).resolve()):
+        sys.exit("CLIO publication blocked: owner output escapes checkout")
+    if target.exists() and target.stat().st_size > 64 * 1024 * 1024:
+        sys.exit("CLIO prior snapshot too large; retained")
     if target.exists():
         _, previous = module.snapshot_records(target.read_bytes(), expected_owner=owner)
         if not {row["record_id"] for row in previous} <= {row["record_id"] for row in rows}:

@@ -64,6 +64,7 @@ def get_device_id() -> str:
     Falls back to ``"unknown-device"`` if hostname is unavailable.
     """
     from rebalance.lib.git_ops import fleet_settings
+
     fleet = fleet_settings()
     if fleet:
         return fleet["device_id"]
@@ -238,6 +239,7 @@ def _write_snapshot(
 def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) -> None:
     """Update ``source_dir/latest.json`` if this device's snapshot is the freshest."""
     from rebalance.lib.git_ops import fleet_settings
+
     if fleet_settings():
         return
     latest_path = source_dir / "latest.json"
@@ -288,6 +290,7 @@ def commit_and_push_sync(
             return {"committed": False, "pushed": False, "deferred": True, "git_error": str(exc)}
 
     from rebalance.lib.git_ops import fleet_settings
+
     fleet = fleet_settings()
     names = (device_id,) if fleet else (device_id, "latest")
     paths = [
@@ -370,9 +373,15 @@ def read_latest_snapshot(sync_dir: Path, source: str) -> dict[str, Any] | None:
             stamp = parse_utc_iso(payload.get("generated_at"))
             device = payload.get("device_id")
             rows = payload.get("rows")
-            if (stamp is None or not isinstance(device, str) or path.name != f"{device}.json"
-                    or payload.get("source") != source or payload.get("schema_version") != SCHEMA_VERSION
-                    or not isinstance(rows, list) or payload.get("row_count") != len(rows)):
+            if (
+                stamp is None
+                or not isinstance(device, str)
+                or path.name != f"{device}.json"
+                or payload.get("source") != source
+                or payload.get("schema_version") != SCHEMA_VERSION
+                or not isinstance(rows, list)
+                or payload.get("row_count") != len(rows)
+            ):
                 continue
             candidates.append((stamp, device, payload))
         except (OSError, ValueError, TypeError):
