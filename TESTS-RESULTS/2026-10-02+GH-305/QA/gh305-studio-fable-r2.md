@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-02.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 4
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -74,5 +74,39 @@ Final focused re-review of Rebalance Studio follow-through #282 / Forge #937. Re
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 (claude)
+
+Reviewed fix commit `fe78517` against R1 (`QA/gh305-studio-fable-r1.md`, candidate `d94fe15`): `git show fe78517` = 6 files, 26+/6- (`manifest.json`, `clio.py`, `index_ops.py`, `daily_work_synthesis.py`, `qualification-controls.py`, PROJECT doc). Re-read the complete touched functions (`collect_packet` :335-375, `sync_clio_prompts` :93-187, `load_recent_clio_prompts` :66-79, `_refresh_clio` :2036-2058), the 9-check controls script, PROTOCOL.md, every receipt log and provenance.jsonl. Probes ran from this worktree with output under `.relay-scratch/tmp/`; no suite, validate.sh, mypy or ruff executed here (neither module is installed in this worktree: `python3 -m mypy --version` → `No module named mypy`).
+
+swept file: yes
+
+**R1 dispositions checked**
+
+- `[Pass]` **R1 Blocker (manifest drift) fixed.** `manifest.json:5` `"version": "0.97.2"` = `pyproject.toml:7` = `src/rebalance/__init__.py:31`. Probe A re-ran the drift section of `utils/frontdoor-check.sh:53-127` verbatim → `rc=0`, stdout empty (no `version … != pyproject` line, no tool-surface drift). The CI front-door job no longer fires on this branch.
+- `[Pass]` **R1 Should (live vs cached citation) fixed as specified.** `daily_work_synthesis.py:351-353`: no `record_id` + exactly one `source_records` entry → cite that `record_id`; otherwise keep the consumer key. Probe C through the real DB fallback (`load_recent_clio_prompts`, scratch DB synced from one synthetic row): `LIVE ['clio:clio1-a']` / `DB-FALLBACK(1 ref) [('clio:clio1-a', [{'record_id': 'clio1-a', 'origin_id': 'origin-a'}])]` — identical id, references retained. Probe B: 2-ref row → `clio:s_2026-10-02T22:00:00Z_abcd` (consumer key kept); 0-ref row → consumer key kept. Falsifier from R1 satisfied.
+- `[Pass]` **R1 Nit (updated counter) fixed.** `clio.py:90` `prompts_updated: int = 0`; `:157-167` splits UPDATE → `updated += 1` from `unchanged += 1`; `index_ops.py:2055` surfaces it. Probe B: `SYNC1 1 0 0`, `SYNC2 0 1 0`, `SYNC3(new origin) 0 0 1` (inserted/unchanged/updated).
+- `[Pass]` **R1 Nit (legacy rows without agent/repo) fixed.** `daily_work_synthesis.py:363-364` `row.get("agent", "")` / `row.get("repo", "")`. Probe B: `{"timestamp","session_id","prompt"}` → `('clio:6bb3b4a7…', '', '')` — retained with the sha256 identity fallback at `:354-356`; `scrub("")` returns `""` (`:89`).
+- `[Pass]` R1 mypy-scope Nit dispositioned accurately: PROJECT doc `:177` states the daily utility is outside the `mypy src/` gate (`ci.yml:86`); no broader claim made.
+
+**Artifact claims**
+
+- `[Pass]` Controls script now 9 checks (`qualification-controls.py:54-64`); the two new checks assert exactly the R1 Should/Nit behaviour. Both fail at base by construction (`row["agent"]` KeyError; id = `clio:legacy-key`) and `controls-final-base.log` lists all 9 as base failures, `controls-final-green.log` 9/9 — consistent with the code.
+- `[Pass]` No new gate, suite registry, DB, vector store, push loop or ledger writer: diff stat is confined to the six files above; no plist/schedule/workflow file touched.
+- `[Pass]` PROJECT doc `:177` is truthful about what was fixed and the mypy boundary.
+- `[Unverified — needs clone run]` `final-focused.log` 74 passed; `controls-final-*.log`. Not executed here per protocol; harness gate follows this turn.
+- `[Unverified — needs clone run]` **Type and static receipts are stale relative to `fe78517`.** `mypy.log` and `static.log` were last recorded at `d94fe15` (`git log -- …/mypy.log`), before the fix touched `clio.py` and `index_ops.py`, both inside `mypy src/` scope. The artifact discloses this ("remaining type/frontdoor receipts are being captured, no qualification claim if fail"), so it is not a truthfulness fault; the harness gate must re-run `mypy src/`, `ruff check .`, `ruff format --check .` and `bash utils/frontdoor-check.sh` on the final head. The change is a dataclass int field and two `.get()` calls, so I expect green.
+
+**New findings (no behaviour change requested)**
+
+- `[Nit]` `daily_work_synthesis.py:350` still carries a non-dict branch (`else row["id"]`) but `:351` and `:363-364` now call `row.get(...)` unconditionally; a `sqlite3.Row` would raise `AttributeError`, which `:374` does not catch. Probe B: `NONDICT raised AttributeError 'sqlite3.Row' object has no attribute 'get'`. Dead in practice — both producers return dicts (`recent_prompt_rows` → `json.loads` rows, `:97,112`; `load_recent_clio_prompts` → `dict(row) | …`, `clio.py:79`). Optional cleanup: drop the `isinstance` branch or add `AttributeError` to the except tuple.
+- `[Nit]` A single `source_records` entry lacking `record_id` drops the row silently (`:353` KeyError → `:374`). Probe B `BADREF` → `[]`. Unreachable from this codebase: `clio.py:150-152` only writes references that carry both keys. Noting for the sweep only; no fix requested.
+
+Pre-existing defects in the touched functions beyond the two Nits above: none found (R1's `import hashlib` in the loop at `clio.py:139` and the commented broad `except` at `:77` stand).
+
+**VERDICT: PASS**
+**Basis:** Definition of Done met: version manifest aligned across all three files and the front-door drift probe is clean; single-origin cached citations now equal live citations through the real DB fallback while multi-origin rows keep their consumer key with every reference; canonical references are additive and the updated counter is surfaced; the packet and PROJECT doc are truthful about the pending type/frontdoor receipts. No open Blocker or Should. Type/static/frontdoor receipts for the final head are the harness gate's to record; a red there would reopen this, not the code review.
+
+Relay closed (Approved), no further turn needed. Producer: record the `mypy src/`, ruff and `frontdoor-check.sh` receipts for the final head alongside the existing logs before claiming qualification.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
