@@ -63,6 +63,10 @@ def get_device_id() -> str:
     hyphens, non-alphanumeric characters (except hyphens) stripped.
     Falls back to ``"unknown-device"`` if hostname is unavailable.
     """
+    from rebalance.lib.git_ops import fleet_settings
+    fleet = fleet_settings()
+    if fleet:
+        return fleet["device_id"]
     try:
         raw = socket.gethostname()
     except Exception:  # noqa: BLE001
@@ -233,6 +237,9 @@ def _write_snapshot(
 
 def _update_latest_pointer(source_dir: Path, device_id: str, generated_at: str) -> None:
     """Update ``source_dir/latest.json`` if this device's snapshot is the freshest."""
+    from rebalance.lib.git_ops import fleet_settings
+    if fleet_settings():
+        return
     latest_path = source_dir / "latest.json"
     if latest_path.exists():
         try:
@@ -280,10 +287,13 @@ def commit_and_push_sync(
         except GitPublishLockBusy as exc:
             return {"committed": False, "pushed": False, "deferred": True, "git_error": str(exc)}
 
+    from rebalance.lib.git_ops import fleet_settings
+    fleet = fleet_settings()
+    names = (device_id,) if fleet else (device_id, "latest")
     paths = [
         f"{sync_subdir}/{source}/{name}.json"
         for source in ("calendar", "email")
-        for name in (device_id, "latest")
+        for name in names
         if (target_repo / sync_subdir / source / f"{name}.json").exists()
     ]
     if not paths:
@@ -292,7 +302,8 @@ def commit_and_push_sync(
         target_repo,
         paths,
         f"sync: {device_id} {generated_at}",
-        resolve_conflicts=lambda: _resolve_pointer_conflicts(target_repo, sync_subdir),
+        push=not fleet,
+        resolve_conflicts=None if fleet else lambda: _resolve_pointer_conflicts(target_repo, sync_subdir),
     )
 
 
@@ -340,19 +351,30 @@ def _resolve_pointer_conflicts(target_repo: Path, sync_subdir: str) -> bool:
 
 
 def read_latest_snapshot(sync_dir: Path, source: str) -> dict[str, Any] | None:
-    """Return the parsed contents of the freshest device snapshot, or None.
-
-    Reads ``sync_dir/<source>/latest.json`` to find the device file, then
-    loads and returns it. Returns None if no snapshots exist yet.
-    """
-    latest_path = sync_dir / source / "latest.json"
-    if not latest_path.exists():
-        return None
-    try:
-        pointer = json.loads(latest_path.read_text(encoding="utf-8"))
-        snapshot_path = sync_dir / source / pointer["snapshot_file"]
-        if not snapshot_path.exists():
-            return None
-        return json.loads(snapshot_path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return None
+    """Select the freshest validated device payload; historical pointers are ignored."""
+    if source not in ("calendar", "email"):
+        raise ValueError("unsupported snapshot source")
+    candidates = []
+    files = list((sync_dir / source).glob("*.json"))
+    if len(files) > 1000:
+        raise ValueError("snapshot candidate limit exceeded")
+    for path in files:
+        if path.name == "latest.json" or path.is_symlink():
+            continue
+        try:
+            if path.stat().st_size > 64 * 1024 * 1024:
+                continue
+            payload = json.loads(path.read_text())
+            if not isinstance(payload, dict):
+                continue
+            stamp = parse_utc_iso(payload.get("generated_at"))
+            device = payload.get("device_id")
+            rows = payload.get("rows")
+            if (stamp is None or not isinstance(device, str) or path.name != f"{device}.json"
+                    or payload.get("source") != source or payload.get("schema_version") != SCHEMA_VERSION
+                    or not isinstance(rows, list) or payload.get("row_count") != len(rows)):
+                continue
+            candidates.append((stamp, device, payload))
+        except (OSError, ValueError, TypeError):
+            continue
+    return max(candidates, key=lambda item: item[:2])[2] if candidates else None

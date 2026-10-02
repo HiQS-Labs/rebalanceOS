@@ -429,7 +429,9 @@ def sync_to_clio(summary: str, now: datetime, dry_run: bool = False) -> dict:
 
     subdir = cfg.get("git_pulse_clio_subdir") or "CLIO"
     filename = cfg.get("git_pulse_clio_filename") or "git-pulse-daily-log.md"
-    file_rel = f"{subdir}/{filename}"
+    from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+    file_rel = fleet_output_path(cfg, f"{subdir}/{filename}")
+    fleet = fleet_settings(cfg)
 
     target_file = target_repo / file_rel
     existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
@@ -457,12 +459,12 @@ def sync_to_clio(summary: str, now: datetime, dry_run: bool = False) -> dict:
         target_repo=target_repo,
         file_rel=file_rel,
         new_content=new_content,
-        push=True,
+        push=not fleet,
         commit_message=f"git-pulse: {now:%Y-%m-%d} daily summary",
     )
     log(f"CLIO sync ({file_rel}): {result}")
     unchanged = result.get("reason") == "no content change"
-    published = bool(result.get("pushed"))
+    published = bool(result.get("pushed")) or bool(result.get("queued"))
     if not (unchanged or published):
         reason = result.get("git_error") or result.get("reason") or "unknown Git publication failure"
         return {
@@ -580,7 +582,8 @@ def show_status() -> int:
         subdir = cfg.get("git_pulse_clio_subdir") or "CLIO"
         filename = cfg.get("git_pulse_clio_filename") or "git-pulse-daily-log.md"
         if target_path:
-            clio_file = Path(target_path).expanduser().resolve() / subdir / filename
+            from rebalance.lib.git_ops import fleet_output_path
+            clio_file = Path(target_path).expanduser().resolve() / fleet_output_path(cfg, f"{subdir}/{filename}")
             log(f"CLIO target: {clio_file} (exists: {clio_file.exists()})")
         else:
             log("CLIO target: pulse_target_path not configured — CLIO write would SKIP")

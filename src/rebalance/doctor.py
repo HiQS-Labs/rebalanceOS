@@ -1852,6 +1852,7 @@ def _check_auth_failures() -> list[Check]:
 # presentation needs are served without collapsing the source model.
 _PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
     # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
+    "ALIVE_NOT_PUBLISHING": (WARN, WARNING, "alive but not publishing"),
     "ALIVE": (OK, NOTICE, "collecting normally"),
     "STALE": (WARN, WARNING, "stale"),
     "ALERT": (WARN, ERROR, "not collecting"),
