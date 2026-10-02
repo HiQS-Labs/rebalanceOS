@@ -1,7 +1,23 @@
+---
+title: GH-282 source recon
+status: Reference for active GH-282 plan
+created: 2026-10-02
+updated: 2026-10-02
+owner: noel
+goal: Record current producer, delivery and reader contracts before changing fleet ownership.
+roadmap_exempt: true
+---
+
 # GH-282 recon — 2026-10-02
 
 Current origin development: 4349ff5. Installed runtime: 17e08c1, 14 commits behind.
 Phase 1 merged via PR #283 (1b4d287). No remaining #282 PR or retained remote task branch.
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Three source audits and a full baseline test run. | Implement the canonical GH-282 plan and retain deployment qualification limits. |
 
 ## Writes and ownership
 - pulse_sync.sh -> ingest/pulse.publish_pulse -> shared git_ops publisher; root live-pulse.md.

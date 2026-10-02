@@ -15,7 +15,7 @@ goal: >
 effort: 4
 complexity: 3
 risk: 2
-phases: 3
+phases: 4
 ratings_provisional: true
 roadmap_exempt: false
 ---
@@ -41,30 +41,10 @@ Rated 2026-09-26 per consensus in AgentChorus #132026.
 | `pri` | 80 | High fleet impact: hourly pulse sync repeatedly fails or collides across 4 Macs. |
 | `sev` | 70 | Misleading diagnostic reporting and silent delivery failures. |
 | `appeal` | 55 | Operator wants reliable hands-free fleet sync across all devices. |
-| `effort` | 65 | Phase 1 is clean, localized, and highly testable (~50 lines across 3 files). |
+| `effort` | 65 | Remaining work spans shared producer policy, collector ownership and truthful readers. |
 
-## Implementation Plan
-
-### Phase 1: Diagnostic Honesty & Resilience (Current Scope)
-1. **Exit Code Taxonomy**:
-   - Update `scripts/pulse_sync.sh` to classify exits cleanly: Exit 0 (OK/no-change), Exit 1 (Config error only), Exit 2 (Git error after retries/timeout), Exit 70 (Render/Python exception), Exit 75 (Busy lock / skip).
-2. **Git Timeout & Error Handling**:
-   - Update `src/rebalance/lib/git_ops.py` to catch `subprocess.TimeoutExpired` / `OSError` in `publish_git_paths` and return `git_error` + `pending=True`.
-   - Add configurable timeout (default 120s, env `REBALANCE_GIT_TIMEOUT`) for `publish_git_paths` and `git_pull_rebase_safe`.
-3. **Timezone Fallback**:
-   - In `src/rebalance/ingest/pulse.py:965`, remove `or "UTC"` so `_resolve_timezone` correctly falls back to `local_tz()` (America/Los_Angeles).
-4. **Doctor Exit 75 Handling**:
-   - In `src/rebalance/doctor.py:1269`, treat status `75` as a non-failing skip state (`idle, skipped (75)`).
-
-### Phase 2: Jitter & Namespace Partitioning (Future PR)
-- Bounded jittered retry (≤ 3 attempts, 2–20s) and per-device deterministic stagger delay.
-- Disjoint namespaces (`devices/<id>/live-pulse.md`).
-- Reader aggregation `fleet_view()` and deprecation of committing `latest.json`.
-
-### Phase 3: Multi-Dimensional Liveness (Future PR)
-- `devices/<id>/status/<job>.yaml` and collector mirroring.
-- `pulse_health.py` `ALIVE_NOT_PUBLISHING` state.
-
+## Phase 1 — merged diagnostics
+PR #283 merged the exit taxonomy, configurable deadlines, host timezone fallback and doctor skip handling. Its original implementation plan is superseded by the ordered work below.
 
 ## Table of contents
 - Phase 0 — grounded recon and prior art
@@ -129,3 +109,12 @@ A locally committed page is queued, not proof of remote delivery. Do not count b
 failure, require an upstream proof before advancing scan watermarks, and preserve rejected commits.
 Python hostname IDs and collector IDs previously differed: use explicit matching configuration.
 Run mutation-heavy tests in a separate full clone; a linked worktree shares Git configuration.
+
+
+## Plan QA dispositions — Fable high, round 1
+1. Implemented: fleet results carry `queued=True`, not `pushed=True`; daily synthesis, digest and sync outcome gates explicitly accept queued success. Fleet mode always wins over caller push=True and PULSE_PUSH; fleet-off preserves the existing knob.
+2. Implemented: the collector config remains the device identity source of truth. Python reads its literal configured device_id at each publish and compares it to pulse_device_id; missing, unsafe or mismatched values refuse before write. Fleet sync payloads use this matching ID. Collector fleet_sync_subdir must match Python sync_subdir; no hostname inference. Historical latest.json stays retained as legacy evidence, ignored by the derived freshest-snapshot reader and not written in fleet mode. That reader is an existing API, not a new production pipeline.
+3. Implemented: deterministic stagger runs before lock acquisition. Existing python3 supplies collector Git deadlines through subprocess process-group termination, no timeout(1) dependency. Every network call is bounded; failure exits Git code 2, busy remains 75. Both early and final pushes use bounded retry/upstream setup. Pending commits remain intact.
+4. Implemented: canonical CLIO owner export is exactly devices/<configured-CLIO-UUID>/clio.jsonl. Imported history remains solely in the private SQLite DB outside the Git checkout; the helper never writes imported origins under snapshots/. The legacy snapshots/ transport remains for its existing hook, explicitly outside CLIO's owner export. No broad devices/ staging.
+5. Implemented: collector YAML carries fleet_mode=true only for opted-in devices. Legacy/unmarked collector devices keep existing ALIVE classification. The live-pulse producer records an owned status with last attempt, last render success and last exit; fleet health distinguishes render failure/staleness and pending delivery using committed upstream status rather than trusting dirty local output. Failure visibility requires a successful delivery of that status; offline peers can only age the last delivered evidence.
+6–10. Implemented/clarified: no new reader daemon; old pointer retained but ignored; existing PULSE_PUSH precedence explicit; old plan superseded; no-upstream/early-network taxonomy covered. Rollback requires a clean private checkout and no unpushed fleet commits; otherwise preserve it and retain the new collector until pending data is reconciled.
