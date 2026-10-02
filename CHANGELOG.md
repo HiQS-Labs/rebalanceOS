@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.97.1] - 2026-10-02
+
+### Fixed
+
+- Fleet configuration failures return structured publishing/sync errors and explicit doctor failures, preserving unrelated scheduler liveness checks. Missing targets fail validation before writes.
+- The collector refuses failed network-budget initialization. Valid delivery behavior and schedules remain unchanged; the Studio receipt and rollout lessons are recorded under GH-282.
+
 ## [0.97.0] - 2026-10-02
 
 ### Added

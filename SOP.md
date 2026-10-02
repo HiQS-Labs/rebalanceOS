@@ -373,3 +373,12 @@ A successful local render waiting for the next collector delivery intentionally 
 doctor WARN (`queued, awaiting collector`). Warning-level health triage may report it during that
 window. Observe the installed collector phase across three real intervals before changing alert
 policy; this warning does not mean the render failed or its queued commit was lost.
+
+Studio activation lessons: bootstrap all known preserved CLIO origins once with explicit origin
+selection, then configure normal exports for the local owner only. Imported records must never
+be echoed by routine exports. The first upgraded collector heartbeat advertises fleet mode; an
+old unmarked heartbeat still uses legacy health until that delivery. Verify queue-to-delivered
+health after this first check-in, not before it. Test missing/mismatched settings as well as valid
+configuration: a refusal must return a structured error or doctor configuration failure, with no
+Git writes. Briefly unload only loaded local delivery jobs, then restore the identical plists.
+Keep capture and same-note export running, and verify preserved record payloads as well as counts.

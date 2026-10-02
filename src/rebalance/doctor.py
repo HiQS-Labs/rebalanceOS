@@ -813,18 +813,24 @@ def _check_scheduler_liveness(
         return [Check("scheduler state", WARN, "undetermined")]
 
     loaded = _loaded_rebalance_labels(launchctl_output)
-    current_device_id = current_device_id or _local_device_id()
+    checks: list[Check] = []
+    try:
+        current_device_id = current_device_id or _local_device_id()
+    except (ValueError, OSError) as exc:
+        checks.append(Check("scheduler fleet configuration", FAIL, str(exc)))
+        current_device_id = None
     if agents_dir is None:
         agents_dir = Path.home() / "Library" / "LaunchAgents"
-    checks: list[Check] = []
     for job in jobs:
         if f"com.rebalance-os.{job}" not in loaded:
             name = f"scheduler:{job}"
-            other_device = _other_device_check(
-                name,
-                _DEVICE_SCOPE_REGISTRY.get(("scheduler", job)),
-                current_device_id,
-            )
+            scope = _DEVICE_SCOPE_REGISTRY.get(("scheduler", job))
+            if current_device_id is None:
+                if scope is not None:
+                    continue  # Ownership is unknown; unscoped liveness still matters.
+                other_device = None
+            else:
+                other_device = _other_device_check(name, scope, current_device_id)
             if other_device is not None:
                 checks.append(other_device)
                 continue
@@ -1889,7 +1895,10 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
     except Exception:  # noqa: BLE001 — doctor must never crash
         return []
 
-    current_device_id = current_device_id or _local_device_id()
+    try:
+        current_device_id = current_device_id or _local_device_id()
+    except (ValueError, OSError) as exc:
+        return [Check("fleet configuration", FAIL, str(exc))]
     checks: list[Check] = []
     for health in devices:
         # Every pulse row is a report about its own collector device.  The

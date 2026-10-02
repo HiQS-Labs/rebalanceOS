@@ -2095,10 +2095,13 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     target_repo = Path(pulse_target).expanduser().resolve()
     sync_subdir = get_sync_subdir()
     sync_dir = target_repo / sync_subdir
-    device_id = get_device_id()
     from rebalance.lib.git_ops import fleet_settings
 
-    fleet = fleet_settings(cfg)
+    try:
+        device_id = get_device_id()
+        fleet = fleet_settings(cfg)
+    except (ValueError, OSError) as exc:
+        return {"scope": "sync", "dry_run": dry_run, "error": f"fleet configuration invalid: {exc}"}
 
     if dry_run:
         return {
@@ -2107,7 +2110,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"publish this device calendar/email files and latest pointers → {target_repo}",
+                f"publish this device calendar/email files{'' if fleet else ' and latest pointers'} → {target_repo}",
             ],
         }
 

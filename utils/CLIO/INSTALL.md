@@ -498,3 +498,7 @@ and stages only devices/<UUID>/clio.jsonl. Imported origins stay in private SQLi
 SOP's GH-282 deployment/rollback steps; preserve full history, verified DB/note backups, personal
 header, same Obsidian filename and unchanged exporter schedule. Do not re-enable other Macs until
 their per-installation source inventory and shared-note recovery pilot checks pass.
+
+### Local fleet activation milestone
+
+The Studio activation of Rebalance #303 and canonical CLIO #5 is verified in the GH-282 deployment receipt. This establishes local render, scheduled collector delivery, committed-history reconcile and the SAME seven-day note/header; it does not qualify four-Mac or disconnected/rejoin operation. Bootstrap known preserved origins once explicitly, then export only each device owner. Keep the private SQLite/WAL local, update a copied collector as well as its runtime checkout, and restore existing delivery plists without changing intervals. Configuration failures must refuse before writes and surface as configuration failures; old unmarked collector metadata uses legacy health until the first upgraded check-in. Other Macs stay disabled pending individual installation and the tracked live pilot.

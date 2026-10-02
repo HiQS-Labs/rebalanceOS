@@ -41,11 +41,11 @@
 .................................                                        [100%]
 =============================== warnings summary ===============================
 tests/test_portfolio_matrix.py:8
-  /Users/noelsaw/task-clones/rebalanceos-gh282-fleet/temp/gh282-qa-fixes-verification/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  <TASK_CLONE>/temp/gh282-qa-fixes-verification/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient
 
 ../../../../rebalance-runtime/.venv/lib/python3.14/site-packages/starlette/testclient.py:53
-  /Users/noelsaw/rebalance-runtime/.venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+  <RUNTIME>/.venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
     _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html

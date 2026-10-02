@@ -1,0 +1,5 @@
+FAIL missing target returns config result: TypeError
+FAIL publisher mismatch returns error before Git: ValueError
+FAIL sync invalid identity returns structured error: ValueError
+FAIL scheduler doctor reports invalid fleet identity: ValueError
+FAIL fleet doctor reports missing config: OSError
