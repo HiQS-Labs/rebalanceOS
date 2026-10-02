@@ -198,4 +198,12 @@ measures it is already open in the plan.
 
 Relay closed (Approved), no further turn needed. Carry new finding 1 into the Studio activation check.
 
+
+### Attestation · relay-drive — 2026-10-02T19:53:05Z
+task: REBALANCE-GH282-IMPLEMENTATION-FABLE-R2
+reviewer: claude
+status: Approved
+reviewed-head: 9719f95e2fa389f45866b1f5e0b0024a5498a101
+added-range: 7988+8573
+added-sha256: 9c44086302a8306449dfd029416d78d42eaf12f56a5d40fed5068eaa3db7a129
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
