@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import time
 import urllib.parse
@@ -854,6 +855,10 @@ def _commit_and_push_if_changed_locked(
     replaceable: bool = False,
 ) -> dict[str, Any]:
     """Write *new_content* to file_rel inside *target_repo*; commit+push only if changed."""
+    from rebalance.lib.git_ops import fleet_settings
+
+    if fleet_settings():
+        push = False
     error = publication_state_error(target_repo, [file_rel])
     if error:
         return {"wrote_file": False, "committed": False, "pushed": False, "git_error": error}
@@ -939,7 +944,7 @@ def _verify_remote_content(target_repo: Path, file_rel: str, expected: str) -> b
 # ---------------------------------------------------------------------------
 
 
-def publish_pulse(
+def _publish_pulse(
     database_path: Path,
     *,
     dry_run: bool = False,
@@ -952,6 +957,12 @@ def publish_pulse(
     """
     started = time.monotonic()
     cfg = get_pulse_config()
+    from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+
+    fleet = fleet_settings(cfg)
+    file_rel = fleet_output_path(cfg, "live-pulse.md") if fleet else cfg.get("pulse_filename") or "live-pulse.md"
+    if fleet:
+        push = False
     missing = [k for k in ("github_login", "pulse_target_path") if not cfg.get(k)]
     if missing:
         return {
@@ -999,7 +1010,7 @@ def publish_pulse(
         git_result = _commit_and_push_if_changed(
             replaceable=True,
             target_repo=target_path,
-            file_rel=cfg.get("pulse_filename") or "live-pulse.md",
+            file_rel=file_rel,
             new_content=markdown,
             push=push,
             commit_message=commit_message,
@@ -1012,7 +1023,7 @@ def publish_pulse(
         "timezone": snapshot.timezone_name,
         "github_login": snapshot.github_login,
         "target_path": str(target_path),
-        "target_filename": cfg.get("pulse_filename") or "live-pulse.md",
+        "target_filename": file_rel,
         "counts": {
             "today_commits": len(snapshot.today.gh_commits),
             "today_items": len(snapshot.today.gh_items),
@@ -1029,3 +1040,82 @@ def publish_pulse(
         "git": git_result,
         "elapsed_seconds": round(time.monotonic() - started, 2),
     }
+
+
+def publish_pulse(database_path: Path, *, dry_run: bool = False, push: bool = True) -> dict[str, Any]:
+    """Render/queue the device page and record its attempt under the common lock."""
+    from rebalance.lib.git_ops import fleet_settings
+    from rebalance.lib.time_ops import now_iso
+
+    cfg = get_pulse_config()
+    try:
+        fleet = fleet_settings(cfg)
+    except (ValueError, OSError) as exc:
+        return {"ok": False, "error": str(exc)}
+    try:
+        result = _publish_pulse(database_path, dry_run=dry_run, push=push)
+    except Exception:
+        if not fleet or dry_run:
+            raise
+        result = {"ok": False, "error": "pulse render failed; inspect scheduler log", "render_error": True}
+    if not fleet or dry_run or (result.get("git") or {}).get("deferred"):
+        return result
+    target = Path(cfg["pulse_target_path"]).expanduser().resolve()
+    relative = f"devices/{fleet['device_id']}/status/pulse-sync.json"
+    git = result.get("git") or {}
+    exit_code = 70 if result.get("render_error") else 1 if not result.get("ok") else 2 if git.get("git_error") else 0
+    try:
+        with git_publish_lock(target):
+            status_path = target / relative
+            previous = json.loads(status_path.read_text()) if status_path.exists() else {}
+            if not isinstance(previous, dict):
+                raise ValueError("invalid owned pulse status; retained for repair")
+            stamp = now_iso()
+            status = {
+                "schema_version": 1,
+                "device_id": fleet["device_id"],
+                "job": "pulse-sync",
+                "last_attempt_utc": stamp,
+                "last_exit": exit_code,
+                "last_render_success_utc": stamp if exit_code == 0 else previous.get("last_render_success_utc"),
+                "payload_path": f"devices/{fleet['device_id']}/live-pulse.md",
+                "payload_sha256": result.get("markdown_sha256") if exit_code == 0 else previous.get("payload_sha256"),
+            }
+            error = publication_state_error(target, [relative])
+            if error:
+                raise ValueError(error)
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(json.dumps(status, sort_keys=True) + "\n")
+            receipt = publish_git_paths(target, [relative], "pulse: attempt status", push=False)
+            if receipt.get("git_error"):
+                result.setdefault("git", {}).update(receipt)
+    except (GitPublishLockError, OSError, ValueError, *GitSubprocessError) as exc:
+        result["status_error"] = str(exc)
+        if isinstance(exc, GitPublishLockBusy):
+            result.setdefault("git", {}).update(deferred=True, git_error=str(exc))
+        else:
+            result.setdefault("git", {}).update(git_error=f"pulse status failed: {exc}", pending=True)
+    try:
+        result["fleet_markdown"] = fleet_view(target)
+    except (ValueError, OSError, *GitSubprocessError):
+        result["fleet_view_error"] = "delivered fleet view unavailable"
+    return result
+
+
+def fleet_view(target_repo: Path) -> str:
+    """Read delivered per-device pages from the existing upstream, without writing."""
+    listing = run_git(target_repo, "ls-tree", "-r", "--name-only", "@{u}", "--", "devices", timeout=5)
+    if listing.returncode:
+        raise ValueError("fleet upstream unavailable")
+    pages = sorted(
+        p for p in listing.stdout.splitlines() if re.fullmatch(r"devices/[a-z0-9][a-z0-9-]{0,63}/live-pulse\.md", p)
+    )
+    if len(pages) > 32:
+        raise ValueError("fleet page limit exceeded")
+    blocks = ["# Fleet live pulse"]
+    for path in pages:
+        page = run_git(target_repo, "show", f"@{{u}}:{path}", timeout=5)
+        if page.returncode or len(page.stdout.encode()) > 4 * 1024 * 1024:
+            raise ValueError("fleet page unavailable or oversized")
+        blocks.append(f"## {path.split('/')[1]}\n\n{page.stdout}")
+    return "\n\n".join(blocks) + "\n"

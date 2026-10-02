@@ -1852,6 +1852,7 @@ def _check_auth_failures() -> list[Check]:
 # presentation needs are served without collapsing the source model.
 _PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
     # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
+    "ALIVE_NOT_PUBLISHING": (WARN, WARNING, "alive but not publishing"),
     "ALIVE": (OK, NOTICE, "collecting normally"),
     "STALE": (WARN, WARNING, "stale"),
     "ALERT": (WARN, ERROR, "not collecting"),
@@ -1929,6 +1930,8 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         _status, raw_severity, phrase = _map_pulse_state(state)
         qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
         detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
+        if health.pulse_delivery_reason:
+            detail += f", {health.pulse_delivery_reason}"
         if health.repo_scan_failures:
             detail += f", {health.repo_scan_failures} repo scan failures"
             if health.scan_failure_examples:

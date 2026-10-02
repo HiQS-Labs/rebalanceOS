@@ -17,7 +17,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -42,6 +42,7 @@ class DeviceStatus:
     repo_scan_failures: int = 0
     scan_failure_examples: str = ""
     notes: list[str] = field(default_factory=list)
+    fleet_delivery_problem: bool = False
 
 
 def parse_args() -> argparse.Namespace:
@@ -150,6 +151,8 @@ def classify(
         return 1, f"ALERT ({hours:.0f}h)"
     if hours > warn_hours:
         return 2, f"STALE ({hours:.1f}h)"
+    if status.fleet_delivery_problem:
+        return 2, f"ALIVE_NOT_PUBLISHING ({hours:.1f}h)"
     return 3, f"ALIVE ({hours:.1f}h)"
 
 
@@ -297,6 +300,23 @@ def main() -> int:
 
     now = datetime.now(timezone.utc)
     statuses = collect_statuses(sync_repo_dir, now)
+    try:
+        from rebalance.ingest.pulse_health import read_collector_health
+        fleet_health = {h.device_id: h for h in read_collector_health(sync_repo_dir, now)}
+        for status in statuses:
+            health = fleet_health.get(status.device_id)
+            if health and health.fleet_mode:
+                status.fleet_delivery_problem = health.state == "ALIVE_NOT_PUBLISHING"
+                if health.pulse_delivery_reason:
+                    status.notes.append(health.pulse_delivery_reason)
+    except ImportError:
+        # Standalone collectors remain supported. An opted-in fleet requires the
+        # canonical reader; never report healthy delivery without that evidence.
+        for status in statuses:
+            metadata = sync_repo_dir / "devices" / f"{status.device_id}.yaml"
+            if metadata.exists() and yaml_value(metadata, "fleet_mode") == "true":
+                status.fleet_delivery_problem = True
+                status.notes.append("verify fleet delivery with rebalance doctor")
     output, exit_code = render(
         statuses, now, args.warn_hours, args.alert_hours, sync_repo_dir
     )

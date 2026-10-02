@@ -10,6 +10,19 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.97.0] - 2026-10-02
+
+### Added
+
+- Opt-in fleet ownership: live pulse, daily logs and digests use distinct device paths; calendar/email snapshots retain their device paths without shared latest-pointer writes. Fleet views select delivered pages and validated snapshots on read.
+- Fleet producers queue exact local commits under the existing publication lock; the existing Git Pulse collector owns remote delivery, with bounded Git calls, jittered retries and a device stagger before lock acquisition. No new job, store or ledger writer.
+- Explicit canonical CLIO owner export/reconcile integration, preserving private full-history SQLite replicas and the same seven-day Obsidian note/exporter schedule.
+- Fleet health verifies upstream page/status evidence and reports alive-but-not-publishing instead of mistaking a fresh collector heartbeat for successful rendering.
+
+### Deployment
+
+- Fleet mode is optional and reversible; deploy only after verified runtime, collector, config, database and note backups. A copied git-pulse executable must be updated separately from the runtime checkout. Four-Mac/offline-rejoin and seven-day qualification remain open in GH-282.
+
 ## [0.96.1] - 2026-09-27
 
 ### Fixed

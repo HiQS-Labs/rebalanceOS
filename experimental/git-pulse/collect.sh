@@ -16,6 +16,61 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
+# Fleet mode is opt-in and preserves the existing launchd interval.
+: "${fleet_mode:=false}"
+: "${fleet_sync_subdir:=sync}"
+case "$fleet_mode" in true|false) ;; *) echo "Invalid fleet_mode" >&2; exit 1 ;; esac
+
+git_network() {
+    python3 - "$sync_repo_dir" "$@" <<'NETWORK'
+import os, signal, subprocess, sys, time
+try:
+    timeout = float(os.environ.get("REBALANCE_GIT_TIMEOUT", "120"))
+    remaining = float(os.environ["GIT_PULSE_NETWORK_DEADLINE"]) - time.monotonic()
+    if not 0 < timeout <= 600 or remaining <= 0:
+        raise ValueError("network deadline exhausted or invalid")
+    proc = subprocess.Popen(["git", "-C", sys.argv[1], *sys.argv[2:]], start_new_session=True)
+    try:
+        proc.wait(timeout=min(timeout, remaining))
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
+        print("Git error: network timeout; pending commits preserved", file=sys.stderr)
+        sys.exit(2)
+    sys.exit(proc.returncode)
+except (ValueError, OSError) as exc:
+    print("Git error: " + str(exc), file=sys.stderr)
+    sys.exit(2)
+NETWORK
+}
+
+push_current_branch() {
+    if git -C "$sync_repo_dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+        git_network push --quiet
+    else
+        git_network push --quiet -u origin HEAD
+    fi
+}
+
+push_with_retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        if push_current_branch; then return 0; fi
+        [ "$attempt" -lt 3 ] || break
+        python3 - <<'JITTER'
+import random, time
+time.sleep(random.uniform(2, 20))
+JITTER
+        pull_safely || return 2
+    done
+    echo "Git error: delivery pending after three attempts" >&2
+    return 2
+}
+
 sanitize_tag() {
     printf '%s' "$1" | sed -e "s/'//g" -e "s/’//g" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//'
 }
@@ -192,7 +247,7 @@ check_sync_repo() {
 
 pull_safely() {
     check_sync_repo || return 1
-    if git -C "$sync_repo_dir" -c rebase.autoStash=false pull --quiet --rebase; then
+    if git_network -c rebase.autoStash=false pull --quiet --rebase; then
         return 0
     fi
     local state
@@ -247,6 +302,7 @@ migrate_legacy_device_identity() {
 
     cat > "$new_metadata_file" <<METADATA
 schema_version: 2
+fleet_mode: "$fleet_mode"
 device_id: "$desired_device_id"
 hardware_uuid: "$(yaml_escape "$hardware_uuid")"
 device_name: "$(yaml_escape "$device_name")"
@@ -311,6 +367,26 @@ if [ ! -d "$sync_repo_dir/.git" ]; then
     exit 1
 fi
 
+if [ "$fleet_mode" = true ] && [ "${1:-}" != "--dry-run" ] && [ -z "${GIT_PULSE_LOCK_FD:-}" ]; then
+    # Delay BEFORE taking the shared lock, so local renderers can still commit.
+    python3 - "$device_id" "${fleet_stagger_max_seconds:-240}" "$fleet_sync_subdir" <<'STAGGER'
+import hashlib, re, sys, time
+from pathlib import PurePosixPath
+device, maximum, subdir = sys.argv[1:]
+if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", device):
+    sys.exit("Invalid fleet device identity")
+if PurePosixPath(subdir).is_absolute() or any(p in ("", ".", "..") for p in subdir.split("/")):
+    sys.exit("Invalid fleet snapshot subdirectory")
+maximum = int(maximum)
+if not 0 <= maximum <= 240:
+    sys.exit("Invalid fleet stagger cap")
+time.sleep(int(hashlib.sha256(device.encode()).hexdigest()[:8], 16) % (maximum + 1))
+STAGGER
+fi
+export GIT_PULSE_NETWORK_DEADLINE="$(python3 -c 'import time; print(time.monotonic() + 900)')"
+export GIT_PULSE_FLEET_MODE="$fleet_mode" GIT_PULSE_FLEET_SYNC_SUBDIR="$fleet_sync_subdir"
+export GIT_PULSE_CLIO_OWNER="${clio_owner_uuid:-}"
+
 # Same OS lock as Python publishers; inherited descriptor spans the entire run.
 # No Rebalance installation is required on a standalone collector device.
 if [ "${1:-}" != "--dry-run" ] && [ -z "${GIT_PULSE_LOCK_FD:-}" ]; then
@@ -374,7 +450,7 @@ repos_skipped_unborn=0
 repo_scan_failures=0
 failed_repos=()
 
-for repo_path in "${repos[@]}"; do
+for repo_path in ${repos[@]+"${repos[@]}"}; do
     repo_count=$((repo_count + 1))
     if [ ! -d "$repo_path/.git" ]; then
         echo "Skipping $repo_path: not a git repo" >&2
@@ -498,16 +574,81 @@ fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 owned = {f"pulse-{d}.md" for d in (device, previous)} | {f"devices/{d}.yaml" for d in (device, previous)} | {f"pdda/registry-{device}.tsv"}
 changed = set(git("diff", "--name-only", "-z").split("\0")) | set(git("diff", "--cached", "--name-only", "-z").split("\0"))
 changed.discard("")
-foreign = {p for p in changed if p not in owned and not p.startswith("snapshots/")}
+from pathlib import Path
+import re, uuid
+fleet = os.environ.get("GIT_PULSE_FLEET_MODE") == "true"
+owner = os.environ.get("GIT_PULSE_CLIO_OWNER", "")
+if owner:
+    if not fleet or str(uuid.UUID(owner)) != owner:
+        sys.exit("Invalid configured CLIO owner UUID or fleet mode")
+    owned.add(f"devices/{owner}/clio.jsonl")
+def is_owned(path):
+    return path in owned or path.startswith("snapshots/") or (fleet and
+        (path.startswith(f"devices/{device}/") or path in
+         {f"{os.environ['GIT_PULSE_FLEET_SYNC_SUBDIR']}/{source}/{device}.json" for source in ("calendar", "email")}))
+for base in ([f"devices/{device}"] if fleet else []) + ([f"devices/{owner}"] if owner else []):
+    current = Path(repo)
+    for part in Path(base).parts:
+        current = current / part
+        if current.is_symlink():
+            sys.exit("Publication blocked: symlink in owned namespace")
+    if current.exists() and any(p.is_symlink() for p in current.rglob("*")):
+        sys.exit("Publication blocked: symlink in owned namespace")
+if fleet:
+    changed.update(p for p in git("ls-files", "--others", "--exclude-standard", "-z").split("\0") if p and is_owned(p))
+foreign = {p for p in changed if not is_owned(p)}
+for path in changed:
+    current = Path(repo)
+    for part in Path(path).parts:
+        current = current / part
+        if current.is_symlink():
+            sys.exit("Publication blocked: symlink in owned output")
+    if not (Path(repo) / path).resolve().is_relative_to(Path(repo).resolve()):
+        sys.exit("Publication blocked: owned output escapes checkout")
 if foreign:
     sys.exit("Publication blocked: unrelated dirty paths: " + ", ".join(sorted(foreign)))
 if changed:
     subprocess.run(["git", "-C", repo, "add", "--", *sorted(changed)], check=True)
     subprocess.run(["git", "-C", repo, "commit", "--only", "-m", "fleet: preserve pending output", "--", *sorted(changed)], check=True)
 PREPARE
-pull_safely
-# Retry previous delivery before appending another heartbeat.
-git -C "$sync_repo_dir" push --quiet
+pull_safely || exit 2
+# Deliver pending history before generating another batch.
+push_with_retry || exit 2
+
+if [ -n "${clio_owner_uuid:-}" ]; then
+    python3 - "$sync_repo_dir" "${clio_store_path:?Configure clio_store_path}" "${clio_database:?Configure clio_database}" "$clio_owner_uuid" "$CONFIG_DIR" <<'CLIO_EXPORT'
+import importlib.util, os, subprocess, sys, tempfile
+from pathlib import Path
+repo, helper, database, owner, private_dir = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("clio_owner_export", helper)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with tempfile.TemporaryDirectory(prefix="clio-export-", dir=private_dir) as scratch:
+    output = Path(scratch) / "owner.jsonl"
+    subprocess.run([sys.executable, helper, "--db", database, "export-device", str(output)],
+                   check=True, timeout=90, stdout=subprocess.DEVNULL)
+    if output.stat().st_size > 64 * 1024 * 1024:
+        sys.exit("CLIO export too large; prior snapshot retained")
+    raw = output.read_bytes()
+    _, rows = module.snapshot_records(raw, expected_owner=owner)
+    target = Path(repo) / "devices" / owner / "clio.jsonl"
+    current = Path(repo)
+    for part in target.relative_to(Path(repo)).parts:
+        current = current / part
+        if current.is_symlink():
+            sys.exit("CLIO publication blocked: symlink in owner output")
+    if not target.resolve().is_relative_to(Path(repo).resolve()):
+        sys.exit("CLIO publication blocked: owner output escapes checkout")
+    if target.exists() and target.stat().st_size > 64 * 1024 * 1024:
+        sys.exit("CLIO prior snapshot too large; retained")
+    if target.exists():
+        _, previous = module.snapshot_records(target.read_bytes(), expected_owner=owner)
+        if not {row["record_id"] for row in previous} <= {row["record_id"] for row in rows}:
+            sys.exit("CLIO export regressed; prior snapshot retained")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    module.atomic(target, raw)
+CLIO_EXPORT
+fi
 
 if [ "$DRY_RUN" -eq 0 ] && [ "$should_migrate_device_id" -eq 1 ] && [ -n "$configured_device_id" ]; then
     migrate_legacy_device_identity "$configured_device_id" "$desired_device_id"
@@ -529,6 +670,7 @@ if [ "$repo_scan_failures" -gt 0 ]; then
 fi
 cat > "$DEVICE_METADATA_FILE" <<METADATA
 schema_version: 2
+fleet_mode: "$fleet_mode"
 device_id: "$device_id"
 hardware_uuid: "$(yaml_escape "$hardware_uuid")"
 device_name: "$(yaml_escape "$device_name")"
@@ -598,6 +740,14 @@ append_stage_path "devices/$device_id.yaml"
 # Guard the file — it only exists on devices with PDDA installed — and stage just this one
 # per-device file, not the whole pdda/ dir, so the projection rides the normal pulse commit.
 [ -f "$sync_repo_dir/pdda/registry-$device_id.tsv" ] && append_stage_path "pdda/registry-$device_id.tsv"
+if [ "$fleet_mode" = true ]; then
+    [ -d "$sync_repo_dir/devices/$device_id" ] && append_stage_path "devices/$device_id"
+    for source in calendar email; do
+        own_snapshot="$fleet_sync_subdir/$source/$device_id.json"
+        [ -f "$sync_repo_dir/$own_snapshot" ] && append_stage_path "$own_snapshot"
+    done
+fi
+[ -n "${clio_owner_uuid:-}" ] && [ -f "$sync_repo_dir/devices/$clio_owner_uuid/clio.jsonl" ] && append_stage_path "devices/$clio_owner_uuid/clio.jsonl"
 git add -A -- "${stage_paths[@]}"
 if ! git diff --cached --quiet -- "${stage_paths[@]}"; then
     if [ "${#new_entries[@]}" -gt 0 ]; then
@@ -607,24 +757,12 @@ if ! git diff --cached --quiet -- "${stage_paths[@]}"; then
     fi
 fi
 
-push_current_branch() {
-    if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-        git push --quiet
-    else
-        git push --quiet -u origin HEAD
-    fi
-}
-
-# One retry on push race (peer pushed between our pull and push).
-if ! push_current_branch 2>/dev/null; then
-    pull_safely
-    push_current_branch
-fi
+push_with_retry || exit 2
 
 # Do not acknowledge until this exact local history is visible upstream.
 git merge-base --is-ancestor HEAD '@{u}' || {
     echo "Publication pending: upstream does not contain local HEAD." >&2
-    exit 1
+    exit 2
 }
 
 # Only advance last-run when every watched repo scan succeeded.

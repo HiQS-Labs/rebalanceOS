@@ -29,6 +29,61 @@ __all__ = [
     "should_descend",
 ]
 
+
+def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | None:
+    """Validate fleet ownership against the existing collector's literal config.
+
+    No shell evaluation: opt-in requires an already canonical, stable collector ID.
+    """
+    if config is None:
+        from rebalance.ingest.config import get_pulse_config
+
+        config = get_pulse_config()
+    if not config.get("pulse_fleet_enabled"):
+        return None
+    directory = Path(
+        os.environ.get("GIT_PULSE_CONFIG_DIR")
+        or os.environ.get("GIT_HISTORY_CONFIG_DIR")
+        or (Path.home() / ".config/git-pulse")
+    )
+    values = {}
+    for line in (directory / "config.sh").read_text().splitlines():
+        match = re.fullmatch(r"\s*(?:export\s+)?(device_id|fleet_mode|fleet_sync_subdir|sync_repo_dir)=(.*)", line)
+        if match:
+            words = shlex.split(match[2], comments=True)
+            if len(words) != 1:
+                raise ValueError("fleet collector configuration must use literal values")
+            values[match[1]] = words[0]
+    device = values.get("device_id", "")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", device) or device != config.get("pulse_device_id"):
+        raise ValueError("fleet device ID missing, unsafe or different from collector; finish identity migration first")
+    if values.get("fleet_mode") != "true":
+        raise ValueError("fleet collector mode must be enabled before Python producers")
+    subdir = str(config.get("sync_subdir") or "sync")
+    if (
+        Path(subdir).is_absolute()
+        or any(part in (".", "..") for part in subdir.split("/"))
+        or not subdir
+        or values.get("fleet_sync_subdir", "sync") != subdir
+    ):
+        raise ValueError("fleet snapshot subdirectory missing, unsafe or different from collector")
+    target = str(values.get("sync_repo_dir") or directory / "repo")
+    target = target.replace("${CONFIG_DIR}", str(directory)).replace("$CONFIG_DIR", str(directory))
+    if "$" in target or Path(target).expanduser().resolve() != Path(config["pulse_target_path"]).expanduser().resolve():
+        raise ValueError("fleet collector checkout differs from pulse_target_path")
+    return {"device_id": device, "sync_subdir": subdir}
+
+
+def fleet_output_path(config: dict[str, Any], relative: str) -> str:
+    """Keep legacy paths when off; put generated output under this device when on."""
+    fleet = fleet_settings(config)
+    if not fleet:
+        return relative
+    if Path(relative).is_absolute() or any(p in ("", ".", "..") for p in relative.split("/")):
+        raise ValueError("fleet output must be a relative path inside the device namespace")
+    return f"devices/{fleet['device_id']}/{relative}"
+
+
 GitSubprocessError = (subprocess.SubprocessError, subprocess.TimeoutExpired)
 
 
@@ -441,12 +496,23 @@ def publish_git_paths(
     timeout: float | None = None,
     resolve_conflicts: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
-    """Commit exact owned paths, deliver once plus one race retry, under caller lock.
+    """Commit exact owned paths, deliver with at most three attempts, under caller lock.
 
     Git commits are the durable pending output. No model, stash or reset is used.
     Foreign staged changes are refused even though --only also bounds the commit.
     """
     effective_timeout = _default_git_timeout(120.0) if timeout is None else timeout
+    from rebalance.ingest.config import get_pulse_config
+
+    cfg = get_pulse_config()
+    fleet = (
+        fleet_settings(cfg)
+        if cfg.get("pulse_fleet_enabled")
+        and Path(cfg.get("pulse_target_path") or "").expanduser().resolve() == repo_path.resolve()
+        else None
+    )
+    if fleet:
+        push = False
     error = publication_state_error(repo_path, paths)
     if error:
         return {"committed": False, "pushed": False, "git_error": error}
@@ -466,14 +532,23 @@ def publish_git_paths(
                 return {"committed": False, "pushed": False, "git_error": proc.stderr.strip()}
         result: dict[str, Any] = {"committed": committed, "pushed": False}
         if not push:
+            if fleet:
+                result["queued"] = True
             return result
-        proc = run_git(repo_path, "push", timeout=effective_timeout)
-        if proc.returncode and ("rejected" in proc.stderr or "fetch first" in proc.stderr):
-            result["repair_log"] = ["one bounded pull/rebase and push retry"]
-            proc = git_pull_rebase_safe(repo_path, timeout=effective_timeout, resolve_conflicts=resolve_conflicts)
+        import random
+
+        for attempt in range(3):
+            proc = run_git(repo_path, "push", timeout=effective_timeout)
             if proc.returncode == 0:
-                proc = run_git(repo_path, "push", timeout=effective_timeout)
-                result["repaired"] = proc.returncode == 0
+                break
+            if attempt == 2 or not ("rejected" in proc.stderr or "fetch first" in proc.stderr):
+                break
+            time.sleep(random.uniform(2, 20))
+            result.setdefault("repair_log", []).append("bounded jittered pull/rebase and push retry")
+            proc = git_pull_rebase_safe(repo_path, timeout=effective_timeout, resolve_conflicts=resolve_conflicts)
+            if proc.returncode:
+                break
+            result["repaired"] = True
         if proc.returncode:
             result.update(git_error=proc.stderr.strip() or proc.stdout.strip(), pending=True)
             return result

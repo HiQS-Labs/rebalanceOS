@@ -2096,6 +2096,9 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     sync_subdir = get_sync_subdir()
     sync_dir = target_repo / sync_subdir
     device_id = get_device_id()
+    from rebalance.lib.git_ops import fleet_settings
+
+    fleet = fleet_settings(cfg)
 
     if dry_run:
         return {
@@ -2117,13 +2120,13 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             owned = [
                 f"{sync_subdir}/{source}/{name}.json"
                 for source in ("calendar", "email")
-                for name in (device_id, "latest")
+                for name in ((device_id,) if fleet else (device_id, "latest"))
             ]
             error = publication_state_error(target_repo, owned)
             if error:
                 return {"scope": "sync", "dry_run": False, "error": error, "deferred": True}
             pending = run_git(target_repo, "log", "--format=%H", "@{u}..HEAD", "--", *owned)
-            if pending.returncode == 0 and pending.stdout:
+            if not fleet and pending.returncode == 0 and pending.stdout:
                 delivery = commit_and_push_sync(
                     target_repo, sync_subdir, device_id=device_id, generated_at="pending", lock_acquired=True
                 )
@@ -2151,6 +2154,9 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "deferred": True,
             "elapsed_seconds": round(time.monotonic() - started, 2),
         }
+
+    if git_result.get("git_error"):
+        return {"scope": "sync", "dry_run": False, "error": git_result["git_error"], "git": git_result}
 
     return {
         "scope": "sync",
