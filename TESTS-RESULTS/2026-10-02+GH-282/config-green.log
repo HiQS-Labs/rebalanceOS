@@ -1,0 +1,5 @@
+PASS missing target returns config result
+PASS publisher mismatch returns error before Git
+PASS sync invalid identity returns structured error
+PASS scheduler doctor reports invalid fleet identity
+PASS fleet doctor reports missing config

@@ -1,0 +1,2 @@
+Baseline bb84cd0: forced Python deadline initialization failure was masked by export, exit 0.
+Fixed 16582d2: same failure exits 1 before export or Git operations.
