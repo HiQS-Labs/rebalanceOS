@@ -109,4 +109,12 @@ Pre-existing defects in the touched functions beyond the two Nits above: none fo
 
 Relay closed (Approved), no further turn needed. Producer: record the `mypy src/`, ruff and `frontdoor-check.sh` receipts for the final head alongside the existing logs before claiming qualification.
 
+
+### Attestation · relay-drive — 2026-10-02T22:53:28Z
+task: GH305-STUDIO-FABLE-R2
+reviewer: claude
+status: Approved
+reviewed-head: 072adb2898b870f3aca807f061b6b03104ea4397
+added-range: 7391+5900
+added-sha256: b9ec5837b48def61154084277c4f2ec3abc88d5fd496e82f5f9d43b45090bb8a
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
