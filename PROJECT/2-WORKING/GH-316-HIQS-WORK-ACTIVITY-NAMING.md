@@ -2,7 +2,7 @@
 gh_issue: 316
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/316
 title: "Rename the work-activity signal to \"HiQS work activity\" (labels + namespace) with a backwards-compatibility adapter"
-status: In progress — plan QA approved (round 1 corrections applied); implementation done, final QA pending
+status: Implemented — double-relay QA complete (plan r1 + final r2/r3); PR ready, awaiting merge
 created: 2026-10-03
 updated: 2026-10-03
 owner: Noel (start-task)
@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA round 1 (CHANGES) adjudicated: all three shoulds accepted; adapter approved as designed. Implementation complete — Python + MCP adapter, labels, docs, parity test (red-first), 0.98.1. | Full gate once, final Codex QA on the diff, then PR. |
+| Full gate run once (2,651 passed; 2 failures both non-code: one device-environment test reproducing on `development`, one doc-links hit from the raw consult transcript — fixed by fenced retention). Final Codex QA r2 found two omissions (manifest metadata, date-sensitive fixture) — fixed; r3 confirmation **APPROVE** on `d3ccc2f`. | PR ready; merge handoff. |
 
 Rating: **rated 55/15/50/55**.
 - **Priority 55:** user-directed; aligns code vocabulary with marketing (HiQS = High Quality Signals); newer work (#315) already adopts the term organically.
@@ -93,3 +93,21 @@ Rating: **rated 55/15/50/55**.
 | 7 | [Nit] Frontmatter status contradicted the status table. | Fixed (this revision). |
 
 Round 2 not required: the reviewer's recommendation pre-approved the corrections; no scope, architecture, or risk changed.
+
+**Final code QA, round 2** (Codex `gpt-6-astra`, HEAD 61c431f): verdict CHANGES — "the adapter is correct; fix two small omissions before approval."
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | [Should] `manifest.json` tools metadata still advertised only `github_balance` / "GitHub activity balance". | **Accepted.** Canonical `hiqs_work_activity` entry added; alias entry marked deprecated. |
+| F2 | [Should] Parity fixture used fixed 2026-10-01 dates against the real clock — idle from Nov 1 without a regression. | **Accepted.** Fixture dates generated as `date.today() - timedelta(days=1)`, parameterized INSERT. |
+| 3-5 | [Pass] Adapter boundaries, parity-test strength, scope. | Noted. |
+
+Round-2 fixes applied (commit `7d0e5e0`), focused checks rerun green.
+
+**Final confirmation, round 3** (Codex, HEAD `d3ccc2f`): **APPROVE — satisfies both round-2 conditions; no further changes required.** Verdicts and transcripts retained verbatim (fenced) under `TESTS-RESULTS/2026-10-03+GH-316/qa/`.
+
+## Gate receipts
+
+- Focused: `test_hiqs_work_activity_alias` (2, red-first) + `test_mcp_probe` + `test_queries_mirror_invariance` + `test_github_readiness` + `test_doc_links` — green.
+- Full suite (once, on the implementation commit): 2,651 passed / 2 failed — both non-code: `test_doctor_scheduled_stack::test_declared_root_overrides_running_checkout` reproduces on unchanged `development` (device-environment, pre-existing); `test_doc_links::test_repo_is_clean` failed on the raw consult transcript left at repo root — fixed by fenced retention, 9/9 green after.
+- Ratchets: read-layer clean (52 sites), script-inventory clean; ruff format/check + mypy clean; `pdda.sh run` 25 observe-mode errors, all pre-existing on unrelated docs, none referencing GH-316.
