@@ -309,6 +309,8 @@ def github_close_loop_cmd(
             kind = "PR" if item["item_type"] == "pull_request" else "Issue"
             typer.echo(f"  - {kind} #{item['number']} {item['title']}")
             typer.echo(f"      {item['evidence']}")
+        if len(items) > 15:
+            typer.echo(f"  … and {len(items) - 15} more (use --output json for the full list)")
     typer.echo("\nCounts are lower bounds: only items inside the local sync window are visible.")
 
 

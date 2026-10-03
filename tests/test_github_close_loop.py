@@ -191,6 +191,10 @@ class CloseLoopFlagTests(unittest.TestCase):
             # A malformed issue creation time cannot prove order either.
             _item(conn, "issue", 223, state="closed", state_reason="completed", created="garbage", closed=FRESH)
             _commit(conn, "c7", "Fixes #223")
+            # A letter-suffixed reference (GH-225a) is not issue 225 — same
+            # boundary rule as the branch-name regex.
+            _item(conn, "issue", 225, state="closed", state_reason="completed", closed=FRESH)
+            _commit(conn, "c8", "refs GH-225a rename")
             conn.commit()
         flagged = self._flagged(
             infer_close_loop_flags(self.db_path, REPO, since_days=15, now=NOW), "closed_without_delivery"
@@ -198,6 +202,7 @@ class CloseLoopFlagTests(unittest.TestCase):
         self.assertNotIn(221, flagged)
         self.assertIn(222, flagged)
         self.assertIn(223, flagged)
+        self.assertIn(225, flagged)
 
     def test_readiness_reader_default_still_filters_to_milestone(self) -> None:
         _seed(self.db_path)
@@ -225,6 +230,29 @@ class CloseLoopFlagTests(unittest.TestCase):
                 "started_not_shipped",
             },
         )
+
+    def test_cli_text_truncation_hints_at_overflow(self) -> None:
+        _seed(self.db_path)  # 4 closed_without_delivery flags already seeded
+        with db_connection(self.db_path, ensure_github_schema) as conn:
+            for number in range(301, 317):  # 16 more -> 20 total, 15 shown
+                _item(conn, "issue", number, state="closed", state_reason="completed", closed=FRESH)
+            conn.commit()
+        result = CliRunner().invoke(
+            app,
+            [
+                "github-close-loop",
+                "--repo",
+                REPO,
+                "--database",
+                str(self.db_path),
+                "--output",
+                "text",
+                "--since-days",
+                "15",
+            ],
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("… and 5 more", result.output)
 
 
 if __name__ == "__main__":

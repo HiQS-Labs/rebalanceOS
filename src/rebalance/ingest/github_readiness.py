@@ -490,7 +490,7 @@ def infer_close_loop_flags(
     for issue, closed_age in candidates:
         number = int(issue["number"])
         created = parse_utc_iso(issue.get("created_at"))
-        ref_re = re.compile(rf"(?:#|\bGH-){number}(?!\d)", re.IGNORECASE)
+        ref_re = re.compile(rf"(?:#|\bGH-){number}(?![0-9a-z])", re.IGNORECASE)
         delivered = False
         for commit in commits:
             if not ref_re.search(commit.get("message") or ""):
@@ -530,7 +530,7 @@ def infer_close_loop_flags(
             "started_not_shipped",
             issue,
             "issue",
-            f"Branch `{branch_by_issue[number]}` exists but no PR links or uses it; issue idle {age:.0f} days.",
+            f"Branch `{branch_by_issue[number]}` exists in the local corpus but no PR links or uses it; issue idle {age:.0f} days.",
         )
 
     order = {flag: i for i, flag in enumerate(CLOSE_LOOP_FLAGS)}

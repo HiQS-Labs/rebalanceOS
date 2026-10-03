@@ -89,6 +89,7 @@ Rating: **rated 65/35/50/75**.
 - **Sync window:** items outside the synced window are invisible, so flags are lower bounds. This is stated in the CLI text output.
 - **Direct-commit provenance:** `github_direct_commits` keeps one row per repo and SHA, and `ref` is the last push ref observed, so default-branch evidence is best-effort. A wrong ref can only flip a confirm-only flag. Per-ref provenance would need a schema change and is deferred.
 - **Closed-without-delivery precision:** cross-repo or squash-without-reference deliveries still false-flag. Evidence asks for confirmation, and the #300 operator spot-check (at least 70% useful) decides whether to tighten the rule.
+- **Branch staleness:** `github_branches` is insert-or-replace per repo and branch name and never prunes upstream deletions, so `started_not_shipped` can name a branch that has since been deleted. Its evidence says "in the local corpus" for this reason; disproving it live is one `ls-remote` away.
 - **Rollback:** the change is purely additive (a new function, a new command, and an opt-in keyword). Revert the PR.
 
 ## Tests and gate
@@ -138,3 +139,5 @@ Rating: **rated 65/35/50/75**.
 **Final code QA, round 2** (HEAD 64848a2): **VERDICT: APPROVE**. F1–F3 were confirmed resolved, and no new blocker was found.
 
 **Post-QA gate fix:** the banned-imports ratchet flagged the new `datetime` import. A reasoned `CANONICAL-PATH-OK` pragma was added, matching the `clio_journey.py` precedent. The change is a comment only, so there is no behaviour change and no re-review.
+
+**Peer review, PR #308** (2026-10-02, ground-truth review on a disposable full clone + a consistent snapshot of this device's 5.17 GB corpus): **verdict Approved, zero blockers**. Every flag rule was cross-checked against raw SQL over the corpus and live GitHub (PR #294 failing check, issues #288/#270/#277 with no closing PRs, branch `review/gh562-agy-qa` live on the remote, PR #308→issue #307 link suppression); three mutation controls went RED; full suite 2,649 passed / 1 failed with the failure reproduced identically on unchanged `development`; read-layer and script-inventory ratchets clean; `pdda.sh run` shows nothing new for GH-307. Two shoulds and two nits were resolved on the branch: the commit-reference lookahead tightened to `(?![0-9a-z])` (matching the branch regex, edge test added red-first), `started_not_shipped` evidence qualified as corpus-local plus this Risks entry, a text-output overflow hint with test, and the measurements published under [TESTS-RESULTS/2026-10-02+GH-307/](../../TESTS-RESULTS/2026-10-02+GH-307/).
