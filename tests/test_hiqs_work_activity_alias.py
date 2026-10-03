@@ -38,7 +38,10 @@ FROZEN_OUTPUT_KEYS = {
 
 def _call(server, name: str, args: dict):
     """Invoke an MCP tool; FastMCP emits one JSON text block per list item."""
-    content, _ = asyncio.run(server.call_tool(name, args))
+    result = asyncio.run(server.call_tool(name, args))
+    # mcp>=1.9.4 returns (content, structured); 1.9.4 itself returns the
+    # bare content sequence — accept both (GH-316 review).
+    content = result[0] if isinstance(result, tuple) else result
     return [json.loads(block.text) for block in content]
 
 

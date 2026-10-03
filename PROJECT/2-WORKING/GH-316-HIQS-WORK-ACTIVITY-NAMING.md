@@ -46,7 +46,7 @@ Rating: **rated 55/15/50/55**.
 
 1. **Canonical name:** `hiqs_work_activity` (MCP tool), `get_hiqs_work_activity()` (Python), label "HiQS work activity" (operator-facing strings).
 2. **Backwards-compatibility adapter (required):** `github_balance` MCP tool remains registered and functional, its docstring marking it the deprecated alias of `hiqs_work_activity`; `get_github_balance` remains as an alias of the canonical function. Both tools return byte-identical shapes for the same inputs.
-3. **Contract freeze:** table `github_activity`, SQL reader `fetch_github_balance`, and all output keys (`project_name`, `total_commits`, `prs_opened`, `prs_merged`, `issues_opened`, `last_active_at`, `repos_touched`) unchanged — consumed by #300 / Needle-fork#79.
+3. **Contract freeze:** table `github_activity`, SQL reader `fetch_github_balance`, and all nine output keys (`project_name`, `repos_linked`, `repos_touched`, `total_commits`, `prs_opened`, `prs_merged`, `issues_opened`, `last_active_at`, `is_idle`) unchanged — consumed by #300 / Needle-fork#79.
 4. **Label rule:** strings that present the *signal* say "HiQS work activity"; strings that describe *ingesting the raw GitHub data source* stay literal ("GitHub activity"). This keeps the diff honest instead of blind-replacing.
 
 ## Smallest surface (ordered)
