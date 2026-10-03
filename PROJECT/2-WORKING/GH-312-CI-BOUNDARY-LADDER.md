@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA **Approved** 2026-10-03 (Codex relay, round 3 of 3, attested reviewed-head `89be1e5`; all six round-1 [Should]s + two round-2 [Should]s implemented). Doc promoted to `2-WORKING`. | Implement Rung 1 + Stage 1 → focused suites → full gates once → final relay QA → PR. |
+| Implemented and double-relay approved: plan QA r3/3 (`89be1e5` attested), final QA r3/3 (attested; both remaining test-isolation findings fixed with before/after falsifier witnesses). Full gates green on the pushed head (root 2663 / HiQS 163 / ruff / mypy / doc links); the branch push itself ran through the shipped gate (receipt: exit 0, 2 s). | **PR [#321](https://github.com/HiQS-Labs/rebalanceOS/pull/321) ready, awaiting merge** (hosted CI re-attesting after the manifest 0.99.0 parity fix). Then merge-cleanup; Rungs 3/4/5 remain on the #312 ladder. |
 
 ## Why
 
