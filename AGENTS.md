@@ -11,6 +11,8 @@
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 
+**CLIO history and HiQS activity lookup:** use the repository [CLIO skill](.agents/skills/clio/SKILL.md) for the configured SQLite reader, Pulse activity and existing Daily summaries.
+
 **"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `hiqs_work_activity()` (alias: `github_balance()`), `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
 
 > ### 🧭 Start here — the central orchestrator (the data-plane spine)
