@@ -1,0 +1,9 @@
+repo_full_name                           total_commits  default_branch_commits
+---------------------------------------  -------------  ----------------------
+Hypercart-Dev-Tools/rebalance-git-pulse  10699          10699                 
+candidates_all_repos
+--------------------
+113                 
+scope           COUNT(*)
+--------------  --------
+suppressed_all  54      

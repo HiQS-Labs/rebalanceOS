@@ -1,0 +1,26 @@
+Recorded at 2026-10-03T04:21:11Z on 281efb2 fix(GH-307): address review findings — regex boundary, branch evidence, overflow hint
+
+=== RED CONTROL 1: commit-reference lookahead reverted to (?!\d) ===
+Expect: test_timestamp_edge_cases (letter-suffix edge) FAILS
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_timestamp_edge_cases
+1 failed, 6 passed in 0.40s
+
+=== RED CONTROL 2: delivery suppression disabled ===
+Expect: twins + timestamp + truncation tests FAIL
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_flags_positive_and_negative_twins
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_timestamp_edge_cases
+3 failed, 4 passed in 0.43s
+
+=== RED CONTROL 3: all_issues filter dropped (readiness default regression guard) ===
+Expect: test_readiness_reader_default_still_filters_to_milestone FAILS
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_readiness_reader_default_still_filters_to_milestone
+1 failed in 0.27s
+
+=== RED CONTROL 4: number-boundary lookahead dropped entirely ===
+Expect: twins test FAILS (#2080 decoy)
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_timestamp_edge_cases
+3 failed, 4 passed in 0.38s
+
+=== post-control state ===
+1
+7 passed in 0.36s
