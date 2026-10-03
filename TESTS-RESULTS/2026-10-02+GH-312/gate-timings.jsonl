@@ -1,0 +1,16 @@
+{"schema_version":1,"run_id":"ruff-check-run1","kind":"ruff-check","exit":0,"wall_s":0.08,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-check-run1.txt"}
+{"schema_version":1,"run_id":"ruff-check-run2","kind":"ruff-check","exit":0,"wall_s":0.04,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-check-run2.txt"}
+{"schema_version":1,"run_id":"ruff-check-run3","kind":"ruff-check","exit":0,"wall_s":0.04,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-check-run3.txt"}
+{"schema_version":1,"run_id":"ruff-format-run1","kind":"ruff-format","exit":0,"wall_s":0.06,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-format-run1.txt"}
+{"schema_version":1,"run_id":"ruff-format-run2","kind":"ruff-format","exit":0,"wall_s":0.04,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-format-run2.txt"}
+{"schema_version":1,"run_id":"ruff-format-run3","kind":"ruff-format","exit":0,"wall_s":0.04,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/ruff-format-run3.txt"}
+{"schema_version":1,"run_id":"root-noembed-run1","kind":"root-noembed","exit":0,"wall_s":303.25,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/root-noembed-run1-tally-only.txt","note":"full console overwritten by a run-labeling mistake; retained tally line covers the aggregate"}
+{"schema_version":1,"run_id":"root-noembed-run2","kind":"root-noembed","exit":0,"wall_s":296.61,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/root-noembed-run2.txt"}
+{"schema_version":1,"run_id":"root-noembed-run3","kind":"root-noembed","exit":0,"wall_s":267.70,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/root-noembed-run3.txt"}
+{"schema_version":1,"run_id":"gate-green-run1","kind":"gate-green","exit":0,"wall_s":332.12,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gate-green-run1.txt"}
+{"schema_version":1,"run_id":"gate-red-run1","kind":"gate-red","exit":1,"wall_s":340.96,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gate-red-run1.txt","note":"exit 1 is the hook's own exit code captured by the runner; BLOCKED message in console"}
+{"schema_version":1,"run_id":"gov-script_inventory-run1","kind":"gov","exit":0,"wall_s":0.07,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gov-script_inventory-run1.txt"}
+{"schema_version":1,"run_id":"gov-machine_paths-run1","kind":"gov","exit":0,"wall_s":0.23,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gov-machine_paths-run1.txt"}
+{"schema_version":1,"run_id":"gov-banned_imports-run1","kind":"gov","exit":0,"wall_s":0.30,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gov-banned_imports-run1.txt"}
+{"schema_version":1,"run_id":"gov-read_layer-run1","kind":"gov","exit":0,"wall_s":0.17,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gov-read_layer-run1.txt"}
+{"schema_version":1,"run_id":"gov-near_duplicates-run1","kind":"gov","exit":0,"wall_s":1.13,"head":"e46150a0fdd8dd2e9f14ba27d74483ad9aa0db2e","console":"consoles/gov-near_duplicates-run1.txt"}

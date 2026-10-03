@@ -1,0 +1,1 @@
+script-inventory ratchet: clean (matches baseline)
