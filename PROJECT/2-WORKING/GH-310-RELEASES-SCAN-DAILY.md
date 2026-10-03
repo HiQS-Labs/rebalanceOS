@@ -2,7 +2,7 @@
 gh_issue: 310
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/310
 title: Opt-in RELEASES ledger scan and /daily close-loop inputs
-status: Plan — Codex QA pending
+status: Plan — Codex QA round 1 dispositions applied
 created: 2026-10-02
 updated: 2026-10-02
 owner: Grok (start-task)
@@ -58,7 +58,7 @@ phases: 1
 
 ### (b) Ledger scan on `github-close-loop`
 1. `--releases-scan DIR[,DIR…]`. **Default off:** the JSON is byte-identical to before (no `releases` key) and the text output is unchanged.
-2. **Discovery** walks each dir to depth ≤ 3, without following symlinks, and prunes `.git`, `node_modules`, `.venv`, `venv`, `__pycache__`, `dist` and `build`.
+2. **Discovery** walks each dir down to a *directory* depth of ≤ 3 below the scan dir (for example `XYZ-forge/temp/gh254-x` is depth 3, so its `releases.db` file sits at depth 4, the same as `find -maxdepth 4 -name releases.db`), without following symlinks, and prunes `.git`, `node_modules`, `.venv`, `venv`, `__pycache__`, `dist` and `build`.
    - A ledger root is a dir containing both `releases.db` and `.git` (a dir or a gitfile). A `releases.db` without `.git` is skipped and counted as `skipped_non_repo`.
    - Discovery is capped at 200 ledgers and reports `truncated`.
 3. **Read-only access.**
@@ -66,8 +66,8 @@ phases: 1
    - Skip a ledger whose SQLite header is in WAL mode (bytes 18–19 == 2) as `wal-mode`, so no `-shm` file is ever created.
    - No migrations, no writes, no CLI `main`.
    - Per-ledger errors (`missing-table`, `unreadable`, `wal-mode`, `identity-unresolved`) are reported per ledger, and the run continues.
-4. **Identity.**
-   - The ledger's `repos.slug` must equal the `--repo` full name, or equal its basename *and* the clone's origin must resolve to `--repo`.
+4. **Identity.** Resolved **per roadmap row**, through `roadmap_items.repo_id` → `repos.slug`, because a ledger can hold several `repos` rows.
+   - The row's slug must equal the `--repo` full name, or equal its basename *and* the clone's origin must resolve to `--repo`.
    - Origin resolution: `git remote get-url origin`, following local-path origins for at most 3 hops.
    - Ledgers for other repos are counted (`other_repo_ledgers`) but not listed.
    - Branch comes from `git branch --show-current`.
@@ -79,7 +79,8 @@ phases: 1
    - Group by gh_number, or by global_id when gh_number is null.
    - When clones disagree on section or status, list every clone's value and pick a `preferred` row: the newest `updated_at`, with ties going to the `development`/`main` branch.
    - The merged task list carries one row per key plus a `clones` count.
-7. **Drift**, joined with the same corpus data the flags use, only for in-progress tasks with a gh_number:
+7. The scan runs on **both** report paths. With `no_local_data` the `releases` block is still attached, just without drift. The read-only guarantee covers the RELEASES ledgers; the existing `ensure_github_schema` call on `rebalance.db` is pre-existing behaviour, and real runs use a `/tmp` copy.
+8. **Drift**, joined with the same corpus data the flags use, only for in-progress tasks with a gh_number:
    - `issue_closed`: the corpus issue is closed.
    - `pr_merged`: the issue is open and a linked PR is merged.
    - `pr_stale`: a linked open PR carries a `stale_pr`/`forgotten_draft` flag.
@@ -109,7 +110,7 @@ phases: 1
    - discovery: a found ledger, a skipped non-repo, a pruned dir;
    - two clones conflicting, with the newest preferred;
    - a corrupt ledger and a missing table reported per ledger without failing;
-   - the **red control**: the ledger's sha256 and mtime are unchanged after a scan, and no `-wal`/`-shm`/`-journal` sidecar appears;
+   - the **red control**: the ledger's sha256 and mtime are unchanged after a scan, and no `-wal`/`-shm`/`-journal` sidecar appears. This includes a WAL-mode fixture, which must be skipped as `wal-mode` with its bytes, mtime and sidecar set unchanged;
    - drift `issue_closed` and `pr_merged` positives with a negative twin;
    - default-off JSON identical to the pre-change shape.
 5. `scan_unclosed_loops.py` (both mirrors): `_close_loop_inputs(...)`, about 90 lines, wired into the daily branch only.
@@ -155,3 +156,14 @@ phases: 1
 | /daily: both off means schema unchanged | Scanner off-mode test. |
 | /daily: at least one real loop per source, cited once | Real run with both inputs on; counts reported. |
 | A merged or closed PR is never an open loop | Scanner on-mode negative twin. |
+
+## Codex QA log
+
+**Plan round 1** (Codex via relay-xyz `consult.sh`, read-only worktree, 2026-10-02 PT): verdict CHANGES.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | BLOCKER: depth ≤ 3 contradicts the 31 ledgers counted at depth ≤ 4. | Accepted as a clarification. Depth is directory depth: a ledger *root* at ≤ 3 has its `releases.db` file at ≤ 4, matching the recon `find -maxdepth 4`. The definition is now in Req 2. |
+| 2 | The scan must also run on the `no_local_data` path; scope the read-only guarantee. | Accepted (Req 7). |
+| 3 | Resolve identity per row via `repo_id` → `repos`; add a WAL fixture to the red control. | Accepted (Req 4 and test list). |
+| 4–5 | Seam, GH-233 distinction, one PR, Focus 5 deferral, tests, version, rating. | Pass. |
