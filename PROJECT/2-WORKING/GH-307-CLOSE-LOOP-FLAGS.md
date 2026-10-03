@@ -2,7 +2,7 @@
 gh_issue: 307
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/307
 title: Close-the-loop flags from the local GitHub corpus
-status: Implemented — final Codex QA and PR pending
+status: Implemented — Codex final QA approved; PR open for review
 created: 2026-10-02
 updated: 2026-10-02
 owner: Grok (start-task)
@@ -134,3 +134,7 @@ Rating: **rated 65/35/50/75**.
 | F1 | BLOCKER: a missing or unparseable created or committed time counted as delivery. | Accepted. Delivery now needs both times to parse, with committed ≥ created. |
 | F2 | BLOCKER: the 5,000-row cap could drop an older qualifying commit. | Accepted. The cap is removed; the read is bounded only by the earliest candidate's `created_at`. |
 | F3 | SHOULD: add timestamp edge tests. | Accepted. Added offset-formatted, malformed-commit and malformed-created cases. A beyond-cap test isn't needed now that there is no cap. |
+
+**Final code QA, round 2** (HEAD 64848a2): **VERDICT: APPROVE**. F1–F3 were confirmed resolved, and no new blocker was found.
+
+**Post-QA gate fix:** the banned-imports ratchet flagged the new `datetime` import. A reasoned `CANONICAL-PATH-OK` pragma was added, matching the `clio_journey.py` precedent. The change is a comment only, so there is no behaviour change and no re-review.

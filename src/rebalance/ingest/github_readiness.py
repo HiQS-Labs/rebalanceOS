@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # CANONICAL-PATH-OK: UTC annotations + day windows; time_ops has no duration helper
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
