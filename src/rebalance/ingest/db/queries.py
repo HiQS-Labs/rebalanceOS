@@ -1047,11 +1047,14 @@ def fetch_release_readiness_data(
     repo_full_name: str,
     *,
     milestone_title: str = "",
+    all_issues: bool = False,
 ) -> dict[str, Any]:
     """Retrieve raw milestone, issues, PRs, and links for release readiness evaluation.
 
     All item facts derive from one resolved set (newest record per canonical
     item wins, SOP §6) before any state or milestone filter is applied.
+    ``all_issues=True`` skips the milestone issue filter (GH-307 close-loop
+    flags read every resolved issue); the default is unchanged.
     """
     alias_map = _get_alias_map()
     spellings = _all_repo_spellings(repo_full_name, alias_map)
@@ -1117,7 +1120,7 @@ def fetch_release_readiness_data(
             deduped_prs.append(d)
     deduped_issues.sort(key=lambda d: (d.get("state") or "", int(d["number"])))
     deduped_prs.sort(key=lambda d: int(d["number"]))
-    if milestone:
+    if milestone and not all_issues:
         deduped_issues = [d for d in deduped_issues if (d.get("milestone_title") or "") == milestone["title"]]
 
     seen_links: set[tuple[int, int]] = set()
@@ -1216,6 +1219,46 @@ def fetch_release_readiness_data(
         "deployment_issue": deployment_issue,
         "recent_release": recent_release,
     }
+
+
+def fetch_direct_commit_messages(
+    conn: sqlite3.Connection,
+    repo_full_name: str,
+    *,
+    ref: str,
+    since_iso: str,
+    limit: int = 5000,
+) -> list[dict[str, Any]]:
+    """Direct commits observed on one ref (e.g. ``refs/heads/development``) since a time.
+
+    Alias-aware, deduped by SHA and bounded by ``limit``. The table keeps one
+    row per repo+SHA with the last push ref observed, so branch provenance is
+    best-effort evidence, not proof (GH-307).
+    """
+    alias_map = _get_alias_map()
+    spellings = _all_repo_spellings(repo_full_name, alias_map)
+    placeholders = ",".join("?" * len(spellings))
+    rows = conn.execute(
+        f"""
+        SELECT sha, message, committed_at
+        FROM github_direct_commits
+        WHERE LOWER(repo_full_name) IN ({placeholders})
+          AND ref = ?
+          AND committed_at >= ?
+        ORDER BY committed_at DESC
+        LIMIT ?
+        """,
+        (*spellings, ref, since_iso, int(limit)),
+    ).fetchall()
+    seen: set[str] = set()
+    commits: list[dict[str, Any]] = []
+    for row in rows:
+        d = dict(row)
+        if d["sha"] in seen:
+            continue
+        seen.add(d["sha"])
+        commits.append(d)
+    return commits
 
 
 # ---------------------------------------------------------------------------

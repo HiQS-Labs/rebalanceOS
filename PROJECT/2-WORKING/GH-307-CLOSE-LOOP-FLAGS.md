@@ -2,7 +2,7 @@
 gh_issue: 307
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/307
 title: Close-the-loop flags from the local GitHub corpus
-status: Plan — Codex QA closed after round 2 (adjudicated); implementing
+status: Implemented — final Codex QA and PR pending
 created: 2026-10-02
 updated: 2026-10-02
 owner: Grok (start-task)
@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Intake captured and parked; recon and a surgical plan written. On the local corpus, rough SQL counts across all repos were: 5 stale PRs, 14 forgotten drafts, 20 needing refinement, 121 closed without a merged linked PR (47 of those have a direct-commit reference) and 8 started-not-shipped. | Codex plan QA via relay-xyz, then implement with focused tests and run the gate once. |
+| Implemented `infer_close_loop_flags`, the `all_issues` reader opt-in, `fetch_direct_commit_messages` and `rebalance github-close-loop`, at version 0.98.0. Five focused tests plus two readiness tests pass, and two mutation red controls fail as expected. A smoke run on a copy of the Mini corpus returned `ok` for rebalanceOS, XYZ-forge and Needle-fork in 0.2 s. | Final Codex QA and a ready PR. Follow-ups: a Needle-fork#79 adapter, an MCP tool, a Focus 5 line (#120), and per-ref commit provenance. |
 
 Rating: **rated 65/35/50/75**.
 - **Priority 65:** the operator calls Rebalance the flagship, and this unblocks #300, XYZ-forge#709 and Focus 5 (#120) without a second GitHub read path.

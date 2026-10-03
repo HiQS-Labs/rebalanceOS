@@ -265,6 +265,53 @@ def github_release_readiness_cmd(
             typer.echo(f"  - #{item.issue_number} {item.classification}{prs} — {item.title}")
 
 
+@app.command("github-close-loop")
+def github_close_loop_cmd(
+    repo: str = typer.Option(..., "--repo", help="Repo in owner/name form"),
+    stale_days: int = typer.Option(7, "--stale-days", min=1, help="Idle days before a PR/issue counts as stale"),
+    since_days: int = typer.Option(30, "--since-days", min=1, help="Look-back window for closed issues"),
+    database: Path | None = DBOption(),
+    output_format: str = typer.Option("text", "--output", help="Output format: text or json"),
+) -> None:
+    """Deterministic close-the-loop flags: stale/draft/refinement PRs, undelivered closes, unshipped branches."""
+    from rebalance.ingest.github_readiness import CLOSE_LOOP_FLAGS, infer_close_loop_flags
+
+    normalized_output = output_format.strip().lower()
+    if normalized_output not in {"text", "json"}:
+        raise typer.BadParameter("--output must be 'text' or 'json'.")
+
+    try:
+        db_path = resolve_database_path(database)
+    except DatabaseNotFoundError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(2) from exc
+    report = infer_close_loop_flags(
+        database_path=db_path,
+        repo_full_name=repo.strip(),
+        stale_days=stale_days,
+        since_days=since_days,
+    )
+    if normalized_output == "json":
+        typer.echo(json.dumps(report, ensure_ascii=False))
+        return
+
+    typer.echo(f"Repo: {report['repo_full_name']} (as of {report['as_of']})")
+    typer.echo(report["summary"])
+    if report["status"] != "ok":
+        return
+    typer.echo("Counts: " + ", ".join(f"{flag}={count}" for flag, count in report["counts"].items()))
+    for flag in CLOSE_LOOP_FLAGS:
+        items = [item for item in report["flags"] if item["flag"] == flag]
+        if not items:
+            continue
+        typer.echo(f"\n{flag}")
+        for item in items[:15]:
+            kind = "PR" if item["item_type"] == "pull_request" else "Issue"
+            typer.echo(f"  - {kind} #{item['number']} {item['title']}")
+            typer.echo(f"      {item['evidence']}")
+    typer.echo("\nCounts are lower bounds: only items inside the local sync window are visible.")
+
+
 @app.command("github-close-candidates")
 def github_close_candidates_cmd(
     repo: str = typer.Option(..., "--repo", help="Repo in owner/name form"),

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timedelta
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -349,3 +350,187 @@ def infer_github_release_readiness(
         recent_release=recent_release,
         issue_states=issue_states,
     )
+
+
+# ---------------------------------------------------------------------------
+# GH-307 — close-the-loop flags (deterministic, read-only over the corpus)
+# ---------------------------------------------------------------------------
+
+CLOSE_LOOP_FLAGS = (
+    "stale_pr",
+    "forgotten_draft",
+    "pr_needs_refinement",
+    "closed_without_delivery",
+    "started_not_shipped",
+)
+_ISSUE_BRANCH_RE = re.compile(r"(?:^|[/_-])gh-?(\d+)(?![0-9a-z])", re.IGNORECASE)
+
+
+def _age_days(value: Any, now: datetime) -> float | None:
+    parsed = parse_utc_iso(value)
+    if parsed is None:
+        return None
+    return (now - parsed).total_seconds() / 86400
+
+
+def _issue_numbers_in_branch(name: str | None) -> set[int]:
+    return {int(n) for n in _ISSUE_BRANCH_RE.findall(name or "")}
+
+
+def infer_close_loop_flags(
+    database_path: Path,
+    repo_full_name: str,
+    *,
+    stale_days: int = 7,
+    since_days: int = 30,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Per-repo close-the-loop flags from locally synced GitHub data.
+
+    Deterministic rules only; every flag carries plain-language evidence.
+    Items outside the local sync window are invisible, so counts are lower
+    bounds. ``closed_without_delivery`` is a prompt to confirm, not a verdict.
+    """
+    from rebalance.ingest.db import fetch_direct_commit_messages, fetch_release_readiness_data
+
+    now = now or now_utc()
+    report: dict[str, Any] = {
+        "repo_full_name": repo_full_name,
+        "status": "ok",
+        "as_of": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "params": {"stale_days": stale_days, "since_days": since_days},
+        "summary": "",
+        "counts": {flag: 0 for flag in CLOSE_LOOP_FLAGS},
+        "flags": [],
+    }
+    flags: list[dict[str, Any]] = report["flags"]
+
+    def add(flag: str, item: dict[str, Any], item_type: str, evidence: str) -> None:
+        flags.append(
+            {
+                "flag": flag,
+                "item_type": item_type,
+                "number": int(item["number"]),
+                "title": item.get("title") or "",
+                "html_url": item.get("html_url") or "",
+                "evidence": evidence,
+            }
+        )
+
+    with db_connection(database_path, ensure_github_schema) as conn:
+        data = fetch_release_readiness_data(conn, repo_full_name, all_issues=True)
+        if not data["repo_meta"]:
+            report["status"] = "no_local_data"
+            report["summary"] = "No local GitHub data found for this repo. Sync artifacts first."
+            return report
+        default_branch = data["repo_meta"].get("default_branch") or "main"
+        issues = data["issues"]
+        prs = data["prs"]
+        pr_by_number = {int(pr["number"]): pr for pr in prs}
+        linked_issue_numbers: set[int] = set()
+        merged_linked: set[int] = set()
+        for link in data["links"]:
+            target = int(link["target_number"])
+            linked_issue_numbers.add(target)
+            pr = pr_by_number.get(int(link["source_number"]))
+            if pr and int(pr.get("is_merged") or 0) == 1:
+                merged_linked.add(target)
+
+        # closed_without_delivery candidates first, so the commit read is bounded.
+        candidates: list[tuple[dict[str, Any], float]] = []
+        for issue in issues:
+            if issue.get("state") != "closed":
+                continue
+            if (issue.get("state_reason") or "").lower() not in ("", "completed"):
+                continue
+            closed_age = _age_days(issue.get("closed_at"), now)
+            if closed_age is None or closed_age > since_days:
+                continue
+            if int(issue["number"]) in merged_linked:
+                continue
+            candidates.append((issue, closed_age))
+        commits: list[dict[str, Any]] = []
+        created_times = [parse_utc_iso(issue.get("created_at")) for issue, _ in candidates]
+        created_times = [t for t in created_times if t is not None]
+        if candidates:
+            # One day of slack absorbs offset-formatted committed_at strings;
+            # the per-issue check below compares parsed datetimes.
+            earliest = min(created_times) if created_times else now - timedelta(days=since_days)
+            commits = fetch_direct_commit_messages(
+                conn,
+                repo_full_name,
+                ref=f"refs/heads/{default_branch}",
+                since_iso=(earliest - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+
+    for pr in prs:
+        if pr.get("state") != "open":
+            continue
+        age = _age_days(pr.get("updated_at"), now)
+        idle = age is not None and age >= stale_days
+        if int(pr.get("is_draft") or 0) == 1:
+            if idle:
+                add("forgotten_draft", pr, "pull_request", f"Draft PR not updated for {age:.0f} days (threshold {stale_days}).")
+        elif idle:
+            add("stale_pr", pr, "pull_request", f"Open PR not updated for {age:.0f} days (threshold {stale_days}).")
+        reasons = []
+        if (pr.get("review_decision") or "").upper() == "CHANGES_REQUESTED":
+            reasons.append("changes requested")
+        if (pr.get("check_status") or "").lower() == "failing":
+            reasons.append("failing checks")
+        if reasons:
+            add("pr_needs_refinement", pr, "pull_request", "Open PR has " + " and ".join(reasons) + ".")
+
+    for issue, closed_age in candidates:
+        number = int(issue["number"])
+        created = parse_utc_iso(issue.get("created_at"))
+        ref_re = re.compile(rf"(?:#|\bGH-){number}(?!\d)", re.IGNORECASE)
+        delivered = False
+        for commit in commits:
+            if not ref_re.search(commit.get("message") or ""):
+                continue
+            committed = parse_utc_iso(commit.get("committed_at"))
+            if created is None or committed is None or committed >= created:
+                delivered = True
+                break
+        if delivered:
+            continue
+        add(
+            "closed_without_delivery",
+            issue,
+            "issue",
+            f"Closed as completed {closed_age:.0f} days ago with no merged linked PR and no "
+            f"`{default_branch}` commit referencing #{number}; confirm it was delivered.",
+        )
+
+    branch_by_issue: dict[int, str] = {}
+    for branch in data.get("branches") or []:
+        for number in _issue_numbers_in_branch(branch.get("name")):
+            branch_by_issue.setdefault(number, branch["name"])
+    pr_head_issues: set[int] = set()
+    for pr in prs:
+        pr_head_issues |= _issue_numbers_in_branch(pr.get("head_ref"))
+    for issue in issues:
+        if issue.get("state") != "open":
+            continue
+        number = int(issue["number"])
+        if number not in branch_by_issue or number in linked_issue_numbers or number in pr_head_issues:
+            continue
+        age = _age_days(issue.get("updated_at"), now)
+        if age is None or age < stale_days:
+            continue
+        add(
+            "started_not_shipped",
+            issue,
+            "issue",
+            f"Branch `{branch_by_issue[number]}` exists but no PR links or uses it; issue idle {age:.0f} days.",
+        )
+
+    order = {flag: i for i, flag in enumerate(CLOSE_LOOP_FLAGS)}
+    flags.sort(key=lambda f: (order[f["flag"]], f["number"]))
+    for item in flags:
+        report["counts"][item["flag"]] += 1
+    report["summary"] = (
+        f"{len(flags)} close-the-loop flag(s) across {len(prs)} PRs and {len(issues)} issues in the local store."
+    )
+    return report
