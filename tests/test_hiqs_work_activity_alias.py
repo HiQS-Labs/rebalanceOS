@@ -11,6 +11,7 @@ import asyncio
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from rebalance.ingest.db import (
@@ -53,11 +54,12 @@ class HiqsWorkActivityAliasTests(unittest.TestCase):
                 "INSERT INTO project_registry (name, status, repos_json, tags_json, custom_fields_json)"
                 " VALUES ('Alpha', 'active', '[\"a/one\"]', '[]', '{}')"
             )
+            recent = (date.today() - timedelta(days=1)).isoformat()
             conn.execute(
                 "INSERT INTO github_activity (login, repo_full_name, scan_date, commits, pushes,"
                 " prs_opened, prs_merged, issues_opened, issue_comments, reviews, last_active_at, scanned_at)"
-                " VALUES ('me', 'a/one', '2026-10-01', 7, 2, 3, 1, 0, 0, 0,"
-                " '2026-10-01T12:00:00Z', '2026-10-01T12:00:00Z')"
+                " VALUES (?, 'a/one', ?, 7, 2, 3, 1, 0, 0, 0, ? || 'T12:00:00Z', ? || 'T12:00:00Z')",
+                (f"me@{recent}", recent, recent, recent),
             )
             conn.commit()
 

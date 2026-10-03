@@ -75,8 +75,12 @@
       "description": "List projects from the local project_registry table"
     },
     {
+      "name": "hiqs_work_activity",
+      "description": "Show HiQS work activity (commit/PR/issue) balance across active projects"
+    },
+    {
       "name": "github_balance",
-      "description": "Show GitHub activity balance across active projects"
+      "description": "Deprecated alias of hiqs_work_activity; identical behavior"
     },
     {
       "name": "github_release_readiness",
