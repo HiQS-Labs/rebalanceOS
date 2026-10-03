@@ -43,7 +43,7 @@ def _mock_repo(tmp_path: Path) -> Path:
     _git("init", cwd=tmp_path)
     _git("config", "user.name", "Tester", cwd=tmp_path)
     _git("config", "user.email", "test@example.com", cwd=tmp_path)
-    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "rebalance" / "ingest").mkdir(parents=True)  # both guard search paths exist
     (tmp_path / "src" / ".keep").write_text("")
     _git("add", "src/.keep", cwd=tmp_path)
     _git("commit", "-m", "init", cwd=tmp_path)
@@ -257,6 +257,27 @@ def test_receipt_write_failure_bypass_never_claims_logged(tmp_path: Path):
     assert "receipt write FAILED" in res.stderr
     assert "BYPASSED (logged" not in res.stdout
     assert "NOT logged" in res.stdout
+
+
+def test_gate_fails_closed_when_guard_search_errors(tmp_path: Path):
+    """A missing searched directory is a guard ERROR, not a silent pass.
+
+    The pre-CR pipelines discarded the search grep's own exit status, so a
+    missing src/rebalance/ read as "no match" and the guard passed vacuously.
+    """
+    repo = _mock_repo(tmp_path)
+    shutil.rmtree(repo / "src" / "rebalance")
+    sha = (
+        subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo), capture_output=True, text=True).stdout.strip()
+        or "0" * 40
+    )
+    res = _run_hook(repo, REF_LINE.format(sha=sha), {"REBALANCE_GATE_PY": str(_stub_python(tmp_path))})
+    assert res.returncode == 1, f"gate must block on guard search error, got {res.returncode}"
+    assert "search error" in res.stderr
+    assert "guard=raw-datetime" in res.stderr
+    rec = _receipts(repo)[-1]
+    assert rec["kind"] == "gate" and rec["exit"] == 1
+    assert rec["detail"]["stages"]["grep-guards"]["exit"] == 1
 
 
 def test_gate_green_with_stub(tmp_path: Path):

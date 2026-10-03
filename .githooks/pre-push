@@ -116,16 +116,49 @@ stage ratchet-banned-imports     "$PY" utils/pdda/check_banned_imports.py --chec
 stage ratchet-read-layer         "$PY" utils/pdda/check_read_layer.py --check
 stage ratchet-near-duplicates    "$PY" utils/pdda/check_near_duplicates.py --check
 
-# The two repo guards, character-for-character the ci.yml root-noembed logic.
+# The two repo guards: same expressions as the ci.yml root-noembed job, with one
+# hardening the CI original lacks (GH-312 CodeRabbit adjudication): the search
+# grep must not fail silently. Semantics, precisely kept:
+#   violation  = filtered output survived (PIPESTATUS[2] == 0) — a candidate the
+#                -v exclusions removed is NOT a violation (calendar_helpers.py's
+#                own docstring legitimately matches the pattern);
+#   error      = the searched directory is missing (pre-checked, because BSD
+#                grep exits 1 on a missing dir — indistinguishable from "clean")
+#                or the search grep errored for real (PIPESTATUS[0] >= 2, e.g.
+#                GNU grep on unreadable paths).
 t0="$(date +%s)"
 guard_rc=0
-if grep -rn "replace('Z'" src/rebalance/ingest/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
-    echo "pre-push gate: FAIL guard=raw-datetime — use parse_calendar_dt() from calendar_helpers.py" >&2
+if [[ ! -d src/rebalance/ingest ]]; then
+    echo "pre-push gate: FAIL guard=raw-datetime — search error: src/rebalance/ingest is missing; the guard could not run" >&2
     guard_rc=1
+else
+    grep -rn "replace('Z'" src/rebalance/ingest/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py
+    pipe_status=("${PIPESTATUS[@]}")  # snapshot first: any assignment resets PIPESTATUS
+    rc_search=${pipe_status[0]}
+    rc_filtered=${pipe_status[2]}
+    if [[ $rc_filtered -eq 0 ]]; then
+        echo "pre-push gate: FAIL guard=raw-datetime — use parse_calendar_dt() from calendar_helpers.py" >&2
+        guard_rc=1
+    elif [[ $rc_search -gt 1 ]]; then
+        echo "pre-push gate: FAIL guard=raw-datetime — search error (exit $rc_search): the guard could not run" >&2
+        guard_rc=1
+    fi
 fi
-if grep -rn "total_seconds() / 60" src/rebalance/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
-    echo "pre-push gate: FAIL guard=raw-duration — use event_duration_minutes() from calendar_helpers.py" >&2
+if [[ ! -d src/rebalance ]]; then
+    echo "pre-push gate: FAIL guard=raw-duration — search error: src/rebalance is missing; the guard could not run" >&2
     guard_rc=1
+else
+    grep -rn "total_seconds() / 60" src/rebalance/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py
+    pipe_status=("${PIPESTATUS[@]}")  # snapshot first: any assignment resets PIPESTATUS
+    rc_search=${pipe_status[0]}
+    rc_filtered=${pipe_status[2]}
+    if [[ $rc_filtered -eq 0 ]]; then
+        echo "pre-push gate: FAIL guard=raw-duration — use event_duration_minutes() from calendar_helpers.py" >&2
+        guard_rc=1
+    elif [[ $rc_search -gt 1 ]]; then
+        echo "pre-push gate: FAIL guard=raw-duration — search error (exit $rc_search): the guard could not run" >&2
+        guard_rc=1
+    fi
 fi
 stages+="${sep}\"grep-guards\": {\"exit\": $guard_rc, \"wall_s\": $(( $(date +%s) - t0 ))}"
 [[ $guard_rc -ne 0 ]] && failures=$((failures + 1))
