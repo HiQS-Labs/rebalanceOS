@@ -13,7 +13,7 @@ branch: codex/clio-reader-skill
 
 # CLIO history and HiQS activity lookup skill
 
-Create a repository skill reusing the merged XYZ-CLIO SQLite reader and existing Pulse/Daily outputs. Preserve configured paths, stable provenance, bounded lookup, and read-only retrieval. No new query implementation or runtime change.
+Create a repository skill reusing the merged XYZ-CLIO SQLite reader and existing Rebalance `github_activity` readers, with optional Pulse/Daily summaries. Preserve configured paths, stable provenance, bounded lookup, and read-only retrieval. No new query implementation or runtime change.
 
 PRS rated 55/30/50/90: requested discovery improvement; no observed data loss; neutral appeal; inexpensive documentation over existing readers.
 
@@ -21,7 +21,7 @@ PRS rated 55/30/50/90: requested discovery improvement; no observed data loss; n
 
 | What was just completed | What's next |
 |---|---|
-| Source/interface recon and skill draft | Focused validation and final Codex relay QA; then PR |
+| Final Codex relay approved revised authorship instructions | Final documentation gate and PR; awaiting merge |
 
 ## Scope and acceptance
 
@@ -47,4 +47,6 @@ Rated 55/30/50/90: priority reflects the requested discoverability gap; severity
 
 ## QA record
 
-Pending final relay review.
+Final Codex relay approved both initial and clarified packets (driver exit 0, attested Approved). The initial Pulse-focused approval was superseded after the operator identified `github_activity`. The revised review found no blockers/shoulds; its plan-opener wording nit is applied. Review log: `TESTS-RESULTS/2026-10-02+GH-315/final-review.log`. The reviewed skill SHA-256 is recorded in `provenance.json`. Runtime behavior/deployment is not claimed.
+
+The standard whole-roadmap writer also reconciled existing stale mirror rows (the first sync added 3 existing rows and updated 76; the task registration then added 1 and updated positions). These generated changes are ledger synchronization, not new scope or status assertions; DB/dump receipt checks pass with existing warnings.
