@@ -136,7 +136,7 @@ def test_verify_reports_armed_state(tmp_path: Path):
         cwd=str(repo),
         capture_output=True,
         text=True,
-        env={**os.environ, "REBALANCE_GATE_PY": str(stub)},
+        env={**_clean_env(), "REBALANCE_GATE_PY": str(stub)},
     )
     assert res.returncode == 0, res.stdout + res.stderr
     assert "armed" in res.stdout and "interpreter present" in res.stdout
@@ -187,7 +187,7 @@ def test_fail_closed_on_missing_interpreter(tmp_path: Path):
         subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo), capture_output=True, text=True).stdout.strip()
         or "0" * 40
     )
-    env = {k: v for k, v in os.environ.items() if k != "REBALANCE_GATE_PY"}
+    env = _clean_env()
     res = subprocess.run(
         ["bash", str(HOOK), "origin", "placeholder-url"],
         input=REF_LINE.format(sha=sha or "0" * 40),
@@ -293,7 +293,7 @@ def test_gate_green_for_real(tmp_path: Path):
                 ["git", "rev-parse", "HEAD"], cwd=str(REPO_ROOT), capture_output=True, text=True
             ).stdout.strip()
         ),
-        {},
+        {"REBALANCE_GATE_PY": str(venv_py)},  # explicitly the repo venv, never an ambient override
     )
     assert res.returncode == 0, res.stdout + res.stderr
     assert "PASS" in res.stdout
