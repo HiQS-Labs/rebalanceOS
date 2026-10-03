@@ -27,7 +27,7 @@ PRS rated 55/30/50/90: requested discovery improvement; no observed data loss; n
 
 - [x] Reuse installed XYZ-CLIO query helper; configuration precedence and missing-store behavior are explicit.
 - [x] Explain exact filters, bounded pagination, stable IDs, pending/fleet limits and seven-day note scope.
-- [x] Route activity requests to existing MCP readers and configured Pulse/Daily outputs.
+- [x] Route activity requests to `github_activity` via existing MCP readers and the shared read-only query layer; Pulse/Daily are optional.
 - [x] Skill validator and mirror comparison pass; doc links pass (632 checked). PDDA reports pre-existing findings in unrelated docs (7 frontmatter, 9 status-table); none name GH-315.
 - [ ] Obtain independent final Codex approval and open PR against development.
 
@@ -35,7 +35,7 @@ PRS rated 55/30/50/90: requested discovery improvement; no observed data loss; n
 
 Base: `cfb91a2180adac9e550d9de5b314bff89ddfda94`. XYZ-CLIO #4 merged September 30; #5 and #6 merged October 2. Canonical `utils/CLIO/clio-store.py` implements config, query and argument parsing. This repository's legacy CLIO directory does not carry that helper. The graph generation was September 2 and reported changed source metadata, so current source was read directly. No Rebalance retrieval MCP was exposed in this session.
 
-Current source anchors: `src/rebalance/paths.py`, `src/rebalance/ingest/config.py::get_pulse_config`, `src/rebalance/lib/git_ops.py::fleet_output_path`, `src/rebalance/ingest/pulse.py::fleet_view`, `utils/daily_synthesis.py`, and the existing Daily skill. Pulse is the working interpretation of the requested activity stream, with Daily explicitly labelled derived synthesis.
+Current source anchors: `src/rebalance/paths.py`, `src/rebalance/ingest/config.py::get_pulse_config`, `src/rebalance/lib/git_ops.py::fleet_output_path`, `src/rebalance/ingest/pulse.py::fleet_view`, `utils/daily_synthesis.py`, and the existing Daily skill. Operator clarified the work activity source is `github_activity`. The skill now names that snapshot table, the shared read-only gateway/query layer, authorship-versus-participation semantics, aliases/deduplication, timestamps and bounded raw-row fallback. Pulse/Daily remain optional derived summaries.
 
 This is a simple, reversible documentation change over existing interfaces. Pre-implementation plan QA is skipped under start-task Step 6's simple-change exception; final independent QA remains required. No production code, helper, query path, install, migration, scheduler, cloud inference or live database mutation is introduced. Use the repository's existing `.agents` and `.claude` skill layout with identical content.
 
