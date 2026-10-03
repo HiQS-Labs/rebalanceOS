@@ -5,7 +5,7 @@ title: CLIO history and HiQS activity lookup skill
 status: In progress
 created: 2026-10-02
 doc_type: feedback
-updated: 2026-10-02
+updated: 2026-10-03
 owner: Codex
 goal: Make existing CLIO history and HiQS activity readers discoverable
 branch: codex/clio-reader-skill
@@ -53,3 +53,7 @@ Final Codex relay approved both initial and clarified packets (driver exit 0, at
 The standard whole-roadmap writer also reconciled existing stale mirror rows (the first sync added 3 existing rows and updated 76; the task registration then added 1 and updated positions). These generated changes are ledger synchronization, not new scope or status assertions; DB/dump receipt checks pass with existing warnings.
 
 Final documentation gate: skill validator, mirror comparison, relative links, front-door board, machine-path guard, ledger consistency and diff whitespace pass. Roadmap coverage is observe-mode exit 0 with unrelated existing findings; it is not reported clean. Evidence: `TESTS-RESULTS/2026-10-02+GH-315/final-checks.log`. No tracked pre-push hook ships on the base; the clone uses the repository hooks directory. No runtime tests or doctor run is claimed for this documentation-only change.
+
+## Naming follow-up — 2026-10-03
+
+Aligned both skill copies with PR #320: HiQS means High Quality Signals; canonical MCP `hiqs_work_activity` and Python `get_hiqs_work_activity`, with deprecated-name fallback for older runtimes. Kept table `github_activity`, SQL reader `fetch_github_balance`, output shape and read-only gateway guidance unchanged. Checked the PR head source for the actual adapter signatures. PR #320 was still open at this update; no merge or deployment is assumed. The earlier relay approval covers the prior revision; this narrow documentation follow-up receives focused validation recorded in `TESTS-RESULTS/2026-10-02+GH-315/naming-checks.log`.

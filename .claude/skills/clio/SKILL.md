@@ -7,7 +7,7 @@ description: >-
   installation, migration, capture setup, or a request to run the Daily workflow.
 ---
 
-# CLIO — prompt history and work activity
+# CLIO — prompt history and HiQS work activity
 
 Contents: [Locate](#locate-the-existing-store) · [Search](#search-prompt-history) ·
 [Activity](#find-the-hiqs-work-activity-stream) · [Report](#report-with-provenance)
@@ -69,14 +69,26 @@ proof of complete fleet coverage. A successful query only covers this replica.
 
 ## Find the HiQS work activity stream
 
-CLIO is evidence of **intent**. The HiQS work activity source is the
+CLIO is evidence of **intent**. HiQS means **High Quality Signals**. The HiQS work activity source is the
 `github_activity` table in the resolved **Rebalance index**. Pulse and Daily
 are optional derived views, not the authorship store.
 A prompt asking for a merge does not prove the PR merged.
 
+Namespace contract from [PR #320](https://github.com/HiQS-Labs/rebalanceOS/pull/320):
+MCP `hiqs_work_activity` and Python
+`rebalance.ingest.github_scan.get_hiqs_work_activity` are canonical;
+`github_balance` and `get_github_balance` remain compatibility aliases. The
+`github_activity` table, SQL reader `fetch_github_balance`, and nine output keys
+are unchanged. The Python facade can ensure schema through its connection path;
+for strictly read-only local inspection, keep using the gateway below.
+
 - [ ] When Rebalance MCP is available, use `index_status()` for freshness and
-  `ask(query=..., since_days=..., skip_synthesis=True)`, `github_balance(since_days=...)`,
+  `hiqs_work_activity(since_days=...)`,
+  `ask(query=..., since_days=..., skip_synthesis=True)`,
   or `get_next_actions()` as appropriate. Inspect the live tool schema first.
+  Prefer `hiqs_work_activity`; if an older runtime does not expose it,
+  `github_balance(since_days=...)` is the deprecated compatibility name with
+  the same response contract. Do not call both and count their results twice.
   Use `peek_source()` for cited source details. Do not call `publish_pulse()` or
   `refresh_index()` merely to read activity; those are write workflows.
 - [ ] Resolve the store with `rebalance.paths.resolve_database_path()` from the
@@ -96,7 +108,7 @@ A prompt asking for a merge does not prove the PR merged.
   plus `commits`, `pushes`, `prs_opened`, `prs_merged`, `issues_opened`,
   `issue_comments`, and `reviews`. It is not an event-by-event transcript.
   **Authorship = commits, pushes, or PRs**; issues, comments, reviews and stars
-  alone do not establish authored work. `github_balance`/org rollups include
+  alone do not establish authored work. `hiqs_work_activity`/org rollups include
   participation fields and combine logins; do not label their complete totals
   operator-authorship. Exclude synthetic watched-repo rows (`login="__watch__"`)
   when attributing work to the operator. They also omit some raw columns (including pushes), so
