@@ -65,9 +65,11 @@ Returns projects from the `project_registry` table.
 
 ---
 
-### `github_balance`
+### `hiqs_work_activity`
 
-Shows GitHub commit/PR/issue activity per project over a rolling window.
+Shows HiQS work activity (commit/PR/issue) per project over a rolling window.
+HiQS = High Quality Signals. `github_balance` remains as a deprecated alias of
+this tool (GH-316): same implementation, identical response shape.
 
 **Prerequisite:** run `rebalance github-scan` via CLI first to populate the `github_activity` table. See PROJECT.md — Step 6 for setup.
 
@@ -426,7 +428,7 @@ A human-readable reference for all running MCP servers on this machine. Store at
 rebalance   python -m rebalance.mcp_server   REBALANCE_DB=/absolute/path/to/rebalance.db
 ```
 
-Live tools: `ask`, `list_projects`, `github_balance`, `query_notes`, `query_github_context`, `github_release_readiness`, `github_close_candidates`, `search_vault`, `create_calendar_event`, `review_timesheet`, `classify_event`, `snap_calendar_edges`, `sleuth_sync_reminders`, `onboarding_status`, `setup_github_token`, `run_preflight`, `confirm_projects`
+Live tools: `ask`, `list_projects`, `hiqs_work_activity` (alias: `github_balance`), `query_notes`, `query_github_context`, `github_release_readiness`, `github_close_candidates`, `search_vault`, `create_calendar_event`, `review_timesheet`, `classify_event`, `snap_calendar_edges`, `sleuth_sync_reminders`, `onboarding_status`, `setup_github_token`, `run_preflight`, `confirm_projects`
 Planned: `weekly_rebalance`, `project_attention`, `review_unattributed_attention`, `classify_attention_item`, `todays_agenda`, `morning_brief`
 
 ---
