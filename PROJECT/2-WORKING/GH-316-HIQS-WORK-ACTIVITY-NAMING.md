@@ -2,7 +2,7 @@
 gh_issue: 316
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/316
 title: "Rename the work-activity signal to \"HiQS work activity\" (labels + namespace) with a backwards-compatibility adapter"
-status: Implemented — plan pending Codex QA; PR open for review
+status: In progress — plan QA approved (round 1 corrections applied); implementation done, final QA pending
 created: 2026-10-03
 updated: 2026-10-03
 owner: Noel (start-task)
@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Recon of every surface complete; intake captured and promoted; plan drafted. | Codex plan QA, then implementation of the rename + adapter with a parity test, gate, final QA, PR. |
+| Plan QA round 1 (CHANGES) adjudicated: all three shoulds accepted; adapter approved as designed. Implementation complete — Python + MCP adapter, labels, docs, parity test (red-first), 0.98.1. | Full gate once, final Codex QA on the diff, then PR. |
 
 Rating: **rated 55/15/50/55**.
 - **Priority 55:** user-directed; aligns code vocabulary with marketing (HiQS = High Quality Signals); newer work (#315) already adopts the term organically.
@@ -78,3 +78,18 @@ Rating: **rated 55/15/50/55**.
 - Both MCP tool names live with identical shapes; `get_github_balance` alias intact.
 - No signal-presenting operator string says bare "GitHub activity"; storage and JSON keys unchanged.
 - Full suite + ratchets green; issue #316 acceptance boxes checkable.
+
+## Codex plan QA log
+
+**Round 1** (Codex `gpt-6-astra` via consult.sh, read-only worktree, 2026-10-03): verdict **CHANGES — approve after these small plan corrections; retain the two alias seams** (verbatim recommendation).
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | [Should] Plan violated its own ingestion-vs-signal rule: `cli/github.py:72` scan wording and `cli/onboard.py:124` discovery wording must stay literal; only the MCP tool reference at `cli/github.py:64` changes. | **Accepted.** Both strings stay literal; only the tool reference updated. |
+| 2 | [Should] Frozen-key list was incomplete — output also carries `repos_linked` and `is_idle` (`queries.py:405`); parity test must assert a populated row with the exact nine-key set, not alias-vs-alias equality. | **Accepted.** `FROZEN_OUTPUT_KEYS` (9 keys) asserted in the test; reviewer's claim verified firsthand at `queries.py:405-410`. |
+| 3 | [Should] Add `MCP.md:68` + tool list `:429`; classify the dashboard "Recent GitHub Activity" (`note_builder.py:374,419`) which is an org rollup from `fetch_org_activity`, a different signal. | **Accepted.** MCP.md updated with canonical name + compat note. Dashboard org view: **Disposition: Retain (out of scope — different signal)**, consistent with the ingestion-vs-signal rule; recorded here. |
+| 4-5 | [Pass] Adapter boundaries sufficient; no ratchet conflict. | Noted. |
+| 6 | [Pass/Nit] 0.98.1 PATCH agreed; label the fourth rating axis "effort cheapness". | Applied in the rating note. |
+| 7 | [Nit] Frontmatter status contradicted the status table. | Fixed (this revision). |
+
+Round 2 not required: the reviewer's recommendation pre-approved the corrections; no scope, architecture, or risk changed.

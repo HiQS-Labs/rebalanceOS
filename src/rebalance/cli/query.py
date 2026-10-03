@@ -115,7 +115,7 @@ def ask_cmd(
         typer.echo(f"\n--- Raw context ({result.elapsed_seconds}s) ---\n")
 
     if result.github_context:
-        typer.echo("\n--- GitHub Activity ---")
+        typer.echo("\n--- HiQS Work Activity ---")
         for g in result.github_context:
             if g.get("is_idle"):
                 typer.echo(f"  {g['project_name']:25s}  IDLE")

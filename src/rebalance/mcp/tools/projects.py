@@ -5,7 +5,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from rebalance.ingest.github_scan import get_github_balance
+from rebalance.ingest.github_scan import get_hiqs_work_activity
 from rebalance.ingest.registry import get_projects
 
 
@@ -23,17 +23,28 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         return get_projects(database_path, status=normalized or None)
 
     @mcp.tool()
-    def github_balance(since_days: int = 30) -> list[dict[str, Any]]:
+    def hiqs_work_activity(since_days: int = 30) -> list[dict[str, Any]]:
         """
-        Show GitHub activity balance across active projects.
+        Show HiQS work activity balance across active projects (canonical name).
 
-        Returns one row per project with commit/PR/issue counts over the last
-        `since_days` days.  Projects with no GitHub activity are flagged as
-        idle (is_idle=true).  Requires a prior `rebalance github-scan` run.
+        HiQS = High Quality Signals. Returns one row per project with
+        commit/PR/issue counts over the last `since_days` days.  Projects with
+        no HiQS work activity are flagged as idle (is_idle=true).  Requires a
+        prior `rebalance github-scan` run.
         """
         project_repos = _project_repos_map(database_path)
-        return get_github_balance(
+        return get_hiqs_work_activity(
             database_path=database_path,
             project_repos=project_repos,
             since_days=since_days,
         )
+
+    @mcp.tool()
+    def github_balance(since_days: int = 30) -> list[dict[str, Any]]:
+        """
+        Deprecated alias of `hiqs_work_activity` (GH-316).
+
+        Same implementation and identical response shape; use the canonical
+        `hiqs_work_activity` tool going forward.
+        """
+        return hiqs_work_activity(since_days=since_days)

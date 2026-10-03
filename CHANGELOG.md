@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.98.1] - 2026-10-03
+
+### Changed
+
+- The per-project work-activity signal is now canonically named HiQS work activity (HiQS = High Quality Signals): a new `hiqs_work_activity` MCP tool joins `get_hiqs_work_activity()` as the canonical namespace, while `github_balance` and `get_github_balance` remain as deprecated aliases with identical behavior. Operator-facing labels updated; the storage table and output contract are unchanged for downstream consumers.
+
 ## [0.98.0] - 2026-10-02
 
 ### Added

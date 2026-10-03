@@ -1,0 +1,7 @@
+FIRSTHAND_COUNT=1
+ECHOED_COUNT=5
+ECHOED "HiQS work activity"
+ECHOED `fetch_github_balance`
+ECHOED `fetch_github_balance`
+ECHOED `fetch_github_balance`
+ECHOED `fetch_github_balance`
