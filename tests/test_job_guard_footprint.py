@@ -870,3 +870,32 @@ def test_a_trip_off_the_main_thread_is_raised_when_the_work_returns(isolated_gua
     thread.join(timeout=10)
     assert "ceiling is 1.0 GB" in outcome.get("raised", "")
     assert signals == [], "the guard must never signal the host process from a worker thread"
+
+
+@pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+def test_null_threshold_reports_default_source(isolated_guard, monkeypatch, key):
+    """An unset JSON value must not claim the device supplied the effective threshold."""
+    _write_device_config(isolated_guard, monkeypatch, {key: None})
+    assert job_guard.guard_settings()[key] == {"value": None, "source": "default"}
+
+
+@pytest.mark.parametrize("raw", [[], "off", 42, None])
+def test_non_object_config_warns_before_using_defaults(isolated_guard, monkeypatch, raw):
+    """Malformed top-level settings must be visible to doctor and the operator."""
+    path = isolated_guard / "rbos.config"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+    warnings = []
+    settings = job_guard.guard_settings(warn=warnings.append)
+    assert settings["memory_guard"] == {"value": True, "source": "default"}
+    assert any("expected an object" in warning for warning in warnings)
+
+
+@pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+def test_sub_byte_threshold_warns_instead_of_silently_using_default(isolated_guard, monkeypatch, key):
+    """A positive GB value that truncates to zero cannot be an effective override."""
+    _write_device_config(isolated_guard, monkeypatch, {key: 1e-20})
+    warnings = []
+    ceiling = job_guard.MemoryCeiling(log=warnings.append)
+    assert ceiling.settings[key] == {"value": None, "source": "default"}
+    assert any(key in warning for warning in warnings)

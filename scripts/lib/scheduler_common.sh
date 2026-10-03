@@ -181,7 +181,7 @@ if artifact_sync_days is not None:
     kwargs["artifact_sync_days"] = artifact_sync_days
 
 result = refresh_index(db_path, **kwargs)
-result["sync_outcome"], exit_code = classify_sync_outcome(result)
+result["sync_outcome"], exit_code = classify_sync_outcome(result, strict=strict)
 
 outcome_file = os.environ.get("RB_OUTCOME_FILE")
 if outcome_file:
@@ -191,8 +191,6 @@ if outcome_file:
     except Exception:
         pass
 
-if strict and exit_code == 0 and result.get("errors"):
-    exit_code = 1
 print(json.dumps(result, indent=2, default=str))
 sys.exit(exit_code)
 PY

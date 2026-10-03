@@ -251,12 +251,20 @@ def _job_guard_check(tmp_path: Path, monkeypatch, section, *, bypass: bool = Fal
 
 
 def test_doctor_reports_job_guard_off_and_its_source(tmp_path: Path, monkeypatch) -> None:
-    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "off"})
+    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "off", "swap_distress_gb": 1.5})
 
     assert check.status == OK
     assert "memory checks OFF" in check.detail
     assert "rbos.config" in check.detail, "the source of the setting must be named"
     assert "lock and timeout still active" in check.detail
+    for label in (
+        "compressor ceiling",
+        "swap distress bar 1.5 GB (device config",
+        "available floor",
+        "footprint ceiling",
+    ):
+        assert label in check.detail, f"disabled checks must still show configured thresholds: {check.detail}"
+    assert "not enforced" in check.detail
 
 
 def test_doctor_reports_each_threshold_and_its_source(tmp_path: Path, monkeypatch) -> None:

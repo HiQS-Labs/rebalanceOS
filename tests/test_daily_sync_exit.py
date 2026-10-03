@@ -292,6 +292,29 @@ class ArgvMappingTests(unittest.TestCase):
         strict_code, _ = self._execute_with_argv(["script", "github,focus5", "7", "1"], degraded_payload)
         self.assertEqual(strict_code, 1)
 
+    def test_strict_mode_rejects_returned_collector_errors(self) -> None:
+        """Strict jobs must fail regardless of which collector error shape was used."""
+        payload = {
+            "errors": [],
+            "results": [{"scope": "vault", "synced": 3}, {"scope": "email", "error": "invalid_grant"}],
+        }
+        for strict, expected in (("0", 0), ("1", 1)):
+            with self.subTest(strict=strict):
+                code, _ = self._execute_with_argv(["script", "vault,email", "7", strict], payload)
+                self.assertEqual(code, expected)
+
+    def test_strict_mode_keeps_embedding_deferrals_and_optional_notes_nonfatal(self) -> None:
+        """A retained-work deferral is not a source error, even for strict jobs."""
+        payload = {
+            "errors": [],
+            "results": [
+                {"scope": "vault", "ingest": {"new_files": 3}, "embedding_deferred": "lock held"},
+                {"scope": "next_actions", "skipped": True, "error": "model unavailable"},
+            ],
+        }
+        code, _ = self._execute_with_argv(["script", "vault", "7", "1"], payload)
+        self.assertEqual(code, 0)
+
     def test_argv_invalid_days_exits_2(self) -> None:
         code, kwargs = self._execute_with_argv(
             ["script", "github", "invalid_number"],
@@ -317,9 +340,9 @@ class ShellExecutionTests(unittest.TestCase):
         (cls.stub_dir / "rebalance" / "ingest" / "__init__.py").write_text("")
         (cls.stub_dir / "rebalance" / "ingest" / "index_ops.py").write_text(
             "import os\n"
-            "def classify_sync_outcome(res):\n"
+            "def classify_sync_outcome(res, *, strict=False):\n"
             '    outcome = res.get("sync_outcome", "complete")\n'
-            '    return outcome, (0 if outcome != "fatal" else 1)\n'
+            '    return outcome, (1 if outcome == "fatal" or (strict and res.get("errors")) else 0)\n'
             "\n"
             "def refresh_index(db, **kw):\n"
             '    mode = os.environ.get("TEST_OUTCOME", "complete")\n'

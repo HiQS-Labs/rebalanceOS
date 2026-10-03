@@ -179,12 +179,12 @@ _OFF_WORDS = {"off", "0", "false", "no"}
 
 
 def _valid_gb(value: float) -> bool:
-    """Positive, finite and at most 1 PB (GH-296 final QA F1/F7).
+    """At least one byte, finite and at most 1 PB (GH-296 final QA F1/F7).
 
     nan, inf or 1e308 would otherwise crash the GB-to-bytes conversion inside the
     very job the setting was meant to protect.
     """
-    return math.isfinite(value) and 0 < value <= 1_000_000
+    return math.isfinite(value) and 1 / GIB <= value <= 1_000_000
 
 
 def device_config_path() -> Path:
@@ -220,7 +220,10 @@ def guard_settings(warn=None) -> dict:
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            raw_section = data.get(CONFIG_SECTION, {}) if isinstance(data, dict) else {}
+            if not isinstance(data, dict):
+                warn(f"ignoring config in {path}: expected an object; using defaults")
+                data = {}
+            raw_section = data.get(CONFIG_SECTION, {})
             if isinstance(raw_section, dict):
                 section = raw_section
             else:
@@ -232,7 +235,7 @@ def guard_settings(warn=None) -> dict:
         raw = os.environ.get(env_name, "").strip() if env_name else ""
         if raw:
             return raw, f"env {env_name}"
-        if key in section:
+        if section.get(key) is not None:
             return section[key], f"device config {path}"
         return None, "default"
 
@@ -1055,11 +1058,6 @@ def settings_report() -> tuple[str, list[str]]:
         log=warnings.append,
     )
     settings = ceiling.settings
-    if not ceiling.memory_checks:
-        return (
-            f"memory checks OFF ({settings['memory_guard']['source']}); lock and timeout still active",
-            warnings,
-        )
     swap_total = swap_total_bytes()
 
     def _src(key: str) -> str:
@@ -1071,13 +1069,15 @@ def settings_report() -> tuple[str, list[str]]:
         else f"default: max(1 GB, {SWAP_DISTRESS_FRACTION:.0%} of {_fmt_gb(swap_total) if swap_total else 'unreadable'} swap)"
     )
     text = (
-        f"memory checks on ({_src('memory_guard')}); "
+        f"memory checks {'on' if ceiling.memory_checks else 'OFF'} ({_src('memory_guard')}); "
         f"compressor ceiling {_fmt_gb(ceiling.max_compressor or 0)} ({_src('max_compressor_gb')}), "
         f"swap distress bar {_fmt_gb(ceiling.swap_distress_bar())} ({swap_src}), "
         f"available floor {_fmt_gb(ceiling.min_available or 0)} ({_src('min_available_gb')}), "
         f"per-job footprint ceiling (wrapper and embedding; mid-run on main thread only) {_fmt_gb(ceiling.max_footprint or 0)} "
         f"({'env' if env_footprint else f'default: {DEFAULT_MAX_FOOTPRINT_FRACTION:.1%} of RAM'})"
     )
+    if not ceiling.memory_checks:
+        text += "; thresholds not enforced; lock and timeout still active"
     return text, warnings
 
 

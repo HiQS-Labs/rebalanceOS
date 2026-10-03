@@ -10,6 +10,14 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.97.1] - 2026-10-02
+
+### Fixed
+
+- Strict scheduled refreshes now fail consistently for returned collector errors as well as raised errors, while deferred embedding remains nonfatal.
+- Memory-guard diagnostics retain configured thresholds when checks are off, clearly mark them as unenforced, and correctly attribute unset values to defaults.
+- Malformed configuration objects and thresholds smaller than one byte now warn before falling back, avoiding silent configuration mistakes.
+
 ## [0.97.0] - 2026-09-27
 
 ### Fixed

@@ -1,0 +1,22 @@
+..                                                                     [100%]
+=================================== FAILURES ===================================
+_ ArgvMappingTests.test_strict_mode_rejects_returned_collector_errors (strict='1') _
+
+self = <test_daily_sync_exit.ArgvMappingTests testMethod=test_strict_mode_rejects_returned_collector_errors>
+
+    def test_strict_mode_rejects_returned_collector_errors(self) -> None:
+        """Strict jobs must fail regardless of which collector error shape was used."""
+        payload = {
+            "errors": [],
+            "results": [{"scope": "vault", "synced": 3}, {"scope": "email", "error": "invalid_grant"}],
+        }
+        for strict, expected in (("0", 0), ("1", 1)):
+            with self.subTest(strict=strict):
+                code, _ = self._execute_with_argv(["script", "vault,email", "7", strict], payload)
+>               self.assertEqual(code, expected)
+E               AssertionError: 0 != 1
+
+tests/test_daily_sync_exit.py:304: AssertionError
+=========================== short test summary info ============================
+SUBFAILED(strict='1') tests/test_daily_sync_exit.py::ArgvMappingTests::test_strict_mode_rejects_returned_collector_errors
+1 failed, 2 passed, 33 deselected, 1 subtests passed in 0.29s

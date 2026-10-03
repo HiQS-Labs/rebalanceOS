@@ -1942,7 +1942,7 @@ def refresh_index(
     }
 
 
-def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
+def classify_sync_outcome(result: dict[str, Any], *, strict: bool = False) -> tuple[str, int]:
     """Return the scheduler outcome and exit code without hiding source errors.
 
     Outcomes:
@@ -1957,6 +1957,8 @@ def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
     deliberate exception is the ``next_actions`` precompute note, which is non-fatal
     by design. A stage whose embedding step the job guard deferred
     (``embedding_deferred``, GH-296) did its other work: degraded, never skipped.
+    Strict scheduler policy makes partial source errors exit 1, while embedding
+    deferrals and optional next-actions notes retain their nonfatal semantics.
     """
     results = result.get("results", [])
     failures = (result.get("errors") or []) + [
@@ -1978,7 +1980,7 @@ def classify_sync_outcome(result: dict[str, Any]) -> tuple[str, int]:
     successful_results = [entry for entry in results if not entry.get("skipped") and not entry.get("error")]
     if not successful_results:
         return "fatal", 1
-    return "degraded", 0
+    return "degraded", 1 if strict else 0
 
 
 # ---------------------------------------------------------------------------
