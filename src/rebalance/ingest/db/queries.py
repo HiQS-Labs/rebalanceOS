@@ -1227,11 +1227,11 @@ def fetch_direct_commit_messages(
     *,
     ref: str,
     since_iso: str,
-    limit: int = 5000,
 ) -> list[dict[str, Any]]:
     """Direct commits observed on one ref (e.g. ``refs/heads/development``) since a time.
 
-    Alias-aware, deduped by SHA and bounded by ``limit``. The table keeps one
+    Alias-aware, deduped by SHA and bounded by ``since_iso`` (callers pass the
+    earliest relevant issue creation time, so no qualifying row is dropped). The table keeps one
     row per repo+SHA with the last push ref observed, so branch provenance is
     best-effort evidence, not proof (GH-307).
     """
@@ -1246,9 +1246,8 @@ def fetch_direct_commit_messages(
           AND ref = ?
           AND committed_at >= ?
         ORDER BY committed_at DESC
-        LIMIT ?
         """,
-        (*spellings, ref, since_iso, int(limit)),
+        (*spellings, ref, since_iso),
     ).fetchall()
     seen: set[str] = set()
     commits: list[dict[str, Any]] = []

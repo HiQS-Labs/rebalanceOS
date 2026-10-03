@@ -126,3 +126,11 @@ Rating: **rated 65/35/50/75**.
 | # | Finding | Disposition |
 |---|---|---|
 | R2-1 | BLOCKER: `github_direct_commits.ref` is last-writer-wins per SHA (`schema.py:654`, `db/github.py:330`), so default-branch provenance is not guaranteed. | **Adjudicated: not a blocker for this scope (ponytail / commensurate).** The flag is advisory and asks for confirmation. A wrong ref only flips a confirm-only suggestion, and locally 99.3% of rows are default-branch. Per-ref provenance needs a schema and writer change, which is out of envelope. The limitation is recorded under Risks, and the default-branch filter stays as best-effort evidence. No round 3 on the plan; the final code QA re-checks. |
+
+**Final code QA, round 1** (Codex via `consult.sh`, HEAD a09e05e): verdict CHANGES.
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | BLOCKER: a missing or unparseable created or committed time counted as delivery. | Accepted. Delivery now needs both times to parse, with committed ≥ created. |
+| F2 | BLOCKER: the 5,000-row cap could drop an older qualifying commit. | Accepted. The cap is removed; the read is bounded only by the earliest candidate's `created_at`. |
+| F3 | SHOULD: add timestamp edge tests. | Accepted. Added offset-formatted, malformed-commit and malformed-created cases. A beyond-cap test isn't needed now that there is no cap. |

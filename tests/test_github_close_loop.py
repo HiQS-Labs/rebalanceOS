@@ -149,6 +149,24 @@ class CloseLoopFlagTests(unittest.TestCase):
         report = infer_close_loop_flags(self.db_path, REPO, since_days=15, now=NOW)
         self.assertIn(220, self._flagged(report, "closed_without_delivery"))
 
+    def test_timestamp_edge_cases(self) -> None:
+        _seed(self.db_path)
+        with db_connection(self.db_path, ensure_github_schema) as conn:
+            # Offset-formatted commit time after creation counts as delivery.
+            _item(conn, "issue", 221, state="closed", state_reason="completed", closed=FRESH)
+            _commit(conn, "c5", "Fixes #221", committed="2026-10-01T05:00:00+05:00")
+            # A malformed commit time cannot prove order, so the flag stays.
+            _item(conn, "issue", 222, state="closed", state_reason="completed", closed=FRESH)
+            _commit(conn, "c6", "Fixes #222", committed="2026-10-01Tnot-a-time")
+            # A malformed issue creation time cannot prove order either.
+            _item(conn, "issue", 223, state="closed", state_reason="completed", created="garbage", closed=FRESH)
+            _commit(conn, "c7", "Fixes #223")
+            conn.commit()
+        flagged = self._flagged(infer_close_loop_flags(self.db_path, REPO, since_days=15, now=NOW), "closed_without_delivery")
+        self.assertNotIn(221, flagged)
+        self.assertIn(222, flagged)
+        self.assertIn(223, flagged)
+
     def test_readiness_reader_default_still_filters_to_milestone(self) -> None:
         _seed(self.db_path)
         with db_connection(self.db_path, ensure_github_schema) as conn:

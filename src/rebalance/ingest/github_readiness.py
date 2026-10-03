@@ -490,7 +490,8 @@ def infer_close_loop_flags(
             if not ref_re.search(commit.get("message") or ""):
                 continue
             committed = parse_utc_iso(commit.get("committed_at"))
-            if created is None or committed is None or committed >= created:
+            # Delivery needs a provable order: unparseable times never suppress the flag.
+            if created is not None and committed is not None and committed >= created:
                 delivered = True
                 break
         if delivered:
