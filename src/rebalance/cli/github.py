@@ -270,6 +270,11 @@ def github_close_loop_cmd(
     repo: str = typer.Option(..., "--repo", help="Repo in owner/name form"),
     stale_days: int = typer.Option(7, "--stale-days", min=1, help="Idle days before a PR/issue counts as stale"),
     since_days: int = typer.Option(30, "--since-days", min=1, help="Look-back window for closed issues"),
+    releases_scan: str = typer.Option(
+        "",
+        "--releases-scan",
+        help="Opt-in: comma-separated dirs to scan read-only for local RELEASES ledgers (releases.db) of this repo",
+    ),
     database: Path | None = DBOption(),
     output_format: str = typer.Option("text", "--output", help="Output format: text or json"),
 ) -> None:
@@ -290,6 +295,7 @@ def github_close_loop_cmd(
         repo_full_name=repo.strip(),
         stale_days=stale_days,
         since_days=since_days,
+        releases_scan_dirs=[d.strip() for d in releases_scan.split(",") if d.strip()] or None,
     )
     if normalized_output == "json":
         typer.echo(json.dumps(report, ensure_ascii=False))
@@ -298,6 +304,7 @@ def github_close_loop_cmd(
     typer.echo(f"Repo: {report['repo_full_name']} (as of {report['as_of']})")
     typer.echo(report["summary"])
     if report["status"] != "ok":
+        _echo_releases(report)
         return
     typer.echo("Counts: " + ", ".join(f"{flag}={count}" for flag, count in report["counts"].items()))
     for flag in CLOSE_LOOP_FLAGS:
@@ -312,6 +319,28 @@ def github_close_loop_cmd(
         if len(items) > 15:
             typer.echo(f"  … and {len(items) - 15} more (use --output json for the full list)")
     typer.echo("\nCounts are lower bounds: only items inside the local sync window are visible.")
+    _echo_releases(report)
+
+
+def _echo_releases(report: dict) -> None:
+    releases = report.get("releases")
+    if releases is None:
+        return
+    counts = releases["counts"]
+    typer.echo(
+        f"\nReleases scan: {releases['ledgers_found']} ledger(s) found, {counts['ledgers']} for this repo, "
+        f"{counts['tasks']} task(s) ({counts['in_progress']} in progress), {counts['conflicts']} conflict(s), "
+        f"{counts['drift']} drift, {counts['ledger_errors']} ledger error(s)"
+    )
+    for task in [t for t in releases["tasks"] if t["status"] == "in-progress"][:10]:
+        number = f"#{task['gh_number']}" if task["gh_number"] is not None else task["global_id"]
+        typer.echo(
+            f"  - {number} [{task['status']}] {task['title']} ({task['branch'] or '?'}, {task['clones']} clone(s))"
+        )
+    for item in releases["drift"][:10]:
+        typer.echo(f"  ! drift {item['kind']}: {item['evidence']}")
+    for conflict in releases["conflicts"][:5]:
+        typer.echo(f"  ? conflict {conflict['key']}: {len(conflict['values'])} clones disagree")
 
 
 @app.command("github-close-candidates")

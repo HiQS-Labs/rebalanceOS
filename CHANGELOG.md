@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.99.0] - 2026-10-02
+
+### Added
+
+- **Read-only RELEASES ledger scan (GH-310).** `rebalance github-close-loop --releases-scan <dir>[,<dir>]` finds `releases.db` ledgers in git clones and worktrees under the given directories (three levels deep, at most 200, skipping hidden and build folders). It opens each one strictly read-only and reports in-progress and parked tasks for the repo, the clones each task appears in, and conflicts where clones disagree on a task's section or status. It then compares those tasks with live GitHub data to flag drift: a task still marked in progress whose issue is closed, whose PR has merged, or whose open PR is stale or a forgotten draft. Ledgers in WAL mode, with a missing table or an unsupported schema, or whose repo can't be identified are reported as errors and skipped. The scan is off by default, and output without the flag is unchanged.
+- **Opt-in loop inputs for `/daily` (GH-310).** The daily unclosed-loop scanner takes `--close-loop` (or `REBALANCE_DAILY_CLOSE_LOOP=1`) and `--releases-scan <dirs>` (or `REBALANCE_RELEASES_SCAN_DIRS`). It merges close-loop flags and ledger tasks into one deduplicated, source-tagged `flagged_loops` list and re-checks every item against its own live GitHub read, so merged PRs and closed issues are never reported as open loops. Closed-without-delivery issues and ledger drift are listed as questions, not loops. If the `rebalance` CLI is unavailable, the scanner prints a single "input skipped" line and its output is unchanged.
+
 ## [0.98.0] - 2026-10-02
 
 ### Added
