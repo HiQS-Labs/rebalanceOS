@@ -2,7 +2,7 @@
 gh_issue: 312
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/312
 title: "CI/CD posture audit — ci-optimize scorecard 17/24 (B): execute Rung 1 (quarantine expiry) + Rung 2 Stage 1 (static pre-push gate)"
-status: In review
+status: In progress
 created: 2026-10-03
 updated: 2026-10-03
 owner: noel
@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Spike executed 2026-10-02 against the four pre-registered gates; campaign published at `TESTS-RESULTS/2026-10-02+GH-312/`. Full-lane gate rejected (G1/G4 fail); static substrate measured (~2.5 s) and hook mechanics proven (G2/G3 pass). This plan drafted and parked. | Codex plan QA → implement Rung 1 + Stage 1 → focused suites → full gates once → final relay QA → PR. |
+| Plan QA **Approved** 2026-10-03 (Codex relay, round 3 of 3, attested reviewed-head `89be1e5`; all six round-1 [Should]s + two round-2 [Should]s implemented). Doc promoted to `2-WORKING`. | Implement Rung 1 + Stage 1 → focused suites → full gates once → final relay QA → PR. |
 
 ## Why
 
