@@ -2,7 +2,7 @@
 gh_issue: 307
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/307
 title: Close-the-loop flags from the local GitHub corpus
-status: Plan — Codex QA pending
+status: Plan — Codex QA round 1 dispositions applied
 created: 2026-10-02
 updated: 2026-10-02
 owner: Grok (start-task)
@@ -49,8 +49,18 @@ Rating: **rated 65/35/50/75**.
    - `stale_pr`: open, non-draft PR whose `updated_at` is at least `stale_days` old.
    - `forgotten_draft`: open draft PR whose `updated_at` is at least `stale_days` old.
    - `pr_needs_refinement`: open PR with `review_decision == CHANGES_REQUESTED` or `check_status == failing`. It can co-occur with stale or draft.
-   - `closed_without_delivery`: closed issue with `state_reason` either `completed` or empty, and `closed_at` within `since_days`. It must have no merged PR linked by any `github_links` PR→issue row, and no direct commit on the repo whose message references `#N` or `GH-N`. `not_planned` is excluded. Evidence says "confirm", because this is surfaced for review, not asserted.
-   - `started_not_shipped`: open issue with a branch matching `(?:^|[/_-])gh-?N(?!\d)` (case-insensitive) and no linked PR in any state. The issue's `updated_at` must be at least `stale_days` old.
+   - `closed_without_delivery`: closed issue with `state_reason` either `completed` or empty, and `closed_at` within `since_days`. Either of these means the issue was delivered, so no flag is raised:
+     - **any** merged PR linked by a PR→issue `github_links` row (`closes` *or* `mentions`). This is deliberate: the flag is surfaced for confirmation, so a weak association suppresses rather than alarms.
+     - a direct commit on `refs/heads/<default_branch>`, committed at or after the issue's `created_at`, whose message references `#N` or `GH-N`.
+
+     `not_planned` is excluded. Evidence says "confirm", because this is surfaced for review, not asserted.
+   - `started_not_shipped`: open issue meeting all of these:
+     - it has a branch matching `(?:^|[/_-])gh-?N(?![0-9a-z])` (case-insensitive);
+     - no PR in any state links it;
+     - no PR's `head_ref` is a matching branch;
+     - its `updated_at` is at least `stale_days` old.
+
+     Branches named only by a bare number are not matched (documented limitation).
 3. CLI: `rebalance github-close-loop --repo O/R [--stale-days 7] [--since-days 30] [--db PATH] [--output text|json]`, in `src/rebalance/cli/github.py`, mirroring `github-close-candidates`.
 4. No writes beyond the existing `ensure_github_schema` call that sibling readers already make. There is no network access.
 
@@ -58,7 +68,7 @@ Rating: **rated 65/35/50/75**.
 
 1. `src/rebalance/ingest/db/queries.py`:
    - Add `all_issues: bool = False` to `fetch_release_readiness_data`. When it's True, skip the milestone issue filter. The default is unchanged.
-   - Add `fetch_direct_commit_messages(conn, repo_full_name, *, since_iso) -> list[str]`. It is alias-aware and bounded by `committed_at >= since_iso`. SQL stays inside `ingest/db/`, which `check_read_layer.py` enforces.
+   - Add `fetch_direct_commit_messages(conn, repo_full_name, *, ref, since_iso) -> list[dict]` returning `message` and `committed_at`. It is alias-aware, keeps only the given ref (the default branch), and is bounded by `committed_at >= since_iso`, where the caller passes the earliest `created_at` among candidates. SQL stays inside `ingest/db/`, which `check_read_layer.py` enforces.
 2. `src/rebalance/ingest/github_readiness.py`: add `infer_close_loop_flags` (about 90 lines) plus a small `_age_days` helper that uses `parse_utc_iso`.
 3. `src/rebalance/ingest/db/__init__.py`: export the new query if the package re-exports queries (follow the existing pattern).
 4. `src/rebalance/cli/github.py`: add the `github-close-loop` command (about 40 lines).
@@ -96,3 +106,16 @@ Rating: **rated 65/35/50/75**.
 - The readiness default milestone filtering is unchanged (a regression test covers it).
 - `rebalance github-close-loop --repo HiQS-Labs/rebalanceOS --output json` runs against a real local DB.
 - The read-layer, script-inventory and PDDA checks are green, or any failures are pre-existing and identical on `development`.
+
+## Codex plan QA log
+
+**Round 1** (Codex `gpt-6-sol` via relay-xyz `consult.sh`, read-only worktree, 2026-10-02 PT): verdict CHANGES.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Reusing `fetch_release_readiness_data` with `all_issues` is right; add a regression test. | Accepted (already planned). |
+| 2 | The columns and values are valid. | Pass. |
+| 3 | BLOCKER: the commit window can miss pre-window delivery, and direct commits come from any branch. | Accepted. The window now starts at the earliest candidate's `created_at`, and only the default-branch ref counts. Locally 15,367 of 15,471 direct commits are default-branch. |
+| 4 | Link kind is discarded, so a mention counts as delivery. | Accepted as an explicit decision: any merged association suppresses the flag (stated in the rule). The reader is unchanged. |
+| 5 | Check PR `head_ref`; the regex accepts `gh307suffix`. | Accepted. A head_ref match suppresses the flag, and the lookahead is `(?![0-9a-z])`. Bare-number branches are a documented limitation. |
+| 6 | Version 0.98.0 and the rating 65/35/50/75 are fine. | Pass. |
