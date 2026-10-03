@@ -312,3 +312,86 @@ on the repo is monitored through the registry, so it no longer ages out. See
 **Enforcement.** `tests/test_watched_repos.py::test_participation_only_does_not_auto_watch_repo`
 pins that a repo with only issues, comments and reviews stays out while a repo with a
 single pull request comes in.
+
+
+## GH-282 — fleet delivery deployment and lessons
+
+Fleet mode reuses the existing collector, common publication lock and schedules. It does not
+select a central Mac. Every participating Mac owns its generated paths and full-history SQLite
+replica; remote delivery is eventual on the existing Git Pulse cadence. The Obsidian note is a
+combined human-readable projection and is never the capture/control plane.
+
+1. Verify canonical collector identity before opting in: configured `device_id` must be present,
+   lower-case and safe, with no pending legacy migration. Inventory local writers, including manual
+   CLI/MCP callers, and verify the private checkout is clean and its pending commits are accounted for.
+2. Back up the declared runtime revision, configs, copied collector executable, canonical CLIO
+   helper, private DB (SQLite backup API), original note and personal header. Verify hashes and DB
+   integrity. Keep machine paths and original private content in ignored local deployment receipts.
+3. Fast-forward the stable runtime to landed `development`. Update the already installed collector
+   copy if it is not a symlink. Keep launchd labels and intervals unchanged; refresh existing long-running
+   runtime processes as needed. Do not activate 3-Eyes or disabled jobs as part of this deployment.
+4. In collector config set `fleet_mode=true`, the existing canonical `device_id`, and
+   `fleet_sync_subdir` matching Rebalance's `sync_subdir`. Set Rebalance `pulse_fleet_enabled=true`
+   and `pulse_device_id` to that same ID. Python validates literal collector settings on every publish.
+   Fleet mode overrides caller `push=True` and `PULSE_PUSH`; a successful local commit is `queued`,
+   never labelled remotely pushed. Shared historical files/pointers are retained but not updated.
+5. For CLIO, install the separately reviewed canonical helper, configure its fleet inventory, and set
+   explicit `clio_store_path`, `clio_database`, `clio_owner_uuid` in collector config. Export only
+   `devices/<CLIO-UUID>/clio.jsonl`; imported origins stay in private SQLite, outside all staged paths.
+   The pre-existing `snapshots/` relay remains separate. Never derive a CLIO UUID from a hostname.
+6. Run actual local rendering, collector delivery and canonical reconcile; verify upstream objects,
+   DB integrity/history preservation, header and the same note path. A fake fixture is useful for
+   contract proof but does not qualify an actual offline/rejoin or all-Mac pilot. Other Macs remain
+   disabled until their individual installation/source-coverage and archive-capacity checks pass.
+7. Rollback disables Python fleet mode and restores the backed-up collector/config/runtime only
+   once the private checkout is clean and no fleet commits are unpushed. Otherwise keep the new
+   collector and preserved pending history until reconciled; never reset, stash or discard it.
+
+The collector staggers once before its inherited lock. Network operations have a 900-second total
+budget and per-call 120-second default timeout, with up to five extra seconds for termination;
+local scanning/export overhead adds to lock time. Busy producers skip with 75 and retry on their
+existing schedule. They cannot record an attempt while another process holds the lock; age of the
+last delivered status remains the signal. Failed network delivery cannot report its failure remotely
+until a later delivery succeeds. Fleet health adds bounded local Git reads to the legacy pure-YAML
+reader; missing or unverifiable upstream evidence is conservatively not publishing. Experimental
+health-check reuses that canonical reader when installed, and otherwise warns for opted-in devices.
+
+Lessons: a merged PR is not a deployed runtime; a copied collector is a second deployment surface;
+Python hostname IDs and collector IDs were different; an inherited-lock re-exec must not repeat the
+stagger inside the lock. Empty repository inventories must work under macOS Bash 3.2. Preserve
+pending commits and use exact owner paths; a heartbeat alone never attests application output.
+
+Fleet render aging uses a named 10-hour bound: 7 hours of scheduled overnight pause, one hour
+for fall-back DST, the producer's half-hour budget, one collector interval and half-hour network/
+stagger grace. Explicit failed attempts and queued output are visible immediately; a silently
+stopped renderer can take that long to age out. Doctor/health detail distinguishes queued, failed
+(exit N), unavailable proof and old delivered output. A CLIO export/validation fault deliberately
+stops that Mac's collector before a new heartbeat; preserve the previous snapshot, inspect the
+backup/DB and cumulative guard, then rerun the existing collector after repair.
+
+A successful local render waiting for the next collector delivery intentionally reports a temporary
+doctor WARN (`queued, awaiting collector`). Warning-level health triage may report it during that
+window. Observe the installed collector phase across three real intervals before changing alert
+policy; this warning does not mean the render failed or its queued commit was lost.
+
+Studio activation lessons: bootstrap all known preserved CLIO origins once with explicit origin
+selection, then configure normal exports for the local owner only. Imported records must never
+be echoed by routine exports. The first upgraded collector heartbeat advertises fleet mode; an
+old unmarked heartbeat still uses legacy health until that delivery. Verify queue-to-delivered
+health after this first check-in, not before it. Test missing/mismatched settings as well as valid
+configuration: a refusal must return a structured error or doctor configuration failure, with no
+Git writes. Briefly unload only loaded local delivery jobs, then restore the identical plists.
+Keep capture and same-note export running, and verify preserved record payloads as well as counts.
+
+### CLIO fleet consumer qualification
+
+The canonical CLIO SQLite remains authoritative; the existing configured compatibility export contains full history across known origins. Verify the resolved source before adding a second reader. Raw history totals differ from filtered consumer totals: reconcile eligible projection keys and canonical source references, including multiple origins sharing one filtered prompt. JSONL records are separated by LF, not Unicode line separators. Preserve existing consumer keys and attach provenance additively. Use the existing semantic maintenance facade for selected, nonembedding projection; neither an empty result nor a guard skip proves consumer readiness. Keep scheduled memory deferral separate from delivery failure and never relax the whole stack to obtain a green receipt.
+
+Studio follow-through (0.97.2): source and package metadata can disagree in an editable install; confirm both after deployment. Restart only existing owned long-running consumers so they import the landed code. A manual named-source refresh proves the local consumer, not the guarded schedule. Read-only XYZ facts may be useful while explicitly partial; record errors and unchanged ledger bytes without repairing unrelated history.
+
+1. Verify a clean runtime and retain a verified SQLite backup plus the affected local configuration before activation.
+2. Fast-forward the runtime to the tested, independently reviewed landing; refresh its editable package metadata without changing dependencies.
+3. Restart existing long-running consumers only; preserve the note identity, installed job plists and exporter/collector cadences.
+4. Preview and run the existing named CLIO refresh and selected nonembedding semantic maintenance facade. Reconcile eligible keys and every origin reference, and compare prior consumer IDs and prompt payloads to the backup.
+5. Verify Daily citations, same-note/header preservation and delivered transport. For the optional XYZ seam, use existing explicit roots and prove the ledger is unchanged; retain the partial flag.
+6. Observe normal guarded jobs before declaring scheduled consumer readiness. On rollback, restore the previous approved runtime and package metadata; restore only the changed config keys. Additive provenance columns are compatible with the previous reader. Use the verified consumer backup only for an observed data regression, with consumer writers paused; never rewind canonical CLIO history to undo a projection change.

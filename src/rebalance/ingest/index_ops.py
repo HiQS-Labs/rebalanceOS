@@ -2105,6 +2105,7 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         "prompts_fetched": res.prompts_fetched,
         "prompts_inserted": res.prompts_inserted,
         "prompts_unchanged": res.prompts_unchanged,
+        "prompts_updated": res.prompts_updated,
         "steps_executed": ["sync_clio_prompts"],
     }
 
@@ -2148,7 +2149,13 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
     target_repo = Path(pulse_target).expanduser().resolve()
     sync_subdir = get_sync_subdir()
     sync_dir = target_repo / sync_subdir
-    device_id = get_device_id()
+    from rebalance.lib.git_ops import fleet_settings
+
+    try:
+        device_id = get_device_id()
+        fleet = fleet_settings(cfg)
+    except (ValueError, OSError) as exc:
+        return {"scope": "sync", "dry_run": dry_run, "error": f"fleet configuration invalid: {exc}"}
 
     if dry_run:
         return {
@@ -2157,7 +2164,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"publish this device calendar/email files and latest pointers → {target_repo}",
+                f"publish this device calendar/email files{'' if fleet else ' and latest pointers'} → {target_repo}",
             ],
         }
 
@@ -2170,13 +2177,13 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             owned = [
                 f"{sync_subdir}/{source}/{name}.json"
                 for source in ("calendar", "email")
-                for name in (device_id, "latest")
+                for name in ((device_id,) if fleet else (device_id, "latest"))
             ]
             error = publication_state_error(target_repo, owned)
             if error:
                 return {"scope": "sync", "dry_run": False, "error": error, "deferred": True}
             pending = run_git(target_repo, "log", "--format=%H", "@{u}..HEAD", "--", *owned)
-            if pending.returncode == 0 and pending.stdout:
+            if not fleet and pending.returncode == 0 and pending.stdout:
                 delivery = commit_and_push_sync(
                     target_repo, sync_subdir, device_id=device_id, generated_at="pending", lock_acquired=True
                 )
@@ -2204,6 +2211,9 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "deferred": True,
             "elapsed_seconds": round(time.monotonic() - started, 2),
         }
+
+    if git_result.get("git_error"):
+        return {"scope": "sync", "dry_run": False, "error": git_result["git_error"], "git": git_result}
 
     return {
         "scope": "sync",

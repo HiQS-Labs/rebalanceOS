@@ -1,0 +1,15 @@
+{
+  "checked_utc": "2026-10-03T01:11:29.049383+00:00",
+  "runtime_source": "b3e017b5182f5a196d55d404a439ae8ff1562422",
+  "last_scheduled_attempt_utc": "2026-10-03T01:08:30.733245+00:00",
+  "daily_work_synthesis_last_exit": 75,
+  "daily_sync_last_exit": 75,
+  "scheduled_consumer_success": false,
+  "latest_compat_records": 3979,
+  "consumer_records": 3979,
+  "consumer_latest_prompt": "2026-10-02T22:50:03Z",
+  "consumer_last_sync": "2026-10-02T23:03:11.571504+00:00",
+  "scheduled_refusal": "[job-guard] refusing to start: memory compressor holds 19.6 GB, ceiling is 16.0 GB, confirmed by swap in use 5.1 GB",
+  "guard_policy_changed": false,
+  "job_forced": false
+}

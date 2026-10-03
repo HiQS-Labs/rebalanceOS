@@ -612,6 +612,7 @@ def project_semantic_documents(
         database_path=database_path,
         source_types=source_types,
         repo_full_name=repo_full_name,
+        use_registry_providers=True,
     )
 
 

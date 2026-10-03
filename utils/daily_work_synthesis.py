@@ -106,7 +106,8 @@ def recent_prompt_rows(cutoff: datetime, limit: int = 16) -> list[dict[str, Any]
     except OSError:
         return []
     rows: list[dict[str, Any]] = []
-    for line in reversed(raw.splitlines()):
+    # JSONL boundaries are LF; Unicode separators may occur inside prompt text.
+    for line in reversed(raw.split("\n")):
         try:
             row = json.loads(line)
             stamp = parse_iso(row.get("timestamp"))
@@ -344,18 +345,30 @@ def collect_packet(db_path: Path, now: datetime, log_dir: Path, cfg: dict[str, A
             rows = load_recent_clio_prompts(db_path, cutoff, limit=16)
         except Exception:
             rows = []
-    for index, row in enumerate(rows):
+    for row in rows:
         try:
-            row_id = row.get("id") if isinstance(row, dict) else row["id"]
+            row_id = (row.get("record_id") or row.get("id")) if isinstance(row, dict) else row["id"]
+            references = row.get("source_records", [])
+            if not row.get("record_id") and len(references) == 1:
+                row_id = references[0]["record_id"]
+            if not row_id:
+                identity = [row.get(name, "") for name in ("session_id", "timestamp", "prompt")]
+                row_id = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
             evidence.append(
                 {
-                    "id": f"clio:{row_id or index}",
+                    "id": f"clio:{row_id}",
                     "kind": "intent",
                     "attested": False,
                     "observed_at": row["timestamp"],
-                    "agent": scrub(row["agent"], 40),
-                    "repo": scrub(row["repo"], 100),
+                    "agent": scrub(row.get("agent", ""), 40),
+                    "repo": scrub(row.get("repo", ""), 100),
                     "text": scrub(row["prompt"]),
+                    "source_records": row.get("source_records", [])
+                    or (
+                        [{"record_id": row["record_id"], "origin_id": row["origin_id"]}]
+                        if row.get("record_id") and row.get("origin_id")
+                        else []
+                    ),
                 }
             )
         except (KeyError, TypeError):

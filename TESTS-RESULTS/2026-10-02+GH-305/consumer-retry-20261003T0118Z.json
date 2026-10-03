@@ -1,0 +1,12 @@
+{
+  "checked_utc": "2026-10-03T01:18:48.885105+00:00",
+  "attempt_utc": "2026-10-03T01:18:02.362000+00:00",
+  "user_requested_retry": true,
+  "existing_launchagent_kickstarted": true,
+  "runs_before": 267,
+  "runs_after": 268,
+  "last_exit": 75,
+  "consumer_started": false,
+  "guard_policy_changed": false,
+  "refusal": "[job-guard] refusing to start: memory compressor holds 19.1 GB, ceiling is 16.0 GB, confirmed by swap in use 5.1 GB"
+}

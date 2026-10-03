@@ -33,6 +33,58 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(h.priority, 3)
         self.assertTrue(h.healthy)
 
+    def test_fleet_respects_scheduled_render_gaps(self) -> None:
+        for minutes in (80, 190, 600):
+            with self.subTest(render_age_minutes=minutes):
+                h = classify(
+                    _h(
+                        NOW - timedelta(minutes=10),
+                        fleet_mode=True,
+                        last_pulse_exit=0,
+                        last_pulse_publish_utc=NOW - timedelta(minutes=minutes),
+                    ),
+                    NOW,
+                )
+                self.assertEqual(h.state, "ALIVE")
+
+    def test_fleet_silent_renderer_eventually_becomes_stale(self) -> None:
+        h = classify(
+            _h(
+                NOW - timedelta(minutes=10),
+                fleet_mode=True,
+                last_pulse_exit=0,
+                last_pulse_publish_utc=NOW - timedelta(minutes=601),
+            ),
+            NOW,
+        )
+        self.assertEqual(h.state, "ALIVE_NOT_PUBLISHING")
+        self.assertIn("old", h.pulse_delivery_reason)
+
+    def test_fleet_queue_and_render_failure_have_distinct_reasons(self) -> None:
+        queued = classify(
+            _h(
+                NOW - timedelta(minutes=10),
+                fleet_mode=True,
+                last_pulse_exit=0,
+                pulse_delivery_pending=True,
+                last_pulse_publish_utc=NOW - timedelta(minutes=10),
+            ),
+            NOW,
+        )
+        failed = classify(
+            _h(
+                NOW - timedelta(minutes=10),
+                fleet_mode=True,
+                last_pulse_exit=70,
+                last_pulse_publish_utc=NOW - timedelta(minutes=10),
+            ),
+            NOW,
+        )
+        self.assertEqual(queued.state, "ALIVE_NOT_PUBLISHING")
+        self.assertEqual(failed.state, "ALIVE_NOT_PUBLISHING")
+        self.assertIn("queued", queued.pulse_delivery_reason)
+        self.assertIn("exit 70", failed.pulse_delivery_reason)
+
     def test_stale_between_warn_and_alert(self) -> None:
         h = classify(_h(NOW - timedelta(hours=5)), NOW)
         self.assertEqual(h.state, "STALE")

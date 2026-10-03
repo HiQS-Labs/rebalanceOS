@@ -10,18 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.97.1] - 2026-10-02
+## [0.98.0] - 2026-10-02
 
 ### Fixed
 
 - Strict scheduled refreshes now fail consistently for returned collector errors as well as raised errors, while deferred embedding remains nonfatal.
 - Memory-guard diagnostics retain configured thresholds when checks are off, clearly mark them as unenforced, and correctly attribute unset values to defaults.
 - Malformed configuration objects and thresholds smaller than one byte now warn before falling back, avoiding silent configuration mistakes.
-
-## [0.97.0] - 2026-09-27
-
-### Fixed
-
 - The scheduled-job memory guard no longer refuses healthy runs on Macs with a small swap file. It treated any swap above 1 GB as proof of memory distress, which a laptop with a 2 GB swap file carries permanently, so every job was refused while half the memory sat free. Swap now confirms distress only when it also fills three quarters of the swap file; an unreadable swap size keeps the old rule.
 - When the guard postpones the embedding step, the run is no longer reported as a hard failure. The work each stage already did (note ingest, GitHub sync, document backfill, dashboard update) is kept and reported, the run is marked partially complete, and the embedding catches up on the next schedule.
 - A job skipped because another copy was still running is no longer shown as a failure in the health check.
@@ -32,6 +27,33 @@
 
 - Each Mac can turn the guard's memory checks off, or set its own compressor, swap and free-memory thresholds, from its local configuration, with no scheduler edits. The one-run-at-a-time lock and the run-time limit always stay on, every run logs when the memory checks are off, and invalid values fall back to the defaults with a warning.
 - The health check reports the guard's effective memory settings on each Mac and where each value came from.
+
+## [0.97.2] - 2026-10-02
+
+### Fixed
+
+- Daily CLIO evidence preserves Unicode JSONL content and stable source citations. Consumer keys remain unchanged while canonical record/origin references are retained additively in the existing semantic projection, including repeated and colliding imports.
+- The semantic maintenance facade now enables selected registry providers, allowing nonembedding CLIO backfill. Studio qualification reuses the full-history compatibility export; memory guards and fleet schedules remain unchanged.
+
+## [0.97.1] - 2026-10-02
+
+### Fixed
+
+- Fleet configuration failures return structured publishing/sync errors and explicit doctor failures, preserving unrelated scheduler liveness checks. Missing targets fail validation before writes.
+- The collector refuses failed network-budget initialization. Valid delivery behavior and schedules remain unchanged; the Studio receipt and rollout lessons are recorded under GH-282.
+
+## [0.97.0] - 2026-10-02
+
+### Added
+
+- Opt-in fleet ownership: live pulse, daily logs and digests use distinct device paths; calendar/email snapshots retain their device paths without shared latest-pointer writes. Fleet views select delivered pages and validated snapshots on read.
+- Fleet producers queue exact local commits under the existing publication lock; the existing Git Pulse collector owns remote delivery, with bounded Git calls, jittered retries and a device stagger before lock acquisition. No new job, store or ledger writer.
+- Explicit canonical CLIO owner export/reconcile integration, preserving private full-history SQLite replicas and the same seven-day Obsidian note/exporter schedule.
+- Fleet health verifies upstream page/status evidence and reports alive-but-not-publishing instead of mistaking a fresh collector heartbeat for successful rendering.
+
+### Deployment
+
+- Fleet mode is optional and reversible; deploy only after verified runtime, collector, config, database and note backups. A copied git-pulse executable must be updated separately from the runtime checkout. Four-Mac/offline-rejoin and seven-day qualification remain open in GH-282.
 
 ## [0.96.1] - 2026-09-27
 
