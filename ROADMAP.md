@@ -37,6 +37,8 @@ goal: >
 - **CLIO journey replay** ([#230](https://github.com/HiQS-Labs/rebalanceOS/issues/230)) — private spike reviewed and ready for review in #231; human usefulness remains a release decision; [plan](PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md).
 
 ### In progress
+
+- **CLIO history and HiQS activity lookup skill** ([#315](https://github.com/HiQS-Labs/rebalanceOS/issues/315)) — document merged readers and configured activity sources; rated 55/30/50/90 → [GH-315-CLIO-READER-SKILL.md](PROJECT/2-WORKING/GH-315-CLIO-READER-SKILL.md)
 - **Close-the-loop flags from the local GitHub corpus** ([#307](https://github.com/HiQS-Labs/rebalanceOS/issues/307)) — active one-phase plan: one deterministic per-repo reader plus `github-close-loop` CLI (stale PR, forgotten draft, needs refinement, closed without delivery, started-not-shipped) reusing the resolved readiness reader, feeding #300 and the triple-arm work. rated 65/35/50/75 → [GH-307-CLOSE-LOOP-FLAGS.md](PROJECT/2-WORKING/GH-307-CLOSE-LOOP-FLAGS.md)
 - **Fleet Pulse delivery** ([#282](https://github.com/HiQS-Labs/rebalanceOS/issues/282)) — Phase 1 merged; device-owned output, sole collector delivery and local rollout active; four-Mac/seven-day qualification remains. [Plan](PROJECT/2-WORKING/GH-282-PULSE-DELIVERY-PIPELINE.md).
 - **One install path — per-job installers folded into `stack.sh`** ([#255](https://github.com/HiQS-Labs/rebalanceOS/issues/255)) — GH-241 follow-up. Phase 1 merged 2026-09-23 via PR #256: `stack.sh up` and the 13 per-job installers had drifted apart; the installers are deleted and one install flow remains. Open: macOS proof via GH-211, and Phase 2. rated 70/65/55/60 → [GH-255-ONE-INSTALL-PATH.md](PROJECT/2-WORKING/GH-255-ONE-INSTALL-PATH.md)
@@ -215,3 +217,4 @@ other section, or written with any other emphasis, are skipped silently — the 
 `no ledger items parsed` and writes no plan. See GH-229.
 
 - **GH-23 publication durability** — In progress: shared Git ownership, safe reconciliation, bounded delivery; broader scheduler/transport redesign deferred. → [GH-23-PUBLICATION-DURABILITY.md](PROJECT/2-WORKING/GH-23-PUBLICATION-DURABILITY.md)
+
