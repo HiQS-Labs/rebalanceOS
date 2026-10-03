@@ -82,3 +82,50 @@ lines in one 194 s github-sync run. The branch now logs it once per run.
   running the new code. Run 3 uses the real branch code.
 - **One Mac.** The Mac Studio (64 GB) and Mac Mini (32 GB) weren't re-measured.
 - **Real side effects.** Runs 1–2 pushed pulse output and wrote normal job logs.
+
+
+## PR 298 takeover review — 2026-10-02
+
+Five review findings were fixed in the existing resolver, report and outcome classifier:
+disabled checks omitted thresholds; null thresholds claimed config provenance; non-object root
+config was silent; sub-byte thresholds silently truncated to zero; strict scheduler policy ignored
+returned collector errors. The last fix centralizes strict policy in `classify_sync_outcome` and
+preserves nonfatal embedding deferrals and optional next-actions notes. No new subsystem or writer.
+
+| Check | Result | Receipt |
+|---|---|---|
+| Settings regressions on incoming eec7071 | 11 failed before correction | [red](review-settings-red.txt) |
+| Strict-policy regression before correction | strict returned-error case failed; nonfatal controls passed | [red](review-strict-red.txt) |
+| Focused guard/doctor/refresh suites | 179 passed, 2 subtests passed | [green](review-focused-green.txt) |
+| Full pre-integration suite | 2888 passed, 21 skipped, 11 xfailed | [receipt](review-premerge-suite.txt) |
+| Full integrated suite at 71786aa | 2891 passed, 21 skipped, 11 xfailed, 148 subtests passed | [receipt](review-integrated-suite.txt) |
+| Ruff, format, mypy, repository ratchets, docs and frontdoor | all passed | [receipt](review-static.txt) |
+| Integrated doctor | guard OK; overall passed with environment warnings | [filtered excerpt](review-doctor-excerpt.txt) |
+
+Reproduction: `PYTHONPATH=src:HiQS python -m pytest tests/ HiQS/tests -q` using Python 3.13
+and the existing installed dependencies. Focused run used `tests/test_job_guard_footprint.py`,
+`tests/test_doctor_launchd.py`, `tests/test_job_guard_wiring.py`, `tests/test_daily_sync_exit.py`,
+`tests/test_collector_registry.py`, and `tests/test_github_knowledge.py`. The settings red run
+selected `null_threshold or non_object_config or sub_byte_threshold or reports_job_guard_off`;
+the strict red run selected `strict_mode_rejects or strict_mode_keeps`.
+[Source hashes](review-source-manifest.json) identify the final integrated code and tests.
+
+External review: CodeRabbit's two documentation changes were already implemented; its reserved
+exit-code finding was withdrawn. Greptile supplied no technical findings because its trial expired.
+The prior Codex relay's accepted worker-thread limitation remains. Two read-only review lanes
+checked the guard and refresh/doctor seams; the refresh lane found the strict-policy gap and then
+verified the correction. The graph generation predates the PR, so changed code and excluded shell
+paths were checked directly against source. No new independent model-service review was claimed.
+
+Integration: development 4652361 is merged into the PR branch. Both roadmap entries and upstream
+fleet/CLIO behavior are preserved. Version 0.98.0 replaces the PR's conflicting 0.97.0 allocation.
+
+### Review limitations and deviations
+
+An initial full run crossed the version edit and failed only the version consistency assertion
+(2875 passed). It is not a clean baseline: [mixed-revision receipt](review-initial-mixed-revision.txt).
+The subsequent full runs used stable source and passed. Raw test receipts replace machine paths;
+the doctor excerpt omits private project/device data and unrelated checks. The full suite retains
+21 existing skips and 11 expected failures, including superseded MLX tests, absent local web output,
+and existing quarantines. Hardware load, 48-hour soak and seven-day qualification were not repeated;
+background-thread mid-run interruption remains outside this review. Nothing was merged or deployed.

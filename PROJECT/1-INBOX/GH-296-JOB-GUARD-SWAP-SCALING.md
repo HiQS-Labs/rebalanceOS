@@ -4,7 +4,7 @@ source: https://github.com/HiQS-Labs/rebalanceOS/issues/296
 title: "job_guard memory guard: per-device on/off (and thresholds) via per-device config, plus a guard-off tech spike"
 status: "Active — fix in flight on fix/gh296-job-guard-swap-scaling"
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-10-02
 owner: noel
 doc_type: bugfix
 goal: >
@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Phases 1–4 implemented, plus the #297 items the operator pulled in (GitHub embedding guarded; returned collector errors classified). Full suite 2870 passed (6 battery-only failures, pre-existing). On the 14" the fixed guard ran 3/3 jobs the old guard refused. QA: agy plan relay approved; Codex implementation relay closed Escalated on one accepted, documented limitation (the worker-thread guard can't interrupt mid-run). Evidence: [TESTS-RESULTS/2026-09-27+GH-296](../../TESTS-RESULTS/2026-09-27+GH-296/SUMMARY.md). | PR open, awaiting review and merge. After merge: 5.2 full re-embed, 5.3 48 h soak, 5.4 7-day check; dashboard subprocess follow-up in #297. |
+| PR 298 takeover fixes implemented; development conflicts resolved at 71786aa, guard release 0.98.0. Integrated suite: 2891 passed; static gates passed; doctor passed with environment warnings. Evidence: [campaign](../../TESTS-RESULTS/2026-09-27+GH-296/SUMMARY.md). | Publish review and await merge. After merge: full re-embed, 48 h soak, seven-day check; accepted worker-thread interruption follow-up remains. |
 
 ## Canonical plan
 
@@ -50,7 +50,7 @@ rated 85/70/50/55 (2026-09-27).
 - [x] Reproduce settings visibility defects: disabled checks omit thresholds, null thresholds
   misattribute defaults, malformed root configuration is silent, and sub-byte overrides truncate to zero.
 - [x] Extend the existing resolver/report only; retain lock, timeout, and accepted worker-thread behavior.
-- [ ] Verify regression tests fail before fixes, run relevant suites and repository gates, retain receipts
+- [x] Verify regression tests fail before fixes, run relevant suites and repository gates, retain receipts
   in the existing campaign, and publish the review to the PR.
 
 Decision rule: each regression must fail on the incoming PR and pass after the narrow correction.
@@ -72,3 +72,9 @@ fixed; the reserved exit-code concern was withdrawn by its reviewer and is not r
 provided no review because its trial expired. CodeRabbit's telemetry question exceeds the actual
 issue requirement: the run record must contain guard mode, while doctor owns thresholds/sources.
 The accepted worker-thread interruption limitation and post-merge hardware qualification remain.
+
+
+Integration: merged `development` at `4652361` into the PR branch. Both roadmap entries
+and all fleet/CLIO changes are retained. The guard feature is now version 0.98.0 because
+0.97.0–0.97.2 already shipped on development; the prior guard changelog entries are consolidated
+under 0.98.0. The branch remains unmerged and runtime deployment is not part of this review.
