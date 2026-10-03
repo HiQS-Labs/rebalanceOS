@@ -1,0 +1,53 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_residual_swap_on_a_small_swap_file_is_not_distress ____________
+
+isolated_guard = PosixPath('<tmp>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1060968b0>
+
+    def test_residual_swap_on_a_small_swap_file_is_not_distress(isolated_guard, monkeypatch):
+        """GH-296: the absolute 1 GiB swap bar is always true on a 2 GB swap file.
+    
+        1.2 GB of static residual swap "confirmed" a compressor reading that the machine
+        had absorbed, so preflight refused and the mid-run check would kill. The bar now
+        scales with the swap file: 1.2 of 2.0 GB is below 75% and is not distress.
+        """
+        _laptop_14in(monkeypatch)
+        ceiling = job_guard.MemoryCeiling(poll_seconds=0.05)
+>       ceiling.preflight()  # must not raise
+        ^^^^^^^^^^^^^^^^^^^
+
+tests/test_job_guard_footprint.py:540: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <utils.job_guard.MemoryCeiling object at 0x106260ec0>
+
+    def preflight(self) -> None:
+        """Refuse to even start when the machine is already starved.
+    
+        Cheaper than starting a 40-minute job that will be killed at minute two,
+        and it is the check that turns a stacked run into a clean error instead
+        of a kernel panic.
+        """
+        # The guard must never silently stop guarding. Without physical RAM every
+        # ceiling below is None and the watchdog disables itself, so a run that only
+        # "passed" because the sysctl was blocked would be indistinguishable from a
+        # genuinely well-behaved one — and #157's measurements would be unreliable
+        # for exactly that reason. Refuse instead: EX_TEMPFAIL is deferred, so a
+        # supervisor retries rather than counting it as a job failure (#156).
+        if not self.total:
+            raise MemoryCeilingExceeded(
+                "refusing to start: cannot determine physical RAM, so no memory ceiling "
+                "can be enforced (an unguarded run must not masquerade as a guarded one)"
+            )
+    
+        # Compressor pressure first: it stays honest when "available" does not.
+        reason = self._compressor_trip()
+        if reason:
+>           raise MemoryCeilingExceeded(f"refusing to start: {reason}")
+E           utils.job_guard.MemoryCeilingExceeded: refusing to start: memory compressor holds 9.3 GB, ceiling is 6.0 GB, confirmed by swap in use 1.2 GB
+
+utils/job_guard.py:811: MemoryCeilingExceeded
+=========================== short test summary info ============================
+FAILED tests/test_job_guard_footprint.py::test_residual_swap_on_a_small_swap_file_is_not_distress
+1 failed, 28 deselected in 0.15s

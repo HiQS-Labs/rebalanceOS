@@ -1,0 +1,4 @@
+[job-guard] starting 'scheduler-obsidian-vault-embeddings': footprint ceiling 999.0 GB, available floor 4.0 GB
+[2026-09-27 11:51:58] === rebalance obsidian vault embeddings starting ===
+[2026-09-27 11:52:15] === rebalance obsidian vault embeddings complete ===
+[job-guard] 'scheduler-obsidian-vault-embeddings' finished with exit 0; peak tree footprint 0.1 GB

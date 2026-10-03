@@ -1,0 +1,2 @@
+[job-guard] starting 'scheduler-pulse-warning-watch': footprint ceiling 3.0 GB, available floor 4.0 GB
+[job-guard] 'scheduler-pulse-warning-watch' finished with exit 0; peak tree footprint 0.0 GB

@@ -1,0 +1,4 @@
+[2026-09-27 15:27:11] === rebalance obsidian vault embeddings starting ===
+[2026-09-27 15:27:16] === rebalance obsidian vault embeddings failed fatally (see JSON above) ===
+        5.60 real         4.20 user         0.88 sys
+           279461888  maximum resident set size

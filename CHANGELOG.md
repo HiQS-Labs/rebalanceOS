@@ -10,6 +10,24 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.98.0] - 2026-10-02
+
+### Fixed
+
+- Strict scheduled refreshes now fail consistently for returned collector errors as well as raised errors, while deferred embedding remains nonfatal.
+- Memory-guard diagnostics retain configured thresholds when checks are off, clearly mark them as unenforced, and correctly attribute unset values to defaults.
+- Malformed configuration objects and thresholds smaller than one byte now warn before falling back, avoiding silent configuration mistakes.
+- The scheduled-job memory guard no longer refuses healthy runs on Macs with a small swap file. It treated any swap above 1 GB as proof of memory distress, which a laptop with a 2 GB swap file carries permanently, so every job was refused while half the memory sat free. Swap now confirms distress only when it also fills three quarters of the swap file; an unreadable swap size keeps the old rule.
+- When the guard postpones the embedding step, the run is no longer reported as a hard failure. The work each stage already did (note ingest, GitHub sync, document backfill, dashboard update) is kept and reported, the run is marked partially complete, and the embedding catches up on the next schedule.
+- A job skipped because another copy was still running is no longer shown as a failure in the health check.
+- GitHub document embedding now takes the same one-at-a-time lock and memory checks as the other embedding steps, so it can no longer run alongside them unchecked.
+- A refresh whose only source failed by reporting an error (for example an expired email login) is now reported as failed instead of complete; alongside a successful source it is reported as partially complete.
+
+### Added
+
+- Each Mac can turn the guard's memory checks off, or set its own compressor, swap and free-memory thresholds, from its local configuration, with no scheduler edits. The one-run-at-a-time lock and the run-time limit always stay on, every run logs when the memory checks are off, and invalid values fall back to the defaults with a warning.
+- The health check reports the guard's effective memory settings on each Mac and where each value came from.
+
 ## [0.97.2] - 2026-10-02
 
 ### Fixed
