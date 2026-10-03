@@ -2,7 +2,7 @@
 gh_issue: 307
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/307
 title: Close-the-loop flags from the local GitHub corpus
-status: Plan — Codex QA round 1 dispositions applied
+status: Plan — Codex QA closed after round 2 (adjudicated); implementing
 created: 2026-10-02
 updated: 2026-10-02
 owner: Grok (start-task)
@@ -87,6 +87,7 @@ Rating: **rated 65/35/50/75**.
 ## Risks and rollback
 
 - **Sync window:** items outside the synced window are invisible, so flags are lower bounds. This is stated in the CLI text output.
+- **Direct-commit provenance:** `github_direct_commits` keeps one row per repo and SHA, and `ref` is the last push ref observed, so default-branch evidence is best-effort. A wrong ref can only flip a confirm-only flag. Per-ref provenance would need a schema change and is deferred.
 - **Closed-without-delivery precision:** cross-repo or squash-without-reference deliveries still false-flag. Evidence asks for confirmation, and the #300 operator spot-check (at least 70% useful) decides whether to tighten the rule.
 - **Rollback:** the change is purely additive (a new function, a new command, and an opt-in keyword). Revert the PR.
 
@@ -119,3 +120,9 @@ Rating: **rated 65/35/50/75**.
 | 4 | Link kind is discarded, so a mention counts as delivery. | Accepted as an explicit decision: any merged association suppresses the flag (stated in the rule). The reader is unchanged. |
 | 5 | Check PR `head_ref`; the regex accepts `gh307suffix`. | Accepted. A head_ref match suppresses the flag, and the lookahead is `(?![0-9a-z])`. Bare-number branches are a documented limitation. |
 | 6 | Version 0.98.0 and the rating 65/35/50/75 are fine. | Pass. |
+
+**Round 2** (re-run after a Mac Mini disconnect interrupted the first attempt): verdict CHANGES. Findings 4 and 5 were confirmed resolved, and the window fix was confirmed.
+
+| # | Finding | Disposition |
+|---|---|---|
+| R2-1 | BLOCKER: `github_direct_commits.ref` is last-writer-wins per SHA (`schema.py:654`, `db/github.py:330`), so default-branch provenance is not guaranteed. | **Adjudicated: not a blocker for this scope (ponytail / commensurate).** The flag is advisory and asks for confirmation. A wrong ref only flips a confirm-only suggestion, and locally 99.3% of rows are default-branch. Per-ref provenance needs a schema and writer change, which is out of envelope. The limitation is recorded under Risks, and the default-branch filter stays as best-effort evidence. No round 3 on the plan; the final code QA re-checks. |
