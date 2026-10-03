@@ -67,7 +67,7 @@ Inspect the top of `~/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_p
   - Items are deduped by `(repo, number)` and source-tagged (`close-loop:<flag>`, `releases:<repo>#<task>`, `releases-drift:pr_stale`) under `flagged_loops`; the summary line gains `N flagged loops (close-loop/releases)`.
   - Every item is re-verified against the scanner's own live GitHub read: a PR must be `OPEN`, an issue must be in the live open set. Merged/closed items are dropped; unverifiable items are counted in `unverified`, never reported as loops.
   - `closed_without_delivery` and ledger-vs-GitHub drift (`issue_closed`, `pr_merged`) go to `questions`, not loops: closed without delivery is a question, not a verdict.
-  - If the `rebalance` CLI (or `REBALANCE_BIN`) is missing or fails, print one line (`daily: <input> input skipped (<reason>)`) and keep the existing output byte-for-byte. Off or skipped, the JSON schema is unchanged.
+  - If the `rebalance` CLI (or `REBALANCE_BIN`) is missing or fails, print one line (`daily: <input> input skipped (<reason>)`) and keep the existing output byte-for-byte. Off or skipped, the JSON schema is unchanged. If only some watched repos fail, print one `input partial` line and list them in `failed_repos`.
   - Cite these as `[Trigger: close-loop:stale_pr <repo>#<n>]` or `[Trigger: releases:<repo>#<task>]` in the unclosed-loop nudge.
 - **Machine CPU Health (Runaway Scanner)**:
   - Execute `python3 .agents/skills/daily/scripts/scan_runaway_cpu.py` (sibling scanner, GH-194).

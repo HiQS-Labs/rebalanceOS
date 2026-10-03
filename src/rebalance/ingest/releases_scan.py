@@ -174,6 +174,7 @@ def _read_ledger(root: Path, repo_full_name: str) -> dict[str, Any]:
                 "title": row["title"] or "",
                 "section": row["section"] or "",
                 "status": status,
+                "status_label": row["status_label"],
                 "rating": "/".join(str(v) for v in ratings) if all(v is not None for v in ratings) else None,
                 "issue_url": row["issue_url"] or "",
                 "doc_path": row["doc_path"] or "",
@@ -212,14 +213,15 @@ def scan_releases(dirs: list[str], repo_full_name: str, *, max_depth: int = 3) -
     conflicts: list[dict[str, Any]] = []
     for key, items in groups.items():
         preferred = max(items, key=lambda t: (t["updated_at"], t["branch"] in _INTEGRATION_BRANCHES))
-        disagree = len({(t["section"], t["status"]) for t in items}) > 1
+        disagree = len({(t["section"], t["status"], t["status_label"]) for t in items}) > 1
         if disagree:
             conflicts.append(
                 {
                     "key": key,
                     "preferred_clone": preferred["clone_path"],
                     "values": [
-                        {k: t[k] for k in ("clone_path", "branch", "section", "status", "updated_at")} for t in items
+                        {k: t[k] for k in ("clone_path", "branch", "section", "status", "status_label", "updated_at")}
+                        for t in items
                     ],
                 }
             )

@@ -174,6 +174,13 @@ phases: 1
 |---|---|---|
 | 1 | SHOULD: add tests for the depth boundary, the `no_local_data` path and a multi-repo ledger. | Accepted. All three are in `tests/test_releases_scan.py`. |
 
+**Code round 1** (Codex via relay-xyz `consult.sh`, HEAD 53cf23e): verdict CHANGES, with two SHOULDs. Both accepted.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | SHOULD: the recorded `status_label` is folded into `in-progress`, so clones whose labels differ look like they agree. | Accepted. Each task now carries the raw `status_label`, and conflict detection compares section, status and label. New test `test_recorded_status_label_is_kept_and_compared`. |
+| 2 | SHOULD: when one watched repo's command fails and another succeeds, the failure is silent (Req 14). | Accepted. The scanner prints one `daily: <inputs> input partial (N of M repo(s) failed: …)` line and lists the repos in `failed_repos`. This is asserted in the on-mode test. |
+
 ## Implementation evidence
 
 - **(b)** `src/rebalance/ingest/releases_scan.py`, the `infer_close_loop_flags(..., releases_scan_dirs=)` hook and the CLI flag. `tests/test_releases_scan.py` (5 tests).

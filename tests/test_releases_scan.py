@@ -135,6 +135,22 @@ class ReleasesScanTests(unittest.TestCase):
         self.assertEqual(result["ledgers_found"], 7)
         self.assertEqual(result["counts"]["ledger_errors"], 4)
 
+    def test_recorded_status_label_is_kept_and_compared(self) -> None:
+        for name, label in (("widget", "in-progress"), ("widget-gh5", "blocked")):
+            db = _ledger(_clone(self.base / name), [("R-1", 1, 5, "In progress", STAMP)])
+            conn = sqlite3.connect(db)  # fixture setup only; the scan itself never writes
+            conn.execute("ALTER TABLE roadmap_items ADD COLUMN status_label TEXT")
+            conn.execute("UPDATE roadmap_items SET status_label = ?", (label,))
+            conn.commit()
+            conn.close()
+        result = scan_releases([str(self.base)], REPO)
+        self.assertEqual(result["tasks"][0]["status"], "in-progress")
+        self.assertIn(result["tasks"][0]["status_label"], {"in-progress", "blocked"})
+        self.assertEqual([c["key"] for c in result["conflicts"]], ["#5"])
+        self.assertEqual(
+            sorted(v["status_label"] for v in result["conflicts"][0]["values"]), ["blocked", "in-progress"]
+        )
+
 
 def _seed_corpus(db_path: Path) -> None:
     with db_connection(db_path, ensure_github_schema) as conn:

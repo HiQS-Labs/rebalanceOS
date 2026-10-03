@@ -760,7 +760,7 @@ def collect_close_loop_inputs(
     before they count as open; anything unverifiable is excluded. Read-only throughout.
     """
     names = (["close-loop"] if close_loop else []) + (["releases"] if releases_dirs else [])
-    result: dict[str, Any] = {"inputs": {}, "flagged_loops": [], "questions": [], "unverified": 0}
+    result: dict[str, Any] = {"inputs": {}, "flagged_loops": [], "questions": [], "unverified": 0, "failed_repos": []}
     binary = os.environ.get("REBALANCE_BIN") or shutil.which("rebalance")
     if not binary:
         for name in names:
@@ -786,6 +786,12 @@ def collect_close_loop_inputs(
         for name in names:
             _skip_input(result["inputs"], name, f"no usable output for {len(failures)} repo(s)")
         return result
+    if failures:
+        result["failed_repos"] = failures
+        print(
+            f"daily: {'/'.join(names)} input partial ({len(failures)} of {len(repos)} repo(s) failed: {', '.join(failures)})",
+            file=sys.stderr,
+        )
     if close_loop:
         result["inputs"]["close-loop"] = "ok"
     if releases_dirs:
@@ -1144,6 +1150,7 @@ def main() -> int:
             payload["questions"] = extra["questions"]
             payload["inputs"] = extra["inputs"]
             payload["unverified"] = extra["unverified"]
+            payload["failed_repos"] = extra["failed_repos"]
         print(json.dumps(payload, indent=2))
     else:
         print(summary_line)

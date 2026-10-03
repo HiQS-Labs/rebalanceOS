@@ -57,7 +57,7 @@ def _fake_cli(tmp_path: Path, payload: dict | None) -> Path:
     return script
 
 
-def test_on_mode_dedupes_tags_and_reverifies(tmp_path, monkeypatch):
+def test_on_mode_dedupes_tags_and_reverifies(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("REBALANCE_BIN", str(_fake_cli(tmp_path, FIXTURE)))
     monkeypatch.setattr(scanner, "_live_open_issue_numbers", lambda repo: {20, 22})
     out = scanner.collect_close_loop_inputs(
@@ -74,6 +74,8 @@ def test_on_mode_dedupes_tags_and_reverifies(tmp_path, monkeypatch):
         "releases-drift:issue_closed",
     ]
     assert out["inputs"] == {"close-loop": "ok", "releases": "ok"}
+    assert out["failed_repos"] == ["Acme/broken"]  # partial failure is reported, not silent
+    assert "input partial (1 of 2 repo(s) failed: Acme/broken)" in capsys.readouterr().err
 
 
 def test_missing_cli_skips_each_input_with_one_line(monkeypatch, capsys):
