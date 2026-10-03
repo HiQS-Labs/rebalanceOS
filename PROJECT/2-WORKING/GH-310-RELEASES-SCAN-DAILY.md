@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| (b) and (c) implemented and committed; focused tests green; real read-only run on the Mini changed no ledger (fingerprint identical before and after). Version 0.99.0, CHANGELOG and README updated. | Final Codex QA via relay-xyz, the full gate once, then push and open the PR against `development`. |
+| (b) and (c) implemented and committed; focused tests green; real read-only run on the Mini changed no ledger (fingerprint identical before and after). Version 0.99.0, CHANGELOG and README updated. | Final Codex QA approved (round 2). Next: the full gate once, then push and open the PR against `development`. |
 
 **Rating: rated 55/30/50/55.**
 - **Priority 55:** the operator asked for it explicitly, and it feeds `/daily` and the #709 storyline with local task context. It is not urgent and no work is blocked.
@@ -181,6 +181,8 @@ phases: 1
 | 1 | SHOULD: the recorded `status_label` is folded into `in-progress`, so clones whose labels differ look like they agree. | Accepted. Each task now carries the raw `status_label`, and conflict detection compares section, status and label. New test `test_recorded_status_label_is_kept_and_compared`. |
 | 2 | SHOULD: when one watched repo's command fails and another succeeds, the failure is silent (Req 14). | Accepted. The scanner prints one `daily: <inputs> input partial (N of M repo(s) failed: …)` line and lists the repos in `failed_repos`. This is asserted in the on-mode test. |
 
+**Code round 2** (HEAD aae4921): verdict APPROVE. Both round-1 SHOULDs were verified as resolved, with no new blocker. Its one NIT (a trailing blank line at the end of this doc) is fixed.
+
 ## Implementation evidence
 
 - **(b)** `src/rebalance/ingest/releases_scan.py`, the `infer_close_loop_flags(..., releases_scan_dirs=)` hook and the CLI flag. `tests/test_releases_scan.py` (5 tests).
@@ -191,4 +193,3 @@ phases: 1
   - `github-close-loop --releases-scan`: 32 ledgers found (31 at recon, plus this task's clone). XYZ-forge has 20 ledgers, 102 tasks, 31 in progress, 2 conflicts and 25 drift; rebalanceOS has 7 ledgers, 88 tasks, 41 in progress, 0 conflicts and 0 drift. 0 ledger errors.
   - `/daily` scanner with both inputs on: 21 flagged loops (18 from the ledger scan, 3 from close-loop flags), 0 unverified, and 60 questions (35 closed without delivery, 25 ledger drift). The run took about 13 s.
   - The ledger fingerprint (path, mtime, size for every `releases.db*` file) was identical before and after both runs.
-
