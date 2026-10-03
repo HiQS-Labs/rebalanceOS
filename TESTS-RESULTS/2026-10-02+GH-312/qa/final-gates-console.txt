@@ -1,0 +1,17 @@
+== HEAD: c5ff4f8ab438a7660e60013fffcbfc25de82a02a
+== ruff check
+All checks passed!
+OK-ruff-check
+== ruff format
+643 files already formatted
+OK-ruff-format
+== mypy src/
+Success: no issues found in 117 source files
+== doc links
+no broken links, no machine-local paths
+== root-noembed lane
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+2662 passed, 20 skipped, 10 xfailed, 1 warning, 146 subtests passed in 270.08s (0:04:30)
+== HiQS lane
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+163 passed, 1 skipped, 1 xfailed in 2.33s
