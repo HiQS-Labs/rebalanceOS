@@ -738,6 +738,7 @@ rebalance ingest notes --vault /path/to/vault --database rebalance.db          #
 rebalance ingest embed --database rebalance.db                                 # embed new chunks
 rebalance github-scan --token <github-pat> --database rebalance.db             # refresh GitHub data
 rebalance github-close-candidates --repo owner/name --database rebalance.db    # open issues likely fixed by merged PRs
+rebalance github-close-loop --repo owner/name --output json                   # stale/draft/refinement PRs, undelivered closes, unshipped branches
 rebalance calendar-sync --database rebalance.db                                # refresh calendar
 rebalance calendar-daily-report                                                # today's events + project breakdown
 rebalance calendar-weekly-report                                               # this week's summary + aggregator

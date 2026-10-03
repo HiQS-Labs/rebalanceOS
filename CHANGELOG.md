@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.98.0] - 2026-10-02
+
+### Added
+
+- `rebalance github-close-loop` reports deterministic close-the-loop flags per repo from the locally synced GitHub corpus, as text or JSON. The flags are stale PRs, forgotten drafts, PRs needing refinement, issues closed without a merged linked PR or a referencing default-branch commit, and issues with a branch but no PR. Each flag carries plain evidence, and counts are lower bounds of the sync window. It feeds the storyline experiment and the work-classification project without re-fetching GitHub. Release readiness behavior is unchanged.
+
 ## [0.97.2] - 2026-10-02
 
 ### Fixed
