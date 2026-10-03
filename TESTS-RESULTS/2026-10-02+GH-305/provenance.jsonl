@@ -15,3 +15,4 @@
 {"event": "deployment", "source": "5f550201511d05ca2baface0f8141c6568142175", "artifact": "deployment.json", "scope": "Studio-only; aggregate public receipt; private payloads retained locally"}
 {"event": "deployment-doc-hygiene", "artifact": "doc-checks.json", "baseline": "535bb7a", "source": "5f55020", "result": "machine path clean; unchanged pre-existing frontmatter/status findings; changelog clean"}
 {"event": "scheduled-consumer-recheck", "artifact": "consumer-run-check-20261003T0110Z.json", "source": "b3e017b5182f5a196d55d404a439ae8ff1562422", "result": "guard-deferred; consumer matches available compatibility history; no job forced"}
+{"event": "user-requested-guarded-consumer-retry", "artifact": "consumer-retry-20261003T0118Z.json", "result": "exit75 before consumer start; installed guard unchanged"}
