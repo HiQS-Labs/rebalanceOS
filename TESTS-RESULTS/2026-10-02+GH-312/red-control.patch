@@ -1,0 +1,12 @@
+diff --git a/tests/test_pytest_rootdir_pinned.py b/tests/test_pytest_rootdir_pinned.py
+index e17a4d3..7ddda27 100644
+--- a/tests/test_pytest_rootdir_pinned.py
++++ b/tests/test_pytest_rootdir_pinned.py
+@@ -33,6 +33,6 @@ def test_pytest_collection_uses_repository_configuration(tmp_path: Path, with_st
+     )
+ 
+     output = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+-    assert result.returncode == 0, output
++    assert result.returncode == 99, output
+     assert re.search(rf"^rootdir: {re.escape(str(REPO_ROOT))}$", result.stdout, re.MULTILINE), output
+     assert re.search(r"^configfile: pyproject\.toml$", result.stdout, re.MULTILINE), output

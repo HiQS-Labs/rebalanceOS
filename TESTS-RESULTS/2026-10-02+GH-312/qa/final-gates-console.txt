@@ -1,0 +1,14 @@
+== HEAD: 6a2d639
+== ruff check
+All checks passed!
+OK
+== ruff format
+643 files already formatted
+== mypy
+Success: no issues found in 117 source files
+== doc links
+no broken links, no machine-local paths
+== root lane
+2663 passed, 20 skipped, 10 xfailed, 1 warning, 146 subtests passed in 246.22s (0:04:06)
+== HiQS
+163 passed, 1 skipped, 1 xfailed in 2.00s

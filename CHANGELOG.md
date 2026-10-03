@@ -10,6 +10,16 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.99.0] - 2026-10-03
+
+### Added
+
+- A pre-push gate now runs the repository's static checks locally before each push in clones that opt in: lint, formatting, the two shared-helper guards, and all five governance ratchets. It fails closed with named failing stages, writes an auditable receipt per run, logs any bypass, and verifies its own installation state on demand. The test suites stay on hosted CI for now; a measured follow-up adds tier-mapped local tests. Evidence: the pre-push gate campaign retained with this release.
+- The known-failure quarantine now carries an owner, a tracked issue, and a UTC expiry. Past the expiry the affected tests stop being masked and fail in the open again, so a quarantine cannot silently become permanent; the reason line states all three facts.
+
+### Changed
+
+- The machine-path guard now also scans git hook files, which carry no file extension by convention but are executable gate code.
 ## [0.98.0] - 2026-10-02
 
 ### Added

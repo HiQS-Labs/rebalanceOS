@@ -1,0 +1,1 @@
+near-duplicate canary: clean (7 baseline pair(s) matched exactly)
