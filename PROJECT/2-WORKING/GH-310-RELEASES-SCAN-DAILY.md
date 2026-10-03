@@ -87,19 +87,19 @@ phases: 1
    - An item missing from the corpus is not drift.
 
 ### (c) `/daily` wiring
-8. **`scan_unclosed_loops.py` daily mode** gets `--close-loop` and `--releases-scan DIRS`.
+9. **`scan_unclosed_loops.py` daily mode** gets `--close-loop` and `--releases-scan DIRS`.
    - Env defaults: `REBALANCE_DAILY_CLOSE_LOOP=1` and `REBALANCE_RELEASES_SCAN_DIRS`.
    - When enabled, for each `PRIMARY_WATCHED_REPOS` repo it runs `rebalance github-close-loop --repo R --output json [--releases-scan DIRS]`. The binary comes from `REBALANCE_BIN`, else `shutil.which("rebalance")`, with a 30-second timeout.
-9. **Merge and dedupe** by `(repo, number)` into `flagged_loops`, where each entry has `sources` tags: `close-loop:<flag>`, `releases:<repo>#<global_id>` and `releases-drift:<kind>`.
-10. **Live re-verification** before an item counts as open:
+10. **Merge and dedupe** by `(repo, number)` into `flagged_loops`, where each entry has `sources` tags: `close-loop:<flag>`, `releases:<repo>#<global_id>` and `releases-drift:<kind>`.
+11. **Live re-verification** before an item counts as open:
     - PR items must be `OPEN` in the scanner's existing live `gh pr list` data.
     - Issue items must appear in one bounded `gh issue list --state open` per repo (only when enabled).
     - Unverifiable items are excluded and counted as `unverified`.
     - `closed_without_delivery` goes to `questions`, never to open loops.
-11. **Output when off:** the payload and summary line are identical.
-12. **Output when on:** adds `counts.flagged_loops`, `flagged_loops`, `questions` and `inputs` (per-input `ok` or `skipped: <reason>`), and appends `, N flagged loops (close-loop/releases)` to the summary line.
-13. **Degradation:** a missing binary, non-zero exit, bad JSON or empty output prints one stderr line, `daily: <input> input skipped (<reason>)`, and the scan otherwise proceeds as today.
-14. **`SKILL.md`** Steps 2/3 and the synthesis guidance get the opt-in inputs, the source-tag citation format (`[Trigger: close-loop:stale_pr …]`, `[Trigger: releases:<repo>#<task>]`), "closed without delivery is a question", and the re-verification rule. Both mirrors are kept identical.
+12. **Output when off:** the payload and summary line are identical.
+13. **Output when on:** adds `counts.flagged_loops`, `flagged_loops`, `questions` and `inputs` (per-input `ok` or `skipped: <reason>`), and appends `, N flagged loops (close-loop/releases)` to the summary line.
+14. **Degradation:** a missing binary, non-zero exit, bad JSON or empty output prints one stderr line, `daily: <input> input skipped (<reason>)`, and the scan otherwise proceeds as today.
+15. **`SKILL.md`** Steps 2/3 and the synthesis guidance get the opt-in inputs, the source-tag citation format (`[Trigger: close-loop:stale_pr …]`, `[Trigger: releases:<repo>#<task>]`), "closed without delivery is a question", and the re-verification rule. Both mirrors are kept identical.
 
 ## Smallest surface (ordered)
 
