@@ -2,7 +2,7 @@
 name: clio
 description: >-
   Locate and search existing CLIO SQLite prompt history and the HiQS work activity
-  stream (Pulse and Daily). Use for finding earlier instructions, sessions, repo or
+  authorship store (`github_activity`). Use for finding earlier instructions, sessions, repo or
   device activity, and tracing prompts to work evidence. Retrieval only; not CLIO
   installation, migration, capture setup, or a request to run the Daily workflow.
 ---
@@ -69,7 +69,9 @@ proof of complete fleet coverage. A successful query only covers this replica.
 
 ## Find the HiQS work activity stream
 
-CLIO is evidence of **intent**. Pulse records work activity; Daily adds synthesis.
+CLIO is evidence of **intent**. The HiQS work activity source is the
+`github_activity` table in the resolved **Rebalance index**. Pulse and Daily
+are optional derived views, not the authorship store.
 A prompt asking for a merge does not prove the PR merged.
 
 - [ ] When Rebalance MCP is available, use `index_status()` for freshness and
@@ -77,27 +79,49 @@ A prompt asking for a merge does not prove the PR merged.
   or `get_next_actions()` as appropriate. Inspect the live tool schema first.
   Use `peek_source()` for cited source details. Do not call `publish_pulse()` or
   `refresh_index()` merely to read activity; those are write workflows.
-- [ ] To locate existing Pulse files, use the configured Rebalance environment
-  and `rebalance.ingest.config.get_pulse_config()`. Read only `pulse_target_path`,
-  `pulse_filename`, `pulse_fleet_enabled`, and the optional daily-log settings.
-  Do not assume a checkout name or dump the entire operator config.
-  With fleet mode off, the page is under `pulse_target_path / pulse_filename`
-  (filename defaults to `live-pulse.md`). With fleet mode on, use the existing
-  `rebalance.lib.git_ops.fleet_output_path(cfg, "live-pulse.md")` resolver for
-  this device's page. It validates configured device ownership; report an error
-  rather than guessing a different device. The CLIO origin UUID and Pulse device
-  label are different identifiers.
-- [ ] For delivered fleet activity, the existing read-only
-  `rebalance.ingest.pulse.fleet_view(Path(pulse_target_path))` reads pages from
-  the **locally known upstream ref**. It does not fetch; report that freshness
-  limitation. Local device output may include activity not yet delivered.
-- [ ] If `git_pulse_clio_enabled` is true, the existing daily synthesis stream is
-  `fleet_output_path(cfg, subdir + "/" + filename)` beneath `pulse_target_path`,
-  using `git_pulse_clio_subdir` (default `CLIO`) and `git_pulse_clio_filename`
-  (default `git-pulse-daily-log.md`). It is derived narrative, not SQLite prompt
-  history. Local Daily cycle logs are `temp/daily-log/YYYY-MM-DD.log` in the
-  checkout that ran Daily; an arbitrary fresh clone will not contain them.
-  Read existing logs only; invoking `$daily` runs a broader workflow.
+- [ ] Resolve the store with `rebalance.paths.resolve_database_path()` from the
+  configured Rebalance environment, not a guessed `rebalance.db` in a fresh clone.
+  This honors the explicit path/environment and installed app-data/config
+  resolution chain. Do not use the separate HiQS app-data DB or CLIO SQLite DB.
+- [ ] If MCP is unavailable, reuse the shared read gateway and query layer:
+  `rebalance.ingest.db.connection.db_connection_readonly` and
+  `rebalance.ingest.db.queries.fetch_github_balance(conn, project_repos, since_days=7)`
+  for known repo mappings, or `fetch_org_activity(conn, since_days=7, limit=20)`
+  for discovery. Run in the existing Rebalance Python environment. The latter's
+  output cap is **per organization**, not a global DB scan cap. Bound the time
+  window and apply a short SQLite progress-handler deadline for large stores;
+  do not open via a writer, initialize a missing DB or call schema migrations.
+- [ ] Interpret `github_activity` correctly: one snapshot per
+  `(login, repo_full_name, scan_date)`, with `scanned_at` and `last_active_at`,
+  plus `commits`, `pushes`, `prs_opened`, `prs_merged`, `issues_opened`,
+  `issue_comments`, and `reviews`. It is not an event-by-event transcript.
+  **Authorship = commits, pushes, or PRs**; issues, comments, reviews and stars
+  alone do not establish authored work. `github_balance`/org rollups include
+  participation fields and combine logins; do not label their complete totals
+  operator-authorship. Exclude synthetic watched-repo rows (`login="__watch__"`)
+  when attributing work to the operator. They also omit some raw columns (including pushes), so
+  zero displayed commits/PRs alone does not rule out a push-only snapshot.
+  `list_watched_repos(since_days=...)` is the existing coverage tool; its result
+  also contains registered projects, so membership alone is not authorship proof.
+- [ ] Preserve alias/dedup semantics: the shared query layer canonicalizes repo
+  aliases/case and keeps the latest scan for each login/canonical-repo/day before
+  aggregation. Never sum duplicate snapshot spellings or count mirrored repos
+  twice. For exact login/date/snapshot inspection not exposed by the reader,
+  inspect the current schema and use a bounded parameterized SELECT through the
+  same read-only gateway, with explicit login/repo/date filters, `LIMIT <= 1000`
+  and a query deadline. Report raw snapshots as such; do not invent another
+  aggregation implementation. Cite `scan_date`/`scanned_at` for snapshot freshness;
+  corroborate particular actions with existing commit/PR records or source URLs.
+
+Optional summaries: use `rebalance.ingest.config.get_pulse_config()` to locate
+`pulse_target_path`. Legacy Pulse uses `pulse_filename` (default `live-pulse.md`);
+fleet mode uses `rebalance.lib.git_ops.fleet_output_path(cfg, "live-pulse.md")`.
+`rebalance.ingest.pulse.fleet_view(Path(pulse_target_path))` reads the locally known
+upstream ref without fetching. Read only needed config fields, and disclose stale
+or missing delivery. Daily cycle logs live at `temp/daily-log/YYYY-MM-DD.log` in
+the checkout that ran Daily. These summaries may lag `github_activity`; do not run
+publishers or `$daily` for a lookup. Do not confuse Pulse device labels with CLIO
+origin UUIDs.
 
 Rebalance's `clio_prompts` table is a downstream consumer copy, distinct from the
 canonical CLIO `events` store and the separate HiQS app-data database. Use
