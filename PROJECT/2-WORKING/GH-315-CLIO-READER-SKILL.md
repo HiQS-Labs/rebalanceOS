@@ -29,7 +29,8 @@ PRS rated 55/30/50/90: requested discovery improvement; no observed data loss; n
 - [x] Explain exact filters, bounded pagination, stable IDs, pending/fleet limits and seven-day note scope.
 - [x] Route activity requests to `github_activity` via existing MCP readers and the shared read-only query layer; Pulse/Daily are optional.
 - [x] Skill validator and mirror comparison pass; doc links pass (632 checked). PDDA reports pre-existing findings in unrelated docs (7 frontmatter, 9 status-table); none name GH-315.
-- [ ] Obtain independent final Codex approval and open PR against development.
+- [x] Obtain independent final Codex approval.
+- [ ] Merge the resulting PR against development after hosted checks.
 
 ## Recon and implementation decision
 
@@ -50,3 +51,5 @@ Rated 55/30/50/90: priority reflects the requested discoverability gap; severity
 Final Codex relay approved both initial and clarified packets (driver exit 0, attested Approved). The initial Pulse-focused approval was superseded after the operator identified `github_activity`. The revised review found no blockers/shoulds; its plan-opener wording nit is applied. Review log: `TESTS-RESULTS/2026-10-02+GH-315/final-review.log`. The reviewed skill SHA-256 is recorded in `provenance.json`. Runtime behavior/deployment is not claimed.
 
 The standard whole-roadmap writer also reconciled existing stale mirror rows (the first sync added 3 existing rows and updated 76; the task registration then added 1 and updated positions). These generated changes are ledger synchronization, not new scope or status assertions; DB/dump receipt checks pass with existing warnings.
+
+Final documentation gate: skill validator, mirror comparison, relative links, front-door board, machine-path guard, ledger consistency and diff whitespace pass. Roadmap coverage is observe-mode exit 0 with unrelated existing findings; it is not reported clean. Evidence: `TESTS-RESULTS/2026-10-02+GH-315/final-checks.log`. No tracked pre-push hook ships on the base; the clone uses the repository hooks directory. No runtime tests or doctor run is claimed for this documentation-only change.
