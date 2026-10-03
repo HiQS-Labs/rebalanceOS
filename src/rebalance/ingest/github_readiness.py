@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timedelta  # CANONICAL-PATH-OK: UTC annotations + day windows; time_ops has no duration helper
+from datetime import datetime, timedelta  # CANONICAL-PATH-OK: day windows; time_ops has no duration helper
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -450,8 +450,9 @@ def infer_close_loop_flags(
                 continue
             candidates.append((issue, closed_age))
         commits: list[dict[str, Any]] = []
-        created_times = [parse_utc_iso(issue.get("created_at")) for issue, _ in candidates]
-        created_times = [t for t in created_times if t is not None]
+        created_times: list[datetime] = [
+            t for issue, _ in candidates if (t := parse_utc_iso(issue.get("created_at"))) is not None
+        ]
         if candidates:
             # One day of slack absorbs offset-formatted committed_at strings;
             # the per-issue check below compares parsed datetimes.
@@ -470,7 +471,12 @@ def infer_close_loop_flags(
         idle = age is not None and age >= stale_days
         if int(pr.get("is_draft") or 0) == 1:
             if idle:
-                add("forgotten_draft", pr, "pull_request", f"Draft PR not updated for {age:.0f} days (threshold {stale_days}).")
+                add(
+                    "forgotten_draft",
+                    pr,
+                    "pull_request",
+                    f"Draft PR not updated for {age:.0f} days (threshold {stale_days}).",
+                )
         elif idle:
             add("stale_pr", pr, "pull_request", f"Open PR not updated for {age:.0f} days (threshold {stale_days}).")
         reasons = []

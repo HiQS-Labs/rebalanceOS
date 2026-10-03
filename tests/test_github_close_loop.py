@@ -18,9 +18,23 @@ OLD = "2026-09-10T00:00:00Z"  # 22 days before NOW
 FRESH = "2026-10-01T00:00:00Z"  # 1.5 days before NOW
 
 
-def _item(conn, item_type, number, *, state="open", state_reason=None, is_draft=0, is_merged=0,
-          review_decision="", check_status="", head_ref="", milestone=None,
-          created=OLD, updated=OLD, closed=None):
+def _item(
+    conn,
+    item_type,
+    number,
+    *,
+    state="open",
+    state_reason=None,
+    is_draft=0,
+    is_merged=0,
+    review_decision="",
+    check_status="",
+    head_ref="",
+    milestone=None,
+    created=OLD,
+    updated=OLD,
+    closed=None,
+):
     conn.execute(
         """
         INSERT INTO github_items
@@ -29,9 +43,25 @@ def _item(conn, item_type, number, *, state="open", state_reason=None, is_draft=
              created_at, updated_at, closed_at, fetched_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (REPO, item_type, number, f"{item_type} {number}", state, state_reason, milestone,
-         is_draft, is_merged, head_ref, review_decision, check_status,
-         f"https://github.com/{REPO}/{number}", created, updated, closed, FRESH),
+        (
+            REPO,
+            item_type,
+            number,
+            f"{item_type} {number}",
+            state,
+            state_reason,
+            milestone,
+            is_draft,
+            is_merged,
+            head_ref,
+            review_decision,
+            check_status,
+            f"https://github.com/{REPO}/{number}",
+            created,
+            updated,
+            closed,
+            FRESH,
+        ),
     )
 
 
@@ -71,10 +101,10 @@ def _seed(db_path: Path) -> None:
             (REPO,),
         )
         # PRs: stale vs fresh, forgotten draft vs fresh draft, refinement vs clean.
-        _item(conn, "pull_request", 101)                                   # stale_pr
-        _item(conn, "pull_request", 102, updated=FRESH)                    # fresh -> none
-        _item(conn, "pull_request", 103, is_draft=1)                       # forgotten_draft
-        _item(conn, "pull_request", 104, is_draft=1, updated=FRESH)        # fresh draft -> none
+        _item(conn, "pull_request", 101)  # stale_pr
+        _item(conn, "pull_request", 102, updated=FRESH)  # fresh -> none
+        _item(conn, "pull_request", 103, is_draft=1)  # forgotten_draft
+        _item(conn, "pull_request", 104, is_draft=1, updated=FRESH)  # fresh draft -> none
         _item(conn, "pull_request", 105, updated=FRESH, review_decision="CHANGES_REQUESTED")
         _item(conn, "pull_request", 106, updated=FRESH, check_status="failing")
         _item(conn, "pull_request", 107, updated=FRESH, review_decision="APPROVED", check_status="success")
@@ -82,30 +112,30 @@ def _seed(db_path: Path) -> None:
         _item(conn, "pull_request", 109, state="closed", is_merged=0, closed=FRESH, updated=FRESH)
         _item(conn, "pull_request", 110, updated=FRESH, head_ref="feat/gh214-tidy")
         # closed_without_delivery: positive and negative twins.
-        _item(conn, "issue", 201, state="closed", state_reason="completed", closed=FRESH)   # flag
-        _item(conn, "issue", 202, state="closed", state_reason="completed", closed=FRESH)   # merged PR link
+        _item(conn, "issue", 201, state="closed", state_reason="completed", closed=FRESH)  # flag
+        _item(conn, "issue", 202, state="closed", state_reason="completed", closed=FRESH)  # merged PR link
         _link(conn, 108, 202, "mentions")
         _item(conn, "issue", 203, state="closed", state_reason="not_planned", closed=FRESH)  # excluded
-        _item(conn, "issue", 204, state="closed", state_reason="completed", closed=FRESH)    # direct commit
+        _item(conn, "issue", 204, state="closed", state_reason="completed", closed=FRESH)  # direct commit
         _commit(conn, "c1", "fix(GH-204): ship it")
-        _item(conn, "issue", 205, state="closed", state_reason="completed", closed=FRESH)    # only unmerged PR -> flag
+        _item(conn, "issue", 205, state="closed", state_reason="completed", closed=FRESH)  # only unmerged PR -> flag
         _link(conn, 109, 205)
-        _item(conn, "issue", 206, state="closed", state_reason="completed", closed=OLD)      # outside 15-day window
-        _item(conn, "issue", 207, state="closed", state_reason="completed", closed=FRESH)    # commit on other ref -> flag
+        _item(conn, "issue", 206, state="closed", state_reason="completed", closed=OLD)  # outside 15-day window
+        _item(conn, "issue", 207, state="closed", state_reason="completed", closed=FRESH)  # commit on other ref -> flag
         _commit(conn, "c2", "wip #207", ref="refs/heads/feat/x")
-        _item(conn, "issue", 208, state="closed", state_reason=None, closed=FRESH)           # #2080 is not #208 -> flag
+        _item(conn, "issue", 208, state="closed", state_reason=None, closed=FRESH)  # #2080 is not #208 -> flag
         _commit(conn, "c3", "closes #2080")
         # started_not_shipped
-        _item(conn, "issue", 211, milestone="M1")   # branch, no PR, stale -> flag
+        _item(conn, "issue", 211, milestone="M1")  # branch, no PR, stale -> flag
         _branch(conn, "feat/gh211-thing")
-        _item(conn, "issue", 212)                   # branch but linked PR
+        _item(conn, "issue", 212)  # branch but linked PR
         _branch(conn, "fix/GH-212")
         _link(conn, 102, 212)
-        _item(conn, "issue", 213, updated=FRESH)    # branch but fresh
+        _item(conn, "issue", 213, updated=FRESH)  # branch but fresh
         _branch(conn, "feat/gh213-new")
-        _item(conn, "issue", 214)                   # branch used by an unlinked PR head
+        _item(conn, "issue", 214)  # branch used by an unlinked PR head
         _branch(conn, "feat/gh214-tidy")
-        _item(conn, "issue", 215)                   # gh2150 / gh215suffix must not match
+        _item(conn, "issue", 215)  # gh2150 / gh215suffix must not match
         _branch(conn, "feat/gh2150-other")
         _branch(conn, "gh215suffix")
         conn.commit()
@@ -162,7 +192,9 @@ class CloseLoopFlagTests(unittest.TestCase):
             _item(conn, "issue", 223, state="closed", state_reason="completed", created="garbage", closed=FRESH)
             _commit(conn, "c7", "Fixes #223")
             conn.commit()
-        flagged = self._flagged(infer_close_loop_flags(self.db_path, REPO, since_days=15, now=NOW), "closed_without_delivery")
+        flagged = self._flagged(
+            infer_close_loop_flags(self.db_path, REPO, since_days=15, now=NOW), "closed_without_delivery"
+        )
         self.assertNotIn(221, flagged)
         self.assertIn(222, flagged)
         self.assertIn(223, flagged)
@@ -183,9 +215,16 @@ class CloseLoopFlagTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         payload = json.loads(result.output)
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(set(payload["counts"]), {
-            "stale_pr", "forgotten_draft", "pr_needs_refinement", "closed_without_delivery", "started_not_shipped",
-        })
+        self.assertEqual(
+            set(payload["counts"]),
+            {
+                "stale_pr",
+                "forgotten_draft",
+                "pr_needs_refinement",
+                "closed_without_delivery",
+                "started_not_shipped",
+            },
+        )
 
 
 if __name__ == "__main__":
