@@ -21,7 +21,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Recon finished on the Mac Mini; the Studio was offline. There are 31 local `releases.db` ledgers under `~/Documents/GitHub` (depth ≤ 4) across 4 GitHub repos (14 XYZ-forge clones, 5 rebalanceOS, 3 product-compass, 2 LTVera); 7 more clones have local-path origins, and some are nested `temp/` clones. Focus 5 Phase 1 is deferred (see Scope). | Codex plan QA via relay-xyz, then implement (b) and then (c). |
+| (b) and (c) implemented and committed; focused tests green; real read-only run on the Mini changed no ledger (fingerprint identical before and after). Version 0.99.0, CHANGELOG and README updated. | Final Codex QA via relay-xyz, the full gate once, then push and open the PR against `development`. |
 
 **Rating: rated 55/30/50/55.**
 - **Priority 55:** the operator asked for it explicitly, and it feeds `/daily` and the #709 storyline with local task context. It is not urgent and no work is blocked.
@@ -58,7 +58,7 @@ phases: 1
 
 ### (b) Ledger scan on `github-close-loop`
 1. `--releases-scan DIR[,DIR…]`. **Default off:** the JSON is byte-identical to before (no `releases` key) and the text output is unchanged.
-2. **Discovery** walks each dir down to a *directory* depth of ≤ 3 below the scan dir (for example `XYZ-forge/temp/gh254-x` is depth 3, so its `releases.db` file sits at depth 4, the same as `find -maxdepth 4 -name releases.db`), without following symlinks, and prunes `.git`, `node_modules`, `.venv`, `venv`, `__pycache__`, `dist` and `build`.
+2. **Discovery** walks each dir down to a *directory* depth of ≤ 3 below the scan dir (for example `XYZ-forge/temp/gh254-x` is depth 3, so its `releases.db` file sits at depth 4, the same as `find -maxdepth 4 -name releases.db`), without following symlinks. Pruning reuses the canonical `rebalance.lib.git_ops.should_descend` (its prune set, including `node_modules`, `.venv`, `__pycache__`, `dist` and `build`, plus every hidden dir), so there is no second prune list.
    - A ledger root is a dir containing both `releases.db` and `.git` (a dir or a gitfile). A `releases.db` without `.git` is skipped and counted as `skipped_non_repo`.
    - Discovery is capped at 200 ledgers and reports `truncated`.
 3. **Read-only access.**
@@ -167,3 +167,21 @@ phases: 1
 | 2 | The scan must also run on the `no_local_data` path; scope the read-only guarantee. | Accepted (Req 7). |
 | 3 | Resolve identity per row via `repo_id` → `repos`; add a WAL fixture to the red control. | Accepted (Req 4 and test list). |
 | 4–5 | Seam, GH-233 distinction, one PR, Focus 5 deferral, tests, version, rating. | Pass. |
+
+**Plan round 2** (same setup): verdict APPROVE, with one SHOULD.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | SHOULD: add tests for the depth boundary, the `no_local_data` path and a multi-repo ledger. | Accepted. All three are in `tests/test_releases_scan.py`. |
+
+## Implementation evidence
+
+- **(b)** `src/rebalance/ingest/releases_scan.py`, the `infer_close_loop_flags(..., releases_scan_dirs=)` hook and the CLI flag. `tests/test_releases_scan.py` (5 tests).
+  - Red controls witnessed: swapping in the read-write `db_connection` changes the ledger bytes and fails the test; removing the WAL skip creates a `-shm` sidecar and fails the test.
+- **(c)** `collect_close_loop_inputs` in `scan_unclosed_loops.py` (both mirrors) and `SKILL.md` (both mirrors). `tests/test_daily_loop_inputs.py` (5 tests).
+  - Red control witnessed: removing the live `OPEN` re-check makes the on-mode test fail (a merged PR would be reported as a loop).
+- **Real runs** on the Mini, against a `/tmp` backup-API copy of `rebalance.db`, scanning `~/Documents/GitHub`:
+  - `github-close-loop --releases-scan`: 32 ledgers found (31 at recon, plus this task's clone). XYZ-forge has 20 ledgers, 102 tasks, 31 in progress, 2 conflicts and 25 drift; rebalanceOS has 7 ledgers, 88 tasks, 41 in progress, 0 conflicts and 0 drift. 0 ledger errors.
+  - `/daily` scanner with both inputs on: 21 flagged loops (18 from the ledger scan, 3 from close-loop flags), 0 unverified, and 60 questions (35 closed without delivery, 25 ledger drift). The run took about 13 s.
+  - The ledger fingerprint (path, mtime, size for every `releases.db*` file) was identical before and after both runs.
+
