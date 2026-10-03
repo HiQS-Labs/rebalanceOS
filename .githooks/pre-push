@@ -1,0 +1,145 @@
+#!/bin/bash
+# Pre-push static gate (GH-312 Rung 2 · Stage 1) — shipped ARMED (executable).
+# git runs this hook only in clones that opted in:  git config core.hooksPath .githooks
+#
+# Function: qualify a push at the author boundary with the same STATIC checks
+# hosted CI runs first — ruff check, ruff format, the two ci.yml repo guards,
+# and the five governance ratchets. An estimated ~2.5 s composite of measured
+# primitives (GH-312 campaign). The test lanes stay hosted for now: Stage 2 adds
+# tier-mapped local tests once Rung 3's path map lands (full-lane local gate was
+# rejected by the spike's own gates — 296.6 s local vs 144 s hosted median).
+#
+# Receipts (P6): one JSONL line per run at temp/gate-receipts.jsonl. A failed
+# receipt write is announced loudly and never reported as "logged".
+#
+# Bypass (P1: logged, never silent):  REBALANCE_SKIP_PREPUSH_GATE=1 git push
+# Empty stdin and delete-only pushes exit 0 without running the gate.
+# Interpreter seam (tests): REBALANCE_GATE_PY overrides $ROOT/.venv/bin/python.
+#
+# Scope limits (P12): checks run against the working tree, not each pushed ref.
+
+set -u
+ROOT="$(git rev-parse --show-toplevel)"
+RECEIPT="$ROOT/temp/gate-receipts.jsonl"
+PY="${REBALANCE_GATE_PY:-$ROOT/.venv/bin/python}"
+
+receipt_write_ok=0
+emit_receipt() {  # $1=kind $2=exit $3=detail(JSON)
+    local ts; ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    # NB: on an unborn branch `git rev-parse HEAD` prints "HEAD" to stdout AND
+    # exits non-zero — capture-then-fallback, or the || appends a second line.
+    local head
+    head="$(git rev-parse HEAD 2>/dev/null)" || head="null"
+    mkdir -p "$(dirname "$RECEIPT")" 2>/dev/null || true
+    if printf '{"schema_version":1,"hook":"pre-push","kind":"%s","exit":%s,"utc":"%s","head":"%s","detail":%s}\n' \
+            "$1" "$2" "$ts" "$head" "$3" >> "$RECEIPT" 2>/dev/null; then
+        receipt_write_ok=1
+    else
+        receipt_write_ok=0
+        echo "pre-push gate: WARNING — receipt write FAILED ($RECEIPT unusable); this run is NOT logged" >&2
+    fi
+}
+
+if [[ "${1:-}" == "--verify" ]]; then
+    rc=0
+    if [[ "$(git config core.hooksPath || true)" == ".githooks" ]]; then
+        echo "verify: core.hooksPath=.githooks  OK"
+    else
+        echo "verify: core.hooksPath not .githooks — install with: git config core.hooksPath .githooks"; rc=1
+    fi
+    if [[ -x "$ROOT/.githooks/pre-push" ]]; then
+        echo "verify: hook armed (executable)  OK"
+    else
+        echo "verify: hook DISARMED (not executable) — git will skip it. Arm with: chmod +x .githooks/pre-push"; rc=1
+    fi
+    if [[ -x "$PY" ]]; then
+        echo "verify: interpreter present ($PY)  OK"
+    else
+        echo "verify: interpreter MISSING ($PY) — gate would fail closed"; rc=1
+    fi
+    exit $rc
+fi
+
+# Nothing to push (empty stdin) or delete-only ref updates: no code moves, no gate.
+any_push=0
+while read -r _lref loid _rref _roid _extra; do
+    [[ -z "${loid:-}" ]] && continue
+    [[ "$loid" =~ ^0+$ ]] || any_push=1
+done
+if [[ $any_push -eq 0 ]]; then
+    emit_receipt noop 0 '"empty or delete-only stdin"'
+    exit 0
+fi
+
+if [[ -n "${REBALANCE_SKIP_PREPUSH_GATE:-}" ]]; then
+    emit_receipt bypass 0 '"bypass requested via REBALANCE_SKIP_PREPUSH_GATE"'
+    if [[ $receipt_write_ok -eq 1 ]]; then
+        echo "pre-push gate: BYPASSED (logged to receipt)"
+    else
+        echo "pre-push gate: BYPASSED — WARNING: bypass NOT logged (receipt write failed)"
+    fi
+    exit 0
+fi
+
+if [[ ! -x "$PY" ]]; then
+    echo "pre-push gate: FAIL CLOSED — interpreter missing or not executable: $PY" >&2
+    echo "  Remediation: create the repo venv (README Getting Started), or bypass once" >&2
+    echo "  with REBALANCE_SKIP_PREPUSH_GATE=1 (logged)." >&2
+    emit_receipt fail-closed 1 '"interpreter missing"'
+    exit 1
+fi
+
+cd "$ROOT" || exit 1
+start="$(date +%s)"
+failures=0
+stages=""
+sep=""
+stage() {  # $1=stage name; remaining args = the command
+    local name="$1"; shift
+    local t0; t0="$(date +%s)"
+    "$@"
+    local rc=$?
+    stages+="${sep}\"$name\": {\"exit\": $rc, \"wall_s\": $(( $(date +%s) - t0 ))}"
+    sep=", "
+    if [[ $rc -ne 0 ]]; then
+        failures=$((failures + 1))
+        echo "pre-push gate: FAIL stage=$name (exit $rc) — push BLOCKED. Full output above." >&2
+    fi
+    return 0  # keep going: report every stage, not just the first failure
+}
+
+stage ruff-check                 "$PY" -m ruff check .
+stage ruff-format                "$PY" -m ruff format --check .
+stage ratchet-script-inventory   "$PY" utils/pdda/check_script_inventory.py --check
+stage ratchet-machine-paths      "$PY" utils/pdda/check_machine_paths.py --check
+stage ratchet-banned-imports     "$PY" utils/pdda/check_banned_imports.py --check
+stage ratchet-read-layer         "$PY" utils/pdda/check_read_layer.py --check
+stage ratchet-near-duplicates    "$PY" utils/pdda/check_near_duplicates.py --check
+
+# The two repo guards, character-for-character the ci.yml root-noembed logic.
+t0="$(date +%s)"
+guard_rc=0
+if grep -rn "replace('Z'" src/rebalance/ingest/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+    echo "pre-push gate: FAIL guard=raw-datetime — use parse_calendar_dt() from calendar_helpers.py" >&2
+    guard_rc=1
+fi
+if grep -rn "total_seconds() / 60" src/rebalance/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+    echo "pre-push gate: FAIL guard=raw-duration — use event_duration_minutes() from calendar_helpers.py" >&2
+    guard_rc=1
+fi
+stages+="${sep}\"grep-guards\": {\"exit\": $guard_rc, \"wall_s\": $(( $(date +%s) - t0 ))}"
+[[ $guard_rc -ne 0 ]] && failures=$((failures + 1))
+
+total=$(( $(date +%s) - start ))
+if [[ $failures -eq 0 ]]; then
+    emit_receipt gate 0 "{\"stages\": {$stages}, \"total_wall_s\": $total}"
+    if [[ $receipt_write_ok -eq 1 ]]; then
+        echo "pre-push gate: PASS (${total}s, logged)"
+    else
+        echo "pre-push gate: PASS (${total}s) — WARNING: NOT logged (receipt write failed)"
+    fi
+    exit 0
+fi
+emit_receipt gate 1 "{\"stages\": {$stages}, \"total_wall_s\": $total, \"failures\": $failures}"
+echo "pre-push gate: $failures failing stage(s) in ${total}s. Bypass once with REBALANCE_SKIP_PREPUSH_GATE=1 (logged)."
+exit 1

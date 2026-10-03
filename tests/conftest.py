@@ -4,6 +4,7 @@ import importlib.machinery
 import os
 import sys
 import types
+from datetime import datetime, timezone
 
 import pytest
 
@@ -66,6 +67,37 @@ except ImportError:  # pragma: no cover - the CI / no-extras path
 #: real defect in commit-threshold auto-promotion.
 #:
 #: DO NOT add to this list to make a red build green. Fix the test or the code.
+#
+#: P13 quarantine policy (GH-312): a quarantine carries a named owner, a tracked
+#: issue, and an explicit UTC expiry. Past the expiry the xfail marker is
+#: withheld and these tests run naked — they fail red and return to the gate,
+#: which is the loud signal forcing either a fix or a deliberate re-quarantine
+#: with a fresh expiry. GH178_QUARANTINE_EXPIRED_AT is that instant.
+GH178_QUARANTINE_EXPIRES_UTC = "2026-11-01T00:00:00Z"
+
+
+def gh178_quarantine_expired(now: datetime | None = None) -> bool:
+    """True once the GH-178 quarantine is expired: ``now >= expiry``, in UTC.
+
+    The boundary is inclusive on purpose (``now == expiry`` means expired): a
+    marker that survives its own expiry instant is how quarantines silently
+    become permanent. Naive ``now`` is read as UTC.
+    """
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    expiry = datetime.fromisoformat(GH178_QUARANTINE_EXPIRES_UTC.replace("Z", "+00:00"))
+    return now >= expiry
+
+
+def gh178_quarantine_reason() -> str:
+    """One-line xfail reason carrying all three P13 elements: owner, issue, expiry."""
+    return (
+        "GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — "
+        f"owner: noel; issue: #178; expires {GH178_QUARANTINE_EXPIRES_UTC}"
+    )
+
+
 KNOWN_FAILING_GH178 = {
     "tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates",
     "tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync",
@@ -103,17 +135,15 @@ def pytest_collection_modifyitems(config, items):
     Non-strict on purpose: if one starts passing the run stays green (XPASS) and
     the entry is simply stale. Strict would turn someone else's unrelated fix
     into a red build, which is the opposite of the point.
+
+    GH-312: the quarantine expires. Past GH178_QUARANTINE_EXPIRES_UTC the marker
+    is withheld, so any still-broken entry fails red in the open — return to gate.
     """
     # Probe lazily: only pay for the subprocess if something actually asks.
     metal_skip = None
     for item in items:
-        if item.nodeid in KNOWN_FAILING_GH178:
-            item.add_marker(
-                pytest.mark.xfail(
-                    reason="GH-178: known-failing since GH-124 (536de83); quarantined by GH-177",
-                    strict=False,
-                )
-            )
+        if item.nodeid in KNOWN_FAILING_GH178 and not gh178_quarantine_expired():
+            item.add_marker(pytest.mark.xfail(reason=gh178_quarantine_reason(), strict=False))
         if item.get_closest_marker("requires_metal") is not None:
             if metal_skip is None:
                 metal_skip = (
