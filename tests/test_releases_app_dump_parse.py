@@ -56,9 +56,33 @@ def test_broken_row_is_not_merged_into_the_next_one():
         releases_app.parse_dump(text)
 
 
+def _count_statements(text: str) -> int:
+    """Count INSERT statements by their starts, ignoring text inside quoted values and comment
+    lines, so a multi-line value that itself contains an `INSERT INTO` line is not counted."""
+    count, in_str, line_start, i = 0, False, True, 0
+    while i < len(text):
+        if line_start and not in_str:
+            if text.startswith("--", i):
+                nl = text.find("\n", i)
+                i = len(text) if nl == -1 else nl + 1
+                continue
+            if text.startswith("INSERT INTO ", i):
+                count += 1
+        ch = text[i]
+        if ch == "'":
+            in_str = not in_str  # a '' escape toggles twice, leaving the state unchanged
+        line_start = ch == "\n"
+        i += 1
+    return count
+
+
+def test_statement_counter_ignores_insert_lines_inside_values():
+    text = HEADER + _row("x", "note\nINSERT INTO t(a, b) VALUES('a', 'b');") + "\n" + _row("y", "it's") + "\n"
+    assert _count_statements(text) == 2
+
+
 def test_committed_ledger_dump_parses_completely():
     text = (ROOT / "releases.sql").read_text(encoding="utf-8")
     tables = releases_app.parse_dump(text)
     parsed = sum(len(rows) for rows in tables.values())
-    statements = sum(1 for line in text.split("\n") if line.startswith("INSERT INTO "))
-    assert parsed == statements
+    assert parsed == _count_statements(text)
