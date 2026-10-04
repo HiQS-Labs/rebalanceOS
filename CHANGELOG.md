@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.98.2] - 2026-10-04
+
+### Fixed
+
+- The release ledger's merge-recovery rebuild can read its own dump again. A ledger value containing a line break is written across several dump lines, and the dump reader only accepted single-line rows, so the documented rebuild refused every dump holding such a row, including the committed one. The reader now accepts multi-line values while still refusing a match that would run past the end of one row into the next. A regression test covers multi-line values, a row-ending sequence inside a value, and the committed ledger itself.
+
 ## [0.98.1] - 2026-10-03
 
 ### Changed

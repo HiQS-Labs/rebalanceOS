@@ -3159,7 +3159,34 @@ def cmd_check(args):
 # inserts, resolving parent GIDs to fresh integer ids in dump order — the "deterministic
 # renumbering on rebuild" the grammar promises.
 
-INSERT_RE = re.compile(r"^INSERT INTO ([a-z_]+)\(([^)]*)\) VALUES\((.*)\);$")
+# DOTALL: _sql_str() writes string values verbatim, so a value holding a newline (a roadmap row's
+# raw_text, for one) spans several dump lines. Without DOTALL `.` stops at the first newline and
+# the dump the tool itself wrote fails to parse on `check --rebuild`. _is_single_values_tuple()
+# keeps the greedy (.*) from swallowing a statement boundary.
+INSERT_RE = re.compile(r"^INSERT INTO ([a-z_]+)\(([^)]*)\) VALUES\((.*)\);$", re.DOTALL)
+
+
+def _is_single_values_tuple(blob):
+    """True when a VALUES(...) blob is exactly one row: every '...' string is closed and nothing
+    outside a string is a paren, semicolon or newline. Values are only NULL, numbers or quoted
+    strings, so any of those outside quotes means the match ran past one statement's end (or
+    stopped on a `);` that sits inside a multi-line string)."""
+    in_str = False
+    i = 0
+    while i < len(blob):
+        ch = blob[i]
+        if in_str:
+            if ch == "'":
+                if i + 1 < len(blob) and blob[i + 1] == "'":
+                    i += 1
+                else:
+                    in_str = False
+        elif ch == "'":
+            in_str = True
+        elif ch in "();\n":
+            return False
+        i += 1
+    return not in_str
 
 
 def _split_values(blob):
@@ -3208,6 +3235,8 @@ def parse_dump(text):
         if not m:
             return False
         table, cols_blob, vals_blob = m.groups()
+        if not _is_single_values_tuple(vals_blob):
+            return False
         cols = [c.strip() for c in cols_blob.split(",")]
         vals = _split_values(vals_blob)
         if len(cols) != len(vals):
