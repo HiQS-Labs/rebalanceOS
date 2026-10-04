@@ -196,11 +196,11 @@ def _gather_github_context(
     project_repos: dict[str, list[str]],
     since_days: int = 7,
 ) -> list[dict[str, Any]]:
-    """Per-project GitHub activity summary."""
-    from rebalance.ingest.github_scan import get_github_balance
+    """Per-project HiQS work activity summary."""
+    from rebalance.ingest.github_scan import get_hiqs_work_activity
 
     try:
-        return get_github_balance(
+        return get_hiqs_work_activity(
             database_path=database_path,
             project_repos=project_repos,
             since_days=since_days,
@@ -284,7 +284,7 @@ def _build_prompt(
 
     # GitHub activity
     if github_context:
-        lines = ["## GitHub Activity (last 7 days)"]
+        lines = ["## HiQS Work Activity (last 7 days)"]
         for g in github_context:
             if g.get("is_idle"):
                 lines.append(f"- {g['project_name']}: IDLE (no activity)")

@@ -11,7 +11,7 @@
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 
-**"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `github_balance()`, `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
+**"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `hiqs_work_activity()` (alias: `github_balance()`), `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
 
 > ### 🧭 Start here — the central orchestrator (the data-plane spine)
 >
@@ -42,7 +42,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 3. **Discover projects:** Call `run_preflight(vault_path)`. Present results using friendly labels: "Most active" = `most_likely_active_projects` (last 14 days), "Semi-active" = `semi_active_projects` (15–30 days), "Dormant" = `dormant_projects` (31+ days), "Vault only" = `potential_projects`. If `github_error` is set, inform the user that GitHub discovery failed. Ask which to keep, remove, or merge. For each kept project, collect: short summary (2–3 sentences) and priority tier (1–5).
 4. **Confirm:** Call `confirm_projects(projects, vault_path)`. Each project dict **must** include `status: "active"`. Minimum shape: `{name, status: "active", summary, repos: [], priority_tier: int, tags: []}`.
 5. **Verify:** Call `list_projects()` to confirm projects are queryable.
-6. **Initial refresh:** Call `refresh_index(scope=["all"])` to populate the SQLite knowledge base. Use `dry_run=True` first for a preview. After it completes, `github_balance()` will return per-project commit/PR/issue counts.
+6. **Initial refresh:** Call `refresh_index(scope=["all"])` to populate the SQLite knowledge base. Use `dry_run=True` first for a preview. After it completes, `hiqs_work_activity()` will return per-project HiQS work activity counts.
 
 **Onboarding & project tools:**
 
@@ -53,7 +53,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 | `run_preflight(vault_path)` | Discover project candidates (read-only) |
 | `confirm_projects(projects, vault_path)` | Write registry and sync to DB |
 | `list_projects(status?)` | Query projects (default: active) |
-| `github_balance(since_days?)` | GitHub activity per project (requires prior refresh) |
+| `hiqs_work_activity(since_days?)` | HiQS work activity per project (deprecated alias: `github_balance`; requires prior refresh) |
 
 **Targeted retrieval and synthesis:**
 

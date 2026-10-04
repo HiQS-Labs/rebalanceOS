@@ -173,7 +173,7 @@ Data sources
                                      ▼
                            MCP server — src/rebalance/mcp/
                            25 tools across 7 domains:
-                             Projects  list_projects · github_balance
+                             Projects  list_projects · hiqs_work_activity
                              Onboarding  onboarding_status · setup_github_token
                                          run_preflight · confirm_projects
                                          ingest_gmail_messages
