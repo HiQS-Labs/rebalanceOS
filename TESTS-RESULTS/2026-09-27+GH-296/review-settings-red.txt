@@ -1,0 +1,232 @@
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+________ test_null_threshold_reports_default_source[max_compressor_gb] _________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104bba520>
+key = 'max_compressor_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_null_threshold_reports_default_source(isolated_guard, monkeypatch, key):
+        """An unset JSON value must not claim the device supplied the effective threshold."""
+        _write_device_config(isolated_guard, monkeypatch, {key: None})
+>       assert job_guard.guard_settings()[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': Non.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:879: AssertionError
+_________ test_null_threshold_reports_default_source[swap_distress_gb] _________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1036e0c30>
+key = 'swap_distress_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_null_threshold_reports_default_source(isolated_guard, monkeypatch, key):
+        """An unset JSON value must not claim the device supplied the effective threshold."""
+        _write_device_config(isolated_guard, monkeypatch, {key: None})
+>       assert job_guard.guard_settings()[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': Non.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:879: AssertionError
+_________ test_null_threshold_reports_default_source[min_available_gb] _________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104c0c290>
+key = 'min_available_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_null_threshold_reports_default_source(isolated_guard, monkeypatch, key):
+        """An unset JSON value must not claim the device supplied the effective threshold."""
+        _write_device_config(isolated_guard, monkeypatch, {key: None})
+>       assert job_guard.guard_settings()[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': Non.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:879: AssertionError
+___________ test_non_object_config_warns_before_using_defaults[raw0] ___________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104d385a0>, raw = []
+
+    @pytest.mark.parametrize("raw", [[], "off", 42, None])
+    def test_non_object_config_warns_before_using_defaults(isolated_guard, monkeypatch, raw):
+        """Malformed top-level settings must be visible to doctor and the operator."""
+        path = isolated_guard / "rbos.config"
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+        warnings = []
+        settings = job_guard.guard_settings(warn=warnings.append)
+        assert settings["memory_guard"] == {"value": True, "source": "default"}
+>       assert any("expected an object" in warning for warning in warnings)
+E       assert False
+E        +  where False = any(<generator object test_non_object_config_warns_before_using_defaults.<locals>.<genexpr> at 0x104bfe330>)
+
+tests/test_job_guard_footprint.py:891: AssertionError
+___________ test_non_object_config_warns_before_using_defaults[off] ____________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104d39480>
+raw = 'off'
+
+    @pytest.mark.parametrize("raw", [[], "off", 42, None])
+    def test_non_object_config_warns_before_using_defaults(isolated_guard, monkeypatch, raw):
+        """Malformed top-level settings must be visible to doctor and the operator."""
+        path = isolated_guard / "rbos.config"
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+        warnings = []
+        settings = job_guard.guard_settings(warn=warnings.append)
+        assert settings["memory_guard"] == {"value": True, "source": "default"}
+>       assert any("expected an object" in warning for warning in warnings)
+E       assert False
+E        +  where False = any(<generator object test_non_object_config_warns_before_using_defaults.<locals>.<genexpr> at 0x104bfd220>)
+
+tests/test_job_guard_footprint.py:891: AssertionError
+____________ test_non_object_config_warns_before_using_defaults[42] ____________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104c1bb50>, raw = 42
+
+    @pytest.mark.parametrize("raw", [[], "off", 42, None])
+    def test_non_object_config_warns_before_using_defaults(isolated_guard, monkeypatch, raw):
+        """Malformed top-level settings must be visible to doctor and the operator."""
+        path = isolated_guard / "rbos.config"
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+        warnings = []
+        settings = job_guard.guard_settings(warn=warnings.append)
+        assert settings["memory_guard"] == {"value": True, "source": "default"}
+>       assert any("expected an object" in warning for warning in warnings)
+E       assert False
+E        +  where False = any(<generator object test_non_object_config_warns_before_using_defaults.<locals>.<genexpr> at 0x104cd8520>)
+
+tests/test_job_guard_footprint.py:891: AssertionError
+___________ test_non_object_config_warns_before_using_defaults[None] ___________
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104c1be50>
+raw = None
+
+    @pytest.mark.parametrize("raw", [[], "off", 42, None])
+    def test_non_object_config_warns_before_using_defaults(isolated_guard, monkeypatch, raw):
+        """Malformed top-level settings must be visible to doctor and the operator."""
+        path = isolated_guard / "rbos.config"
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        monkeypatch.setenv("REBALANCE_CONFIG", str(path))
+        warnings = []
+        settings = job_guard.guard_settings(warn=warnings.append)
+        assert settings["memory_guard"] == {"value": True, "source": "default"}
+>       assert any("expected an object" in warning for warning in warnings)
+E       assert False
+E        +  where False = any(<generator object test_non_object_config_warns_before_using_defaults.<locals>.<genexpr> at 0x104cd8ad0>)
+
+tests/test_job_guard_footprint.py:891: AssertionError
+_ test_sub_byte_threshold_warns_instead_of_silently_using_default[max_compressor_gb] _
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104c655e0>
+key = 'max_compressor_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_sub_byte_threshold_warns_instead_of_silently_using_default(isolated_guard, monkeypatch, key):
+        """A positive GB value that truncates to zero cannot be an effective override."""
+        _write_device_config(isolated_guard, monkeypatch, {key: 1e-20})
+        warnings = []
+        ceiling = job_guard.MemoryCeiling(log=warnings.append)
+>       assert ceiling.settings[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': 1e-.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         {'value': 1e-20} != {'value': None}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:900: AssertionError
+_ test_sub_byte_threshold_warns_instead_of_silently_using_default[swap_distress_gb] _
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104c65c70>
+key = 'swap_distress_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_sub_byte_threshold_warns_instead_of_silently_using_default(isolated_guard, monkeypatch, key):
+        """A positive GB value that truncates to zero cannot be an effective override."""
+        _write_device_config(isolated_guard, monkeypatch, {key: 1e-20})
+        warnings = []
+        ceiling = job_guard.MemoryCeiling(log=warnings.append)
+>       assert ceiling.settings[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': 1e-.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         {'value': 1e-20} != {'value': None}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:900: AssertionError
+_ test_sub_byte_threshold_warns_instead_of_silently_using_default[min_available_gb] _
+
+isolated_guard = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104cd1a90>
+key = 'min_available_gb'
+
+    @pytest.mark.parametrize("key", ["max_compressor_gb", "swap_distress_gb", "min_available_gb"])
+    def test_sub_byte_threshold_warns_instead_of_silently_using_default(isolated_guard, monkeypatch, key):
+        """A positive GB value that truncates to zero cannot be an effective override."""
+        _write_device_config(isolated_guard, monkeypatch, {key: 1e-20})
+        warnings = []
+        ceiling = job_guard.MemoryCeiling(log=warnings.append)
+>       assert ceiling.settings[key] == {"value": None, "source": "default"}
+E       AssertionError: assert {'value': 1e-.../rbos.config'} == {'value': Non...e': 'default'}
+E         
+E         Differing items:
+E         {'source': 'device config <TEMP_PATH>'} != {'source': 'default'}
+E         {'value': 1e-20} != {'value': None}
+E         Use -v to get more diff
+
+tests/test_job_guard_footprint.py:900: AssertionError
+_______________ test_doctor_reports_job_guard_off_and_its_source _______________
+
+tmp_path = PosixPath('<TEMP_PATH>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104cd26d0>
+
+    def test_doctor_reports_job_guard_off_and_its_source(tmp_path: Path, monkeypatch) -> None:
+        check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "off", "swap_distress_gb": 1.5})
+    
+        assert check.status == OK
+        assert "memory checks OFF" in check.detail
+        assert "rbos.config" in check.detail, "the source of the setting must be named"
+        assert "lock and timeout still active" in check.detail
+        for label in ("compressor ceiling", "swap distress bar 1.5 GB (device config", "available floor", "footprint ceiling"):
+>           assert label in check.detail, f"disabled checks must still show configured thresholds: {check.detail}"
+E           AssertionError: disabled checks must still show configured thresholds: memory checks OFF (device config <TEMP_PATH>; lock and timeout still active
+E           assert 'compressor ceiling' in 'memory checks OFF (device config <TEMP_PATH>; lock and timeout still active'
+E            +  where 'memory checks OFF (device config <TEMP_PATH>; lock and timeout still active' = Check(name='job-guard', status='ok', detail='memory checks OFF (device config <TEMP_PATH>; lock and timeout still active', hint='', severity='notice').detail
+
+tests/test_doctor_launchd.py:261: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_guard_footprint.py::test_null_threshold_reports_default_source[max_compressor_gb]
+FAILED tests/test_job_guard_footprint.py::test_null_threshold_reports_default_source[swap_distress_gb]
+FAILED tests/test_job_guard_footprint.py::test_null_threshold_reports_default_source[min_available_gb]
+FAILED tests/test_job_guard_footprint.py::test_non_object_config_warns_before_using_defaults[raw0]
+FAILED tests/test_job_guard_footprint.py::test_non_object_config_warns_before_using_defaults[off]
+FAILED tests/test_job_guard_footprint.py::test_non_object_config_warns_before_using_defaults[42]
+FAILED tests/test_job_guard_footprint.py::test_non_object_config_warns_before_using_defaults[None]
+FAILED tests/test_job_guard_footprint.py::test_sub_byte_threshold_warns_instead_of_silently_using_default[max_compressor_gb]
+FAILED tests/test_job_guard_footprint.py::test_sub_byte_threshold_warns_instead_of_silently_using_default[swap_distress_gb]
+FAILED tests/test_job_guard_footprint.py::test_sub_byte_threshold_warns_instead_of_silently_using_default[min_available_gb]
+FAILED tests/test_doctor_launchd.py::test_doctor_reports_job_guard_off_and_its_source
+11 failed, 92 deselected in 0.38s
