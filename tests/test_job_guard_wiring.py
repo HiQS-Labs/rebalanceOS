@@ -40,6 +40,10 @@ def _enable_guard(monkeypatch, tmp_path):
     # A test that means to exercise the ceiling should set this to a value that trips it, rather
     # than relying on whatever the host happens to be doing.
     monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB", "999")
+    # GH-296: settings also come from the device config; never read the real one.
+    monkeypatch.setenv("REBALANCE_CONFIG", str(tmp_path / "no-rbos.config"))
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_MEMORY", raising=False)
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB", raising=False)
     # The module caches its load; drop it so LOCK_DIR is re-read per test.
     _job_guard._module = None
     _job_guard._load_attempted = False
@@ -63,9 +67,10 @@ def test_embed_leaves_are_decorated():
     This is the regression test for the #174 gap — a guard with no callers.
     """
     from rebalance.ingest.embedder import embed_chunks
+    from rebalance.ingest.github_knowledge import embed_github_documents
     from rebalance.ingest.semantic_index import embed_pending
 
-    for fn in (embed_chunks, embed_pending):
+    for fn in (embed_chunks, embed_pending, embed_github_documents):
         assert hasattr(fn, "__wrapped__"), f"{fn.__name__} is not guarded — GH-172 crash path is open again"
 
 
@@ -76,9 +81,10 @@ def test_facades_delegate_and_are_not_double_guarded():
     take the same ``flock`` twice in one process and self-deadlock.
     """
     from rebalance.ingest.embedder import embed_vault_chunks
+    from rebalance.ingest.github_knowledge import refresh_github_embeddings
     from rebalance.ingest.semantic_index import embed_semantic_pending
 
-    for fn in (embed_vault_chunks, embed_semantic_pending):
+    for fn in (embed_vault_chunks, embed_semantic_pending, refresh_github_embeddings):
         assert not hasattr(fn, "__wrapped__"), (
             f"{fn.__name__} is double-guarded; it delegates to a guarded leaf and would deadlock on the shared flock"
         )
@@ -218,3 +224,87 @@ def test_lock_is_released_after_guard_exits(tmp_path):
         lock = guard_mod.SingleInstanceLock("rebalance-embed", lock_dir=lock_dir)
         lock.acquire(on_conflict="refuse")
         lock.release()
+
+
+def test_inner_guard_does_not_refuse_a_small_swap_laptop(monkeypatch):
+    """GH-296: the second (in-process) guard shares MemoryCeiling, so the swap fix reaches it.
+
+    Before the fix the embedding leaves refused on this exact state even with the
+    launchd wrapper removed, and the run was reported ``fatal`` (exit 1).
+    """
+    mod = _job_guard.load_job_guard()
+    GIB = 1024**3
+    monkeypatch.delenv("REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB")  # use the real 25% ceiling
+    monkeypatch.setattr(mod, "total_memory_bytes", lambda: 24 * GIB)
+    monkeypatch.setattr(mod, "compressor_bytes", lambda: int(9.3 * GIB))
+    monkeypatch.setattr(mod, "available_memory_bytes", lambda: 6 * GIB)
+    monkeypatch.setattr(mod, "swap_used_bytes", lambda: int(1.2 * GIB))
+    monkeypatch.setattr(mod, "swap_total_bytes", lambda: 2 * GIB)
+    with _job_guard.embedding_guard():
+        pass  # must not raise
+
+
+def test_is_deferral_separates_never_started_from_tripped():
+    mod = _job_guard.load_job_guard()
+    assert _job_guard.is_deferral(mod.RefusedToStart("refusing to start: x"))
+    assert _job_guard.is_deferral(mod.InstanceConflict("held"))
+    assert not _job_guard.is_deferral(mod.MemoryCeilingExceeded("tripped mid-run"))
+    assert not _job_guard.is_deferral(RuntimeError("unrelated"))
+
+
+@pytest.mark.parametrize(
+    "env, expected",
+    [
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "6.5"}, 6.5),
+        ({"REBALANCE_JOB_GUARD_MAX_RSS_GB": "5"}, 5.0),
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "6.5", "REBALANCE_JOB_GUARD_MAX_RSS_GB": "5"}, 6.5),
+        ({"REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB": "nan"}, None),
+    ],
+)
+def test_inner_guard_resolves_the_footprint_ceiling_like_the_wrapper(monkeypatch, env, expected):
+    """GH-296 final QA F3: the bridge read only the RSS alias, so the layers disagreed."""
+    mod = _job_guard.load_job_guard()
+    for name in ("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "REBALANCE_JOB_GUARD_MAX_RSS_GB"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    seen = {}
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _fake_guard(name, **kwargs):
+        seen.update(kwargs)
+        yield
+
+    monkeypatch.setattr(mod, "guard", _fake_guard)
+    with _job_guard.embedding_guard():
+        pass
+    assert seen["max_rss_gb"] == expected
+    assert (mod.env_max_footprint_gb(warn=lambda m: None)) == expected
+
+
+def test_github_embedding_waits_for_the_shared_embedding_lock(tmp_path):
+    """#297 / GH-296 QA F6: GitHub embedding used to encode without the rebalance-embed lock.
+
+    With another embedding run holding the lock, the leaf must refuse before any
+    model work, and the collector's call site must turn that into a deferral.
+    """
+    from rebalance.ingest.github_knowledge import embed_github_documents
+    from rebalance.ingest.index_ops import _embed_or_defer, _embedding_deferred
+
+    mod = _job_guard.load_job_guard()
+    model_calls: list[int] = []
+
+    def _model(texts, model_name):
+        model_calls.append(len(texts))
+        return [[0.0] * 1024 for _ in texts]
+
+    with mod.guard(_job_guard.EMBEDDING_LOCK, log=lambda m: None):
+        with pytest.raises(mod.InstanceConflict):
+            embed_github_documents(tmp_path / "x.db", embed_texts=_model, power_defer=False)
+        deferred = _embed_or_defer(
+            lambda: embed_github_documents(tmp_path / "x.db", embed_texts=_model, power_defer=False)
+        )
+    assert model_calls == [], "model work ran while another embedding run held the lock"
+    assert "already running" in _embedding_deferred(deferred)

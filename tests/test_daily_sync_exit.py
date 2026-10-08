@@ -94,6 +94,27 @@ class DailySyncExitTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(result["sync_outcome"], "fatal")
 
+    def test_wrapper_sole_returned_error_exits_one_and_keeps_details(self) -> None:
+        """GH-296 final QA F2, through the real wrapper payload."""
+        payload = {"errors": [], "results": [{"scope": "email", "error": "invalid_grant"}]}
+
+        exit_code, result = _run_refresh_payload(payload)
+
+        self.assertEqual((exit_code, result["sync_outcome"]), (1, "fatal"))
+        self.assertEqual(result["results"][0]["error"], "invalid_grant")
+
+    def test_wrapper_deferred_embedding_exits_zero_and_keeps_reason(self) -> None:
+        """GH-296: ingest ran, embedding deferred by the guard — partial, reason retained."""
+        payload = {
+            "errors": [],
+            "results": [{"scope": "vault", "ingest": {"new_files": 2}, "embedding_deferred": "refusing to start"}],
+        }
+
+        exit_code, result = _run_refresh_payload(payload)
+
+        self.assertEqual((exit_code, result["sync_outcome"]), (0, "degraded"))
+        self.assertEqual(result["results"][0]["embedding_deferred"], "refusing to start")
+
     def test_clean_run_exits_zero(self) -> None:
         exit_code, result = _run_refresh_payload({"errors": [], "results": [{"scope": "vault"}]})
 
@@ -110,6 +131,63 @@ class ClassifySyncOutcomeDirectTests(unittest.TestCase):
         outcome, code = classify_sync_outcome({"results": [{"scope": "vault"}]})
         self.assertEqual(outcome, "complete")
         self.assertEqual(code, 0)
+
+    def test_embedding_deferred_by_guard_is_degraded_not_skipped(self) -> None:
+        """GH-296: the collector ingested, then the guard deferred its embedding step.
+
+        The work that ran must never be reported as skipped (no exit 75) nor as a
+        failure (no exit 1): the run is partial.
+        """
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault", "ingest": {"new_files": 2}, "embedding_deferred": "refusing to start"}]}
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_no_embedding_deferral_stays_complete(self) -> None:
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome({"results": [{"scope": "vault", "embedding_deferred": None}]})
+        self.assertEqual((outcome, code), ("complete", 0))
+
+    def test_sole_returned_collector_error_is_fatal(self) -> None:
+        """#297 / GH-296 QA F2: an error returned inside a result is a failure, not complete."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome({"errors": [], "results": [{"scope": "email", "error": "invalid_grant"}]})
+        self.assertEqual((outcome, code), ("fatal", 1))
+
+    def test_returned_collector_error_beside_a_success_is_degraded(self) -> None:
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault", "synced": 3}, {"scope": "email", "error": "invalid_grant"}]}
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_returned_error_beside_a_deferred_embedding_scope_is_degraded(self) -> None:
+        """A deferred-embedding scope did real work, so it counts as a (partial) success."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {
+                "results": [
+                    {"scope": "semantic", "embedding_deferred": "refusing to start"},
+                    {"scope": "sync", "error": "pulse_target_path not configured"},
+                ]
+            }
+        )
+        self.assertEqual((outcome, code), ("degraded", 0))
+
+    def test_next_actions_note_stays_non_fatal(self) -> None:
+        """The next-actions precompute note is non-fatal by design (index_ops refresh_index)."""
+        from rebalance.ingest.index_ops import classify_sync_outcome
+
+        outcome, code = classify_sync_outcome(
+            {"results": [{"scope": "vault"}, {"scope": "next_actions", "skipped": True, "error": "gemini down"}]}
+        )
+        self.assertEqual((outcome, code), ("complete", 0))
 
     def test_migration_error_is_fatal(self) -> None:
         from rebalance.ingest.index_ops import classify_sync_outcome
@@ -214,6 +292,29 @@ class ArgvMappingTests(unittest.TestCase):
         strict_code, _ = self._execute_with_argv(["script", "github,focus5", "7", "1"], degraded_payload)
         self.assertEqual(strict_code, 1)
 
+    def test_strict_mode_rejects_returned_collector_errors(self) -> None:
+        """Strict jobs must fail regardless of which collector error shape was used."""
+        payload = {
+            "errors": [],
+            "results": [{"scope": "vault", "synced": 3}, {"scope": "email", "error": "invalid_grant"}],
+        }
+        for strict, expected in (("0", 0), ("1", 1)):
+            with self.subTest(strict=strict):
+                code, _ = self._execute_with_argv(["script", "vault,email", "7", strict], payload)
+                self.assertEqual(code, expected)
+
+    def test_strict_mode_keeps_embedding_deferrals_and_optional_notes_nonfatal(self) -> None:
+        """A retained-work deferral is not a source error, even for strict jobs."""
+        payload = {
+            "errors": [],
+            "results": [
+                {"scope": "vault", "ingest": {"new_files": 3}, "embedding_deferred": "lock held"},
+                {"scope": "next_actions", "skipped": True, "error": "model unavailable"},
+            ],
+        }
+        code, _ = self._execute_with_argv(["script", "vault", "7", "1"], payload)
+        self.assertEqual(code, 0)
+
     def test_argv_invalid_days_exits_2(self) -> None:
         code, kwargs = self._execute_with_argv(
             ["script", "github", "invalid_number"],
@@ -239,9 +340,9 @@ class ShellExecutionTests(unittest.TestCase):
         (cls.stub_dir / "rebalance" / "ingest" / "__init__.py").write_text("")
         (cls.stub_dir / "rebalance" / "ingest" / "index_ops.py").write_text(
             "import os\n"
-            "def classify_sync_outcome(res):\n"
+            "def classify_sync_outcome(res, *, strict=False):\n"
             '    outcome = res.get("sync_outcome", "complete")\n'
-            '    return outcome, (0 if outcome != "fatal" else 1)\n'
+            '    return outcome, (1 if outcome == "fatal" or (strict and res.get("errors")) else 0)\n'
             "\n"
             "def refresh_index(db, **kw):\n"
             '    mode = os.environ.get("TEST_OUTCOME", "complete")\n'
@@ -291,7 +392,7 @@ class ShellExecutionTests(unittest.TestCase):
         code, outcome, log_line = self._run_shell_refresh("degraded", strict="0")
         self.assertEqual(code, 0)
         self.assertEqual(outcome, "degraded")
-        self.assertIn("degraded; partial errors recorded", log_line)
+        self.assertIn("degraded; partial errors or deferred steps recorded", log_line)
 
     def test_shell_fatal_exits_1(self) -> None:
         code, outcome, log_line = self._run_shell_refresh("fatal", strict="0")

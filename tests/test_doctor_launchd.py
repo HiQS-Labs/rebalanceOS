@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from rebalance.doctor import ERROR, FAIL, OK, WARN, _check_launchd, _check_scheduler_liveness
 
 NOW = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
@@ -220,3 +222,95 @@ def test_doctor_launchd_status_75_is_ok_skipped(tmp_path: Path):
     assert pulse_check is not None
     assert pulse_check.status == OK
     assert "skipped (75)" in pulse_check.detail
+
+
+def test_guard_lock_conflict_exit_3_is_a_skip_not_a_failure(tmp_path: Path) -> None:
+    """GH-296 final QA F5: 3 (lock held) is a deferred code, like 75."""
+    checks = _check_launchd("-\t3\tcom.rebalance-os.github-sync\n", log_dir=tmp_path / "logs", now=NOW)
+
+    assert checks[0].status == OK
+    assert "skipped (3)" in checks[0].detail
+
+
+def _job_guard_check(tmp_path: Path, monkeypatch, section, *, bypass: bool = False) -> object:
+    from rebalance.doctor import _check_job_guard
+
+    # conftest disables the guard suite-wide; doctor must see it as an operator would.
+    monkeypatch.setenv("REBALANCE_JOB_GUARD", "0" if bypass else "1")
+
+    config = tmp_path / "rbos.config"
+    config.write_text(json.dumps({"job_guard": section}), encoding="utf-8")
+    monkeypatch.setenv("REBALANCE_CONFIG", str(config))
+    for name in (
+        "REBALANCE_JOB_GUARD_MEMORY",
+        "REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB",
+        "REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    return _check_job_guard()
+
+
+def test_doctor_reports_job_guard_off_and_its_source(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "off", "swap_distress_gb": 1.5})
+
+    assert check.status == OK
+    assert "memory checks OFF" in check.detail
+    assert "rbos.config" in check.detail, "the source of the setting must be named"
+    assert "lock and timeout still active" in check.detail
+    for label in (
+        "compressor ceiling",
+        "swap distress bar 1.5 GB (device config",
+        "available floor",
+        "footprint ceiling",
+    ):
+        assert label in check.detail, f"disabled checks must still show configured thresholds: {check.detail}"
+    assert "not enforced" in check.detail
+
+
+def test_doctor_reports_each_threshold_and_its_source(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"swap_distress_gb": 1.5})
+
+    assert check.status == OK
+    for label in (
+        "compressor ceiling",
+        "swap distress bar 1.5 GB (device config",
+        "available floor",
+        "footprint ceiling",
+    ):
+        assert label in check.detail, f"doctor omitted {label!r}: {check.detail}"
+
+
+def test_doctor_warns_on_an_invalid_job_guard_value(tmp_path: Path, monkeypatch) -> None:
+    check = _job_guard_check(tmp_path, monkeypatch, {"memory_guard": "sometimes"})
+
+    assert check.status == WARN
+    assert "invalid memory_guard" in check.detail
+    assert "memory checks on" in check.detail, "an invalid value must fall back to on"
+
+
+def test_doctor_reports_the_wrappers_env_footprint_ceiling(tmp_path: Path, monkeypatch) -> None:
+    """GH-296 final QA F3: the report must match what run_guarded enforces."""
+    monkeypatch.setenv("REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "6.5")
+    check = _job_guard_check(tmp_path, monkeypatch, {})
+
+    assert "per-job footprint ceiling (wrapper and embedding; mid-run on main thread only) 6.5 GB (env)" in check.detail
+
+
+def test_doctor_warns_when_the_test_only_guard_bypass_is_set(tmp_path: Path, monkeypatch) -> None:
+    """GH-296 final QA F3: REBALANCE_JOB_GUARD=0 drops the embedding lock too — say so."""
+    check = _job_guard_check(tmp_path, monkeypatch, {}, bypass=True)
+
+    assert check.status == WARN
+    assert "REBALANCE_JOB_GUARD=0" in check.detail
+
+
+@pytest.mark.parametrize("name", ["REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB", "REBALANCE_JOB_GUARD_MAX_RSS_GB"])
+@pytest.mark.parametrize("raw", ["nan", "inf", "-1", "1e308"])
+def test_doctor_survives_an_invalid_footprint_override(tmp_path: Path, monkeypatch, name, raw) -> None:
+    """GH-296 final QA F7: an invalid footprint variable warns; it must not break the report."""
+    monkeypatch.setenv(name, raw)
+    check = _job_guard_check(tmp_path, monkeypatch, {})
+
+    assert "could not read" not in check.detail
+    assert "per-job footprint ceiling (wrapper and embedding; mid-run on main thread only)" in check.detail
+    assert "default: 12.5% of RAM" in check.detail

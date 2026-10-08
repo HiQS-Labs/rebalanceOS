@@ -257,7 +257,7 @@ shipped and GH-172 had to fix — a guard with zero callers):
 | Condition | Behaviour |
 |---|---|
 | Another embedding run holds the lock | `InstanceConflict` — the second run refuses and exits. **This is the GH-172 fix.** |
-| Job exceeds 35% of physical RAM | `MemoryCeilingExceeded` — SIGTERM, then SIGKILL after grace |
+| Job exceeds 12.5% of physical RAM (or the configured footprint ceiling) | `MemoryCeilingExceeded` — SIGTERM, then SIGKILL after grace |
 | Machine available memory below floor | Refuses to *start* (`preflight`), rather than dying at minute two |
 | Guard module missing | Warns loudly on stderr, runs **unguarded** — see below |
 
@@ -269,14 +269,33 @@ see this occasionally in `daily-sync`/`github-sync`/`vault-sync` logs.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `REBALANCE_JOB_GUARD` | `1` | Set `0` to disable entirely. **Do not** disable on a machine that runs scheduled embeds. |
-| `REBALANCE_JOB_GUARD_MAX_RSS_GB` | 35% of physical RAM | Absolute RSS ceiling for one embedding pass |
+| `REBALANCE_JOB_GUARD` | `1` | Test-only: `0` disables the guard **including the single-instance lock**. To turn off only the memory checks on one Mac, use `job_guard.memory_guard` below. |
+| `REBALANCE_JOB_GUARD_MAX_FOOTPRINT_GB` (alias `..._MAX_RSS_GB`) | 12.5% of physical RAM | Per-job footprint ceiling |
 | `REBALANCE_JOB_GUARD_ON_CONFLICT` | `refuse` | `replace` SIGTERMs the incumbent and takes over — the "re-run the embeddings" ergonomic |
 | `JOB_GUARD_LOCK_DIR` | `~/.cache/rebalance-os/locks` | Lock namespace. Shared across clones **on purpose**: two worktrees running the same job must still collide. |
 | `JOB_GUARD_MODULE` | `<repo>/utils/job_guard.py` | Point at a vendored copy on non-editable installs |
 
-On a machine with substantially less RAM than 68 GB, consider setting
-`REBALANCE_JOB_GUARD_MAX_RSS_GB` explicitly rather than relying on the fraction.
+### Per-device memory-check settings (GH-296)
+
+Set these in the `job_guard` section of `temp/rbos.config` in the checkout the guard
+runs from (or the file `$REBALANCE_CONFIG` names). No plist edits are needed, and both
+guard layers (the launchd wrapper and the in-process embedding guard) read the same
+file. Precedence: CLI flag > environment variable > `rbos.config` > default. An invalid
+value is ignored with a warning and the default applies.
+
+```json
+"job_guard": { "memory_guard": "on", "swap_distress_gb": 1.5 }
+```
+
+| Key | Env override | Default | Purpose |
+|---|---|---|---|
+| `memory_guard` | `REBALANCE_JOB_GUARD_MEMORY` | `on` | `off` skips the memory checks only. The single-instance lock and the wall-clock timeout always stay on, and every run logs that the checks are disabled. |
+| `max_compressor_gb` | `REBALANCE_JOB_GUARD_MAX_COMPRESSOR_GB` | 25% of RAM | Compressor size that counts as pressure (only when confirmed, see below) |
+| `swap_distress_gb` | `REBALANCE_JOB_GUARD_SWAP_DISTRESS_GB` | max(1 GB, 75% of the swap file) | Swap in use that confirms the pressure is real |
+| `min_available_gb` | — (CLI `--min-available-gb`) | max(12% of RAM, 4 GB) | Available-memory floor |
+
+`rebalance doctor` shows the effective values and where each came from (`job-guard`
+line), as does `python3 utils/job_guard.py --name x --status`.
 
 ### Non-editable installs
 

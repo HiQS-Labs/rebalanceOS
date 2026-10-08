@@ -398,7 +398,7 @@ above and check that `python3 --version` really was 3.12+.
 > **Embedding runs under a memory guard (GH-172).** Embedding is the heaviest
 > local job in this project — it loads a Qwen model and holds vectors resident.
 > Every embedding pass therefore takes a **single-instance lock** and runs under a
-> **memory ceiling** (default: 35% of physical RAM), so a second run cannot stack
+> **memory ceiling** (default: 12.5% of physical RAM), so a second run cannot stack
 > on a first and exhaust the machine. This is on by default with nothing to
 > install.
 >
@@ -420,8 +420,9 @@ above and check that `python3 --version` really was 3.12+.
 >
 > Full reference, tuning variables, and the non-editable-install caveat:
 > [UPGRADE.md § Embedding job guard](UPGRADE.md#embedding-job-guard-gh-172--verify-on-every-device).
-> On a machine with substantially less than 64 GB RAM, set
-> `REBALANCE_JOB_GUARD_MAX_RSS_GB` explicitly rather than relying on the fraction.
+> Each Mac can turn the memory checks off, or tune them, in the `job_guard` section
+> of `temp/rbos.config` (the lock and timeout always stay on); `rebalance doctor`
+> shows the effective values on its `job-guard` line.
 
 > **If you install the scheduled jobs**, note that the plist templates in
 > `scripts/` set `Nice=5` on batch jobs and use a deliberately de-collided
