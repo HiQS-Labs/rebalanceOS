@@ -51,6 +51,10 @@ enum Theme {
     static let destructiveText  = dynamic(light: 0xD13F39, dark: 0xFF8C85)
     /// Window border.
     static let windowBorder = dynamicA(light: (0x000000, 0.08), dark: (0xFFFFFF, 0.10))
+    /// Hover tooltip bubble — dark in both appearances; lifted in dark mode so it
+    /// still separates from the dark glass panel.
+    static let tooltipBG    = dynamic(light: 0x1D1D1F, dark: 0x45454A)
+    static let tooltipText  = Color(hex: 0xF5F5F7)
 
     /// Key-cap fill / border / bottom-highlight.
     static let keycapBG     = dynamic(light: 0xF1F0EB, dark: 0x333337)
