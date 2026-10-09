@@ -79,6 +79,101 @@ struct StatusDot: View {
     }
 }
 
+/// Hover tooltip drawn by SwiftUI itself. AppKit `.help()` tooltips only appear
+/// while the app is active, and this panel never activates the app
+/// (`.nonactivatingPanel` + `orderFrontRegardless`), so `.help()` text never
+/// shows on hover. The tip is a dark bubble below the control with an arrow
+/// pointing up at the control's centre. `edge` picks which side of the control
+/// the bubble lines up with, so bubbles near the panel edge aren't clipped; the
+/// arrow stays centred on the control either way. Callers must keep the
+/// control's container above later siblings (`zIndex`), or the content below
+/// will draw over the tip.
+struct HoverTooltip: ViewModifier {
+    let text: String
+    let edge: HorizontalAlignment
+
+    @State private var hovering = false
+    @State private var visible = false
+
+    private let gap: CGFloat = 4
+    private let arrowSize = CGSize(width: 12, height: 6)
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                hovering = inside
+                guard inside else {
+                    visible = false
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if hovering { visible = true }
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if showing {
+                    // Measure the control, then hang the tip below it: the
+                    // arrow stays centred on the control and the bubble lines
+                    // up with `edge`. The tip's top starts `gap` below the
+                    // control's bottom edge, so it never covers the control.
+                    GeometryReader { geo in
+                        VStack(alignment: edge, spacing: -0.5) {
+                            TooltipArrow()
+                                .fill(Theme.tooltipBG)
+                                .frame(width: arrowSize.width, height: arrowSize.height)
+                                .frame(width: geo.size.width)
+                            Text(text)
+                                .font(Theme.bodyMed)
+                                .foregroundStyle(Theme.tooltipText)
+                                .lineLimit(1)
+                                .fixedSize()
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Theme.tooltipBG, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                        }
+                        .fixedSize()
+                        .frame(width: geo.size.width, alignment: Alignment(horizontal: edge, vertical: .top))
+                        .offset(y: geo.size.height + gap)
+                    }
+                    .tooltipChrome()
+                }
+            }
+            .animation(.easeOut(duration: 0.12), value: visible)
+    }
+
+    private var showing: Bool { visible && !text.isEmpty }
+}
+
+/// Upward-pointing triangle joining a tooltip bubble to its control.
+private struct TooltipArrow: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private extension View {
+    /// Shared tooltip treatment: soft shadow, no hit-testing, fade, and hidden
+    /// from VoiceOver (the control carries its own accessibility label).
+    func tooltipChrome() -> some View {
+        shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 2)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+            .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Tooltip that shows on hover even though the panel never activates the app.
+    func hoverTooltip(_ text: String, edge: HorizontalAlignment = .center) -> some View {
+        modifier(HoverTooltip(text: text, edge: edge))
+    }
+}
+
 /// Telemetry health dot: maps HealthStatus directly to green / orange / red.
 /// Color is never the only cue — callers pair it with adjacent text.
 struct HealthDot: View {

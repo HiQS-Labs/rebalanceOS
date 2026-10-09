@@ -22,6 +22,7 @@ struct ContentView: View {
                 .fill(Theme.glassFill)
             VStack(spacing: 0) {
                 header
+                    .zIndex(1) // header tooltips hang over the content below
                 Divider().overlay(Theme.separator)
                 content
             }
@@ -70,7 +71,7 @@ struct ContentView: View {
         VStack(spacing: Theme.Space.s) {
             HStack(spacing: Theme.Space.s) {
                 ToolbarIconButton(systemName: "xmark", isDestructive: true, action: onHide)
-                    .help("Hide panel")
+                    .hoverTooltip("Hide panel", edge: .leading)
                     .accessibilityLabel("Hide panel")
 
                 ModeSegmentedControl(selected: model.viewMode, onSelect: selectMode)
@@ -78,10 +79,12 @@ struct ContentView: View {
                 Spacer(minLength: Theme.Space.xs)
 
                 ToolbarIconButton(systemName: "arrow.clockwise", action: refreshPanel)
-                    .help(refreshHelpText)
+                    .hoverTooltip(refreshHelpText, edge: .trailing)
+                    .accessibilityLabel(refreshHelpText)
 
                 ToolbarIconButton(systemName: "arrow.up.left.and.arrow.down.right", action: togglePanelWidth)
-                    .help("Toggle panel width")
+                    .hoverTooltip("Toggle panel width", edge: .trailing)
+                    .accessibilityLabel("Toggle panel width")
 
                 // GH-120. Icon mirrors the state it switches TO, matching the
                 // panel-width button beside it.
@@ -91,10 +94,12 @@ struct ContentView: View {
                         : "rectangle.split.3x1",
                     action: toggleRosterLayout
                 )
-                .help(model.tileCards
-                      ? "Stack the repos in one column"
-                      : "Tile the repos left to right")
+                .hoverTooltip(rosterLayoutHelpText, edge: .trailing)
+                .accessibilityLabel(rosterLayoutHelpText)
             }
+            // Keep the icon row above the status row and the roster so the
+            // hover tooltips that hang below the icons aren't drawn over.
+            .zIndex(1)
 
             HStack(spacing: Theme.Space.s) {
                 if model.viewMode == .telemetry {
@@ -234,6 +239,10 @@ struct ContentView: View {
                 : "\(attentionCount) off-roster repos need attention"
         )
         .accessibilityLabel(attentionCount == 0 ? "No repos need attention" : "\(attentionCount) repos need attention")
+    }
+
+    private var rosterLayoutHelpText: String {
+        model.tileCards ? "Stack the repos in one column" : "Tile the repos left to right"
     }
 
     private var refreshHelpText: String {
@@ -738,7 +747,7 @@ private struct SegmentedModeButton: View {
         .foregroundStyle(isSelected ? Theme.text : Theme.text2)
         .background(background,
                     in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .help(label)
+        .hoverTooltip(label)
         .accessibilityLabel(label)
         .onHover { hovered = $0 }
     }
