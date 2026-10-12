@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.98.4] - 2026-10-09
+
+### Fixed
+
+- The Focus 5 menu-bar panel's toolbar icons now show their tooltips on hover. The panel deliberately never takes focus from the app you are working in, and macOS only shows standard tooltips for the active app, so the existing tooltips never appeared. The panel now draws its own: a dark label below each icon with a small arrow pointing at it, shown after a short hover, kept clear of the icon and lined up so it is not cut off at the panel edge.
+
 ## [0.98.3] - 2026-10-07
 
 ### Fixed
