@@ -92,22 +92,31 @@ struct HoverTooltip: ViewModifier {
     let text: String
     let edge: HorizontalAlignment
 
-    @State private var hovering = false
-    @State private var visible = false
+    /// How long the pointer must rest on the control before the tip shows.
+    static let dwell: TimeInterval = 0.5
+
+    @State private var state: HoverTooltipState
 
     private let gap: CGFloat = 4
     private let arrowSize = CGSize(width: 12, height: 6)
 
+    /// `state` lets tests render the tip already shown; callers use the default.
+    init(text: String, edge: HorizontalAlignment, state: HoverTooltipState = HoverTooltipState()) {
+        self.text = text
+        self.edge = edge
+        _state = State(initialValue: state)
+    }
+
     func body(content: Content) -> some View {
         content
             .onHover { inside in
-                hovering = inside
                 guard inside else {
-                    visible = false
+                    state.pointerExited()
                     return
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if hovering { visible = true }
+                let hover = state.pointerEntered()
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.dwell) {
+                    state.dwellElapsed(for: hover)
                 }
             }
             .overlay(alignment: .topLeading) {
@@ -138,10 +147,45 @@ struct HoverTooltip: ViewModifier {
                     .tooltipChrome()
                 }
             }
-            .animation(.easeOut(duration: 0.12), value: visible)
+            .animation(.easeOut(duration: 0.12), value: state.isVisible)
     }
 
-    private var showing: Bool { visible && !text.isEmpty }
+    private var showing: Bool { state.isVisible && !text.isEmpty }
+}
+
+/// The show/hide rules behind `HoverTooltip`, kept apart from the view so they
+/// can be tested without a pointer. Every enter and exit starts a new hover;
+/// the dwell timer started on entry passes back the hover it belongs to, and
+/// only reveals the tip if that hover is still the current one. Without that
+/// check, a timer left over from an earlier hover (enter, leave after 0.2 s,
+/// come back) would show the tip before the new hover had dwelt for the full
+/// delay.
+struct HoverTooltipState: Equatable {
+    private(set) var isVisible = false
+    private var hover = 0
+    private var inside = false
+
+    /// The pointer entered the control. Returns the hover to hand back to
+    /// `dwellElapsed(for:)` once the dwell delay has passed.
+    mutating func pointerEntered() -> Int {
+        hover += 1
+        inside = true
+        isVisible = false
+        return hover
+    }
+
+    /// The pointer left the control: hide the tip and orphan any pending dwell.
+    mutating func pointerExited() {
+        hover += 1
+        inside = false
+        isVisible = false
+    }
+
+    /// A dwell delay started for `hover` has passed.
+    mutating func dwellElapsed(for hover: Int) {
+        guard inside, hover == self.hover else { return }
+        isVisible = true
+    }
 }
 
 /// Upward-pointing triangle joining a tooltip bubble to its control.
