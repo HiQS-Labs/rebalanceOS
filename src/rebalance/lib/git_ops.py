@@ -73,8 +73,9 @@ def collector_clone(values: dict[str, str], directory: Path | None = None) -> Pa
     """
     directory = directory or collector_config_dir()
     raw = values.get("sync_repo_dir") or str(directory / "repo")
-    for name, value in (("CONFIG_DIR", directory), ("HOME", Path.home())):
-        raw = re.sub(rf"\$\{{{name}\}}|\${name}(?![A-Za-z0-9_])", lambda _m, v=str(value): v, raw)
+    for name, value in (("CONFIG_DIR", str(directory)), ("HOME", str(Path.home()))):
+        parts = re.split(rf"\$\{{{name}\}}|\${name}(?![A-Za-z0-9_])", raw)
+        raw = value.join(parts)
     if "$" in raw:
         raise ValueError(f"collector sync_repo_dir has an unresolved expression: {values.get('sync_repo_dir')}")
     return Path(raw).expanduser()
@@ -131,7 +132,13 @@ def discover_pulse_clone(config: dict[str, Any], directory: Path | None = None) 
     collector = collector_clone(values, directory) if values is not None else None
     raw_target = str(config.get("pulse_target_path") or "").strip()
     target = Path(raw_target).expanduser() if raw_target else None
-    if _is_git_clone(collector) and _is_git_clone(target) and collector.resolve() != target.resolve():
+    if (
+        collector is not None
+        and target is not None
+        and _is_git_clone(collector)
+        and _is_git_clone(target)
+        and collector.resolve() != target.resolve()
+    ):
         raise ValueError(
             f"two different pulse clones: collector sync_repo_dir -> {collector}, "
             f"pulse_target_path -> {target}; choose one by hand"
@@ -161,7 +168,7 @@ def fleet_enrollment_changes(
     if not _DEVICE_ID.fullmatch(device):
         raise ValueError(f"collector device_id missing or unsafe ({device!r}); finish identity migration first")
     clone = discover_pulse_clone(config, directory)
-    if not _is_git_clone(clone):
+    if clone is None or not _is_git_clone(clone):
         raise ValueError(f"no git clone of the pulse repo found (resolved: {clone}); clone it first")
     literal = str(clone.resolve())
     subdir = str(config.get("sync_subdir") or "sync")
