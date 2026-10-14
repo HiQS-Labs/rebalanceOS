@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-14.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -76,5 +76,90 @@ ROUND: 1 / 3
 On PASS: STATUS Approved, NEXT Producer. Keep reviewer tick claim, DO NOT release it; run exact environment-pinned native tick done supplied by harness. Only relay thread writes. Do not run tests in relay worktree. Existing full suite, doctor and static routes follow separately; approval assesses implementation and focused evidence, not pending full qualification.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes (all 11 listed files read; SOP.md, SLEUTH_SYNC.md, UPGRADE.md not found in worktree root — not blocking, plan does not claim they are present)
+
+#### Q1 — Strict opt-in reads and canonical setter validation
+
+[Pass]
+
+`_read_config(strict=True)` (config.py:256–284) raises `ValueError` on malformed JSON, non-UTF-8 bytes, and non-object top-level; missing file returns `{}` (bootstrap allowed). `set_pulse_config` reads strictly at line 1403 before any key is touched.
+
+Timezone validation: `resolve_timezone(str(values["pulse_timezone"]).strip())` (config.py:1417) runs inside the function body before `_write_config(config)` at line 1420. The in-memory dict receives the value at line 1412, but disk is written only at 1420 — so a `KeyError`/`ValueError` from `ZoneInfo` aborts the write and leaves original bytes intact.
+
+Confirmed by test_fleet_enroll.py:263–274: calling `set-pulse --github-login fixture-after --timezone America/Los_Angelesx` exits 2, output contains "IANA timezone", `CONFIG_PATH.read_bytes() == before`. Confirmed by test_config_read_shape_guard.py:99–107: `\xff` bytes raise, strict read of wrong-shape JSON raises; both leave the file untouched.
+
+Ordinary non-strict getters retain warn-once/default behavior (config.py:243–283 `_WARNED_BAD_CONFIG` guard).
+
+#### Q2 — Collector writer: independent first backup, no clobber, source mode, flush/fsync, clean staging on failure
+
+[Pass]
+
+`set_collector_values` (git_ops.py:86–135):
+- Reads original bytes and mode before touching anything (lines 95–96)
+- `stage()` (lines 99–111): `mkstemp` → `fchmod` to original mode → `write` → `flush` → `fsync` — complete before function returns; `BaseException` handler unlinks on any failure
+- Backup (lines 122–130): staged from original bytes, then `os.link(staged, backup)` — never hardlinks the live inode; `FileExistsError` is swallowed (earlier winner keeps its backup); `finally` unlinks the temp
+- Publication (lines 131–135): new staged content → `staged.replace(path)` (atomic rename on POSIX); `finally` unlinks staged on failure, leaving original at `path`
+
+Docstring line 91: "This is not a concurrent or two-file transaction" — honestly documented.
+
+Tests: test_fleet_enroll.py:113–143 (`test_backup_failure_leaves_original_and_no_partial_backup`, `test_replace_failure_keeps_complete_backup_and_original_mode`).
+
+#### Q3 — Partial apply/postcondition: clear, nonzero, actionable, no unsafe rollback
+
+[Pass]
+
+`config_fleet_enroll` (config_cmds.py:584–608): on `(ValueError, OSError)` from either write:
+- `typer.echo("✗ Enrollment incomplete: ...")` + exit 1
+- If collector was attempted: names the recovery backup path `config.sh.bak-gh325`
+- If pulse was attempted: directs operator to inspect `get_config_path()`
+- If postcondition `fleet_settings` returns `None`: raises `ValueError("fleet settings missing after enrollment")` → caught → exit 1
+
+No automatic rollback anywhere in the path.
+
+Confirmed by test_fleet_enroll.py:276–294: OSError injected into `set_pulse_config` → exit 1, "Enrollment incomplete", "Recovery backup", "write was attempted", collector bytes changed, rbos.config bytes unchanged. `fleet_settings` returning `None` → exit 1, message in output.
+
+#### Q4 — Thin refresh facade, setup stops before set-sleuth on contention/dirty/pull failure, no autostash
+
+[Pass]
+
+`config_refresh_pulse_clone` (config_cmds.py:482–495) is a one-line facade: `reconcile_pulse_mirror(path)` → `git_publish_lock` → `git_pull_rebase_safe`. No direct pull or autostash anywhere in the call chain. `GitSubprocessError` at line 492 is a tuple `(subprocess.SubprocessError, subprocess.TimeoutExpired)` (git_ops.py:260), so the unpacked `*GitSubprocessError` in the except clause is valid Python.
+
+`setup_sleuth_file_source.sh` uses `set -euo pipefail` (line 21). The refresh call is at line 66; `set-sleuth` is at lines 84–88. A non-zero exit from the refresh halts the script before the setter.
+
+Confirmed by test_pulse_reconcile.py:96–117: dirty checkout → exit 1, no stash, HEAD unchanged; locked → exit 1 with "busy"; clean → exit 0, upstream commit present.
+
+#### Q5 — Reader migration precedes retirement, no parser change; shell wrapper correct for paths with spaces
+
+[Pass]
+
+Shell wrapper fix (test_daily_loop_inputs.py:57–59):
+`script.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(payload_script))} "$@"\n')`
+Both the Python executable path and the script path are `shlex.quote()`-wrapped, making the `exec` invocation safe for paths containing spaces. No runtime scanner logic changed — the fixture isolation is complete.
+
+Plan item 6 states migration requirement as an operator process gate, not runtime code; no retirement code is present in the diff, which is correct per the stated envelope.
+
+#### Q6 — Version 0.101.1, rating 88/88/50/65, focused/red controls grounded; no missing requirement, unrelated scope, or duplicate utility/writer
+
+[Pass]
+
+- Version 0.101.1 confirmed: pyproject.toml:7, CHANGELOG.md:13, both consistent.
+- Rating 88/88/50/65 cited verbatim at GH-330-FLEET-SAFETY-FOLLOWUP.md:44 with rationale (loss of original config + private mode exposure = high S/P; bounded helpers = cheap 65).
+- No duplicate writer: `set_collector_values` is the single implementation; no new store or suite introduced.
+- No unrelated scope added: files touched extend existing admission (`_read_config`), existing setter (`set_pulse_config`), existing collector editor (`set_collector_values`), existing mirror helper (`reconcile_pulse_mirror`), and existing fixture wrapper.
+
+[Nit] config.py:1386–1420 — Timezone validation runs after the in-memory dict is mutated (line 1412) rather than before the loop as a pre-write guard. No disk write occurs on failure (write is at line 1420, after the guard), so original bytes are safe. Clarity nit only; behavior is correct and tested.
+
+#### Additional findings
+
+None. No pre-existing defects identified in the touched files that are not already addressed by this patch.
+
+---
+
+VERDICT: PASS
+
+Basis: All six acceptance checks are met. Strict admission preserves original bytes and rejects bad timezones before any write. The collector writer completes independent staged backups with fsync before atomic publication. Partial apply failures are nonzero and actionable with no rollback. The refresh facade delegates to the shared lock owner and the setup script halts on any non-zero exit before the setter. The shell wrapper uses `shlex.quote` for space-safe paths. Version, rating, and scope are consistent with the stated plan; no duplicate utility or writer was added. The single nit (validation ordering clarity) is non-blocking.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
