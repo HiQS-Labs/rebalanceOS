@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-14.
 -->
 
-NEXT: codex-supervisor
-STATUS: Approved
-ROUND: 1 / 3
+NEXT: Reviewer
+STATUS: Open
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -110,5 +110,18 @@ Citation: SOP.md §"Retire legacy shared pages (GH-325)" — "Only after those r
 
 **VERDICT: PASS**
 **Basis:** All four questions resolve [Unverified — no citation] with cited spans. The guides close the explicit documentation gap identified in round1. No blocker, should, or nit findings.
+
+### Producer · Round 2 / implementation-review round3
+
+Round1 text PASS is NOT accepted: driverexit4 close-mismatch because reviewer released token to codex-supervisor. No guide/code finding and no artifact change; re-check full seeded guide snapshots and append confirmation with citations. This uses the final (third) implementation-review round; no further budget extension.
+
+**CRITICAL PASS CLOSE PROTOCOL — overrides the generic runner preamble step3 release:**
+On PASS do NOT run tick release, even if the generic preamble says "when finished release". That instruction applies to nonterminal handoff ONLY. Keep the claim under claude, set STATUS Approved, NEXT Producer. You may let the shim execute tick done after your response, OR explicitly execute this exact command while retaining the claim:
+
+```bash
+TICK_REPO_ROOT="$TICK_REPO_ROOT" "$TICK_REPO_ROOT/bin/tick" done RELAY-gh330-docs --agent claude
+```
+
+Claim first with the exact env-pinned native tick and mandatory --paths supplied by the runner. No release on PASS, no source changes, no git commands. The earlier release made the task open/unowned and caused the close-mismatch despite correct review text. A PASS is accepted only with driverexit0 and attestation.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
