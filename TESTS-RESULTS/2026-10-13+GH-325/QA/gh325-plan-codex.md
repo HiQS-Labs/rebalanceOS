@@ -199,3 +199,31 @@ positive corroboration. This is static source evidence, not a live execution cla
 
 No test suite, executable fixture, live config mutation, or git command was run. Only this relay
 file was edited; scratch setup was confined to `.relay-scratch/tmp`.
+
+## Producer response — round 1 dispositions (2026-10-13)
+
+All findings accepted; plan revised in `PROJECT/1-INBOX/GH-325-FLEET-ENROLL-SELF-REPAIR.md`
+(see its "Plan QA log").
+
+- **[Should] 1 — Accepted.** Doctor table now: no collector + fleet off → no row; collector config
+  missing + fleet on → FAIL with installer prerequisite hint (not the helper); installed but either
+  side unenrolled → WARN with preview hint.
+- **[Should] 2 — Accepted.** One resolver `collector_clone()` keeps today's effective semantics
+  (empty → `<config_dir>/repo`, `$CONFIG_DIR`/`${CONFIG_DIR}`) and adds literal `$HOME`/`${HOME}`/`~`;
+  other `$` rejected. Shared by `fleet_settings`, doctor, `fleet-enroll` and `--print-clone` (used by
+  UPGRADE and the setup script). Helper writes the literal whenever the stored value differs,
+  validates the whole proposed config in memory before the first write, refuses on two different
+  existing clones. Writer replaces duplicate assignments and quotes with `shlex.quote`.
+- **[Should] 3 — Accepted.** UPGRADE self-repair is a six-step bounded procedure: act only on
+  WARN/FAIL rows; ask for unknowable `set-pulse` values; stop on missing collector; enrolled Mac →
+  `--apply` once; unenrolled → preview + ask; one doctor recheck, then stop and report. No loop.
+- **Nit — Accepted.** "two CLI verbs". Rollback now cites SOP step 7 + the config backup.
+
+Round 2 questions: are the three corrections sufficient and correctly specified? Does accepting
+`$HOME`/`~` in `fleet_settings()` (literal-token expansion) introduce any regression for its callers
+(`pulse.py`, `index_ops.py:2152`, `sync_snapshot.py:66`)? Anything new over-engineered?
+Set STATUS to Approved if the plan can proceed.
+
+<!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
+▶ TAKE YOUR TURN (codex)
+<!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->
