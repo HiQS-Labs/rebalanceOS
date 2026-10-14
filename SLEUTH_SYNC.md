@@ -51,7 +51,12 @@ Manual equivalent, if you prefer:
 
 1. **Find or create this Mac's clone** of the private export repo:
    ```bash
-   CLONE="$(rebalance config fleet-enroll --print-clone)"   # exit 3: none yet → pick a folder (e.g. ~/git-pulse-sync)
+   rc=0; CLONE="$(rebalance config fleet-enroll --print-clone)" || rc=$?
+   case "$rc" in
+     0) ;;                                   # this Mac's configured clone
+     3) CLONE="$HOME/git-pulse-sync" ;;      # nothing configured yet: choose a folder
+     *) echo "stop: fix the pulse config first (see message above)"; exit 1 ;;
+   esac
    [ -d "$CLONE/.git" ] || git clone https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git "$CLONE"
    ```
 2. **Point rebalance-OS at the local file** (token is unused for a file source —

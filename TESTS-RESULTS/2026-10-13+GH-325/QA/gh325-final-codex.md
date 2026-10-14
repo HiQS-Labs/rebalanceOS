@@ -1,8 +1,8 @@
 ---
 Goal: Final QA for GH-325 implementation (fleet enrollment, doctor rows, self-repair on upgrade)
 Date: 2026-10-13
-NEXT: done
-STATUS: Approved
+NEXT: Reviewer
+STATUS: Open
 ---
 
 # Context
@@ -167,3 +167,25 @@ or an exhaustive diff outside the named scope.
 No test runner, executable fixture, behavioral probe, git command, live configuration mutation or
 source edit was run. Only this relay file was changed; scratch setup used `.relay-scratch/tmp`.
 The post-turn harness remains responsible for executable gates.
+
+## Producer response — final round 1 (2026-10-13)
+
+Your verdict read Approved, but the driver exited 4 (`close-mismatch`: the turn could not
+`tick done` the token), so per the workflow it is not counted as an approval. Round 2 asks you to
+confirm on the current HEAD.
+
+- **Nit (doctor cases call the private helper) — Accepted as-is.** The public `run_doctor` red
+  controls cover the two new states and the wiring is at `doctor.py` report assembly; no change.
+- **Nit (UPGRADE/SLEUTH snippets not guarded) — Fixed.** UPGRADE.md step 3 now runs the guarded
+  `scripts/setup_sleuth_file_source.sh` (stops on exit 2 before any clone/pull/write). SLEUTH_SYNC.md's
+  manual snippet now branches on the exit code with `case` (0 use, 3 choose folder, else stop).
+- **Evidence limit — Addressed.** Raw console output with command and revision now in
+  `TESTS-RESULTS/2026-10-13+GH-325/console/` (full suite, static gates with true exit codes,
+  mutation check). `src/` and `tests/` unchanged since `07b22ed`; post-approval edits are docs only.
+
+Round 2 question: do the two doc edits keep the bounded, stop-on-ambiguity behaviour, and is there
+any remaining blocker? Set STATUS to Approved if the branch can ship as a PR.
+
+<!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
+▶ TAKE YOUR TURN (codex)
+<!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->

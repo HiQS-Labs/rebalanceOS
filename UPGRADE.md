@@ -144,19 +144,13 @@ git pull
 # 3. Sleuth — all devices should use the file-source method, reading the export from
 #    THIS Mac's clone of rebalance-git-pulse. The folder name differs per Mac
 #    (~/git-pulse-sync on one, ~/Documents/GitHub/rebalance-git-pulse on another), so
-#    never assume it — ask this Mac's own config (GH-325):
-CLONE="$(.venv/bin/rebalance config fleet-enroll --print-clone)"; rc=$?
-#    rc 0 → use "$CLONE" (clone into it only if the folder does not exist yet:
-#           git clone https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git "$CLONE")
-#    rc 3 → nothing configured: pick a folder (example ~/git-pulse-sync), clone into it, then
-#           .venv/bin/rebalance config set-pulse --target-path <that folder>
-#    rc 2 → config is broken or names two different clones: STOP and fix by hand; do not
-#           clone or change Sleuth until --print-clone returns 0.
-#    If this machine was previously pointed at the Web API, override it now.
-.venv/bin/rebalance config set-sleuth \
-    --base-url "$CLONE/sync/sleuth/reminders-neochrome.json" \
-    --token file-source \
-    --workspace neochrome
+#    never assume it. The setup script asks this Mac's own config
+#    (`rebalance config fleet-enroll --print-clone`, GH-325), reuses or clones that folder,
+#    and points Sleuth at it. It stops without cloning or changing anything when the config
+#    is broken or names two different clones. Only when nothing is configured at all does it
+#    use ~/git-pulse-sync; pass --clone-dir <folder> to choose another.
+#    Also overrides a machine previously pointed at the Web API.
+bash scripts/setup_sleuth_file_source.sh --workspace neochrome
 #    This reads the published Sleuth export directly from the companion repo —
 #    no API auth, tunnel, or public :2020 endpoint. A file:// or local-path
 #    base_url is read directly (token unused). Full setup + troubleshooting:

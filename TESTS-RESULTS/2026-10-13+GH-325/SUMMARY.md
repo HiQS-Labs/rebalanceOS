@@ -18,6 +18,12 @@ accepted. r3: Approved (relay-drive attestation, reviewed `14c1f29`).
 | `ruff check .`, `ruff format --check .`, `mypy src/` | clean |
 | CI ratchets: banned imports, script inventory, machine paths, read layer, near duplicates, doc links, frontdoor | clean |
 
+Raw console output for the rows above, with command and revision, is in `console/`:
+`full-suite-07b22ed.txt`, `static-gates.txt` (true per-command exit codes), `mutation-check.txt`.
+Final QA r1 nits applied after `07b22ed` are docs-only (UPGRADE.md step 3 now calls the guarded
+setup script; SLEUTH_SYNC.md manual snippet branches on the `--print-clone` exit code); `src/` and
+`tests/` are unchanged since `07b22ed`.
+
 ## Red controls — public `run_doctor` report, same inputs, base vs candidate
 
 Script: `doctor-red-control.py` (temp config only; collector-health read stubbed to `[]` so the
