@@ -227,3 +227,87 @@ Set STATUS to Approved if the plan can proceed.
 <!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
 ▶ TAKE YOUR TURN (codex)
 <!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->
+
+
+## Codex review — round 2 (2026-10-13)
+
+**Verdict: Block pending two bounded specification corrections. STATUS remains Open.**
+The three prior findings are addressed in the main enrollment path: plan lines 127–151
+specify visibility, effective clone selection, validation before writes and byte-stable reruns;
+lines 167–181 specify a bounded repair/recheck procedure. Two seams still need correction.
+All plan references below refer to `PROJECT/1-INBOX/GH-325-FLEET-ENROLL-SELF-REPAIR.md`.
+
+### [Should] 1. Distinguish missing configuration from resolution failure in clone discovery
+
+Plan lines 152–154 specify `--print-clone` as “C, else P”, without explicitly carrying over
+lines 137–140's conflicting-clone refusal or bypassing enrollment's device-ID prerequisite.
+Lines 164–166 equate refusal with “no clone configured anywhere”; lines 192–195 fall back to
+`~/git-pulse-sync` on any refusal. A parse error, unresolved expression, or conflicting pair
+is not proof that no clone is configured. The existing setup script then clones or pulls at
+the selected path and writes the Sleuth source (`scripts/setup_sleuth_file_source.sh:48–73`).
+That fallback can recreate the wrong-folder behavior this task is intended to eliminate.
+
+Observed input: collector `sync_repo_dir="$OTHER/repo"` and an existing configured publisher
+clone; alternatively two distinct existing C/P clones, or no collector file with valid P.
+Affected scope: UPGRADE step 3 and the Sleuth setup script's automatic clone selection.
+Falsifier: print-only discovery returns P when the collector is absent without requiring an
+identity; conflicting clones or malformed configuration stop both callers without cloning,
+pulling or changing the source; only a distinct no-configured-clone result permits the
+explicit first-install fallback. An explicit `--clone-dir` remains usable.
+
+Cheapest correction: define print-only resolution independently of enrollment eligibility,
+reuse the same conflict check, and distinguish absence from invalid/ambiguous configuration
+with a documented exit status. Both callers must branch on that distinction. No new framework.
+
+### [Should] 2. Correct the doctor baseline and red-control expectation
+
+I correct my round-1 inference: no direct `fleet_settings` reference in doctor does **not**
+mean doctor never reaches it. `doctor.py:115–124` calls `sync_snapshot.get_device_id`, which
+calls `fleet_settings` at `sync_snapshot.py:66–68`. `_check_pulse_collectors` invokes that
+identity helper and already emits `Check("fleet configuration", FAIL, str(exc))` on
+ValueError/OSError (`doctor.py:1899–1902`), provided the health read reaches that branch.
+The public report invokes this check at `doctor.py:2567`.
+
+Thus plan lines 64–68 overstate silence, and lines 209–212 cannot require the base public
+report to have no WARN/FAIL for fleet-enabled/missing-config input. The proposed change still
+adds value: actionable remediation, reliable detection, and unenrolled-device visibility.
+
+Observed input: `pulse_fleet_enabled=true`, valid publisher target, missing collector config,
+with the existing collector-health read returning normally (an empty list suffices).
+Affected scope: baseline factual claim and the missing-config red control through run_doctor.
+Falsifier: on base, record the existing generic fleet-configuration FAIL when this branch is
+reached; demonstrate the candidate's missing-config installer remedy is absent on base.
+Keep the separate installed-but-unenrolled control for the missing enrollment warning.
+
+Cheapest correction: qualify the recon claim and assert the new actionable diagnostic contract,
+not total absence of a failure. Do not suppress the existing failure to manufacture red evidence.
+
+Static source inspection command (exit 0):
+`rg -n -A 14 '^def _local_device_id' src/rebalance/doctor.py`
+Decisive output: line 122 imports `get_device_id` from `rebalance.ingest.sync_snapshot`;
+line 124 returns `get_device_id().removesuffix("-local")`. Direct source reads above establish
+the downstream validation and its exception handler. This is a static call-path finding,
+not a claim that the full report was executed.
+
+### Remaining round-2 answers and limits
+
+- The shared small resolver is justified by its concrete callers. Literal `$HOME` expansion
+  can extend acceptance without changing the fleet return shape, identity checks, subdirectory
+  checks or path equality. Those invariants must remain. `~` already passes through
+  `Path.expanduser()` in current `git_ops.py:75`; describing it as newly accepted is a Nit.
+  Publication, snapshot identity and sync export consume the same validated device/subdirectory
+  result (`pulse.py:1051–1054`, `sync_snapshot.py:66–68`, `index_ops.py:2152–2156`). No caller
+  regression is demonstrated by the plan alone; preserve literal-token boundaries and do not
+  introduce shell evaluation. Config normalization on apply remains useful.
+- The narrowly scoped second writer, pre-write validation, duplicate replacement and backup
+  are proportionate for four personal Macs. No transaction service or extra subsystem is needed.
+- Retirement scope, ignored-filename visibility, rollout gates and rating remain acceptable.
+  Appeal remains 50; historical counts and fleet rollout state remain unverified here.
+- **[Unverified — needs clone run]** implementation behavior, resolver compatibility, full doctor
+  red controls, idempotence and live delivery. No test suite or executable fixture was run.
+- Used the SWE review rubric and direct seeded-source review. Graph project enumeration was
+  fully paginated (84 entries); this checkout has no index. Related `rebalanceOS` generation
+  `2026-09-02T03:54:57Z` is a different checkout. Coverage for the seven relevant paths reported
+  changed metadata on six and excluded `scripts/` on one; direct source was used instead.
+  No graph refresh, git command, live configuration change or source edit was performed.
+  Only this relay file was edited; scratch setup was confined to `.relay-scratch/tmp`.
