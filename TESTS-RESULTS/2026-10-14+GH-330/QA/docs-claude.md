@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-14.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -123,5 +123,41 @@ TICK_REPO_ROOT="$TICK_REPO_ROOT" "$TICK_REPO_ROOT/bin/tick" done RELAY-gh330-doc
 ```
 
 Claim first with the exact env-pinned native tick and mandatory --paths supplied by the runner. No release on PASS, no source changes, no git commands. The earlier release made the task open/unowned and caused the close-mismatch despite correct review text. A PASS is accepted only with driverexit0 and attestation.
+
+### Reviewer · Round 2 (claude)
+
+swept file: yes — re-reviewed all three source snapshots in full (SOP.md, SLEUTH_SYNC.md, UPGRADE.md). No pre-existing defects found outside GH-330 scope.
+
+**Q1 — SOP requires migrating/verifying each reader BEFORE deleting legacy pages, retaining collector pages/metadata?**
+
+[Pass] Step 2 inventories every root-page reader, migrates VS Code sidebars, and states "A configured reader still using a root page blocks retirement." Step 3 conditions deletion on "Only after those reader checks." Step 4 names kept paths.
+Citation: SOP.md §"Retire legacy shared pages (GH-325)" — "Only after those reader checks, delete root `live-pulse.md` and `live-pulse-*.md`" and "Keep `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`"
+
+**Q2 — Recovery notes describe strict refusal, validated timezone, complete independent new backups, mode preservation, partial attempted writes, prior-backup inspection, no automatic rollback, no ACL/concurrency/power-loss promises?**
+
+[Pass] All eight claims present.
+Citation: SOP.md §"Fleet configuration repair failures (GH-330)":
+- Strict refusal: "refuses an existing malformed, non-object or unreadable Rebalance config"
+- Validated timezone: "Pulse timezone input is validated before settings writes"
+- Complete independent new backups: "New collector backups are completed independent copies before publication"
+- Mode preservation: "replacement preserves Unix permission bits"
+- Partial attempted writes: "A partial apply reports attempted writes and the backup location"
+- Prior-backup inspection: "An older `config.sh.bak-gh325` may predate this guarantee: inspect it before manual recovery"
+- No automatic rollback: "It never automatically restores a potentially stale first backup over newer settings"
+- No ACL/concurrency/power-loss promises: "Ownership/ACLs, concurrent config writers and two-file/power-loss transactions are not qualified here"
+
+**Q3 — Upgrade and Sleuth guides describe setup's existing shared lock, stop before settings on failure, and normal read-side fetch/upstream blob without worktree writes?**
+
+[Pass] All three behaviors confirmed with citations across both guides.
+- Shared lock + stop on failure: UPGRADE.md §"Steps (run on each device)" step 3 — "Existing clones refresh under the shared writer lock, without autostash. Lock contention, dirty/in-progress Git state or refresh failure stops before Sleuth settings change."
+- Read-side fetch without worktree writes: SLEUTH_SYNC.md §Freshness — "git fetch + git show of the upstream export blob, without worktree/index writes, rebase or autostash"
+- Cross-confirmation: SOP.md §"Fleet configuration repair failures (GH-330)" — "A busy publisher, existing Git operation, dirty checkout or failed pull stops setup before writing Sleuth settings"
+
+**Q4 — Any changed-guide contradiction or missing acceptance requirement?**
+
+[Pass] No contradictions found. The shared-lock-stops-before-settings behavior is described identically in three independent places: SOP.md §"Fleet configuration repair failures (GH-330)" ("stops setup before writing Sleuth settings"), SLEUTH_SYNC.md §Freshness ("Setup separately uses the existing shared writer lock"), and UPGRADE.md step 3 ("stops before Sleuth settings change"). The non-destructive fetch model is consistent: SLEUTH_SYNC.md §Freshness ("without worktree/index writes, rebase or autostash") and SOP.md §GH-330 ("Normal Sleuth reads fetch upstream blobs without rebasing or stashing the checkout"). No acceptance requirement from the Definition of Done is missing.
+
+**VERDICT: PASS**
+**Basis:** All four questions resolve [Unverified — no citation] with cited spans. The guides close the explicit documentation gap identified in round1. No blocker, should, or nit findings. Round 1 text was correct; close-mismatch was caused by token release rather than review error.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
