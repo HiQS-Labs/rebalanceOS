@@ -384,8 +384,13 @@ def infer_close_loop_flags(
     stale_days: int = 7,
     since_days: int = 30,
     now: datetime | None = None,
+    releases_scan_dirs: list[str] | None = None,
 ) -> dict[str, Any]:
     """Per-repo close-the-loop flags from locally synced GitHub data.
+
+    ``releases_scan_dirs`` (GH-310, opt-in) attaches a read-only ``releases`` block:
+    local RELEASES ledger tasks for this repo, clone conflicts and drift. When it is
+    None the report is unchanged.
 
     Deterministic rules only; every flag carries plain-language evidence.
     Items outside the local sync window are invisible, so counts are lower
@@ -422,6 +427,10 @@ def infer_close_loop_flags(
         if not data["repo_meta"]:
             report["status"] = "no_local_data"
             report["summary"] = "No local GitHub data found for this repo. Sync artifacts first."
+            if releases_scan_dirs is not None:
+                from rebalance.ingest.releases_scan import scan_releases
+
+                report["releases"] = scan_releases(releases_scan_dirs, repo_full_name)
             return report
         default_branch = data["repo_meta"].get("default_branch") or "main"
         issues = data["issues"]
@@ -429,10 +438,13 @@ def infer_close_loop_flags(
         pr_by_number = {int(pr["number"]): pr for pr in prs}
         linked_issue_numbers: set[int] = set()
         merged_linked: set[int] = set()
+        issue_prs: dict[int, list[dict[str, Any]]] = {}
         for link in data["links"]:
             target = int(link["target_number"])
             linked_issue_numbers.add(target)
             pr = pr_by_number.get(int(link["source_number"]))
+            if pr:
+                issue_prs.setdefault(target, []).append(pr)
             if pr and int(pr.get("is_merged") or 0) == 1:
                 merged_linked.add(target)
 
@@ -540,4 +552,42 @@ def infer_close_loop_flags(
     report["summary"] = (
         f"{len(flags)} close-the-loop flag(s) across {len(prs)} PRs and {len(issues)} issues in the local store."
     )
+    if releases_scan_dirs is not None:
+        from rebalance.ingest.releases_scan import scan_releases
+
+        releases = scan_releases(releases_scan_dirs, repo_full_name)
+        issue_by_number = {int(issue["number"]): issue for issue in issues}
+        stale_prs = {f["number"] for f in flags if f["flag"] in ("stale_pr", "forgotten_draft")}
+        for task in releases["tasks"]:
+            if task["status"] != "in-progress" or task["gh_number"] is None:
+                continue
+            number = int(task["gh_number"])
+            issue = issue_by_number.get(number)
+            if issue is None:
+                continue
+            kind = ""
+            if issue.get("state") == "closed":
+                kind, evidence = "issue_closed", f"Ledger marks #{number} in progress but the issue is closed."
+            elif number in merged_linked:
+                kind, evidence = "pr_merged", f"Ledger marks #{number} in progress but a linked PR is merged."
+            else:
+                stale = sorted(
+                    int(pr["number"])
+                    for pr in issue_prs.get(number, [])
+                    if pr.get("state") == "open" and int(pr["number"]) in stale_prs
+                )
+                if stale:
+                    kind, evidence = "pr_stale", f"Ledger marks #{number} in progress; linked PR #{stale[0]} is stale."
+            if kind:
+                releases["drift"].append(
+                    {
+                        "kind": kind,
+                        "gh_number": number,
+                        "title": task["title"],
+                        "clone_path": task["clone_path"],
+                        "evidence": evidence,
+                    }
+                )
+        releases["counts"]["drift"] = len(releases["drift"])
+        report["releases"] = releases
     return report

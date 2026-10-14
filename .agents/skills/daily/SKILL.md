@@ -50,6 +50,7 @@ Inspect the top of `~/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_p
 
 ### Step 2 — Read Rebalance Live Work Signal (Operational Signal)
 - Optionally consume established XYZ status from explicitly configured `xyz_harness_root` and `xyz_ledger_roots` (or `REBALANCE_XYZ_HARNESS` / `REBALANCE_XYZ_LEDGER_ROOTS`, path-separated roots). No discovery or guessed sibling path. The helper reads at most four roots, 2 MiB per helper and 2,000 issues per root, with a shared two-second ledger window inside six seconds for the complete status read. Native SQLite reads use the existing read gateway and deadline. No CLI `main`, refresh, migration, writer or remote update is called. If unconfigured, preserve the existing Daily output. Configuration does not enable the opt-in Terra canary or change its privacy/spending limits.
+- Optionally (GH-310, default off) widen recorded task status across local clones with the read-only RELEASES ledger scan: `--releases-scan <dirs>` on the Step 3 scanner (or `REBALANCE_RELEASES_SCAN_DIRS`, comma-separated). It runs `rebalance github-close-loop --releases-scan` per watched repo, which opens each clone's `releases.db` with SQLite `mode=ro` and never writes, migrates or refreshes a ledger.
 - Call `get_next_actions()` / load ranked next actions from `rebalance.db`.
 - Query upcoming calendar events for today from `calendar_events` (or trigger `rebalance calendar-sync` if needed).
 - Query active Sleuth reminders (`sleuth_reminders`).
@@ -62,6 +63,12 @@ Inspect the top of `~/Documents/Noel Saw/0. Claude Prompts.md` (or query `clio_p
 - Execute `python3 .agents/skills/daily/scripts/scan_unclosed_loops.py --update-ledger` (or `bash .claude/skills/rebalance/collect.sh`).
 - Automatically updates and synchronizes `temp/close-the-loop.md` with active in-flight worktrees, un-PRed branches, and open pull requests.
 - Identifies repos with `ACTIVE` or `WARM` worktrees, recent commit timestamps, unmerged branches, and dirty working trees.
+- **Opt-in loop inputs (GH-310, default off)**: add `--close-loop` (or `REBALANCE_DAILY_CLOSE_LOOP=1`) to fold in `rebalance github-close-loop --json` flags, and/or `--releases-scan <dirs>` for the ledger scan above.
+  - Items are deduped by `(repo, number)` and source-tagged (`close-loop:<flag>`, `releases:<repo>#<task>`, `releases-drift:pr_stale`) under `flagged_loops`; the summary line gains `N flagged loops (close-loop/releases)`.
+  - Every item is re-verified against the scanner's own live GitHub read: a PR must be `OPEN`, an issue must be in the live open set. Merged/closed items are dropped; unverifiable items are counted in `unverified`, never reported as loops.
+  - `closed_without_delivery` and ledger-vs-GitHub drift (`issue_closed`, `pr_merged`) go to `questions`, not loops: closed without delivery is a question, not a verdict.
+  - If the `rebalance` CLI (or `REBALANCE_BIN`) is missing or fails, print one line (`daily: <input> input skipped (<reason>)`) and keep the existing output byte-for-byte. Off or skipped, the JSON schema is unchanged. If only some watched repos fail, print one `input partial` line and list them in `failed_repos`.
+  - Cite these as `[Trigger: close-loop:stale_pr <repo>#<n>]` or `[Trigger: releases:<repo>#<task>]` in the unclosed-loop nudge.
 - **Machine CPU Health (Runaway Scanner)**:
   - Execute `python3 .agents/skills/daily/scripts/scan_runaway_cpu.py` (sibling scanner, GH-194).
   - Flags processes pinning a core across cycles: `%CPU > 50`, duty cycle (CPU time ÷ elapsed) `> 0.5`, elapsed `> 2h`, and (same `(pid, lstart)` persisted from the previous cycle with growing CPU time **or** elapsed `> 24h`); known long-lived services (`mcp_server`, `pulse_server`, IDE helpers, system daemons) are exempt.
