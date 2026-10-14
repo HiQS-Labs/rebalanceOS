@@ -1,8 +1,8 @@
 ---
 Goal: Plan QA for GH-325 (fleet enrollment, doctor checks, self-repair on upgrade)
 Date: 2026-10-13
-NEXT: claude-a
-STATUS: Open
+NEXT: done
+STATUS: Approved
 ---
 
 # Context
@@ -332,3 +332,39 @@ Approved if the plan can proceed; otherwise list only blocking defects.
 <!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
 ▶ TAKE YOUR TURN (codex)
 <!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->
+
+
+## Codex review — round 3 (2026-10-13)
+
+**Verdict: Ship the plan. STATUS: Approved. No blocking defects remain.**
+
+Both round-2 corrections are sufficiently specified to proceed with implementation:
+
+- **Clone discovery:** plan lines 155–164 separate print-only discovery from enrollment,
+  preserve the conflict check, and distinguish resolved (0), invalid/ambiguous (2), and
+  unconfigured (3). The two callers at lines 173–177 and 203–207 stop on invalid/ambiguous
+  configuration; fallback is restricted to absence. An absent collector can use P without
+  requiring an identity, and the explicit setup override bypasses discovery. This closes the
+  wrong-folder fallback finding without adding a separate resolution system.
+- **Doctor baseline:** plan lines 64–70 acknowledge the indirect validation path, and lines
+  219–225 preserve the existing generic failure while testing the newly actionable remedy.
+  Seeded source corroborates the chain: `doctor.py:122–124` calls snapshot identity,
+  `ingest/sync_snapshot.py:66–68` calls fleet validation, and `doctor.py:1899–1902` catches
+  its configuration errors. As noted in round 2, the red-control fixture must allow the
+  preceding health read to return normally so that this branch is reached.
+
+The earlier acceptance of the bounded repair loop, pre-write validation, narrow second writer,
+retirement scope and rating stands. No additional subsystem or plan expansion is warranted for
+these four personal Macs. Approval is for implementation of this plan, not deployment qualification.
+
+**[Unverified — needs clone run]** Resolver compatibility, print-only exit behavior and caller
+side effects, public doctor red controls, apply/idempotence and live fleet delivery remain planned
+verification. No test suite, executable fixture or runtime behavior probe was run in this turn.
+
+Evidence scope: read the revised plan in full and checked the two corrected seams directly against
+seeded source, using the SWE review rubric. Graph enumeration returned all 84 projects with no
+entry for this checkout. Related `rebalanceOS` is another checkout; coverage generation
+`2026-09-02T03:54:57Z` reports changed metadata for the three Python evidence paths and excludes
+`scripts/`. Direct source reads therefore supplied the evidence; no index was refreshed.
+Only this relay file was edited, with scratch confined to `.relay-scratch/tmp`; no git command,
+live configuration write, test runner or executable fixture was invoked.
