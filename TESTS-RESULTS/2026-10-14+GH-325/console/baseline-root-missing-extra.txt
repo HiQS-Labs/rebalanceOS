@@ -1,0 +1,250 @@
+........................................................................ [  2%]
+.......................xx.x.x..x.x..xxx................................. [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+.............................................................. [ 12%]
+........................................................................ [ 15%]
+...................................................................... [ 17%]
+................................................................................................................................ [ 22%]
+................................................................ [ 24%]
+............................................................. [ 26%]
+.................................FF..FF............................................................................................. [ 31%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+...................................................................... [ 46%]
+........................................................................ [ 49%]
+.................................................................... [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+.............................................................................................................. [ 63%]
+.............................ssssssssssssssss........................... [ 66%]
+........................................................................ [ 68%]
+.....................................................x.................. [ 71%]
+..................................................................... [ 73%]
+.............................................................. [ 75%]
+..................................................................... [ 78%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+..................................................................................................... [ 92%]
+........................................................................ [ 94%]
+........................................................................ [ 97%]
+.........................................ssss......................... [100%]
+=================================== FAILURES ===================================
+_______________ EmbedderTests.test_embed_vault_chunks_end_to_end _______________
+
+self = <test_embedder.EmbedderTests testMethod=test_embed_vault_chunks_end_to_end>
+
+    def test_embed_vault_chunks_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "rebalance.db"
+            with db_connection(db_path, ensure_schema) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO vault_files (rel_path, title, content_hash, ingested_at, file_size_bytes, last_modified)
+                    VALUES ('note.md', 'Test Note', 'hash1', '2026-08-19T00:00:00Z', 100, '2026-08-19T00:00:00Z')
+                    """
+                )
+                file_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                conn.execute(
+                    """
+                    INSERT INTO chunks (file_id, chunk_index, heading, heading_level, body, char_count, content_hash)
+                    VALUES (?, 0, 'Heading', 1, 'Body content of the test note', 30, 'chash1')
+                    """,
+                    (file_id,),
+                )
+                conn.commit()
+    
+            mock_model = MagicMock()
+            mock_model.encode.return_value = [[0.1] * EMBEDDING_DIM]
+    
+>           with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x102b57e20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+___________ EmbedderTests.test_load_and_embed_batch_with_mock_model ____________
+
+self = <test_embedder.EmbedderTests testMethod=test_load_and_embed_batch_with_mock_model>
+
+    def test_load_and_embed_batch_with_mock_model(self) -> None:
+        mock_model = MagicMock()
+        mock_model.encode.return_value = [[0.5] * EMBEDDING_DIM, [0.8] * EMBEDDING_DIM]
+    
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x102b57e20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+_______________ test_real_model_loads_and_embeds_on_this_machine _______________
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+>           from sentence_transformers import SentenceTransformer
+E           ModuleNotFoundError: No module named 'sentence_transformers'
+
+src/rebalance/ingest/embedder.py:135: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.mark.skipif(
+        not _model_is_cached(DEFAULT_MODEL),
+        reason=f"{DEFAULT_MODEL} is not in the local HF cache; refusing to download ~130MB mid-suite",
+    )
+    def test_real_model_loads_and_embeds_on_this_machine():
+        """The un-mocked one: load the real model and produce a real vector.
+    
+        Every other test in this module mocks `SentenceTransformer`, so none of them
+        can tell a working install from a broken one. This is the test that would
+        catch a wrong model name, a sentence-transformers API change, a torch/Metal
+        load failure, or a dimension drift between `EMBEDDING_DIM` and what the model
+        actually emits.
+    
+        Asserting the dimension matters beyond "it ran": `EMBEDDING_DIM` is baked
+        into the vec0 table declarations in `db/schema.py`, so a model whose true
+        output width disagrees with that constant produces a database that rejects
+        every insert.
+        """
+        from rebalance.ingest.embedder import EMBEDDING_DIM, _embed_batch
+    
+>       model, tokenizer = _load_model(DEFAULT_MODEL)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+model_name = 'BAAI/bge-small-en-v1.5'
+
+    def _load_model(model_name: str = DEFAULT_MODEL) -> tuple:
+        """Load model via SentenceTransformers. Cached after first call."""
+        global _cached_model, _cached_tokenizer, _cached_model_name
+        if _cached_model is not None and _cached_model_name == model_name:
+            return _cached_model, _cached_tokenizer
+    
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+>           raise RuntimeError("sentence-transformers package is required for embeddings") from exc
+E           RuntimeError: sentence-transformers package is required for embeddings
+
+src/rebalance/ingest/embedder.py:137: RuntimeError
+_____________ test_load_model_succeeds_even_when_metal_unavailable _____________
+
+    def test_load_model_succeeds_even_when_metal_unavailable():
+        """Wiring only (mocked): `_load_model` must not require a Metal device.
+    
+        Proves the CPU fallback path is reachable. Does NOT prove the real library
+        loads — see `test_real_model_loads_and_embeds_on_this_machine` for that.
+        """
+        mock_st = MagicMock()
+>       with patch("sentence_transformers.SentenceTransformer", return_value=mock_st):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_embedder_metal_unavailable.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pkgutil.py:458: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1406: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1371: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'sentence_transformers', import_ = <function _gcd_import at 0x102b57e20>
+
+>   ???
+E   ModuleNotFoundError: No module named 'sentence_transformers'
+
+<frozen importlib._bootstrap>:1335: ModuleNotFoundError
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <verify-clone>/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: no usable Metal device (probed out-of-process; MLX would abort this run rather than raise) — GH-250
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+FAILED tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+FAILED tests/test_embedder.py::EmbedderTests::test_load_and_embed_batch_with_mock_model
+FAILED tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+FAILED tests/test_embedder_metal_unavailable.py::test_load_model_succeeds_even_when_metal_unavailable
+4 failed, 2758 passed, 20 skipped, 10 xfailed, 1 warning, 160 subtests passed in 241.06s (0:04:01)

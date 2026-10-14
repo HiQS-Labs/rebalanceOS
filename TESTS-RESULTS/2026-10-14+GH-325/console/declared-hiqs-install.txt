@@ -1,0 +1,9 @@
+Resolved 50 packages in 400ms
+   Building hiqs @ file://<home>/Documents/GH%20Repos/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13/HiQS
+Downloading numpy (5.2MiB)
+      Built hiqs @ file://<home>/Documents/GH%20Repos/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13/HiQS
+ Downloaded numpy
+Prepared 2 packages in 8.46s
+Installed 2 packages in 22ms
+ + hiqs==0.1.0 (from file://<home>/Documents/GH%20Repos/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13/HiQS)
+ + numpy==2.5.4

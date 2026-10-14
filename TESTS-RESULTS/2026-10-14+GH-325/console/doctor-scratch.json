@@ -1,0 +1,17 @@
+{
+  "scope": "public doctor CLI with scratch enrolled config, no DB/auth; collector-health transport stubbed",
+  "exit": 1,
+  "pulse_fleet_rows": [
+    {
+      "name": "pulse fleet",
+      "status": "ok",
+      "severity": "warning",
+      "disposition": "ok",
+      "detail": "enrolled as fixture-mac (<scratch>/clone)",
+      "hint": ""
+    }
+  ],
+  "global_health_qualified": false,
+  "expected_setup_gaps": true,
+  "probe_correction": "Initial assertion incorrectly expected uppercase OK; corrected to canonical doctor.OK constant (ok), no product change."
+}

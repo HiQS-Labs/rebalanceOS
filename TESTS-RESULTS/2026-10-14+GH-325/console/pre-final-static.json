@@ -1,0 +1,82 @@
+[
+  {
+    "command": [
+      ".venv/bin/ruff",
+      "check",
+      "."
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/ruff",
+      "format",
+      "--check",
+      "."
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "mypy",
+      "src/"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "utils/pdda/check_banned_imports.py",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "utils/pdda/check_script_inventory.py",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "utils/pdda/check_machine_paths.py",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "utils/pdda/check_read_layer.py",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "utils/pdda/check_near_duplicates.py",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "scripts/check_doc_links.py"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bash",
+      "utils/frontdoor-check.sh"
+    ],
+    "exit": 0
+  }
+]
