@@ -30,10 +30,159 @@ __all__ = [
 ]
 
 
-def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | None:
+_COLLECTOR_KEYS = ("device_id", "fleet_mode", "fleet_sync_subdir", "sync_repo_dir")
+
+
+def _collector_assignment(key: str) -> re.Pattern[str]:
+    return re.compile(rf"\s*(?:export\s+)?({key})=(.*)")
+
+
+def collector_config_dir() -> Path:
+    """The git-pulse collector's config directory (same lookup as collect.sh)."""
+    return Path(
+        os.environ.get("GIT_PULSE_CONFIG_DIR")
+        or os.environ.get("GIT_HISTORY_CONFIG_DIR")
+        or (Path.home() / ".config/git-pulse")
+    )
+
+
+def read_collector_config(directory: Path | None = None) -> dict[str, str]:
+    """Read the collector keys fleet mode depends on, without shell evaluation.
+
+    Raises FileNotFoundError when the collector is not installed, ValueError
+    when a value is not a single literal word.
+    """
+    directory = directory or collector_config_dir()
+    pattern = _collector_assignment("|".join(_COLLECTOR_KEYS))
+    values: dict[str, str] = {}
+    for line in (directory / "config.sh").read_text().splitlines():
+        match = pattern.fullmatch(line)
+        if match:
+            words = shlex.split(match[2], comments=True)
+            if len(words) != 1:
+                raise ValueError("fleet collector configuration must use literal values")
+            values[match[1]] = words[0]
+    return values
+
+
+def collector_clone(values: dict[str, str], directory: Path | None = None) -> Path:
+    """Effective collector clone: ``sync_repo_dir`` or ``<config dir>/repo``.
+
+    ``$CONFIG_DIR``, ``$HOME`` (and their ``${...}`` forms) and a leading ``~``
+    are expanded as literal tokens; any other ``$`` expression is rejected.
+    """
+    directory = directory or collector_config_dir()
+    raw = values.get("sync_repo_dir") or str(directory / "repo")
+    for name, value in (("CONFIG_DIR", directory), ("HOME", Path.home())):
+        raw = re.sub(rf"\$\{{{name}\}}|\${name}(?![A-Za-z0-9_])", lambda _m, v=str(value): v, raw)
+    if "$" in raw:
+        raise ValueError(f"collector sync_repo_dir has an unresolved expression: {values.get('sync_repo_dir')}")
+    return Path(raw).expanduser()
+
+
+def set_collector_values(updates: dict[str, str], directory: Path | None = None) -> None:
+    """Set collector keys in ``config.sh``, keeping every other line.
+
+    Every existing assignment of a key is rewritten (a later duplicate must not
+    override), missing keys are appended, values are shell-quoted because
+    collect.sh sources the file. The first write leaves ``config.sh.bak-gh325``.
+    """
+    directory = directory or collector_config_dir()
+    path = directory / "config.sh"
+    text = path.read_text()
+    backup = directory / "config.sh.bak-gh325"
+    if not backup.exists():
+        backup.write_text(text)
+    lines = text.splitlines()
+    for key, value in updates.items():
+        pattern = _collector_assignment(key)
+        assignment = f"{key}={shlex.quote(value)}"
+        hits = [i for i, line in enumerate(lines) if pattern.fullmatch(line)]
+        for i in hits:
+            lines[i] = assignment
+        if not hits:
+            lines.append(assignment)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text("\n".join(lines) + "\n")
+    temp.replace(path)
+
+
+_DEVICE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+
+
+def _is_git_clone(path: Path | None) -> bool:
+    return path is not None and (path / ".git").exists()
+
+
+def discover_pulse_clone(config: dict[str, Any], directory: Path | None = None) -> Path | None:
+    """Find this Mac's pulse clone from its own config, whatever the folder is called.
+
+    Returns the collector clone if it is a git repo, else ``pulse_target_path``
+    if it is; if neither exists yet, the configured path (``pulse_target_path``
+    first, then an explicit collector ``sync_repo_dir``). Returns None when
+    nothing is configured. Raises ValueError when the config is unreadable or
+    names two different existing clones — callers must stop, not fall back.
+    """
+    directory = directory or collector_config_dir()
+    try:
+        values: dict[str, str] | None = read_collector_config(directory)
+    except FileNotFoundError:
+        values = None
+    collector = collector_clone(values, directory) if values is not None else None
+    raw_target = str(config.get("pulse_target_path") or "").strip()
+    target = Path(raw_target).expanduser() if raw_target else None
+    if _is_git_clone(collector) and _is_git_clone(target) and collector.resolve() != target.resolve():
+        raise ValueError(
+            f"two different pulse clones: collector sync_repo_dir -> {collector}, "
+            f"pulse_target_path -> {target}; choose one by hand"
+        )
+    for candidate in (collector, target):
+        if _is_git_clone(candidate):
+            return candidate
+    if target is not None:
+        return target
+    if values and values.get("sync_repo_dir"):
+        return collector
+    return None
+
+
+def fleet_enrollment_changes(
+    config: dict[str, Any], directory: Path | None = None
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Collector and Rebalance config changes that enroll this Mac in fleet mode.
+
+    Validates the whole proposed configuration in memory first; raises
+    ValueError (or FileNotFoundError without a collector) with nothing written.
+    Empty dicts mean the Mac is already enrolled exactly as proposed.
+    """
+    directory = directory or collector_config_dir()
+    values = read_collector_config(directory)
+    device = values.get("device_id", "")
+    if not _DEVICE_ID.fullmatch(device):
+        raise ValueError(f"collector device_id missing or unsafe ({device!r}); finish identity migration first")
+    clone = discover_pulse_clone(config, directory)
+    if not _is_git_clone(clone):
+        raise ValueError(f"no git clone of the pulse repo found (resolved: {clone}); clone it first")
+    literal = str(clone.resolve())
+    subdir = str(config.get("sync_subdir") or "sync")
+    collector = {"sync_repo_dir": literal, "fleet_mode": "true", "fleet_sync_subdir": subdir}
+    collector = {k: v for k, v in collector.items() if values.get(k) != v}
+    pulse: dict[str, Any] = {"pulse_target_path": literal, "pulse_device_id": device, "pulse_fleet_enabled": True}
+    pulse = {k: v for k, v in pulse.items() if config.get(k) != v}
+    if config.get("pulse_filename_set"):
+        pulse["pulse_filename"] = ""
+    proposed = {**config, **{k: v for k, v in pulse.items() if k != "pulse_filename"}}
+    fleet_settings(proposed, collector_values={**values, **collector})
+    return collector, pulse
+
+
+def fleet_settings(
+    config: dict[str, Any] | None = None, *, collector_values: dict[str, str] | None = None
+) -> dict[str, str] | None:
     """Validate fleet ownership against the existing collector's literal config.
 
     No shell evaluation: opt-in requires an already canonical, stable collector ID.
+    ``collector_values`` validates proposed collector settings without reading the file.
     """
     if config is None:
         from rebalance.ingest.config import get_pulse_config
@@ -44,21 +193,10 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
     target_path = config.get("pulse_target_path")
     if not isinstance(target_path, (str, Path)) or not str(target_path).strip():
         raise ValueError("pulse_target_path required for fleet publication")
-    directory = Path(
-        os.environ.get("GIT_PULSE_CONFIG_DIR")
-        or os.environ.get("GIT_HISTORY_CONFIG_DIR")
-        or (Path.home() / ".config/git-pulse")
-    )
-    values = {}
-    for line in (directory / "config.sh").read_text().splitlines():
-        match = re.fullmatch(r"\s*(?:export\s+)?(device_id|fleet_mode|fleet_sync_subdir|sync_repo_dir)=(.*)", line)
-        if match:
-            words = shlex.split(match[2], comments=True)
-            if len(words) != 1:
-                raise ValueError("fleet collector configuration must use literal values")
-            values[match[1]] = words[0]
+    directory = collector_config_dir()
+    values = collector_values if collector_values is not None else read_collector_config(directory)
     device = values.get("device_id", "")
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", device) or device != config.get("pulse_device_id"):
+    if not _DEVICE_ID.fullmatch(device) or device != config.get("pulse_device_id"):
         raise ValueError("fleet device ID missing, unsafe or different from collector; finish identity migration first")
     if values.get("fleet_mode") != "true":
         raise ValueError("fleet collector mode must be enabled before Python producers")
@@ -70,9 +208,7 @@ def fleet_settings(config: dict[str, Any] | None = None) -> dict[str, str] | Non
         or values.get("fleet_sync_subdir", "sync") != subdir
     ):
         raise ValueError("fleet snapshot subdirectory missing, unsafe or different from collector")
-    target = str(values.get("sync_repo_dir") or directory / "repo")
-    target = target.replace("${CONFIG_DIR}", str(directory)).replace("$CONFIG_DIR", str(directory))
-    if "$" in target or Path(target).expanduser().resolve() != Path(target_path).expanduser().resolve():
+    if collector_clone(values, directory).resolve() != Path(target_path).expanduser().resolve():
         raise ValueError("fleet collector checkout differs from pulse_target_path")
     return {"device_id": device, "sync_subdir": subdir}
 
