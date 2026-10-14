@@ -2178,7 +2178,7 @@ def _check_pulse() -> Check:
             "pulse",
             WARN,
             f"pulse config missing keys: {', '.join(missing)}",
-            "set the missing pulse config values in temp/rbos.config so hourly pulse-sync can render and push",
+            "rebalance config set-pulse --github-login <login> --target-path <this Mac's pulse clone>",
         )
     target = Path(str(cfg.get("pulse_target_path"))).expanduser()
     if not target.exists():
@@ -2196,6 +2196,70 @@ def _check_pulse() -> Check:
             "point pulse_target_path at the root of the destination git repo",
         )
     return Check("pulse", OK, f"configured ({target})")
+
+
+def _check_pulse_fleet() -> list[Check]:
+    """Fleet enrollment for this Mac (GH-325) — every row names its repair command.
+
+    Silent when neither the collector nor Rebalance fleet mode is set up. The
+    UPGRADE.md self-repair step runs these hints once, then rechecks.
+    """
+    from rebalance.ingest.config import get_pulse_config
+    from rebalance.lib.git_ops import collector_config_dir, fleet_settings, read_collector_config
+
+    cfg = get_pulse_config()
+    enabled = bool(cfg.get("pulse_fleet_enabled"))
+    try:
+        read_collector_config()
+    except FileNotFoundError:
+        if not enabled:
+            return []
+        return [
+            Check(
+                "pulse fleet",
+                FAIL,
+                f"fleet mode enabled but collector config missing: {collector_config_dir() / 'config.sh'}",
+                "install the fleet check-in collector first: bash experimental/git-pulse/install.sh "
+                "(fleet-enroll cannot fix this)",
+            )
+        ]
+    except (OSError, ValueError) as exc:
+        return [
+            Check(
+                "pulse fleet",
+                FAIL,
+                f"collector config unreadable: {exc}",
+                "fix the collector config.sh by hand, then run: rebalance config fleet-enroll",
+            )
+        ]
+    if not enabled:
+        return [
+            Check(
+                "pulse fleet",
+                WARN,
+                "this Mac is not enrolled in fleet mode",
+                "preview: rebalance config fleet-enroll — apply only after the SOP per-Mac checks",
+            )
+        ]
+    checks: list[Check] = []
+    try:
+        fleet = fleet_settings(cfg)
+    except (OSError, ValueError) as exc:
+        checks.append(Check("pulse fleet", FAIL, str(exc), "repair: rebalance config fleet-enroll --apply"))
+    else:
+        assert fleet is not None
+        checks.append(Check("pulse fleet", OK, f"enrolled as {fleet['device_id']} ({cfg.get('pulse_target_path')})"))
+    if cfg.get("pulse_filename_set"):
+        checks.append(
+            Check(
+                "pulse fleet filename",
+                WARN,
+                f"pulse_filename={cfg.get('pulse_filename')!r} is ignored in fleet mode "
+                "(this Mac writes devices/<device_id>/live-pulse.md)",
+                "repair: rebalance config fleet-enroll --apply",
+            )
+        )
+    return checks
 
 
 def _check_job_guard() -> Check:
@@ -2556,6 +2620,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_commit_coverage(db_path))
     report.checks.append(_check_xyz_pin())
     report.checks.append(_check_pulse())
+    report.checks.extend(_check_pulse_fleet())
     report.checks.append(_check_job_guard())
 
     # Auth-event log — last deauth/auth failure per integration (calendar,

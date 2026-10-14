@@ -479,6 +479,94 @@ def config_clear_github_token() -> None:
     typer.echo("✓ Stored PAT cleared. `get-github-token` will now fall back to gh CLI.")
 
 
+@config_app.command("set-pulse")
+def config_set_pulse(
+    github_login: str = typer.Option("", "--github-login", help="GitHub login the pulse attributes work to"),
+    target_path: Path = typer.Option(None, "--target-path", help="This Mac's clone of the pulse repo"),
+    timezone: str = typer.Option("", "--timezone", help="IANA timezone for today/yesterday boundaries"),
+) -> None:
+    """Set the pulse publisher keys doctor reports as missing (GH-246)."""
+    from rebalance.ingest.config import set_pulse_config
+
+    if not (github_login or target_path or timezone):
+        raise typer.BadParameter("pass at least one of --github-login, --target-path, --timezone")
+    target = None
+    if target_path:
+        resolved = target_path.expanduser().resolve()
+        if not (resolved / ".git").exists():
+            raise typer.BadParameter(f"not a git clone: {resolved}")
+        target = str(resolved)
+    set_pulse_config(github_login=github_login or None, pulse_target_path=target, pulse_timezone=timezone or None)
+    typer.echo("✓ pulse config updated — run `rebalance doctor` to verify")
+
+
+@config_app.command("fleet-enroll")
+def config_fleet_enroll(
+    apply: bool = typer.Option(False, "--apply", help="Write the changes (default: preview only)"),
+    print_clone: bool = typer.Option(
+        False,
+        "--print-clone",
+        help="Print this Mac's pulse clone and exit: 0 found, 2 invalid/ambiguous config, 3 nothing configured",
+    ),
+) -> None:
+    """Enroll this Mac in fleet mode, or repair an enrolled Mac's config (GH-325).
+
+    Reads the clone path from this Mac's own config, whatever the folder is
+    called. Previews by default; re-running on an enrolled Mac is the repair path.
+    """
+    from rebalance.ingest.config import get_pulse_config, set_pulse_config
+    from rebalance.lib.git_ops import (
+        collector_config_dir,
+        discover_pulse_clone,
+        fleet_enrollment_changes,
+        fleet_settings,
+        set_collector_values,
+    )
+
+    cfg = get_pulse_config()
+    if print_clone:
+        try:
+            clone = discover_pulse_clone(cfg)
+        except ValueError as exc:
+            typer.echo(f"✗ {exc}", err=True)
+            raise typer.Exit(2)
+        if clone is None:
+            typer.echo("✗ no pulse clone configured on this Mac", err=True)
+            raise typer.Exit(3)
+        typer.echo(str(clone))
+        return
+
+    try:
+        collector, pulse = fleet_enrollment_changes(cfg)
+    except FileNotFoundError:
+        typer.echo(
+            f"✗ collector config not found ({collector_config_dir() / 'config.sh'}); "
+            "install the fleet check-in collector first: bash experimental/git-pulse/install.sh",
+            err=True,
+        )
+        raise typer.Exit(1)
+    except ValueError as exc:
+        typer.echo(f"✗ {exc}", err=True)
+        raise typer.Exit(1)
+    if not collector and not pulse:
+        typer.echo("✓ already enrolled — nothing to change")
+        return
+    for key, value in collector.items():
+        typer.echo(f"  collector config.sh: {key}={value}")
+    for key, value in pulse.items():
+        typer.echo(f"  rebalance config:    {key}={value}" if value != "" else f"  rebalance config:    remove {key}")
+    if not apply:
+        typer.echo("Preview only. Re-run with --apply to write these changes.")
+        return
+    if collector:
+        set_collector_values(collector)
+    if pulse:
+        set_pulse_config(**pulse)
+    fleet = fleet_settings(get_pulse_config())
+    assert fleet is not None
+    typer.echo(f"✓ enrolled as {fleet['device_id']} — run `rebalance doctor` to verify")
+
+
 @config_app.command("set-sleuth")
 def config_set_sleuth(
     base_url: str = typer.Option("", "--base-url", help="Sleuth Web API base URL"),

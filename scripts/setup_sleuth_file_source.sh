@@ -14,7 +14,8 @@
 #
 # Flags (all optional; defaults shown):
 #   --workspace neochrome
-#   --clone-dir ~/git-pulse-sync
+#   --clone-dir <this Mac's pulse clone>   default: `rebalance config fleet-enroll --print-clone`;
+#                                          ~/git-pulse-sync only when nothing is configured (GH-325)
 #   --repo-url  https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git
 
 set -euo pipefail
@@ -25,7 +26,7 @@ REBALANCE="$REBALANCE_DIR/.venv/bin/rebalance"
 [ -x "$REBALANCE" ] || REBALANCE="rebalance"
 
 WORKSPACE="neochrome"
-CLONE_DIR="$HOME/git-pulse-sync"
+CLONE_DIR=""
 REPO_URL="https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git"
 
 while [ $# -gt 0 ]; do
@@ -36,6 +37,20 @@ while [ $# -gt 0 ]; do
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+
+# Default to this Mac's own pulse clone — folder names differ per Mac (GH-325).
+# --print-clone exits 0 found, 3 nothing configured, 2 broken/ambiguous config.
+if [ -z "$CLONE_DIR" ]; then
+    rc=0
+    CLONE_DIR="$("$REBALANCE" config fleet-enroll --print-clone)" || rc=$?
+    if [ "$rc" -eq 3 ]; then
+        CLONE_DIR="$HOME/git-pulse-sync"
+    elif [ "$rc" -ne 0 ]; then
+        echo "ERROR: cannot tell which pulse clone this Mac uses (see message above)." >&2
+        echo "       Fix the config, or pass --clone-dir explicitly. Nothing was changed." >&2
+        exit 1
+    fi
+fi
 
 # Expand a leading ~ in --clone-dir.
 case "$CLONE_DIR" in "~"|"~/"*) CLONE_DIR="${HOME}/${CLONE_DIR#\~/}";; esac

@@ -141,13 +141,16 @@ git pull
 #    Use the dedicated, NO-EXPIRATION classic PAT (scopes: repo, read:org).
 .venv/bin/rebalance config set-github-token ghp_XXXXXXXX
 
-# 3. Sleuth — all devices should use the git-pulse-sync file-source method.
-#    If this machine was previously pointed at the Web API, override it now.
-git clone https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git ~/git-pulse-sync
-.venv/bin/rebalance config set-sleuth \
-    --base-url "~/git-pulse-sync/sync/sleuth/reminders-neochrome.json" \
-    --token file-source \
-    --workspace neochrome
+# 3. Sleuth — all devices should use the file-source method, reading the export from
+#    THIS Mac's clone of rebalance-git-pulse. The folder name differs per Mac
+#    (~/git-pulse-sync on one, ~/Documents/GitHub/rebalance-git-pulse on another), so
+#    never assume it. The setup script asks this Mac's own config
+#    (`rebalance config fleet-enroll --print-clone`, GH-325), reuses or clones that folder,
+#    and points Sleuth at it. It stops without cloning or changing anything when the config
+#    is broken or names two different clones. Only when nothing is configured at all does it
+#    use ~/git-pulse-sync; pass --clone-dir <folder> to choose another.
+#    Also overrides a machine previously pointed at the Web API.
+bash scripts/setup_sleuth_file_source.sh --workspace neochrome
 #    This reads the published Sleuth export directly from the companion repo —
 #    no API auth, tunnel, or public :2020 endpoint. A file:// or local-path
 #    base_url is read directly (token unused). Full setup + troubleshooting:
@@ -174,7 +177,35 @@ A healthy `rebalance doctor` shows, among the checks:
  OK  sleuth             — configured (via file source)
  OK  calendar           — OAuth token present (via keyring) · authorized Nd ago
  OK  gmail              — OAuth token present (via keyring)   # or: MCP mode — N messages ingested
+ OK  pulse fleet        — enrolled as <device_id> (<this Mac's clone>)   # or WARN "not enrolled" — see below
 ```
+
+## Fleet self-repair (agent-run, every upgrade) — GH-325
+
+Run this once after the steps above, on every upgrade. It is written for the agent doing
+the upgrade: each `pulse` / `pulse fleet` doctor row names the command that repairs it.
+The procedure is bounded — one repair attempt, one recheck, then stop.
+
+1. Run `.venv/bin/rebalance doctor`. Act only on `pulse`, `pulse fleet` and
+   `pulse fleet filename` rows that are WARN or FAIL. OK rows need nothing.
+2. `pulse` — "missing keys": ask the operator for the GitHub login and this Mac's clone
+   path (use `rebalance config fleet-enroll --print-clone` when it returns 0). Never guess
+   them. Then run `rebalance config set-pulse --github-login … --target-path …`.
+3. `pulse fleet` — "collector config missing": stop and report. The fleet check-in
+   collector must be installed first (`bash experimental/git-pulse/install.sh`); the
+   enroll command cannot fix this.
+4. Mac **already enrolled** (`pulse_fleet_enabled` is true) with a WARN/FAIL `pulse fleet*`
+   row: run `.venv/bin/rebalance config fleet-enroll --apply` **once**, without asking.
+   This is config repair — clone path written as a literal, `pulse_filename` removed,
+   collector `fleet_mode`/`fleet_sync_subdir` aligned.
+5. Mac **not enrolled** (WARN "this Mac is not enrolled in fleet mode"): run
+   `.venv/bin/rebalance config fleet-enroll` (preview), show the operator the planned
+   changes, and run `--apply` only on their yes. Enrollment follows the per-Mac rollout
+   gate in SOP.md § "GH-282 — fleet delivery deployment and lessons".
+6. Re-run `.venv/bin/rebalance doctor` once. If any `pulse` / `pulse fleet*` row is still
+   WARN/FAIL, or `fleet-enroll` refused (for example "two different pulse clones"), stop and
+   report the exact row and values to the operator. Do not retry, loop, choose between
+   clones, or move or re-clone anything.
 
 ## Opt-in integrations (per-device, as needed)
 

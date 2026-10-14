@@ -1351,6 +1351,8 @@ def get_pulse_config() -> dict[str, Any]:
         "slack_user_id": config.get("slack_user_id"),
         "pulse_target_path": config.get("pulse_target_path"),
         "pulse_filename": config.get("pulse_filename", "live-pulse.md"),
+        # True only when the operator set pulse_filename; fleet mode ignores it (GH-325).
+        "pulse_filename_set": "pulse_filename" in config,
         "pulse_fleet_enabled": bool(config.get("pulse_fleet_enabled", False)),
         "pulse_device_id": config.get("pulse_device_id"),
         "sync_subdir": config.get("sync_subdir") or "sync",
@@ -1379,7 +1381,10 @@ def get_claude_cloud_config() -> dict[str, Any]:
 
 
 def set_pulse_config(**values: Any) -> None:
-    """Update one or more pulse config keys. Pass None to leave a key unchanged."""
+    """Update one or more pulse config keys. Pass None to leave a key unchanged.
+
+    ``pulse_filename=""`` removes the key: fleet mode ignores it (GH-325).
+    """
     allowed = {
         "github_login",
         "slack_user_id",
@@ -1397,6 +1402,9 @@ def set_pulse_config(**values: Any) -> None:
         if key not in allowed:
             raise ValueError(f"Unknown pulse config key: {key}")
         if value is None:
+            continue
+        if key == "pulse_filename" and value == "":
+            config.pop(key, None)
             continue
         config[key] = str(value).strip() if isinstance(value, str) else value
     _write_config(config)

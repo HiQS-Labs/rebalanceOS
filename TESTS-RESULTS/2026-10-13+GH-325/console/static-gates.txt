@@ -1,0 +1,33 @@
+# static gates, code at 07b22ed
+$ .venv/bin/python -m ruff check .
+All checks passed!
+rc=0
+$ .venv/bin/python -m ruff format --check .
+648 files already formatted
+rc=0
+$ .venv/bin/mypy src/
+Success: no issues found in 117 source files
+rc=0
+$ .venv/bin/python utils/pdda/check_banned_imports.py --check
+sqlite gateway ratchet: clean (0 baseline file(s) matched exactly)
+banned-import ratchet: clean (29 baseline file(s) matched exactly)
+rc=0
+$ .venv/bin/python utils/pdda/check_script_inventory.py --check
+script-inventory ratchet: clean (matches baseline)
+rc=0
+$ .venv/bin/python utils/pdda/check_machine_paths.py --check
+check_machine_paths: clean (0 machine-local path violations)
+rc=0
+$ .venv/bin/python utils/pdda/check_read_layer.py --check
+read-layer ratchet: clean (52 baseline site(s) matched exactly)
+rc=0
+$ .venv/bin/python utils/pdda/check_near_duplicates.py --check
+near-duplicate canary: clean (7 baseline pair(s) matched exactly)
+rc=0
+$ .venv/bin/python scripts/check_doc_links.py
+checked 645 relative markdown links under ~/Documents/GH Repos/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13
+no broken links, no machine-local paths
+rc=0
+$ bash utils/frontdoor-check.sh
+
+rc=0

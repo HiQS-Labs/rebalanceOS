@@ -1,0 +1,11 @@
+# mutation check of tests/test_fleet_enroll.py, code at 07b22ed; each mutation reverted with git checkout
+## baseline
+19 passed, 12 subtests passed in 0.63s
+## conflict check off ( 1 file changed, 1 insertion(+), 1 deletion(-))
+3 failed, 17 passed, 11 subtests passed in 0.52s
+## HOME expansion off ( 1 file changed, 1 insertion(+), 1 deletion(-))
+5 failed, 16 passed, 10 subtests passed in 0.54s
+## first duplicate only ( 1 file changed, 1 insertion(+), 1 deletion(-))
+1 failed, 18 passed, 12 subtests passed in 0.50s
+## validate-before-write removed ( 1 file changed, 1 insertion(+), 1 deletion(-))
+1 failed, 19 passed, 11 subtests passed in 0.49s

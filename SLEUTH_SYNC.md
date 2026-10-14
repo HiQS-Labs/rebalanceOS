@@ -18,7 +18,7 @@ Sleuth box (systemd timer, every 5 min)
    └─ PUT  Hypercart-Dev-Tools/rebalance-git-pulse : sync/sleuth/reminders-<ws>.json   (GitHub contents API)
                                                   │
                                         git pull  ▼
-rebalance-OS  ──reads──►  ~/git-pulse-sync/sync/sleuth/reminders-<ws>.json   (local clone)
+rebalance-OS  ──reads──►  <this Mac's clone>/sync/sleuth/reminders-<ws>.json   (local clone)
 ```
 
 - **Publisher** lives in the `sleuth-app` repo under `deploy/reminders-export/`
@@ -38,20 +38,32 @@ rebalance-OS  ──reads──►  ~/git-pulse-sync/sync/sleuth/reminders-<ws>.
 
 ```bash
 bash scripts/setup_sleuth_file_source.sh
-# options: --workspace neochrome  --clone-dir ~/git-pulse-sync  --repo-url <url>
+# options: --workspace neochrome  --clone-dir <path>  --repo-url <url>
 ```
+
+The clone folder differs per Mac (`~/git-pulse-sync` on one,
+`~/Documents/GitHub/rebalance-git-pulse` on another). The script and the steps below
+ask this Mac's own config with `rebalance config fleet-enroll --print-clone`
+(exit 0 found, 3 nothing configured, 2 broken or two different clones — stop).
+Only when nothing is configured does it fall back to `~/git-pulse-sync` (GH-325).
 
 Manual equivalent, if you prefer:
 
-1. **Clone the private export repo** (any path; `~/git-pulse-sync` is the convention):
+1. **Find or create this Mac's clone** of the private export repo:
    ```bash
-   git clone https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git ~/git-pulse-sync
+   rc=0; CLONE="$(rebalance config fleet-enroll --print-clone)" || rc=$?
+   case "$rc" in
+     0) ;;                                   # this Mac's configured clone
+     3) CLONE="$HOME/git-pulse-sync" ;;      # nothing configured yet: choose a folder
+     *) echo "stop: fix the pulse config first (see message above)"; exit 1 ;;
+   esac
+   [ -d "$CLONE/.git" ] || git clone https://github.com/Hypercart-Dev-Tools/rebalance-git-pulse.git "$CLONE"
    ```
 2. **Point rebalance-OS at the local file** (token is unused for a file source —
    any non-empty placeholder):
    ```bash
    rebalance config set-sleuth \
-       --base-url "~/git-pulse-sync/sync/sleuth/reminders-neochrome.json" \
+       --base-url "$CLONE/sync/sleuth/reminders-neochrome.json" \
        --token file-source \
        --workspace neochrome
    ```
@@ -68,10 +80,10 @@ unchanged: `--base-url http://<dev-host>:2020 --token <token> --workspace neochr
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Sleuth reminders file not found: …` | The export repo isn't cloned/pulled on this device | `git clone …/rebalance-git-pulse.git ~/git-pulse-sync` (or `git -C ~/git-pulse-sync pull`) |
-| `doctor`: `published export is stale — heartbeat … (Nh ago)` | The publisher timer is dead **or** the local sync/clone is stuck (the publisher stamps an hourly `exportGeneratedAt`; doctor warns past ~3h) | Check the publisher: `systemctl list-timers sleuth-reminders-export.timer` on the Sleuth box. Locally, the sync auto-refreshes the clone — see `source_refresh` in the refresh result; force with `git -C ~/git-pulse-sync pull` |
+| `Sleuth reminders file not found: …` | The export repo isn't cloned/pulled on this device | `git clone …/rebalance-git-pulse.git "$CLONE"` (or `git -C "$CLONE" pull`), with `CLONE=$(rebalance config fleet-enroll --print-clone)` |
+| `doctor`: `published export is stale — heartbeat … (Nh ago)` | The publisher timer is dead **or** the local sync/clone is stuck (the publisher stamps an hourly `exportGeneratedAt`; doctor warns past ~3h) | Check the publisher: `systemctl list-timers sleuth-reminders-export.timer` on the Sleuth box. Locally, the sync auto-refreshes the clone — see `source_refresh` in the refresh result; force with `git -C "$CLONE" pull` |
 | `… refusing to reconcile (wrong file/endpoint?)` / `missing filters.activeOnly` / `source.type …` | Contract guard tripped — wrong workspace file, truncated/partial export, or publisher drift. **No DB rows were changed.** | Confirm `base_url` points at the right `reminders-<workspace>.json` and the publisher is healthy; the guard is intentional — it refuses to retire reminders from a bad payload |
-| `Sleuth reminders file is invalid JSON` | Partial write / merge conflict in the clone | `git -C ~/git-pulse-sync status`; resolve, then re-pull |
+| `Sleuth reminders file is invalid JSON` | Partial write / merge conflict in the clone | `git -C "$CLONE" status`; resolve, then re-pull |
 | Want the live API instead (dev/debug) | — | `rebalance config set-sleuth --base-url http://<host>:2020 --token <token> --workspace <ws>` |
 
 **Freshness model:** the publisher stamps an hourly-rounded `exportGeneratedAt`; the consumer persists it and `rebalance doctor` compares **that** (not the local `last_synced_at`, which re-reads keep bumping) to now — so a dead publisher is visible. Before each read the sync does a best-effort, **non-destructive** refresh of the export clone (`git fetch` + checkout of only the export file — no `pull --rebase`, so it can't conflict with other jobs writing that repo); status is reported as `source_refresh`.
