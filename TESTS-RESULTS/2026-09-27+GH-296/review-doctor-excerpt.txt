@@ -1,0 +1,7 @@
+Command: PYTHONPATH=src:HiQS python -m rebalance doctor
+Privacy-filtered excerpt; private project/device and unrelated checks omitted.
+    OK     job-guard — memory checks on (default); compressor ceiling 16.0 GB 
+(default), swap distress bar 4.5 GB (default: max(1 GB, 75% of 6.0 GB swap)), 
+available floor 7.7 GB (default), per-job footprint ceiling (wrapper and 
+embedding; mid-run on main thread only) 8.0 GB (default: 12.5% of RAM)
+Health check passed with warnings.

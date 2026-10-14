@@ -1,0 +1,3 @@
+[job-guard] memory compressor holds 10.7 GB (ceiling 6.0 GB) but the machine is not in distress: swap 1.1 GB, available 5.3 GB. Proceeding — ambient compressor pressure this job does not cause is not a reason to refuse it (#157).
+[job-guard] starting 'scheduler-pulse-warning-watch': footprint ceiling 3.0 GB, available floor 4.0 GB
+[job-guard] 'scheduler-pulse-warning-watch' finished with exit 0; peak tree footprint 0.0 GB

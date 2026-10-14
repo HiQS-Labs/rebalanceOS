@@ -1,0 +1,11 @@
+{
+  "scope": "Documentation-only CLIO and github_activity lookup skill",
+  "base": "cfb91a2180adac9e550d9de5b314bff89ddfda94",
+  "reviewed_skill_sha256": "87355873a3fb64fd9577dc002531a2ec4b04aa11cbd1c64f754ef031ee369341",
+  "review": "Codex relay, revised packet, attested Approved, driver exit 0",
+  "upstream_prs": [
+    "https://github.com/HiQS-Labs/XYZ-CLIO/pull/4",
+    "https://github.com/HiQS-Labs/XYZ-CLIO/pull/5"
+  ],
+  "log_redaction": "Task clone absolute path replaced with <task-clone>; no prompt data queried"
+}

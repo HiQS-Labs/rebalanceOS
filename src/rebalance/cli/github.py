@@ -61,7 +61,7 @@ def github_scan(
     days: int = typer.Option(30, help="Number of days to look back (supports 30-day A/B/C band classification)"),
     database: Path | None = DBOption(),
 ) -> None:
-    """Fetch GitHub activity and persist to database for use by github_balance MCP tool."""
+    """Fetch GitHub activity and persist to database for use by the hiqs_work_activity MCP tool."""
     from rebalance.ingest.github_scan import scan_and_store_github_activity
 
     try:

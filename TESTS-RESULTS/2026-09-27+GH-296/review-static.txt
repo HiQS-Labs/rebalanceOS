@@ -1,0 +1,26 @@
+Integrated source 71786aa. Commands run with the existing Python 3.13 environment:
+ruff check .
+ruff format --check .
+mypy src/
+python utils/pdda/check_banned_imports.py --check
+python utils/pdda/check_script_inventory.py --check
+python utils/pdda/check_machine_paths.py --check
+python utils/pdda/check_read_layer.py --check
+python utils/pdda/check_near_duplicates.py --check
+python scripts/check_doc_links.py
+bash utils/frontdoor-check.sh
+git diff --check
+
+Captured tool output (checkout path replaced):
+All checks passed!
+639 files already formatted
+Success: no issues found in 117 source files
+sqlite gateway ratchet: clean (0 baseline file(s) matched exactly)
+banned-import ratchet: clean (29 baseline file(s) matched exactly)
+script-inventory ratchet: clean (matches baseline)
+check_machine_paths: clean (0 machine-local path violations)
+read-layer ratchet: clean (52 baseline site(s) matched exactly)
+near-duplicate canary: clean (7 baseline pair(s) matched exactly)
+checked 628 relative markdown links under <REVIEW_CLONE>
+no broken links, no machine-local paths
+Combined command exit: 0
