@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-14.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: codex-supervisor
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -75,5 +75,40 @@ ROUND: 1 / 3
 On PASS keep reviewer claim; exact native environment-pinned tick done, never release. Only relay thread writes, no source/code/test changes. This supplemental pass spends round2, not a reset of the3-round implementation-review budget.
 
 ## Log
+
+### Reviewer · Round 1 (claude)
+
+swept file: yes — reviewed all three source snapshots in full (SOP.md, SLEUTH_SYNC.md, UPGRADE.md), including pre-existing sections. No pre-existing defects found that bear on the GH-330 scope.
+
+**Q1 — SOP requires migrating/verifying each reader BEFORE deleting legacy pages, retaining collector pages/metadata?**
+
+[Pass] Step 2 requires inventorying every root-page reader, migrating VS Code sidebars and any other explicit path, and explicitly states "A configured reader still using a root page blocks retirement." Step 3 conditions deletion on "Only after those reader checks." Step 4 names the kept paths: `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`.
+Citation: SOP.md §"Retire legacy shared pages (GH-325)" — "Only after those reader checks, delete root `live-pulse.md` and `live-pulse-*.md`" and "Keep `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`"
+
+**Q2 — Recovery notes describe strict refusal, validated timezone, complete independent new backups, mode preservation, partial attempted writes, prior-backup inspection, and no automatic rollback/ACL/concurrency/power-loss promises?**
+
+[Pass] All eight claims are present in SOP.md §"Fleet configuration repair failures (GH-330)":
+- Strict refusal: "refuses an existing malformed, non-object or unreadable Rebalance config"
+- Validated timezone: "Pulse timezone input is validated before settings writes"
+- Complete independent new backups: "New collector backups are completed independent copies before publication"
+- Mode preservation: "replacement preserves Unix permission bits"
+- Partial attempted writes: "A partial apply reports attempted writes and the backup location"
+- Prior-backup inspection: "An older `config.sh.bak-gh325` may predate this guarantee: inspect it before manual recovery"
+- No automatic rollback: "It never automatically restores a potentially stale first backup over newer settings"
+- No ACL/concurrency/power-loss promises: "Ownership/ACLs, concurrent config writers and two-file/power-loss transactions are not qualified here"
+
+**Q3 — Upgrade and Sleuth guides describe setup's existing shared lock, stop before settings on failure, and normal read-side fetch/upstream blob without worktree writes?**
+
+[Pass] All three behaviors are present across both guides.
+- Shared lock + stop on failure: UPGRADE.md step 3 — "Existing clones refresh under the shared writer lock, without autostash. Lock contention, dirty/in-progress Git state or refresh failure stops before Sleuth settings change."
+- Read-side fetch without worktree writes: SLEUTH_SYNC.md §Freshness — "git fetch + git show of the upstream export blob, without worktree/index writes, rebase or autostash"
+- Cross-reference: SOP.md GH-330 section and SLEUTH_SYNC.md §Setup both independently confirm the shared-lock model, consistent with UPGRADE.md.
+
+**Q4 — Any changed-guide contradiction or missing acceptance requirement?**
+
+[Unverified — no citation] No contradictions found between the three guides on the GH-330-scope behaviors. SOP.md, UPGRADE.md, and SLEUTH_SYNC.md give consistent accounts of the shared lock, stop-before-settings behavior, non-destructive fetch model, and the backup/recovery limits. No acceptance requirement from the Definition of Done is missing.
+
+**VERDICT: PASS**
+**Basis:** All four questions resolve [Unverified — no citation] with cited spans. The guides close the explicit documentation gap identified in round1. No blocker, should, or nit findings.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
