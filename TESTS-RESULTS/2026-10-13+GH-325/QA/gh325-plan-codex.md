@@ -368,3 +368,11 @@ entry for this checkout. Related `rebalanceOS` is another checkout; coverage gen
 `scripts/`. Direct source reads therefore supplied the evidence; no index was refreshed.
 Only this relay file was edited, with scratch confined to `.relay-scratch/tmp`; no git command,
 live configuration write, test runner or executable fixture was invoked.
+
+### Attestation · relay-drive — 2026-10-14T05:16:41Z
+task: RELAY-gh325-plan-codex-r3
+reviewer: codex
+status: Approved
+reviewed-head: 14c1f29e7b1cd1506b335a9463812dd841ce3ed1
+added-range: 23158+2494
+added-sha256: 3104c2423151c44ef778adcd5517ce06d94b6f9be132bd612dd463bfffcf115d
