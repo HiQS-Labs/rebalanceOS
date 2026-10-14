@@ -1,0 +1,16 @@
+mode,job,start,exit,secs,swap_used_mb,free_pct
+old,pulse-sync,15:21:54,75,0,1194.31,48
+old,pulse-web-sync,15:21:54,75,0,1194.31,48
+old,pulse-warning-watch,15:21:54,75,0,1194.31,48
+old,github-sync,15:21:54,75,0,1194.31,48
+old,obsidian-vault-embeddings,15:21:54,75,0,1194.31,49
+proposed,pulse-sync,15:21:54,0,6,1194.31,49
+proposed,pulse-web-sync,15:22:00,0,17,1194.31,48
+proposed,pulse-warning-watch,15:22:17,0,0,1194.31,47
+proposed,github-sync,15:22:17,0,142,1194.31,47
+proposed,obsidian-vault-embeddings,15:24:39,0,6,1194.31,47
+none,pulse-sync,15:24:45,0,3,1194.31,48
+none,pulse-web-sync,15:24:48,0,13,1194.31,48
+none,pulse-warning-watch,15:25:01,0,0,1194.31,47
+none,github-sync,15:25:01,0,130,1194.31,47
+none,obsidian-vault-embeddings,15:27:11,1,5,1194.31,48

@@ -1,0 +1,4 @@
+[job-guard] starting 'scheduler-pulse-sync': footprint ceiling 999.0 GB, available floor 4.0 GB
+[2026-09-27 11:38:51] === rebalance pulse sync starting ===
+[2026-09-27 11:38:57] === pulse sync complete ===
+[job-guard] 'scheduler-pulse-sync' finished with exit 0; peak tree footprint 0.1 GB

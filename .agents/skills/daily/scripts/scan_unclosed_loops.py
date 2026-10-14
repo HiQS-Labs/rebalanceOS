@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -727,6 +728,164 @@ def update_close_the_loop_ledger(
     ledger_path.write_text("\n".join(content), encoding="utf-8")
 
 
+def _skip_input(inputs: dict[str, str], name: str, reason: str) -> None:
+    inputs[name] = f"skipped: {reason}"
+    print(f"daily: {name} input skipped ({reason})", file=sys.stderr)
+
+
+def _live_open_issue_numbers(repo: str) -> set[int] | None:
+    code, out = run_cmd(
+        ["gh", "issue", "list", "--repo", repo, "--state", "open", "--limit", "1000", "--json", "number"],
+        timeout=10,
+    )
+    if code != 0:
+        return None
+    try:
+        return {int(item["number"]) for item in json.loads(out or "[]")}
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+def collect_close_loop_inputs(
+    repos: list[str],
+    prs_by_remote: dict[str, list[dict[str, Any]]],
+    pr_error_remotes: set[str],
+    *,
+    close_loop: bool,
+    releases_dirs: str,
+) -> dict[str, Any]:
+    """GH-310 opt-in inputs: `rebalance github-close-loop` flags and the RELEASES ledger scan.
+
+    Items are merged by (repo, number) with source tags and re-verified against live GitHub
+    before they count as open; anything unverifiable is excluded. Read-only throughout.
+    """
+    names = (["close-loop"] if close_loop else []) + (["releases"] if releases_dirs else [])
+    result: dict[str, Any] = {"inputs": {}, "flagged_loops": [], "questions": [], "unverified": 0, "failed_repos": []}
+    binary = os.environ.get("REBALANCE_BIN") or shutil.which("rebalance")
+    if not binary:
+        for name in names:
+            _skip_input(result["inputs"], name, "rebalance CLI not found")
+        return result
+
+    reports: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
+    for repo in repos:
+        cmd = [binary, "github-close-loop", "--repo", repo, "--output", "json"]
+        if releases_dirs:
+            cmd += ["--releases-scan", releases_dirs]
+        code, out = run_cmd(cmd, timeout=30)
+        try:
+            data = json.loads(out) if code == 0 and out.strip() else None
+        except ValueError:
+            data = None
+        if isinstance(data, dict):
+            reports[repo] = data
+        else:
+            failures.append(repo)
+    if not reports:
+        for name in names:
+            _skip_input(result["inputs"], name, f"no usable output for {len(failures)} repo(s)")
+        return result
+    if failures:
+        result["failed_repos"] = failures
+        print(
+            f"daily: {'/'.join(names)} input partial ({len(failures)} of {len(repos)} repo(s) failed: {', '.join(failures)})",
+            file=sys.stderr,
+        )
+    if close_loop:
+        result["inputs"]["close-loop"] = "ok"
+    if releases_dirs:
+        if any((r.get("releases") or {}).get("ledgers_found") for r in reports.values()):
+            result["inputs"]["releases"] = "ok"
+        else:
+            _skip_input(result["inputs"], "releases", "no ledgers found")
+
+    candidates: dict[tuple[str, int], dict[str, Any]] = {}
+
+    def add(repo: str, number: Any, item_type: str, title: str, url: str, source: str) -> None:
+        if type(number) is not int:
+            return
+        item = candidates.setdefault(
+            (repo, number),
+            {"repo": repo, "number": number, "item_type": item_type, "title": title, "url": url, "sources": []},
+        )
+        if item_type == "pull_request":
+            item["item_type"] = "pull_request"
+        if source not in item["sources"]:
+            item["sources"].append(source)
+
+    for repo, data in reports.items():
+        if close_loop:
+            for flag in data.get("flags") or []:
+                if flag.get("flag") == "closed_without_delivery":
+                    result["questions"].append(
+                        {
+                            "repo": repo,
+                            "number": flag.get("number"),
+                            "title": flag.get("title", ""),
+                            "url": flag.get("html_url", ""),
+                            "source": "close-loop:closed_without_delivery",
+                            "question": "Closed as completed with no merged PR found: was it delivered?",
+                        }
+                    )
+                    continue
+                add(
+                    repo,
+                    flag.get("number"),
+                    flag.get("item_type", ""),
+                    flag.get("title", ""),
+                    flag.get("html_url", ""),
+                    f"close-loop:{flag.get('flag')}",
+                )
+        releases = (data.get("releases") or {}) if releases_dirs else {}
+        for task in releases.get("tasks") or []:
+            if task.get("status") == "in-progress":
+                add(
+                    repo,
+                    task.get("gh_number"),
+                    "issue",
+                    task.get("title", ""),
+                    task.get("issue_url", ""),
+                    f"releases:{repo}#{task.get('global_id')}",
+                )
+        for drift in releases.get("drift") or []:
+            if drift.get("kind") == "pr_stale":
+                add(repo, drift.get("gh_number"), "issue", drift.get("title", ""), "", "releases-drift:pr_stale")
+            else:
+                result["questions"].append(
+                    {
+                        "repo": repo,
+                        "number": drift.get("gh_number"),
+                        "title": drift.get("title", ""),
+                        "url": "",
+                        "source": f"releases-drift:{drift.get('kind')}",
+                        "question": f"{drift.get('evidence', '')} Update the ledger?",
+                    }
+                )
+
+    live_issues: dict[str, set[int] | None] = {}
+    for (repo, number), item in sorted(candidates.items()):
+        if item["item_type"] == "pull_request":
+            live = None if repo in pr_error_remotes else prs_by_remote.get(repo)
+            match = next((p for p in live or [] if p.get("number") == number), None)
+            if match is None:
+                result["unverified"] += 1
+                continue
+            if str(match.get("state", "")).upper() != "OPEN":
+                continue
+        else:
+            if repo not in live_issues:
+                live_issues[repo] = _live_open_issue_numbers(repo)
+            open_numbers = live_issues[repo]
+            if open_numbers is None:
+                result["unverified"] += 1
+                continue
+            if number not in open_numbers:
+                continue
+        result["flagged_loops"].append(item)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scan and report unclosed loops across repositories")
     parser.add_argument(
@@ -752,6 +911,17 @@ def main() -> int:
         type=float,
         default=None,
         help="Delay between snapshots in seconds (default 30 for shutdown, 0 for daily)",
+    )
+    parser.add_argument(
+        "--close-loop",
+        action="store_true",
+        default=os.environ.get("REBALANCE_DAILY_CLOSE_LOOP") == "1",
+        help="Opt-in (daily mode): add `rebalance github-close-loop` flags, live re-verified",
+    )
+    parser.add_argument(
+        "--releases-scan",
+        default=os.environ.get("REBALANCE_RELEASES_SCAN_DIRS", ""),
+        help="Opt-in (daily mode): comma-separated dirs to scan read-only for RELEASES ledgers",
     )
     args = parser.parse_args()
 
@@ -913,6 +1083,18 @@ def main() -> int:
             }
         )
 
+    extra = None
+    if args.close_loop or args.releases_scan:
+        extra = collect_close_loop_inputs(
+            PRIMARY_WATCHED_REPOS,
+            prs_by_remote,
+            {e.get("remote") for e in pr_errors if e.get("remote")},
+            close_loop=args.close_loop,
+            releases_dirs=args.releases_scan,
+        )
+        if not any(state == "ok" for state in extra["inputs"].values()):
+            extra = None
+
     should_update_ledger = args.update_ledger and not args.no_ledger_write
     ledger_file = Path(find_repo_root() or Path.cwd()) / "temp" / "close-the-loop.md"
     if should_update_ledger:
@@ -942,6 +1124,9 @@ def main() -> int:
     else:
         parts.append("0 unpushed commits")
 
+    if extra is not None:
+        parts.append(f"{len(extra['flagged_loops'])} flagged loops (close-loop/releases)")
+
     summary_line = f"- **Unclosed Loops**: {', '.join(parts)} `[Details: temp/close-the-loop.md]`"
 
     if args.json:
@@ -959,6 +1144,13 @@ def main() -> int:
             "unpushed_branches": unpushed_branches,
             "ledger_path": str(ledger_file),
         }
+        if extra is not None:
+            payload["counts"]["flagged_loops"] = len(extra["flagged_loops"])
+            payload["flagged_loops"] = extra["flagged_loops"]
+            payload["questions"] = extra["questions"]
+            payload["inputs"] = extra["inputs"]
+            payload["unverified"] = extra["unverified"]
+            payload["failed_repos"] = extra["failed_repos"]
         print(json.dumps(payload, indent=2))
     else:
         print(summary_line)

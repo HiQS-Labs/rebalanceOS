@@ -10,7 +10,7 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.99.0] - 2026-10-04
+## [0.100.0] - 2026-10-14
 
 ### Added
 
@@ -20,6 +20,35 @@
 ### Changed
 
 - The machine-path guard now also scans git hook files, which carry no file extension by convention but are executable gate code.
+## [0.99.0] - 2026-10-13
+
+### Added
+
+- **Read-only RELEASES ledger scan (GH-310).** `rebalance github-close-loop --releases-scan <dir>[,<dir>]` finds `releases.db` ledgers in git clones and worktrees under the given directories (three levels deep, at most 200, skipping hidden and build folders). It opens each one strictly read-only and reports in-progress and parked tasks for the repo, the clones each task appears in, and conflicts where clones disagree on a task's section or status. It then compares those tasks with live GitHub data to flag drift: a task still marked in progress whose issue is closed, whose PR has merged, or whose open PR is stale or a forgotten draft. Ledgers in WAL mode, with a missing table or an unsupported schema, or whose repo can't be identified are reported as errors and skipped. The scan is off by default, and output without the flag is unchanged.
+- **Opt-in loop inputs for `/daily` (GH-310).** The daily unclosed-loop scanner takes `--close-loop` (or `REBALANCE_DAILY_CLOSE_LOOP=1`) and `--releases-scan <dirs>` (or `REBALANCE_RELEASES_SCAN_DIRS`). It merges close-loop flags and ledger tasks into one deduplicated, source-tagged `flagged_loops` list and re-checks every item against its own live GitHub read, so merged PRs and closed issues are never reported as open loops. Closed-without-delivery issues and ledger drift are listed as questions, not loops. If the `rebalance` CLI is unavailable, the scanner prints a single "input skipped" line and its output is unchanged.
+## [0.98.4] - 2026-10-09
+
+### Fixed
+
+- The Focus 5 menu-bar panel's toolbar icons now show their tooltips on hover. The panel deliberately never takes focus from the app you are working in, and macOS only shows standard tooltips for the active app, so the existing tooltips never appeared. The panel now draws its own: a dark label below each icon with a small arrow pointing at it, shown after a short hover, kept clear of the icon and lined up so it is not cut off at the panel edge.
+
+## [0.98.3] - 2026-10-07
+
+### Fixed
+
+- Strict scheduled refreshes now fail consistently for returned collector errors as well as raised errors, while deferred embedding remains nonfatal.
+- Memory-guard diagnostics retain configured thresholds when checks are off, clearly mark them as unenforced, and correctly attribute unset values to defaults.
+- Malformed configuration objects and thresholds smaller than one byte now warn before falling back, avoiding silent configuration mistakes.
+- The scheduled-job memory guard no longer refuses healthy runs on Macs with a small swap file. It treated any swap above 1 GB as proof of memory distress, which a laptop with a 2 GB swap file carries permanently, so every job was refused while half the memory sat free. Swap now confirms distress only when it also fills three quarters of the swap file; an unreadable swap size keeps the old rule.
+- When the guard postpones the embedding step, the run is no longer reported as a hard failure. The work each stage already did (note ingest, GitHub sync, document backfill, dashboard update) is kept and reported, the run is marked partially complete, and the embedding catches up on the next schedule.
+- A job skipped because another copy was still running is no longer shown as a failure in the health check.
+- GitHub document embedding now takes the same one-at-a-time lock and memory checks as the other embedding steps, so it can no longer run alongside them unchecked.
+- A refresh whose only source failed by reporting an error (for example an expired email login) is now reported as failed instead of complete; alongside a successful source it is reported as partially complete.
+
+### Added
+
+- Each Mac can turn the guard's memory checks off, or set its own compressor, swap and free-memory thresholds, from its local configuration, with no scheduler edits. The one-run-at-a-time lock and the run-time limit always stay on, every run logs when the memory checks are off, and invalid values fall back to the defaults with a warning.
+- The health check reports the guard's effective memory settings on each Mac and where each value came from.
 
 ## [0.98.2] - 2026-10-04
 
