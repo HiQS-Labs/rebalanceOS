@@ -160,4 +160,12 @@ Citation: SOP.md §"Fleet configuration repair failures (GH-330)":
 **VERDICT: PASS**
 **Basis:** All four questions resolve [Unverified — no citation] with cited spans. The guides close the explicit documentation gap identified in round1. No blocker, should, or nit findings. Round 1 text was correct; close-mismatch was caused by token release rather than review error.
 
+
+### Attestation · relay-drive — 2026-10-14T23:35:27Z
+task: RELAY-gh330-docs
+reviewer: claude
+status: Approved
+reviewed-head: 5fc59de87aab1870f611643a5223e8b9700c1b7e
+added-range: 11605+3914
+added-sha256: 4f085bfa17f5eaa33073cd8d9aa96d4a25d2c64746249716c00218d53d4fbad7
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
