@@ -10,6 +10,21 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.99.0] - 2026-10-13
+
+### Added
+
+- `rebalance config fleet-enroll` enrolls a Mac in fleet mode, or repairs an enrolled Mac's settings. It reads the pulse clone's location from the Mac's own configuration, so a clone at `~/git-pulse-sync` on one Mac and `~/Documents/GitHub/rebalance-git-pulse` on another both work. It shows the planned changes by default and writes only with `--apply`. It checks everything before writing, keeps a backup of the collector settings, and refuses without writing anything when the two settings files point at different clones. Re-running it on an enrolled Mac changes nothing.
+- `rebalance config fleet-enroll --print-clone` prints this Mac's pulse clone. Exit code 3 means none is set up yet; exit code 2 means the settings are broken or name two different clones.
+- `rebalance config set-pulse` sets the pulse login, clone path and timezone that `rebalance doctor` reports as missing. Previously this meant hand-editing a settings file.
+- `rebalance doctor` now shows a `pulse fleet` row naming the command that fixes it. It warns when a Mac with the fleet check-in installed is not enrolled. It fails when fleet mode is on but the collector is not installed, or the fleet settings are invalid. It warns when a pulse filename is set that fleet mode ignores.
+- UPGRADE.md has an agent-run "Fleet self-repair" step for every upgrade. It repairs an enrolled Mac's settings once, asks before enrolling a new Mac, re-checks once, and stops and reports anything it cannot fix. SOP.md adds a one-Mac-at-a-time rollout order and a plan to retire the old shared pulse pages.
+
+### Changed
+
+- The clone path in the fleet check-in collector's settings may now use `$HOME` or `~`, not only an absolute path or `$CONFIG_DIR`. Any other `$` expression is still rejected, and SOP.md now documents the rule.
+- UPGRADE.md, SLEUTH_SYNC.md and the Sleuth setup script use this Mac's configured clone instead of assuming `~/git-pulse-sync`. The setup script stops before cloning anything when the settings are broken or ambiguous.
+
 ## [0.98.4] - 2026-10-09
 
 ### Fixed

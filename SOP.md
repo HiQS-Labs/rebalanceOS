@@ -330,11 +330,21 @@ combined human-readable projection and is never the capture/control plane.
 3. Fast-forward the stable runtime to landed `development`. Update the already installed collector
    copy if it is not a symlink. Keep launchd labels and intervals unchanged; refresh existing long-running
    runtime processes as needed. Do not activate 3-Eyes or disabled jobs as part of this deployment.
-4. In collector config set `fleet_mode=true`, the existing canonical `device_id`, and
-   `fleet_sync_subdir` matching Rebalance's `sync_subdir`. Set Rebalance `pulse_fleet_enabled=true`
-   and `pulse_device_id` to that same ID. Python validates literal collector settings on every publish.
+4. Enroll with `rebalance config fleet-enroll` (preview), then `--apply` (GH-325). It sets collector
+   `fleet_mode=true`, `fleet_sync_subdir` matching Rebalance's `sync_subdir`, and `sync_repo_dir`
+   as a literal path; and Rebalance `pulse_fleet_enabled=true`, `pulse_device_id` (the collector's
+   canonical `device_id`) and `pulse_target_path` (same literal path). It removes `pulse_filename`,
+   which fleet mode ignores. It validates everything before writing, backs up the collector file to
+   `config.sh.bak-gh325`, and refuses — writing nothing — when the two configs name different clones.
+   Python validates literal collector settings on every publish.
    Fleet mode overrides caller `push=True` and `PULSE_PUSH`; a successful local commit is `queued`,
    never labelled remotely pushed. Shared historical files/pointers are retained but not updated.
+
+   **Clone path rule.** The collector's `config.sh` is read without shell evaluation. In
+   `sync_repo_dir` only `$CONFIG_DIR`, `$HOME` (and their `${…}` forms) and a leading `~` are
+   expanded; any other `$` expression is rejected. Empty means `<config dir>/repo`. The result must
+   be the same directory as Rebalance `pulse_target_path`. The folder name itself is free and differs
+   per Mac; `rebalance config fleet-enroll --print-clone` reports this Mac's clone.
 5. For CLIO, install the separately reviewed canonical helper, configure its fleet inventory, and set
    explicit `clio_store_path`, `clio_database`, `clio_owner_uuid` in collector config. Export only
    `devices/<CLIO-UUID>/clio.jsonl`; imported origins stay in private SQLite, outside all staged paths.
@@ -346,6 +356,34 @@ combined human-readable projection and is never the capture/control plane.
 7. Rollback disables Python fleet mode and restores the backed-up collector/config/runtime only
    once the private checkout is clean and no fleet commits are unpushed. Otherwise keep the new
    collector and preserved pending history until reconciled; never reset, stash or discard it.
+   `config.sh.bak-gh325` is the pre-enrollment collector config.
+
+### Four-Mac rollout (GH-325)
+
+Mac Studio is enrolled. Roll out the rest one Mac at a time, in this order: Mac Mini →
+MacBook Pro 14" → MBP 16". At most one Mac per day. For each Mac:
+
+1. Upgrade it (UPGRADE.md, including "Fleet self-repair"). Doctor shows `pulse fleet` WARN
+   "this Mac is not enrolled".
+2. Run steps 1–2 above (identity, writers, clean checkout, backups) on that Mac.
+3. `rebalance config fleet-enroll` (preview), then `--apply` on the operator's yes.
+4. Gate before the next Mac: doctor `pulse fleet` OK; one collector interval delivered for that
+   Mac (`fleet:<device>` no longer `queued, awaiting collector`); step 6 checks pass.
+
+Enrolled Macs repair themselves on later upgrades through UPGRADE.md "Fleet self-repair".
+
+### Retire legacy shared pages (GH-325)
+
+Fleet mode stops updating the Python-written root pages in the pulse repo: `live-pulse.md` and
+`live-pulse-<device>.md` (from per-Mac `pulse_filename`). Retire them only after all four Macs
+show delivered fleet output for seven consecutive days (the #282 qualification window):
+
+1. Confirm no Mac still has `pulse_fleet_enabled` false (doctor on each, or `fleet:*` rows).
+2. In one commit to the pulse repo, delete root `live-pulse.md` and `live-pulse-*.md`.
+3. Keep `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`: the collector still
+   writes them in fleet mode, and `health-check.py`, `recap.py`, `view.sh` and `pulse_health` read them.
+
+`pulse_filename` is already removed from each Mac's config by `fleet-enroll`.
 
 The collector staggers once before its inherited lock. Network operations have a 900-second total
 budget and per-call 120-second default timeout, with up to five extra seconds for termination;
