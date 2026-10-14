@@ -1,0 +1,50 @@
+F...F                                                                    [100%]
+=================================== FAILURES ===================================
+___________________ test_on_mode_dedupes_tags_and_reverifies ___________________
+
+tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-65/test_on_mode_dedupes_tags_and_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1202689d0>
+capsys = <_pytest.capture.CaptureFixture object at 0x106a65e80>
+
+    def test_on_mode_dedupes_tags_and_reverifies(tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv("REBALANCE_BIN", str(_fake_cli(tmp_path, FIXTURE)))
+        monkeypatch.setattr(scanner, "_live_open_issue_numbers", lambda repo: {20, 22})
+        out = scanner.collect_close_loop_inputs(
+            [REPO, "Acme/broken"], LIVE_PRS, set(), close_loop=True, releases_dirs=str(tmp_path)
+        )
+        loops = {(i["repo"], i["number"]): i["sources"] for i in out["flagged_loops"]}
+>       assert loops == {
+            (REPO, 10): ["close-loop:stale_pr", "close-loop:pr_needs_refinement"],
+            (REPO, 20): ["close-loop:started_not_shipped", f"releases:{REPO}#R-20"],
+        }  # merged PR 11 and closed issue 21 are not open loops; PR 12 is unverifiable
+E       AssertionError: assert {} == {('Acme/widge...widget#R-20']}
+E         
+E         Right contains 2 more items:
+E         {('Acme/widget', 10): ['close-loop:stale_pr', 'close-loop:pr_needs_refinement'],
+E          ('Acme/widget', 20): ['close-loop:started_not_shipped',
+E                                'releases:Acme/widget#R-20']}
+E         Use -v to get more diff
+
+tests/test_daily_loop_inputs.py:67: AssertionError
+----------------------------- Captured stderr call -----------------------------
+daily: close-loop input skipped (no usable output for 2 repo(s))
+daily: releases input skipped (no usable output for 2 repo(s))
+_____________________ test_main_on_adds_fields_and_summary _____________________
+
+tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-65/test_main_on_adds_fields_and_s0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106917570>
+capsys = <_pytest.capture.CaptureFixture object at 0x120268180>
+
+    def test_main_on_adds_fields_and_summary(tmp_path, monkeypatch, capsys):
+        monkeypatch.delenv("REBALANCE_RELEASES_SCAN_DIRS", raising=False)
+        monkeypatch.setenv("REBALANCE_BIN", str(_fake_cli(tmp_path, FIXTURE)))
+        payload = _run_main(monkeypatch, capsys, ["--close-loop"])
+>       assert payload["counts"]["flagged_loops"] == 2  # PR 10 + issue 20 (close-loop source only)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'flagged_loops'
+
+tests/test_daily_loop_inputs.py:128: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_daily_loop_inputs.py::test_on_mode_dedupes_tags_and_reverifies
+FAILED tests/test_daily_loop_inputs.py::test_main_on_adds_fields_and_summary
+2 failed, 3 passed in 1.06s
