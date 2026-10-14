@@ -1,0 +1,86 @@
+........................................................................ [  2%]
+.......................xx.x.x..x.x..xxx................................. [  5%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+.............................................................. [ 13%]
+........................................................................ [ 15%]
+........................................................................ [ 18%]
+........................................................ [ 20%]
+........................................................................ [ 23%]
+..................................................... [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+...................................................................... [ 46%]
+........................................................................ [ 49%]
+.................................................................... [ 52%]
+........................................................................ [ 54%]
+........................................................................ [ 57%]
+.............................................................................................................. [ 61%]
+.......................................ssssssssssssssss................. [ 64%]
+........................................................................ [ 67%]
+...............................................................x........ [ 69%]
+..................................................................... [ 72%]
+.............................................................. [ 74%]
+..................................................................... [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+............................................................................................................................................................................. [ 94%]
+........................................................................ [ 97%]
+...................................................................... [ 99%]
+....                                                                     [100%]
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <machine-home>/Documents/GH Repos/rebalanceOS/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+22.80s setup    tests/test_web_surface.py::PulseWebHtmlContractTests::test_contains_doctype
+19.70s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_content_survives_repair
+13.85s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_repair_failure_propagates_error
+13.34s call     tests/test_git_publication_contract.py::test_peer_pointer_conflict_preserves_both_snapshots
+11.98s call     tests/test_pulse_self_repair.py::TestPulseSelfRepair::test_self_repair_on_push_rejection
+8.70s call     tests/test_git_publication_contract.py::test_conflict_preserves_commit_and_leaves_no_owned_rebase
+7.95s call     tests/test_next_actions_parity.py::CrossSurfaceParityTests::test_ask_reads_persisted_cache_and_never_recomputes
+5.45s call     tests/test_scheduler_policy.py::TestInstallFlow::test_legacy_survives_a_successor_that_never_registers
+4.55s call     tests/test_git_publication_contract.py::test_replaceable_page_peer_race_delivers_without_authored_resolution
+3.54s call     tests/test_pytest_rootdir_pinned.py::test_pytest_collection_uses_repository_configuration[foreign-cwd]
+3.14s call     tests/test_power_ops.py::TwoStoreBatteryRecoveryTests::test_default_refresh_recipe_vault_chunks_power_deferral
+2.87s call     tests/test_pytest_rootdir_pinned.py::test_pytest_collection_uses_repository_configuration[stray-conftest]
+2.68s call     tests/test_stack_script.py::StackScriptTests::test_advertised_repair_backs_up_a_dangling_venv_before_rebuild
+2.44s call     tests/test_power_ops.py::TwoStoreBatteryRecoveryTests::test_refresh_semantic_pipeline_on_battery_and_ac
+2.06s call     tests/test_health_issue_reporter.py::TestLLMTriage::test_real_api_call_gemini
+1.87s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_schema_corrupt_should_not_skip
+1.84s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_gmail_mcp_no_messages
+1.83s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_launchd_single_nonzero_exit
+1.79s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_database_location_split
+1.75s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_github_token_missing_should_not_skip
+1.74s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_hard_db_not_found_should_not_skip
+1.73s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_sleuth_env_missing
+1.57s call     tests/test_health_issue_reporter.py::TestTriageScenarios::test_soft_calendar_token_missing
+1.44s call     tests/test_stack_script.py::StackScriptTests::test_install_guards_only_the_named_job_binding
+1.41s call     tests/test_git_pulse_collect_cli.py::GitPulseCollectCliTests::test_collect_backfill_skips_rows_already_present_in_pulse_file
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+2640 passed, 16 skipped, 10 xfailed, 1 warning, 146 subtests passed in 284.86s (0:04:44)

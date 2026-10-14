@@ -1,0 +1,115 @@
+#!/bin/bash
+# Pre-push fast gate — GH-312 Rung 2 spike candidate. DISARMED in the tree:
+# this file ships non-executable so git skips it; arming is a deliberate
+# operator act (chmod +x). Verify state with:  bash .githooks/pre-push --verify
+#
+# Function: qualify a push at the author boundary by running the same fast
+# checks hosted CI runs first — the lint stages (ruff check / format) plus the
+# root-noembed test lane and its two grep guards, identical flags to ci.yml.
+# Results are appended as JSONL receipts to temp/gate-receipts.jsonl (P6).
+#
+# Bypass (P1: logged, never silent):  REBALANCE_SKIP_PREPUSH_GATE=1 git push
+# Delete-only pushes and empty ref updates exit 0 without running the gate.
+#
+# Known scope limits (disclosed, P12): tests run against the working tree,
+# not each pushed ref; multi-ref pushes are checked once, not per-ref.
+
+set -u
+ROOT="$(git rev-parse --show-toplevel)"
+RECEIPT="$ROOT/temp/gate-receipts.jsonl"
+PY="$ROOT/.venv/bin/python"
+
+emit_receipt() {  # $1=kind $2=exit $3=detail(json string)
+    local ts; ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf '{"schema_version":1,"hook":"pre-push","kind":"%s","exit":%s,"utc":"%s","head":"%s","detail":%s}\n' \
+        "$1" "$2" "$ts" "$([[ -n ${GATE_HEAD:-} ]] && echo "$GATE_HEAD" || git rev-parse HEAD 2>/dev/null || echo null)" "$3" \
+        >> "$RECEIPT" 2>/dev/null || true
+}
+
+if [[ "${1:-}" == "--verify" ]]; then
+    rc=0
+    if [[ "$(git config core.hooksPath || true)" == ".githooks" ]]; then
+        echo "verify: core.hooksPath=.githooks  OK"
+    else
+        echo "verify: core.hooksPath not .githooks — install with: git config core.hooksPath .githooks"; rc=1
+    fi
+    if [[ -x "$ROOT/.githooks/pre-push" ]]; then
+        echo "verify: hook armed (executable)  OK"
+    else
+        echo "verify: hook DISARMED (not executable) — git will skip it. Arm with: chmod +x .githooks/pre-push"; rc=1
+    fi
+    [[ -x "$PY" ]] && echo "verify: .venv python present  OK" || { echo "verify: .venv python MISSING — gate would fail closed"; rc=1; }
+    exit $rc
+fi
+
+# Nothing to push (empty stdin) or delete-only ref updates: no code moves, no gate.
+# stdin lines are "<local ref> <local oid> <remote ref> <remote oid>"; the local
+# oid is the SECOND field, and an all-zeros local oid means a deletion.
+any_push=0
+while read -r _lref loid _rref _roid _extra; do
+    [[ -z "${loid:-}" ]] && continue
+    [[ "$loid" =~ ^0+$ ]] || any_push=1
+done
+if [[ $any_push -eq 0 ]]; then
+    emit_receipt noop 0 '"empty or delete-only stdin"'; exit 0
+fi
+
+if [[ -n "${REBALANCE_SKIP_PREPUSH_GATE:-}" ]]; then
+    echo "pre-push gate: BYPASSED via REBALANCE_SKIP_PREPUSH_GATE (logged to receipt)"
+    emit_receipt bypass 0 "\"${REBALANCE_SKIP_PREPUSH_GATE}\""
+    exit 0
+fi
+
+if [[ ! -x "$PY" ]]; then
+    echo "pre-push gate: FAIL CLOSED — $PY missing or not executable." >&2
+    echo "  Remediation: create the repo venv (see README Getting Started), or bypass once" >&2
+    echo "  with REBALANCE_SKIP_PREPUSH_GATE=1 (logged)." >&2
+    emit_receipt fail-closed 1 '"missing venv python"'; exit 1
+fi
+
+GATE_HEAD="$(git rev-parse HEAD 2>/dev/null || echo null)"
+cd "$ROOT" || exit 1
+start="$(date +%s)"; failures=0; stages=""
+run_stage() {  # $1=name $2=start_s ; rest: command...
+    local name="$1" s="$1"; shift; local t0="$1"; shift
+    "$@"; local rc=$?; local dt=$(( $(date +%s) - t0 ))
+    stages="$stages\"$name\": {\"exit\": $rc, \"wall_s\": $dt}, "
+    if [[ $rc -ne 0 ]]; then
+        failures=$((failures+1))
+        echo "pre-push gate: FAIL stage=$name (exit $rc, ${dt}s) — push BLOCKED. Full log above." >&2
+    fi
+    return $rc
+}
+
+run_stage ruff-check  "$(date +%s)" "$PY" -m ruff check .
+run_stage ruff-format "$(date +%s)" "$PY" -m ruff format --check .
+
+# Root-noembed lane — identical selection to ci.yml (GH-144 C3 seam split).
+t0="$(date +%s)"
+PYTHONPATH=src:HiQS PYTHONDONTWRITEBYTECODE=1 "$PY" -m pytest tests/ -q -p no:cacheprovider \
+    --ignore=tests/test_embedder.py --ignore=tests/test_embedder_metal_unavailable.py
+rc=$?; dt=$(( $(date +%s) - t0 )); stages="$stages\"root-noembed\": {\"exit\": $rc, \"wall_s\": $dt}, "
+if [[ $rc -ne 0 ]]; then
+    failures=$((failures+1))
+    echo "pre-push gate: FAIL stage=root-noembed (exit $rc, ${dt}s) — push BLOCKED. Full log above." >&2
+fi
+
+# The two repo grep guards from the ci.yml root-noembed job, verbatim logic.
+t0="$(date +%s)"; guard_rc=0
+if grep -rn "replace('Z'" src/rebalance/ingest/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+    echo "pre-push gate: FAIL guard=raw-datetime — use parse_calendar_dt() from calendar_helpers.py" >&2; guard_rc=1
+fi
+if grep -rn "total_seconds() / 60" src/rebalance/ --include="*.py" | grep -v "# raw-ok" | grep -v calendar_helpers.py; then
+    echo "pre-push gate: FAIL guard=raw-duration — use event_duration_minutes() from calendar_helpers.py" >&2; guard_rc=1
+fi
+dt=$(( $(date +%s) - t0 )); stages="$stages\"grep-guards\": {\"exit\": $guard_rc, \"wall_s\": $dt}"
+[[ $guard_rc -ne 0 ]] && failures=$((failures+1))
+
+total=$(( $(date +%s) - start ))
+emit_receipt "gate" "$([[ $failures -eq 0 ]] && echo 0 || echo 1)" "{\"stages\": {${stages}}, \"total_wall_s\": $total}"
+if [[ $failures -eq 0 ]]; then
+    echo "pre-push gate: PASS (${total}s)"
+    exit 0
+fi
+echo "pre-push gate: $failures failing stage(s) in ${total}s. Fix or bypass once with REBALANCE_SKIP_PREPUSH_GATE=1 (logged)."
+exit 1

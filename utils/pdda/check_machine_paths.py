@@ -38,6 +38,7 @@ SCANNED_EXTENSIONS = {".py", ".sh", ".swift", ".md", ".txt", ".json", ".yaml", "
 SCANNED_ROOT_DIRECTORIES = {
     ".agents",
     ".claude",
+    ".githooks",  # GH-312: git hooks are gate code — scanned despite being extensionless
     "src",
     "scripts",
     "utils",
@@ -63,6 +64,10 @@ def should_scan(path: Path, root: Path) -> bool:
     for part in parts:
         if part in EXCLUDED_PARTS:
             return False
+    # GH-312: hook files under .githooks/ carry no suffix by git convention but are
+    # executable gate code — scan them regardless of extension.
+    if parts[0] == ".githooks" and path.is_file():
+        return True
     return path.suffix in SCANNED_EXTENSIONS
 
 
