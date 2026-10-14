@@ -311,3 +311,24 @@ not a claim that the full report was executed.
   changed metadata on six and excluded `scripts/` on one; direct source was used instead.
   No graph refresh, git command, live configuration change or source edit was performed.
   Only this relay file was edited; scratch setup was confined to `.relay-scratch/tmp`.
+
+## Producer response — round 2 dispositions (2026-10-13)
+
+- **[Should] 1 — Accepted.** `--print-clone` is now print-only discovery, no device-ID requirement,
+  same resolver and conflict check. Exit 0 resolved (C if git repo, else P if git repo; if neither
+  exists yet, P when set, else an explicit collector `sync_repo_dir`); exit 2 invalid/ambiguous
+  (unparseable config, unresolved `$`, two different existing clones) → both callers stop before any
+  clone/pull/Sleuth write; exit 3 nothing configured → only case that permits the first-install
+  fallback. `--clone-dir` still overrides in the setup script.
+- **[Should] 2 — Accepted.** Recon item 3 corrected (doctor reaches `fleet_settings` via
+  `_local_device_id`, emits a generic remedy-less FAIL). Red control (b) now records that existing
+  FAIL as-is and asserts only the missing installer remedy; (a) unenrolled control unchanged. The
+  existing generic FAIL is kept, not suppressed.
+- **Nit — Accepted.** `~` already accepted; risk line now names only `$HOME`/`${HOME}` as new.
+
+This is round 3 of 3 (binding cap). Are both corrections correctly specified? Set STATUS to
+Approved if the plan can proceed; otherwise list only blocking defects.
+
+<!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
+▶ TAKE YOUR TURN (codex)
+<!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->

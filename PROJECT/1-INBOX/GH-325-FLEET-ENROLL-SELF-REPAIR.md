@@ -63,8 +63,11 @@ Effort 55: one doctor check, two CLI verbs (`fleet-enroll`, `set-pulse`), docs, 
    `fleet_sync_subdir=<sync_subdir>` plus Rebalance `pulse_fleet_enabled=true`,
    `pulse_device_id=<device_id>` (SOP step 4). `set_pulse_config()` (`ingest/config.py:1381`) has
    no callers and no CLI (#246). `_check_pulse()` (`doctor.py:2155`) only checks
-   `github_login`/`pulse_target_path`; it never calls `fleet_settings()`, so a fleet misconfiguration
-   surfaces only when `pulse-sync` runs and fails.
+   `github_login`/`pulse_target_path`. Doctor reaches `fleet_settings()` only indirectly:
+   `_check_pulse_collectors` → `_local_device_id` (`doctor.py:115-124`) → `sync_snapshot.get_device_id`
+   (`sync_snapshot.py:66-68`), and on error emits a generic `fleet configuration` FAIL with no
+   remedy (`doctor.py:1899-1902`). Nothing reports an installed-but-unenrolled Mac, and no row names
+   a repair command. (Corrected in plan QA r2: the original "never calls" overstated silence.)
 4. **`pulse_filename` silently ignored.** `pulse.py:963` uses `devices/<id>/live-pulse.md` in fleet
    mode. `get_pulse_config()` defaults `pulse_filename` to `live-pulse.md`, so "explicitly set" must
    be read from the raw config.
@@ -149,9 +152,16 @@ Existing subsystems extended, no new modules:
      collector file then Rebalance config, then run `fleet_settings()` again and print OK. Re-running
      on an enrolled Mac is the repair path; with nothing to change it prints "already enrolled" and
      leaves both files byte-identical.
-  6. `--print-clone`: print the resolved clone path (`C`, else `P`) and exit; refuse non-zero if
-     neither resolves. Used by UPGRADE.md and `setup_sleuth_file_source.sh` so nothing hardcodes a
-     folder.
+  6. `--print-clone`: print-only discovery, independent of enrollment eligibility (no device-ID
+     requirement, writes nothing). Same resolver and conflict check as step 2. Exit codes:
+     - **2 — invalid or ambiguous:** collector config unparseable, an unresolved `$` expression, or
+       `C` and `P` both existing git repos that differ. Message names the values. Callers **stop**.
+     - **0 — resolved:** prints `C` if it is a git repo, else `P` if it is; if neither exists yet,
+       prints `P` when set, else `C` when the collector sets an explicit `sync_repo_dir` (a
+       configured-but-not-yet-cloned path; callers may clone there).
+     - **3 — nothing configured:** no collector config (or no explicit `sync_repo_dir`) and no `P`.
+       Only this code allows the first-install fallback to a folder the operator chooses.
+     Used by UPGRADE.md step 3 and `setup_sleuth_file_source.sh`, so nothing hardcodes a folder.
   7. No dirty-clone check: enrollment writes no files inside the clone; dirt is the collector's
      concern at publish time (#314).
 - **`rebalance config set-pulse --github-login X --target-path P [--timezone Z]`** (#246): validates
@@ -161,9 +171,10 @@ Existing subsystems extended, no new modules:
 ## Docs
 
 - **UPGRADE.md step 3** — resolve the clone from this Mac's config instead of a fixed folder:
-  `CLONE="$(.venv/bin/rebalance config fleet-enroll --print-clone)"`. Only if that refuses (no clone
-  configured anywhere), clone to a folder of the operator's choice (`~/git-pulse-sync` is the
-  example) and record it with `set-pulse --target-path`. `--base-url` uses `"$CLONE/sync/sleuth/…"`.
+  `CLONE="$(.venv/bin/rebalance config fleet-enroll --print-clone)"`. Exit 0 → use it (clone there
+  if it does not exist yet). Exit 3 (nothing configured) → ask the operator for a folder
+  (`~/git-pulse-sync` is the example), clone, record it with `set-pulse --target-path`. Exit 2 →
+  stop and report; do not clone or change Sleuth. `--base-url` uses `"$CLONE/sync/sleuth/…"`.
 - **UPGRADE.md new section "Fleet self-repair (agent-run, every upgrade)"** — a bounded procedure,
   run once after the refresh steps:
   1. Run `rebalance doctor`. Act only on `pulse` / `pulse fleet` rows that are WARN or FAIL; OK rows
@@ -191,8 +202,9 @@ Existing subsystems extended, no new modules:
 - **SLEUTH_SYNC.md** — `~/git-pulse-sync` becomes "your clone (example: `~/git-pulse-sync`)".
 - **`scripts/setup_sleuth_file_source.sh`** — default `CLONE_DIR` to the output of
   `rebalance config fleet-enroll --print-clone` (same resolver as the publisher, so no literal
-  variable text reaches `git clone`); if that refuses, fall back to `~/git-pulse-sync`. `--clone-dir`
-  still overrides.
+  variable text reaches `git clone`). Exit 3 only → fall back to `~/git-pulse-sync`; exit 2 → exit
+  non-zero with the message before any clone, pull or Sleuth write. An explicit `--clone-dir`
+  skips discovery and still overrides.
 - CHANGELOG entry.
 
 ## Implementation order (verification inline)
@@ -206,17 +218,19 @@ Existing subsystems extended, no new modules:
    an existing config test file.
 3. `doctor.py`: `_check_pulse_fleet()` + `set-pulse` hint for missing keys. Verify: new cases in
    `tests/test_doctor_pulse_severity.py` — one per table row, asserting status **and** hint through
-   the same public `run_doctor`/report path. **Red control:** run those cases against base
-   `0589b44`'s doctor (same inputs: installed-but-unenrolled collector; fleet enabled with collector
-   config missing) and record that the report has no WARN/FAIL for either — evidence in
-   `TESTS-RESULTS/2026-10-13+GH-325/`.
+   the same public `run_doctor`/report path. **Red controls** against base `0589b44`'s doctor, same
+   inputs, evidence in `TESTS-RESULTS/2026-10-13+GH-325/`: (a) installed-but-unenrolled collector →
+   base report has no WARN/FAIL naming enrollment; (b) fleet enabled, collector config missing →
+   base emits the generic `fleet configuration` FAIL (recorded as-is, not suppressed) but no
+   installer remedy; candidate emits the actionable row. The existing generic FAIL is kept.
 4. `cli/config_cmds.py`: `fleet-enroll`, `set-pulse`. Verify (temp `GIT_PULSE_CONFIG_DIR` + temp git
    repos): preview writes nothing (bytes unchanged); `--apply` on `$HOME/...` writes a literal path
    and `fleet_settings()` passes; empty `sync_repo_dir` with `pulse_target_path` elsewhere → writes an
    explicit literal so both readers agree; existing valid `$CONFIG_DIR/repo` → accepted; two
    different existing clones → refuse, bytes unchanged; unsafe `sync_subdir` → refuse before any
    write; missing `device_id` → refuse, no write; second `--apply` → "already enrolled", both files
-   byte-identical; `--print-clone` prints the resolved path.
+   byte-identical; `--print-clone` → 0 with `P` when the collector is absent (no device ID needed),
+   2 on conflicting clones and on `$OTHER/repo`, 3 when nothing is configured.
 5. Docs (UPGRADE, SOP, SLEUTH_SYNC), setup script default, CHANGELOG, ROADMAP line.
 6. Manual check on this Mac (Studio): `rebalance config fleet-enroll` preview against the live
    config shows only "remove `pulse_filename`" (Studio still sets it). Recorded under
@@ -230,7 +244,8 @@ Existing subsystems extended, no new modules:
   refuses and names both; the operator picks. No silent rebinding (AGENTS.md warns about rebinding a
   fleet to another clone).
 - Doctor rows on Macs without the collector and without fleet enabled: none emitted.
-- `fleet_settings()` now accepts `$HOME`/`~` (literal-token expansion). Every caller
+- `fleet_settings()` now accepts `$HOME`/`${HOME}` (literal-token expansion; `~` already passed via
+  `Path.expanduser()`). Identity, subdirectory and path-equality checks are unchanged. Every caller
   (`pulse.py`, `index_ops.py:2152`, `sync_snapshot.py:66`) gains that acceptance; none loses one.
 
 ## Plan QA log
@@ -242,4 +257,9 @@ Existing subsystems extended, no new modules:
   safe writer; (3) UPGRADE self-repair is a bounded once-then-recheck-then-stop procedure. Nit: two
   CLI verbs. Rollback now names SOP step 7 for applied config. Driver exit 3 (reviewer did not hand
   the token back); verdict was written and committed, so treated as a completed changes-requested round.
+- r2 (Codex): 2 Should + 1 Nit, all **accepted**. (1) `--print-clone` is print-only with exit
+  0/2/3 distinguishing resolved / invalid-or-ambiguous / nothing-configured; both callers stop on 2
+  and fall back only on 3. (2) Recon corrected: doctor already reaches `fleet_settings` via
+  `_local_device_id` and emits a generic FAIL; red control (b) now asserts the missing remedy, not
+  total silence. Nit: `~` was already accepted. Driver exit 3 again (token not handed back).
 - `set_collector_values()` writing a file `install.sh` also writes: backup first; only three keys.
