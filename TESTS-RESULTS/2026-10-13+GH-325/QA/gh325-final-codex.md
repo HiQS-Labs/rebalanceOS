@@ -243,3 +243,11 @@ non-code-document/shell reads. No test suite, executable fixture, behavioral pro
 live configuration mutation or source edit was performed. Only this relay file was edited;
 scratch setup was confined to `.relay-scratch/tmp`. The approval token is closed with the
 absolute env-pinned `tick done`, as required for an approved turn.
+
+### Attestation · relay-drive — 2026-10-14T05:38:21Z
+task: RELAY-gh325-final-codex-r2
+reviewer: codex
+status: Approved
+reviewed-head: e8e17edc6dca3f987cb27f38c2db42c0190d1a6e
+added-range: 13017+3885
+added-sha256: 5ecdcd9316f9045101beb76be2c481daacd624b442210108ce56bc8aac4f2c5d
