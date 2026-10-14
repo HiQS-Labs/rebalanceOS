@@ -2,7 +2,7 @@ F...F                                                                    [100%]
 =================================== FAILURES ===================================
 ___________________ test_on_mode_dedupes_tags_and_reverifies ___________________
 
-tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-65/test_on_mode_dedupes_tags_and_0')
+tmp_path = PosixPath('<scratch-path>')
 monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1202689d0>
 capsys = <_pytest.capture.CaptureFixture object at 0x106a65e80>
 
@@ -31,7 +31,7 @@ daily: close-loop input skipped (no usable output for 2 repo(s))
 daily: releases input skipped (no usable output for 2 repo(s))
 _____________________ test_main_on_adds_fields_and_summary _____________________
 
-tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-65/test_main_on_adds_fields_and_s0')
+tmp_path = PosixPath('<scratch-path>')
 monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106917570>
 capsys = <_pytest.capture.CaptureFixture object at 0x120268180>
 
