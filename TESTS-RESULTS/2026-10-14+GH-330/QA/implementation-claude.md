@@ -162,4 +162,12 @@ VERDICT: PASS
 
 Basis: All six acceptance checks are met. Strict admission preserves original bytes and rejects bad timezones before any write. The collector writer completes independent staged backups with fsync before atomic publication. Partial apply failures are nonzero and actionable with no rollback. The refresh facade delegates to the shared lock owner and the setup script halts on any non-zero exit before the setter. The shell wrapper uses `shlex.quote` for space-safe paths. Version, rating, and scope are consistent with the stated plan; no duplicate utility or writer was added. The single nit (validation ordering clarity) is non-blocking.
 
+
+### Attestation · relay-drive — 2026-10-14T23:27:52Z
+task: RELAY-gh330-implementation
+reviewer: claude
+status: Approved
+reviewed-head: 5e5db538f70f408fc7e06037b00ea524ea940d8c
+added-range: 7374+6777
+added-sha256: 131e8700241852348bc707e55fb8cdced9e0f12412b32775fd0d72d8e2fce96c
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
