@@ -1,0 +1,7 @@
+mode,job,start,exit,secs,swap_used_mb,swap_total_mb,free_pct,compressor_gb
+old,pulse-warning-watch,17:34:31,75,0,1168.00,2048.00,42,11.48
+old,github-sync,17:34:31,75,0,1168.00,2048.00,42,11.48
+old,obsidian-vault-embeddings,17:34:31,75,1,1168.00,2048.00,42,11.48
+fixed,pulse-warning-watch,17:34:32,0,0,1168.00,2048.00,42,11.48
+fixed,github-sync,17:34:32,0,194,1168.00,2048.00,42,11.47
+fixed,obsidian-vault-embeddings,17:37:46,0,117,1226.06,2048.00,40,11.99

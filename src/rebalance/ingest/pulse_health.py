@@ -11,7 +11,7 @@ Source of truth: the per-device YAML the git-pulse collector writes to
 ``scan_status``, ``repo_scan_failures``, ``scan_failure_examples``). We resolve
 ``{sync_repo_dir}`` from rebalance's own ``pulse_target_path`` first (the
 configured git-pulse-sync working tree), then fall back to the git-pulse
-``config.sh``. Reading is pure: flat-YAML line parse, no subprocess, no git.
+``config.sh``. Legacy reading is pure flat YAML. Opted-in fleet publishers additionally verify delivered status/page with bounded local Git object reads.
 
 Scope note: this is a *targeted* promotion of the health-read path only. The
 full git-pulse migration (collect.sh, recap, launchd jobs) remains Phase 9. The
@@ -21,6 +21,9 @@ The ``classify`` thresholds and states mirror that script exactly.
 """
 
 from __future__ import annotations
+
+import hashlib
+import json
 
 import os
 import re
@@ -36,6 +39,12 @@ WARN_HOURS = 3.0
 ALERT_HOURS = 24.0
 
 
+# 23:00 -> 06:00 gap (7h), fall-back DST (1h), producer budget (0.5h),
+# collector cadence (1h) and network/stagger grace (0.5h). Explicit failures
+# and queued output remain immediately visible; this is only silent-job aging.
+MAX_SCHEDULED_RENDER_AGE_HOURS = 10.0
+
+
 @dataclass
 class CollectorHealth:
     """One device's git-pulse collector health, post-classification."""
@@ -46,8 +55,13 @@ class CollectorHealth:
     scan_status: str = "ok"
     repo_scan_failures: int = 0
     scan_failure_examples: str = ""
+    fleet_mode: bool = False
+    last_pulse_publish_utc: datetime | None = None
+    last_pulse_exit: int | None = None
+    pulse_delivery_pending: bool = False
+    pulse_delivery_reason: str = ""
     # Filled by classify():
-    state: str = ""  # ALIVE | STALE | ALERT | DEGRADED | NO PUSHES
+    state: str = ""  # ALIVE | ALIVE_NOT_PUBLISHING | STALE | ALERT | DEGRADED | NO PUSHES
     priority: int = 3  # lower = worse (sorts first)
     age_hours: float | None = None
 
@@ -159,6 +173,25 @@ def classify(
         health.state, health.priority = "ALERT", 1
     elif hours > warn_hours:
         health.state, health.priority = "STALE", 2
+    elif health.fleet_mode and (
+        health.pulse_delivery_pending
+        or health.last_pulse_exit != 0
+        or health.last_pulse_publish_utc is None
+        or not -1 / 60 <= (now - health.last_pulse_publish_utc).total_seconds() / 3600 <= MAX_SCHEDULED_RENDER_AGE_HOURS
+    ):
+        health.state, health.priority = "ALIVE_NOT_PUBLISHING", 2
+        if health.last_pulse_exit not in (None, 0):
+            health.pulse_delivery_reason = f"render failed (exit {health.last_pulse_exit})"
+            if health.pulse_delivery_pending:
+                health.pulse_delivery_reason += "; awaiting collector delivery"
+        elif not health.pulse_delivery_reason:
+            if health.last_pulse_publish_utc is None:
+                health.pulse_delivery_reason = "no verified delivered status"
+            elif health.pulse_delivery_pending:
+                health.pulse_delivery_reason = "queued, awaiting collector"
+            else:
+                age = (now - health.last_pulse_publish_utc).total_seconds() / 3600
+                health.pulse_delivery_reason = f"delivered render {age:.1f}h old; outside scheduled freshness bound"
     else:
         health.state, health.priority = "ALIVE", 3
     return health
@@ -195,6 +228,56 @@ def read_collector_health(
             repo_scan_failures=_int(_yaml_value(yaml_path, "repo_scan_failures")),
             scan_failure_examples=_yaml_value(yaml_path, "scan_failure_examples"),
         )
+        health.fleet_mode = _yaml_value(yaml_path, "fleet_mode") == "true"
+        if health.fleet_mode:
+            # Only local Git object reads, each bounded to five seconds. Upstream
+            # evidence cannot be replaced by a dirty/queued local success.
+            from rebalance.lib.git_ops import run_git
+
+            relative = f"devices/{device_id}/status/pulse-sync.json"
+            try:
+                if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", device_id):
+                    raise ValueError("unsafe fleet device identity")
+                delivered = run_git(Path(sync_repo_dir), "show", f"@{{u}}:{relative}", timeout=5)
+                if delivered.returncode or len(delivered.stdout) > 65536:
+                    raise ValueError("upstream status unavailable")
+                status = json.loads(delivered.stdout)
+                if (
+                    status.get("device_id") != device_id
+                    or status.get("job") != "pulse-sync"
+                    or status.get("schema_version") != 1
+                    or type(status.get("last_exit")) is not int
+                ):
+                    raise ValueError("invalid delivered status")
+                health.last_pulse_exit = status["last_exit"]
+                health.last_pulse_publish_utc = parse_utc_iso(status.get("last_render_success_utc"))
+                payload_path = f"devices/{device_id}/live-pulse.md"
+                if status.get("payload_path") != payload_path:
+                    raise ValueError("invalid delivered payload path")
+                payload = run_git(Path(sync_repo_dir), "show", f"@{{u}}:{payload_path}", timeout=5)
+                if payload.returncode or hashlib.sha256(payload.stdout.encode()).hexdigest() != status.get(
+                    "payload_sha256"
+                ):
+                    raise ValueError("delivered page and status do not match")
+                local = Path(sync_repo_dir) / relative
+                if local.is_symlink():
+                    raise ValueError("symlinked status")
+                if local.exists():
+                    local_status = json.loads(local.read_text())
+                    if (
+                        not isinstance(local_status, dict)
+                        or local_status.get("device_id") != device_id
+                        or local_status.get("job") != "pulse-sync"
+                        or type(local_status.get("last_exit")) is not int
+                    ):
+                        raise ValueError("invalid local status")
+                    health.pulse_delivery_pending = local_status != status
+                    if health.pulse_delivery_pending:
+                        health.last_pulse_exit = local_status["last_exit"]
+            except Exception:  # doctor remains conservative on unreadable fleet evidence
+                # Conservative for opted-in publishers: unverifiable is not ALIVE.
+                health.pulse_delivery_pending = True
+                health.pulse_delivery_reason = "delivery evidence unavailable"
         classify(health, now, warn_hours, alert_hours)
         out.append(health)
 

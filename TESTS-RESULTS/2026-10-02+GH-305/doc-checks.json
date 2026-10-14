@@ -1,0 +1,25 @@
+{
+  "frontmatter": {
+    "candidate_exit": 0,
+    "base_exit": 0,
+    "findings_identical_to_base": true,
+    "changed_plan_reported": false
+  },
+  "status-table": {
+    "candidate_exit": 0,
+    "base_exit": 0,
+    "findings_identical_to_base": true,
+    "changed_plan_reported": false
+  },
+  "changelog": {
+    "candidate_exit": 0,
+    "base_exit": 0,
+    "findings_identical_to_base": true,
+    "changed_plan_reported": false
+  },
+  "machine_paths": {
+    "exit": 0,
+    "violations": 0
+  },
+  "scope": "known baseline doc hygiene findings retained; no findings on changed plan; no overall doc-hygiene green claim"
+}

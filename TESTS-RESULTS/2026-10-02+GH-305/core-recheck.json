@@ -1,0 +1,22 @@
+{
+  "utc": "2026-10-02T22:28:45.410604+00:00",
+  "live_fleet_qualification": false,
+  "sqlite_integrity": "ok",
+  "all_backup_records_preserved": true,
+  "all_backup_payloads_preserved": true,
+  "history_rows": 3976,
+  "known_origins": 3,
+  "personal_header_preserved": true,
+  "same_note_path": true,
+  "latest_eligible_natural_prompt_rendered": true,
+  "owner_only_remote_snapshot": true,
+  "delivered_owner_rows": 2827,
+  "no_pending_commits": true,
+  "fleet_health": "ALIVE",
+  "fleet_reason": "",
+  "last_pulse_exit": 0,
+  "delivery_pending": false,
+  "note_bytes": 390234,
+  "note_sha256": "1d9d864f705167b2b1d670aa48076e1da39b0f193464a89dc1a64cd46b7847a9",
+  "runtime_head": "535bb7a65537dacc3619a4108cbdddbea1c72e92"
+}

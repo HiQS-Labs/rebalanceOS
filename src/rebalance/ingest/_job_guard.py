@@ -36,6 +36,11 @@ condition so it does not stay invisible.
 Disable with ``REBALANCE_JOB_GUARD=0`` (the test suite does this — see
 ``tests/conftest.py`` — because ``MemoryCeiling.preflight()`` refuses to start on
 a memory-starved machine, which would make tests fail spuriously on a busy box).
+That switch drops the single-instance lock too, so it is **test-only**. An
+operator who wants the memory checks off on one Mac uses the GH-296 device
+setting (``job_guard.memory_guard: off`` in ``rbos.config``, or
+``REBALANCE_JOB_GUARD_MEMORY=off``), which ``utils/job_guard.py`` resolves for
+both guard layers and which keeps the ``rebalance-embed`` lock.
 """
 
 from __future__ import annotations
@@ -53,7 +58,6 @@ EMBEDDING_LOCK = "rebalance-embed"
 
 _ENV_ENABLED = "REBALANCE_JOB_GUARD"
 _ENV_ON_CONFLICT = "REBALANCE_JOB_GUARD_ON_CONFLICT"
-_ENV_MAX_RSS_GB = "REBALANCE_JOB_GUARD_MAX_RSS_GB"
 _ENV_MODULE = "JOB_GUARD_MODULE"
 
 _FALSEY = {"0", "false", "no", "off", ""}
@@ -133,8 +137,8 @@ def embedding_guard(
     ``MemoryCeilingExceeded`` when the job trips the RSS ceiling or the machine's
     available-memory floor. Both are strictly better outcomes than #172.
 
-    ``max_rss_gb`` defaults to ``job_guard.DEFAULT_MAX_RSS_FRACTION`` (35% of
-    physical RAM) when unset — the ceiling is applied by ``MemoryCeiling``, not
+    ``max_rss_gb`` defaults to ``job_guard.DEFAULT_MAX_FOOTPRINT_FRACTION`` (12.5%
+    of physical RAM) when unset — the ceiling is applied by ``MemoryCeiling``, not
     hardcoded here.
     """
     if not enabled():
@@ -151,17 +155,29 @@ def embedding_guard(
         return
 
     if max_rss_gb is None:
-        raw = os.environ.get(_ENV_MAX_RSS_GB, "").strip()
-        if raw:
-            try:
-                max_rss_gb = float(raw)
-            except ValueError:
-                _warn_once(f"ignoring non-numeric {_ENV_MAX_RSS_GB}={raw!r}")
+        # The same resolver as the launchd wrapper (canonical footprint variable,
+        # then the deprecated RSS alias), so both layers and the doctor report
+        # agree on the ceiling (GH-296 final QA F3).
+        max_rss_gb = mod.env_max_footprint_gb(warn=_warn_once)
 
     resolved_conflict = on_conflict or os.environ.get(_ENV_ON_CONFLICT, "refuse").strip()
 
     with mod.guard(name, max_rss_gb=max_rss_gb, on_conflict=resolved_conflict):
         yield
+
+
+def is_deferral(exc: BaseException) -> bool:
+    """True when ``exc`` means "never started; retry later", not "failed" (GH-296).
+
+    Covers the lock being held (``InstanceConflict``) and a preflight memory refusal
+    (``RefusedToStart``). A ceiling tripped MID-run is still a failure. The classes
+    live in the path-loaded ``utils/job_guard.py``, so they are resolved from it.
+    """
+    mod = load_job_guard()
+    if mod is None:
+        return False
+    deferrable = tuple(getattr(mod, name) for name in ("InstanceConflict", "RefusedToStart") if hasattr(mod, name))
+    return bool(deferrable) and isinstance(exc, deferrable)
 
 
 def guarded_embedding(fn):

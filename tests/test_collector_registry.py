@@ -119,6 +119,62 @@ class CollectorRegistryTests(unittest.TestCase):
             finally:
                 COLLECTORS.pop("smoke_test", None)
 
+    def test_embed_or_defer_separates_deferral_from_failure(self) -> None:
+        """GH-296: a guard deferral becomes a stand-in result; a mid-run trip still raises."""
+        from rebalance.ingest import _job_guard
+        from rebalance.ingest.index_ops import _embed_or_defer, _embedding_deferred
+
+        mod = _job_guard.load_job_guard()
+        self.assertIsNotNone(mod)
+
+        def _refused(**_: Any) -> Any:
+            raise mod.RefusedToStart("refusing to start: memory compressor holds 9.3 GB")
+
+        def _locked(**_: Any) -> Any:
+            raise mod.InstanceConflict("job 'rebalance-embed' is already running")
+
+        def _tripped(**_: Any) -> Any:
+            raise mod.MemoryCeilingExceeded("process tree holds 5 GB, ceiling is 3 GB")
+
+        self.assertIn("refusing to start", _embedding_deferred(_embed_or_defer(_refused)))
+        self.assertIn("already running", _embedding_deferred(_embed_or_defer(_locked)))
+        with self.assertRaises(mod.MemoryCeilingExceeded):
+            _embed_or_defer(_tripped)
+        self.assertIsNone(_embedding_deferred(object()))
+
+    def test_vault_keeps_its_ingest_when_embedding_is_deferred(self) -> None:
+        """GH-296 final QA F4: ingest ran before the guarded leaf refused; it must stay visible."""
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from rebalance.ingest import _job_guard
+        from rebalance.ingest.index_ops import _refresh_vault, classify_sync_outcome
+
+        mod = _job_guard.load_job_guard()
+        ingest = SimpleNamespace(
+            total_files=10,
+            new_files=3,
+            updated_files=1,
+            touched_files=0,
+            deleted_files=0,
+            total_chunks=40,
+            elapsed_seconds=0.1,
+        )
+
+        def _refused(**_: Any) -> Any:
+            raise mod.RefusedToStart("refusing to start: memory compressor holds 9.3 GB")
+
+        with (
+            mock.patch("rebalance.ingest.note_ingester.ingest_vault", return_value=ingest),
+            mock.patch("rebalance.ingest.embedder.embed_chunks", side_effect=_refused),
+        ):
+            result = _refresh_vault(Path("/tmp/x.db"), Path("/tmp/vault"), dry_run=False)
+
+        self.assertEqual(result["ingest"]["new_files"], 3, "completed ingest work was discarded")
+        self.assertIn("refusing to start", result["embedding_deferred"])
+        self.assertEqual(result["embed_chunks"]["embedded"], 0)
+        self.assertEqual(classify_sync_outcome({"results": [result]}), ("degraded", 0))
+
 
 if __name__ == "__main__":
     unittest.main()

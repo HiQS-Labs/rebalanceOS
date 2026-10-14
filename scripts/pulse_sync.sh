@@ -49,7 +49,7 @@ try:
     print(json.dumps(result, indent=2, default=str))
 
     if not result.get("ok"):
-        sys.exit(1)
+        sys.exit(70 if result.get("render_error") else 1)
 
     git = result.get("git") or {}
     if git.get("deferred"):

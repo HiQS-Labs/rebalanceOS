@@ -1,0 +1,5 @@
+FAIL real missing target returns config result: TypeError
+FAIL real collector identity mismatch refuses before Git: ValueError
+FAIL real sync identity mismatch returns structured error: ValueError
+FAIL real scheduler identity error preserves unloaded-job failure: ValueError
+FAIL real missing collector file yields doctor config failure: FileNotFoundError

@@ -741,3 +741,22 @@ Copyright 2025-2026 Hypercart DBA Neochrome, Inc.
 rebalance is dual-licensed, matching the rest of the HiQS suite. **AGPL-3.0-only** is the
 default and covers nearly every use — see [`LICENSE`](LICENSE). A commercial license is
 available for use that AGPL-3.0 does not fit; see [`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md).
+
+
+## Opt-in fleet Pulse delivery (GH-282)
+
+Rebalance producers → device-owned files/exact local commits → existing Git Pulse collector →
+private Git remote → each Mac's checkout/SQLite replica → combined human-readable views.
+No Mac is a permanent hub. `git_ops.fleet_settings` validates the configured collector identity,
+checkout and sync subdirectory. Generated live pulse, daily synthesis and digests use
+`devices/<id>/`; calendar/email keep `sync/<source>/<id>.json`. Historical shared files are retained
+for rollback and no longer written in fleet mode. `read_latest_snapshot` chooses validated payloads
+on read; `pulse.fleet_view` derives delivered pages and is returned by fleet publishing through the
+existing CLI/MCP result. These are readers of existing data, not new stores or writer daemons.
+
+CLIO's capture UUID is independent of the friendly collector ID. Its canonical helper exports only
+its owner snapshot to `devices/<UUID>/clio.jsonl`; the collector validates it before atomic publication.
+Reconcile imports committed blobs into private SQLite without re-exporting foreign origins. Existing
+semantic indexing, publishers and readonly XYZ ledger integrations retain their contracts. The same
+Obsidian filename/header and five-minute renderer remain, backed by full history on every installed
+Mac. Live fleet qualification remains tracked in the canonical GH-282 plan.

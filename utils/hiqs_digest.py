@@ -930,7 +930,8 @@ def publish(content: str, now: datetime, slot: str, *, dry_run: bool, push: bool
     except Exception as e:  # noqa: BLE001 — same import-chain hazard as above
         return {"ok": False, "reason": _scrub(f"rebalance package not importable: {e}")}
 
-    target_path = get_pulse_config().get("pulse_target_path")
+    cfg = get_pulse_config()
+    target_path = cfg.get("pulse_target_path")
     if not target_path:
         return {"ok": False, "reason": "pulse_target_path is not configured"}
 
@@ -948,7 +949,11 @@ def publish(content: str, now: datetime, slot: str, *, dry_run: bool, push: bool
     subdir = os.environ.get("HIQS_DIGEST_SUBDIR", "digests").strip()
     if not _is_safe_subdir(subdir):
         return {"ok": False, "reason": f"HIQS_DIGEST_SUBDIR is not a relative path inside the repo: {subdir!r}"}
-    file_rel = f"{subdir}/hiqs-{now:%Y-%m-%d}-{slot}.md"
+    from rebalance.lib.git_ops import fleet_output_path, fleet_settings
+
+    file_rel = fleet_output_path(cfg, f"{subdir}/hiqs-{now:%Y-%m-%d}-{slot}.md")
+    if fleet_settings(cfg):
+        push = False
 
     if dry_run:
         log(f"DRY RUN — would write {file_rel} in the pulse repo:")

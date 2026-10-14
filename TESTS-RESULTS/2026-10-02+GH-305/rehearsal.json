@@ -1,0 +1,12 @@
+{
+  "source_rows": 3978,
+  "eligible_projection_keys": 3978,
+  "eligible_canonical_references": 3978,
+  "excluded": {},
+  "first_inserted": 32,
+  "second_inserted": 0,
+  "all_eligible_references_present": true,
+  "nonembedding_semantic_documents": 3978,
+  "live_destination_changed": false,
+  "cloud_calls": 0
+}

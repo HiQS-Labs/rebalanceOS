@@ -1,0 +1,13 @@
+{
+  "tested_head": "65243a5e6a2c8f677d7a015df306bd67be1d1151",
+  "verification_scope": "492 affected cases, 28 subtests; five witnessed config controls; deadline control; real-Git probe; static/type gates",
+  "files": {
+    "src/rebalance/lib/git_ops.py": "cc186596d9e57a21a689e7eebddfbdb137dcb722a094049571a47f96ffcc371a",
+    "src/rebalance/ingest/index_ops.py": "3ad7ba1dcf48c0de1cd0423bae5ae1ad9e9171ddb4841e1d344d7344f4331519",
+    "src/rebalance/doctor.py": "dbf52f55a639d422c04865c578e428294cfd77b9d21942268f08489e64d59cbd",
+    "experimental/git-pulse/collect.sh": "7751f461e08c654e3c34403385ce0554c3300d83d4a95a3a61470b29211369b5",
+    "src/rebalance/__init__.py": "00d95f7638f7ba02fb29b1a8f61389c025181902c9b811cac6cf26568d5a70d1",
+    "pyproject.toml": "591151a236f032a867a6d69b30ac63c2e58e5e714c82eb3335f8d8d44f5586ad",
+    "manifest.json": "ffa4d45fb4851139a9b9439b9baeb3a9a1b098da65392f9543df46dd636f99e7"
+  }
+}

@@ -1,0 +1,74 @@
+........................................................................ [  2%]
+.......................xx.x.x..x.x..xxx................................. [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+.............................................................. [ 12%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................ [ 19%]
+........................................................................ [ 21%]
+..................................................... [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+...................................................................... [ 43%]
+........................................................................ [ 46%]
+.................................................................... [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+...................................... [ 57%]
+...............................................ssssssssssssssss......... [ 60%]
+........................................................................ [ 62%]
+.......................................................................x [ 65%]
+..................................................................... [ 67%]
+.................................................................. [ 70%]
+.................................................................... [ 72%]
+..................................................................... [ 75%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+......................................................................................................... [ 86%]
+.................................................................... [ 88%]
+........................................................................ [ 91%]
+.....................................................ssss............. [ 93%]
+................s...................................x................... [ 96%]
+........................................................................ [ 98%]
+.................................                                        [100%]
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <verification-clone>/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+../../../../rebalance-runtime/.venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  <runtime-venv>/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: no usable Metal device (probed out-of-process; MLX would abort this run rather than raise) — GH-250
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] HiQS/tests/test_affinity.py:123: UNKNOWN, not pass: private_names.txt absent, so no name check ran. Create it (one lowercase name per line, gitignored) to enforce locally; the Phase 6 pre-extraction history scan remains the blocking gate.
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+2807 passed, 21 skipped, 11 xfailed, 2 warnings, 146 subtests passed in 276.61s (0:04:36)

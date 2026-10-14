@@ -1,0 +1,31 @@
+{
+  "utc": "2026-10-03T01:58:37.372696+00:00",
+  "accepted_normal_scheduled_runs": [
+    {
+      "at": "2026-10-02T18:33:03.243783-07:00",
+      "cycle": 15,
+      "status": "accepted",
+      "evidence_count": 42,
+      "model": "gpt-5.6-terra"
+    },
+    {
+      "at": "2026-10-02T18:48:55.821093-07:00",
+      "cycle": 16,
+      "status": "accepted",
+      "evidence_count": 42,
+      "model": "gpt-5.6-terra"
+    }
+  ],
+  "schedule_seconds": 900,
+  "installed_job_environment_overrides": false,
+  "guard_matches_committed_source": true,
+  "guard_git_blob": "26c1e7393f8dae6459b119180202e3da73dd7fbd",
+  "normal_scheduled_bypass_used": false,
+  "lifecycle_completion_seconds": [
+    52.39,
+    60.22
+  ],
+  "logging_directory_missing_observed": true,
+  "expected_logging_directory_recreated": true,
+  "remaining": "fleet rollout, offline/rejoin, publisher handoff and operational observation window"
+}

@@ -1,0 +1,10 @@
+skill-creator quick_validate: exit=0
+Skill is valid!
+
+cmp .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md: exit=0
+
+python3 scripts/check_doc_links.py: exit=0
+checked 632 relative markdown links under <task-clone>
+no broken links, no machine-local paths
+
+git diff --check: exit=0

@@ -813,18 +813,24 @@ def _check_scheduler_liveness(
         return [Check("scheduler state", WARN, "undetermined")]
 
     loaded = _loaded_rebalance_labels(launchctl_output)
-    current_device_id = current_device_id or _local_device_id()
+    checks: list[Check] = []
+    try:
+        current_device_id = current_device_id or _local_device_id()
+    except (ValueError, OSError) as exc:
+        checks.append(Check("scheduler fleet configuration", FAIL, str(exc)))
+        current_device_id = None
     if agents_dir is None:
         agents_dir = Path.home() / "Library" / "LaunchAgents"
-    checks: list[Check] = []
     for job in jobs:
         if f"com.rebalance-os.{job}" not in loaded:
             name = f"scheduler:{job}"
-            other_device = _other_device_check(
-                name,
-                _DEVICE_SCOPE_REGISTRY.get(("scheduler", job)),
-                current_device_id,
-            )
+            scope = _DEVICE_SCOPE_REGISTRY.get(("scheduler", job))
+            if current_device_id is None:
+                if scope is not None:
+                    continue  # Ownership is unknown; unscoped liveness still matters.
+                other_device = None
+            else:
+                other_device = _other_device_check(name, scope, current_device_id)
             if other_device is not None:
                 checks.append(other_device)
                 continue
@@ -910,7 +916,7 @@ def _daily_sync_launchd_check(pid: str, status: str, log_dir: Path, now: datetim
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
         if outcome == "degraded":
-            detail = f"{source} degraded (partial source errors recorded)"
+            detail = f"{source} degraded (partial source errors or deferred embedding recorded)"
             if status != "0":
                 detail += f"; launchctl status {status} is stale"
             return Check("launchd:daily-sync", OK, detail)
@@ -1266,7 +1272,9 @@ def _check_launchd(
         except ValueError:
             pass
 
-        is_ok_status = status_val in ("0", "75", "-") or is_negative_signal
+        # 3 and 75 are the job guard's deferred codes (lock held / refused to
+        # start): nothing ran and nothing is broken (GH-296 final QA F5).
+        is_ok_status = status_val in ("0", "3", "75", "-") or is_negative_signal
         # A genuine crash exit: live now, but the exit that produced this
         # snapshot was neither clean (0) nor a signal (GH-146 Root cause B).
         is_crash_exit = has_live_pid and not is_ok_status
@@ -1308,8 +1316,8 @@ def _check_launchd(
         elif has_live_pid or is_ok_status:
             if has_live_pid:
                 running = "running"
-            elif status_val == "75":
-                running = "idle, skipped (75)"
+            elif status_val in ("3", "75"):
+                running = f"idle, skipped ({status_val})"
             else:
                 running = "idle, last run ok"
             checks.append(Check(f"launchd:{short}", OK, running, severity=NOTICE))
@@ -1852,6 +1860,7 @@ def _check_auth_failures() -> list[Check]:
 # presentation needs are served without collapsing the source model.
 _PULSE_STATE_TO_CHECK: dict[str, tuple[str, str, str]] = {
     # pulse state -> (Check.status, Check.severity, human phrase for `detail`)
+    "ALIVE_NOT_PUBLISHING": (WARN, WARNING, "alive but not publishing"),
     "ALIVE": (OK, NOTICE, "collecting normally"),
     "STALE": (WARN, WARNING, "stale"),
     "ALERT": (WARN, ERROR, "not collecting"),
@@ -1888,7 +1897,10 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
     except Exception:  # noqa: BLE001 — doctor must never crash
         return []
 
-    current_device_id = current_device_id or _local_device_id()
+    try:
+        current_device_id = current_device_id or _local_device_id()
+    except (ValueError, OSError) as exc:
+        return [Check("fleet configuration", FAIL, str(exc))]
     checks: list[Check] = []
     for health in devices:
         # Every pulse row is a report about its own collector device.  The
@@ -1929,6 +1941,8 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         _status, raw_severity, phrase = _map_pulse_state(state)
         qualifier = state.split(" (", 1)[1].rstrip(")") if " (" in state else ""
         detail = f"{phrase} — {age}" if not qualifier else f"{phrase} ({qualifier}) — {age}"
+        if health.pulse_delivery_reason:
+            detail += f", {health.pulse_delivery_reason}"
         if health.repo_scan_failures:
             detail += f", {health.repo_scan_failures} repo scan failures"
             if health.scan_failure_examples:
@@ -2182,6 +2196,34 @@ def _check_pulse() -> Check:
             "point pulse_target_path at the root of the destination git repo",
         )
     return Check("pulse", OK, f"configured ({target})")
+
+
+def _check_job_guard() -> Check:
+    """Effective job-guard memory settings for this Mac, with their sources (GH-296)."""
+    from rebalance.ingest import _job_guard  # noqa: PLC0415
+
+    mod = _job_guard.load_job_guard()
+    if mod is None:
+        return Check(
+            "job-guard",
+            WARN,
+            f"job guard unavailable at {_job_guard.module_path()}; embedding runs are unguarded",
+            "set JOB_GUARD_MODULE to a vendored copy of utils/job_guard.py",
+        )
+    try:
+        report, warnings = mod.settings_report()
+    except Exception as exc:  # noqa: BLE001 — a probe failure must not break doctor
+        return Check("job-guard", WARN, f"could not read job guard settings: {exc}")
+    if not _job_guard.enabled():
+        warnings.append("REBALANCE_JOB_GUARD=0 is set: the embedding guard, including its lock, is OFF (test-only)")
+    if warnings:
+        return Check(
+            "job-guard",
+            WARN,
+            f"{report}; {'; '.join(warnings)}",
+            f"fix the job_guard section in {mod.device_config_path()}",
+        )
+    return Check("job-guard", OK, report, severity=NOTICE)
 
 
 def _check_deep_work_stalls(db_path: Path) -> Check:
@@ -2514,6 +2556,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_commit_coverage(db_path))
     report.checks.append(_check_xyz_pin())
     report.checks.append(_check_pulse())
+    report.checks.append(_check_job_guard())
 
     # Auth-event log — last deauth/auth failure per integration (calendar,
     # github, gmail), read from the unified temp/logs/auth_activity.jsonl.

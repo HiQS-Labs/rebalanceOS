@@ -1,0 +1,21 @@
+{
+  "reviewed_source_commit": "71786aa0a1461e434d7a9bd298d0859c84db49f0",
+  "integration_base": "4652361fca32f0b4a880ba07c97aca4062baa7c3",
+  "files": {
+    "utils/job_guard.py": "e329108971a8ee4a844a8c50bfa9de47482936c11bcfa6e6b41d154f0ebf06e3",
+    "src/rebalance/ingest/_job_guard.py": "7f749d4d2e95e6eb20cb6f5ba950940b8f1e16f4f23b6e4dbd159952f5352be6",
+    "src/rebalance/ingest/index_ops.py": "2b9c68d5719985b3ba53d907a0c3db1f6ffc6433e64592f59997e71eced98027",
+    "src/rebalance/ingest/github_knowledge.py": "f2037d9e53c999bd3b040026365f5ca4229d9cc3700b87f70b7796bc979d80ae",
+    "src/rebalance/doctor.py": "657e8bcac07a093d9b212642cd4a187e9b11e1f6e0b519544551fee04ef1c452",
+    "scripts/lib/scheduler_common.sh": "2a41b94734a27bee1dcea04372f1c0a0baad9f6baa1d620285c19fc65140ec47",
+    "tests/test_job_guard_footprint.py": "7b2dcedd9271e778a7b3d63bbe2ef439ace898d6be6d660f90e5b0a616617b16",
+    "tests/test_doctor_launchd.py": "3abfe46f60cc2c9ae5a81798bb1193a83b4602ecbeee9539eb84ab617cde75fe",
+    "tests/test_daily_sync_exit.py": "ff9c4fe62e27cfa2345bf13fca05f6a66c306c6169697321d89b90b82e6f2dca",
+    "tests/test_job_guard_wiring.py": "8038e57ab0c0393508fbe9342b6a4c470d1b19cad3ecae91cb6f837695852506",
+    "tests/test_collector_registry.py": "07e05445e3b41a23f05b9d2979fc1b22538c7771b6df195a96a4573c1abeb190",
+    "tests/test_github_knowledge.py": "b159ac341678311d471c11e7885da63d456bdf2557d4cb009ca15a1a4d42b696",
+    "pyproject.toml": "b766721cb9c40256ec6fbfd99753b64fe381091b7990e1f289c60e6b93cddeaf",
+    "manifest.json": "e7a9d6bc043570a179b2da8e739bab6f6220d441242ce73b2e0693f8763b2b00",
+    "src/rebalance/__init__.py": "a5fa5d5eaa88adf048dd18b5cf3356d17c10a16a10b697ac3772014f1b8e93d6"
+  }
+}

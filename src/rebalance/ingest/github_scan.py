@@ -738,13 +738,13 @@ def filter_ignored_repo_activity(result: GitHubScanResult, ignored_repos: list[s
 # ---------------------------------------------------------------------------
 
 
-def get_github_balance(
+def get_hiqs_work_activity(
     database_path: Path,
     project_repos: dict[str, list[str]],
     since_days: int = 14,
 ) -> list[dict[str, Any]]:
     """
-    Return GitHub activity summary per project using the project→repos mapping.
+    Return the HiQS work activity summary per project (canonical name, GH-316).
 
     Args:
         database_path:  Path to the SQLite database.
@@ -752,8 +752,10 @@ def get_github_balance(
         since_days:     How many days back to aggregate.
 
     Returns:
-        List of dicts with project_name, total_commits, prs_opened, prs_merged,
-        issues_opened, last_active_at, repos_touched.
+        List of dicts with project_name, repos_linked, repos_touched,
+        total_commits, prs_opened, prs_merged, issues_opened, last_active_at,
+        is_idle. This output contract is frozen — external consumers
+        (storyline experiment, Needle-fork adapter) read it as-is.
     """
     if not database_path.exists():
         return []
@@ -762,6 +764,11 @@ def get_github_balance(
 
     with db_connection(database_path, ensure_github_schema) as conn:
         return fetch_github_balance(conn, project_repos, since_days=since_days)
+
+
+# Backwards-compatibility adapter (GH-316): github_balance is the deprecated
+# name of the HiQS work activity signal; kept so existing callers never break.
+get_github_balance = get_hiqs_work_activity
 
 
 # ---------------------------------------------------------------------------

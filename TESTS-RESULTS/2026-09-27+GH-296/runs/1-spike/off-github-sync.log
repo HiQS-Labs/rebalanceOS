@@ -1,0 +1,4 @@
+[job-guard] starting 'scheduler-github-sync': footprint ceiling 999.0 GB, available floor 4.0 GB
+[2026-09-27 11:39:13] === rebalance hourly github sync starting ===
+[2026-09-27 11:51:57] === rebalance hourly github sync complete ===
+[job-guard] 'scheduler-github-sync' finished with exit 0; peak tree footprint 0.1 GB

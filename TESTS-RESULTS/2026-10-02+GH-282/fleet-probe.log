@@ -1,0 +1,44 @@
+PASS foreign history retained locally
+PASS commit-only mac-0
+PASS owned status mac-0
+PASS not delivered before collector mac-0
+PASS no shared pointer mac-0
+PASS sync queued mac-0
+PASS commit-only mac-1
+PASS owned status mac-1
+PASS not delivered before collector mac-1
+PASS no shared pointer mac-1
+PASS sync queued mac-1
+PASS commit-only mac-2
+PASS owned status mac-2
+PASS not delivered before collector mac-2
+PASS no shared pointer mac-2
+PASS sync queued mac-2
+PASS commit-only mac-3
+PASS owned status mac-3
+PASS not delivered before collector mac-3
+PASS no shared pointer mac-3
+PASS sync queued mac-3
+PASS concurrent delivery mac-0
+PASS concurrent delivery mac-1
+PASS concurrent delivery mac-2
+PASS concurrent delivery mac-3
+PASS page retained mac-0
+PASS canonical owner-only CLIO mac-0
+PASS page retained mac-1
+PASS canonical owner-only CLIO mac-1
+PASS page retained mac-2
+PASS canonical owner-only CLIO mac-2
+PASS page retained mac-3
+PASS canonical owner-only CLIO mac-3
+PASS delivered fleet healthy
+PASS derived fleet view
+PASS render failure red control
+PASS pending failure not healthy
+PASS failure status delivered
+PASS delivered failure visible
+PASS foreign dirt refused and preserved
+PASS busy common lock skips with 75
+PASS stale index lock refuses without lost commits
+PASS timed-out push exits 2 and preserves owned blobs/watermark
+Synthetic probe only; live fleet qualification remains pending.

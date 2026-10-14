@@ -168,3 +168,16 @@ elsewhere blocks installing *that* job but not an unrelated one.
 Secrets: never put API keys in templates (tracked in git). The
 health-check-triage job reads `ANTHROPIC_API_KEY` from the rendered plist or
 keyring; reinstalling overwrites a hand-added key (`stack.sh` warns, naming the key).
+
+
+### Fleet delivery policy (GH-282)
+
+The per-machine no-shared-minute rule remains. Opt-in fleet mode changes ownership and push
+policy, not launchd cadence: pulse-sync renders/queues under the common non-blocking lock; the
+existing hourly Git Pulse collector is the only pusher on that Mac. Its deterministic device delay
+(0–240 seconds) runs once before lock acquisition, not in a replacement timer. Collector retries are
+at most three per push phase, with 2–20-second jitter and a total 900-second network budget.
+Exit 75 means a skipped busy run, not failed capture/delivery. CLI/MCP publishers honor the same
+fleet policy. CLIO's existing five-minute exporter still renders the same combined seven-day note.
+See SOP's GH-282 deployment section for identity/config matching, backups, copied-binary updates,
+rollback and the still-required real four-Mac/offline-rejoin/seven-day qualification.

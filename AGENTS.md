@@ -11,7 +11,9 @@
 
 This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
 
-**"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `github_balance()`, `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
+**CLIO history and HiQS activity lookup:** use the repository [CLIO skill](.agents/skills/clio/SKILL.md) for the configured SQLite reader and the `github_activity` authorship store, with optional Pulse/Daily summaries.
+
+**"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `hiqs_work_activity()` (alias: `github_balance()`), `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
 
 > ### 🧭 Start here — the central orchestrator (the data-plane spine)
 >
@@ -42,7 +44,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 3. **Discover projects:** Call `run_preflight(vault_path)`. Present results using friendly labels: "Most active" = `most_likely_active_projects` (last 14 days), "Semi-active" = `semi_active_projects` (15–30 days), "Dormant" = `dormant_projects` (31+ days), "Vault only" = `potential_projects`. If `github_error` is set, inform the user that GitHub discovery failed. Ask which to keep, remove, or merge. For each kept project, collect: short summary (2–3 sentences) and priority tier (1–5).
 4. **Confirm:** Call `confirm_projects(projects, vault_path)`. Each project dict **must** include `status: "active"`. Minimum shape: `{name, status: "active", summary, repos: [], priority_tier: int, tags: []}`.
 5. **Verify:** Call `list_projects()` to confirm projects are queryable.
-6. **Initial refresh:** Call `refresh_index(scope=["all"])` to populate the SQLite knowledge base. Use `dry_run=True` first for a preview. After it completes, `github_balance()` will return per-project commit/PR/issue counts.
+6. **Initial refresh:** Call `refresh_index(scope=["all"])` to populate the SQLite knowledge base. Use `dry_run=True` first for a preview. After it completes, `hiqs_work_activity()` will return per-project HiQS work activity counts.
 
 **Onboarding & project tools:**
 
@@ -53,7 +55,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 | `run_preflight(vault_path)` | Discover project candidates (read-only) |
 | `confirm_projects(projects, vault_path)` | Write registry and sync to DB |
 | `list_projects(status?)` | Query projects (default: active) |
-| `github_balance(since_days?)` | GitHub activity per project (requires prior refresh) |
+| `hiqs_work_activity(since_days?)` | HiQS work activity per project (deprecated alias: `github_balance`; requires prior refresh) |
 
 **Targeted retrieval and synthesis:**
 
@@ -167,6 +169,7 @@ operator name from what it does, never from how it ships.
 - Hardcoding credentials or secrets in code or config files.
 - Destructive operations without explicit confirmation or dry-run support.
 - Counting one real-world entity twice because it has an alias, rename, mirror, fork, or casing variant. Canonicalise before aggregating, de-duplicate the store, and never let the de-dup test assert on zeros — see [`SOP.md` §6](SOP.md).
+- If CI is repeatedly red or merges are stalling, follow the CI churn recovery SOP ([#293](https://github.com/HiQS-Labs/rebalanceOS/issues/293), linked from [`SOP.md` §9](SOP.md)) before patching failures one at a time.
 - **Script and LaunchAgent Sprawl (GH-241)**: Never create ad-hoc `.sh` or `.py` files in `scripts/` or `utils/`, and never add new LaunchAgent plists. All operator CLI commands must be subcommands in `src/rebalance/cli/`, agent capabilities in `src/rebalance/mcp/`, and periodic tasks dispatched through the orchestrator (`src/rebalance/ingest/index_ops.py`). Any addition of `.py`, `.sh`, or `.swift` files under `scripts/` and `utils/`, or `*.plist.template` files is blocked mechanically by `utils/pdda/check_script_inventory.py --check` against `utils/pdda/script_inventory_baseline.json` in CI (non-template `.plist` files and `SCHEDULER.md` are governed by scheduler policy). Governance checkers and baselines live exclusively in `utils/pdda/check_*.py` and `utils/pdda/*_baseline.json`. Exemptions require a non-empty `SCRIPT-INVENTORY-OK: <reason>` pragma in the first 10 lines AND explicit registration in `script_inventory_baseline.json`'s `exemptions` list with operator review; non-exempt additions are strictly prohibited. Deletions ratchet downward permanently — deleting code counts as progress.
 
 ## Security & Credentials

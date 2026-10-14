@@ -1,0 +1,84 @@
+F.F                                                                   [100%]
+=================================== FAILURES ===================================
+___ ClassifyTests.test_fleet_queue_and_render_failure_have_distinct_reasons ____
+
+self = <test_pulse_health.ClassifyTests testMethod=test_fleet_queue_and_render_failure_have_distinct_reasons>
+
+    def test_fleet_queue_and_render_failure_have_distinct_reasons(self) -> None:
+        queued = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+            last_pulse_exit=0, pulse_delivery_pending=True,
+            last_pulse_publish_utc=NOW - timedelta(minutes=10)), NOW)
+        failed = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+            last_pulse_exit=70, last_pulse_publish_utc=NOW - timedelta(minutes=10)), NOW)
+        self.assertEqual(queued.state, "ALIVE_NOT_PUBLISHING")
+        self.assertEqual(failed.state, "ALIVE_NOT_PUBLISHING")
+>       self.assertIn("queued", queued.pulse_delivery_reason)
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'CollectorHealth' object has no attribute 'pulse_delivery_reason'. Did you mean: 'pulse_delivery_pending'?
+
+tests/test_pulse_health.py:57: AttributeError
+_ ClassifyTests.test_fleet_respects_scheduled_render_gaps (render_age_minutes=80) _
+
+self = <test_pulse_health.ClassifyTests testMethod=test_fleet_respects_scheduled_render_gaps>
+
+    def test_fleet_respects_scheduled_render_gaps(self) -> None:
+        for minutes in (80, 190, 600):
+            with self.subTest(render_age_minutes=minutes):
+                h = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+                    last_pulse_exit=0, last_pulse_publish_utc=NOW - timedelta(minutes=minutes)), NOW)
+>               self.assertEqual(h.state, "ALIVE")
+E               AssertionError: 'ALIVE_NOT_PUBLISHING' != 'ALIVE'
+E               - ALIVE_NOT_PUBLISHING
+E               + ALIVE
+
+tests/test_pulse_health.py:41: AssertionError
+_ ClassifyTests.test_fleet_respects_scheduled_render_gaps (render_age_minutes=190) _
+
+self = <test_pulse_health.ClassifyTests testMethod=test_fleet_respects_scheduled_render_gaps>
+
+    def test_fleet_respects_scheduled_render_gaps(self) -> None:
+        for minutes in (80, 190, 600):
+            with self.subTest(render_age_minutes=minutes):
+                h = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+                    last_pulse_exit=0, last_pulse_publish_utc=NOW - timedelta(minutes=minutes)), NOW)
+>               self.assertEqual(h.state, "ALIVE")
+E               AssertionError: 'ALIVE_NOT_PUBLISHING' != 'ALIVE'
+E               - ALIVE_NOT_PUBLISHING
+E               + ALIVE
+
+tests/test_pulse_health.py:41: AssertionError
+_ ClassifyTests.test_fleet_respects_scheduled_render_gaps (render_age_minutes=600) _
+
+self = <test_pulse_health.ClassifyTests testMethod=test_fleet_respects_scheduled_render_gaps>
+
+    def test_fleet_respects_scheduled_render_gaps(self) -> None:
+        for minutes in (80, 190, 600):
+            with self.subTest(render_age_minutes=minutes):
+                h = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+                    last_pulse_exit=0, last_pulse_publish_utc=NOW - timedelta(minutes=minutes)), NOW)
+>               self.assertEqual(h.state, "ALIVE")
+E               AssertionError: 'ALIVE_NOT_PUBLISHING' != 'ALIVE'
+E               - ALIVE_NOT_PUBLISHING
+E               + ALIVE
+
+tests/test_pulse_health.py:41: AssertionError
+______ ClassifyTests.test_fleet_silent_renderer_eventually_becomes_stale _______
+
+self = <test_pulse_health.ClassifyTests testMethod=test_fleet_silent_renderer_eventually_becomes_stale>
+
+    def test_fleet_silent_renderer_eventually_becomes_stale(self) -> None:
+        h = classify(_h(NOW - timedelta(minutes=10), fleet_mode=True,
+            last_pulse_exit=0, last_pulse_publish_utc=NOW - timedelta(minutes=601)), NOW)
+        self.assertEqual(h.state, "ALIVE_NOT_PUBLISHING")
+>       self.assertIn("old", h.pulse_delivery_reason)
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'CollectorHealth' object has no attribute 'pulse_delivery_reason'. Did you mean: 'pulse_delivery_pending'?
+
+tests/test_pulse_health.py:47: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_pulse_health.py::ClassifyTests::test_fleet_queue_and_render_failure_have_distinct_reasons
+SUBFAILED(render_age_minutes=80) tests/test_pulse_health.py::ClassifyTests::test_fleet_respects_scheduled_render_gaps
+SUBFAILED(render_age_minutes=190) tests/test_pulse_health.py::ClassifyTests::test_fleet_respects_scheduled_render_gaps
+SUBFAILED(render_age_minutes=600) tests/test_pulse_health.py::ClassifyTests::test_fleet_respects_scheduled_render_gaps
+FAILED tests/test_pulse_health.py::ClassifyTests::test_fleet_silent_renderer_eventually_becomes_stale
+5 failed, 1 passed, 11 deselected in 1.02s

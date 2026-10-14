@@ -1,0 +1,30 @@
+{
+  "utc": "2026-10-02T23:03:09.705733+00:00",
+  "runtime_source": "5f550201511d05ca2baface0f8141c6568142175",
+  "scheduled_guard_policy_changed": false,
+  "other_devices_enabled": false,
+  "full_fleet_qualified": false,
+  "preview_scopes": [
+    "clio"
+  ],
+  "semantic_documents_scanned": 3979,
+  "source_rows": 3979,
+  "eligible_projection_keys": 3979,
+  "eligible_canonical_references": 3979,
+  "explicit_exclusions": {},
+  "known_origin_coverage": [
+    365,
+    782,
+    2832
+  ],
+  "all_eligible_keys_present": true,
+  "all_canonical_references_present": true,
+  "all_semantic_references_present": true,
+  "prior_consumer_ids_and_payloads_preserved": true,
+  "consumer_quick_check": "ok",
+  "new_embeddings_run": false,
+  "new_cloud_synthesis_run": false,
+  "daily_recent_rows": 6,
+  "daily_canonical_ids_present": true,
+  "scheduled_consumer_success_claimed": false
+}
