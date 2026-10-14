@@ -1,0 +1,14 @@
+[
+  {
+    "path": "SOP.md",
+    "sha256": "fdb97d13e44a79c6aa16306ab962429852d147296faf4fad9691a3588318fc19"
+  },
+  {
+    "path": "SLEUTH_SYNC.md",
+    "sha256": "0a6fb587da253b931741c6d8e48aad85b00e6a38e5446ea3203a054b52b50222"
+  },
+  {
+    "path": "UPGRADE.md",
+    "sha256": "ee1f2dde2b01d88d4e202567b29ea691fe7fe1090436a4638a11456930b5a59e"
+  }
+]

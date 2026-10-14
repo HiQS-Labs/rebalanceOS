@@ -1,0 +1,17 @@
+{
+  "added_len": 3914,
+  "added_sha256": "4f085bfa17f5eaa33073cd8d9aa96d4a25d2c64746249716c00218d53d4fbad7",
+  "added_start": 11605,
+  "artifact_sha256": "ebdbf854564934270ab4313fb77a2f0a5f9b6dfaada5f46ee99690786cee8a3d",
+  "attested_at": "2026-10-14T23:35:27Z",
+  "driver_pid": 13898,
+  "isolated": true,
+  "relay_file_rel": "TESTS-RESULTS/2026-10-14+GH-330/QA/docs-claude.md",
+  "reviewed_head": "5fc59de87aab1870f611643a5223e8b9700c1b7e",
+  "reviewer": "claude",
+  "schema": "relay-drive/attest@1",
+  "status": "Approved",
+  "task": "RELAY-gh330-docs",
+  "trailer_sha256": "aa012aef8e254fffb4768d1e368679a24e89c4e4ff9a7cfc2eb420cbcbe97736",
+  "driver_exit": 0
+}

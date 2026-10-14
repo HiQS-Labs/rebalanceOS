@@ -1,0 +1,15 @@
+{
+  "scope": "public doctor with scratch enrollment, missing DB/auth; collector-health stubbed",
+  "exit": 1,
+  "pulse_fleet_rows": [
+    {
+      "name": "pulse fleet",
+      "status": "ok",
+      "severity": "warning",
+      "disposition": "ok",
+      "detail": "enrolled as fixture-mac (<scratch>/clone)",
+      "hint": ""
+    }
+  ],
+  "global_health_qualified": false
+}

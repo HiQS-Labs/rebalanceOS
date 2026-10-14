@@ -2,7 +2,7 @@
 gh_issue: 330
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/330
 title: Fleet safety follow-up
-status: Implementation verification
+status: PR-ready; awaiting merge
 created: 2026-10-14
 updated: 2026-10-14
 owner: noel
@@ -26,7 +26,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Claude Code current-base plan approved (driver0, reviewed4c7bc5c); targeted preserved fixes ported; fixture failure reproduced | Focused verification, Claude final implementation QA, final gates and ready PR |
+| Claude plan, implementation and explicit guide-gap QA approved with driver0; full root2801 + HiQS163 pass; version0.101.1 | Gated PR publication against development, then await merge and authorized cleanup |
 
 Tracking [#330](https://github.com/HiQS-Labs/rebalanceOS/issues/330), follow-up to merged [#326](https://github.com/HiQS-Labs/rebalanceOS/pull/326). Related #328's remaining rollout/hash-check gaps stay separate.
 Base development1a496fac55e5d56eaebf6aaf3c444d9c5017e65d. Clone rebalanceOS-gh330-fleet-safety-followup-2026-10-14; branch fix/rebalanceOS-gh330-fleet-safety-followup-2026-10-14. Primary preserved; no deploy or live configuration/database operations.
@@ -58,3 +58,7 @@ rated88/88/50/65, no operator override. Reproduced loss of original configuratio
 No new tests suites/frameworks/CI lanes. Existing test_config_read_shape_guard, test_fleet_enroll, test_pulse_reconcile plus time/publication cases cover failures; full tests/ and HiQS/tests in separate processes include CI-skipped embedding tests. Existing pre-push hook installed (.githooks), no bypass. Doctor fixture checks fleet row only; intentionally missing DB/auth remain and do not qualify deployed health. Preserve baseline failures and approved review receipts; final full suite on approved implementation once, rerun only for concrete failures/new changes. Issue/doc/ledger remain awaiting merge at PR readiness. Retain task clone for /merge-cleanup after origin landing. No old clone disposal until unique work/evidence is safely preserved on origin.
 
 Current-base plan confirmation: [Claude review](../../TESTS-RESULTS/2026-10-14+GH-330/QA/plan-claude.md), Approved round1 driver0. New graph fixture lookup returned no nodes; coverage freshness missing, exact source read fallback. Fixture baseline reproduced2 failures/3pass, so the bounded shell wrapper correction is justified. ROADMAP title carries GH-330 for the existing ledger parser; its issue_url column is XYZ-forge-only legacy behavior and is not changed here. Raw text and canonical plan retain the full tracking URL.
+
+## Final handoff (2026-10-14)
+
+[Current qualification](../../TESTS-RESULTS/2026-10-14+GH-330/SUMMARY.md) retains exact commands, sanitized receipts, full-suite outputs and known limits. Native Claude plan reviewed4c7bc5c; implementation reviewed5e5db53; supplemental guides reviewed5fc59de. All accepted driver exits0; rejected guide close remains explicit and consumed one round (implementation total3). Code and guides are unchanged from the full qualification revisione2e72e8. Existing skips/xfails and PDDA backlog remain; no deployed/four-Mac qualification. No live config/CLIO database/history changes. Source/installed version0.101.1 verified. Required push gate and hosted CI are inspected on the published PR head; issue330 tracks that PR. Preserve this task clone and prior unique evidence until origin landing is verified; /merge-cleanup owns retirement. No merging/deployment performed.
