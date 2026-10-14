@@ -1,8 +1,8 @@
 ---
 Goal: Final QA for GH-325 implementation (fleet enrollment, doctor rows, self-repair on upgrade)
 Date: 2026-10-13
-NEXT: Reviewer
-STATUS: Open
+NEXT: done
+STATUS: Approved
 ---
 
 # Context
@@ -189,3 +189,57 @@ any remaining blocker? Set STATUS to Approved if the branch can ship as a PR.
 <!-- ▽ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK ▽ -->
 ▶ TAKE YOUR TURN (codex)
 <!-- △ RELAY AUTOMATION: DO NOT MODIFY THIS BLOCK △ -->
+
+
+## Codex final review — round 2 (2026-10-13)
+
+**Verdict: Ship as a PR. STATUS: Approved. No remaining blocker in the round-2 changes.**
+
+The two documentation corrections preserve the intended stop-on-ambiguity behavior:
+
+- `UPGRADE.md:144` now delegates setup to the existing guarded script at line 153.
+  `scripts/setup_sleuth_file_source.sh:43` captures discovery failure explicitly; only exit 3
+  selects the first-install default, and every other nonzero result exits at line 51, before
+  the clone/pull operations at line 64 or config write at line 85. Reusing this guard is a
+  proportionate correction, with no new subsystem.
+- `SLEUTH_SYNC.md:54` captures the discovery status and branches explicitly: 0 keeps the resolved
+  path, 3 chooses the documented default, and all other statuses exit before line 60's clone.
+  The code therefore implements the surrounding stop-on-invalid/ambiguous guidance.
+- `UPGRADE.md:183` retains one repair attempt and one recheck. Missing collector config stops;
+  new enrollment still previews and asks; refusal or unresolved rows stop without clone selection
+  or another repair loop (`UPGRADE.md:194`, `:201`, `:205`). The upgrade's use of the script adopts
+  its already-approved first-install default instead of the plan's explicit folder question on
+  exit 3. This is a minor procedural deviation, acceptable because it applies only when discovery
+  finds nothing configured, is disclosed at line 150, and supports an explicit folder override.
+
+The added retained evidence improves the audit trail:
+
+- `console/full-suite-07b22ed.txt:1` names the revision, command and exclusions; lines 18–20
+  record 2754 passed, 20 skipped, 10 xfailed and exit 0. This supports the reported CI-flags run,
+  not an assertion that excluded tests or live rollout passed.
+- `console/static-gates.txt:1` identifies the code revision and records each command, decisive
+  result and `rc=0` for lint, format, typing and the listed governance checks.
+- **Nonblocking evidence limit:** `console/mutation-check.txt:1` identifies the revision and
+  reports the baseline and four failure totals, but contains neither exact mutation patches nor
+  invocation commands, failure identities or individual exit codes. It remains a summarized
+  producer record, not the fully reproducible raw mutation transcript described in the response.
+  The earlier manual byte-comparison claims likewise remain producer-reported.
+
+The round-1 implementation verdict, accepted private-helper-test nit, and rating 65/55/50/55
+stand within their stated boundaries. This turn checks the requested documentation/evidence
+follow-up against the seeded files; it does not independently establish the producer's claim
+that source and tests are unchanged since 07b22ed. No git command was used to establish provenance.
+The public doctor red-control source and retained JSONL still support the two diagnostic
+comparisons described in round 1; no fixture was executed here.
+
+**[Unverified — needs clone run]** Current-revision executable gates, CLI behavior and caller
+regressions remain for the post-turn harness. Deployment qualification, four-Mac rollout and
+retirement remain operator-run. Approval authorizes PR preparation, not a claim those gates ran.
+
+Review method: SWE rubric, targeted direct reads of the revised docs, guarded shell script,
+plan/review history and campaign artifacts. Graph project enumeration returned all 84 entries
+and no index for this checkout; no graph generation or coverage claim is made for these direct
+non-code-document/shell reads. No test suite, executable fixture, behavioral probe, git command,
+live configuration mutation or source edit was performed. Only this relay file was edited;
+scratch setup was confined to `.relay-scratch/tmp`. The approval token is closed with the
+absolute env-pinned `tick done`, as required for an approved turn.
