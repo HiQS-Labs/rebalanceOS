@@ -10,7 +10,7 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
-## [0.99.0] - 2026-10-13
+## [0.101.0] - 2026-10-14
 
 ### Added
 
@@ -25,6 +25,22 @@
 - The clone path in the fleet check-in collector's settings may now use `$HOME` or `~`, not only an absolute path or `$CONFIG_DIR`. Any other `$` expression is still rejected, and SOP.md now documents the rule.
 - UPGRADE.md, SLEUTH_SYNC.md and the Sleuth setup script use this Mac's configured clone instead of assuming `~/git-pulse-sync`. The setup script stops before cloning anything when the settings are broken or ambiguous.
 
+## [0.100.0] - 2026-10-14
+
+### Added
+
+- A pre-push gate now runs the repository's static checks locally before each push in clones that opt in: lint, formatting, the two shared-helper guards, and all five governance ratchets. It fails closed with named failing stages, writes an auditable receipt per run, logs any bypass, and verifies its own installation state on demand. The test suites stay on hosted CI for now; a measured follow-up adds tier-mapped local tests. Evidence: the pre-push gate campaign retained with this release.
+- The known-failure quarantine now carries an owner, a tracked issue, and a UTC expiry. Past the expiry the affected tests stop being masked and fail in the open again, so a quarantine cannot silently become permanent; the reason line states all three facts.
+
+### Changed
+
+- The machine-path guard now also scans git hook files, which carry no file extension by convention but are executable gate code.
+## [0.99.0] - 2026-10-13
+
+### Added
+
+- **Read-only RELEASES ledger scan (GH-310).** `rebalance github-close-loop --releases-scan <dir>[,<dir>]` finds `releases.db` ledgers in git clones and worktrees under the given directories (three levels deep, at most 200, skipping hidden and build folders). It opens each one strictly read-only and reports in-progress and parked tasks for the repo, the clones each task appears in, and conflicts where clones disagree on a task's section or status. It then compares those tasks with live GitHub data to flag drift: a task still marked in progress whose issue is closed, whose PR has merged, or whose open PR is stale or a forgotten draft. Ledgers in WAL mode, with a missing table or an unsupported schema, or whose repo can't be identified are reported as errors and skipped. The scan is off by default, and output without the flag is unchanged.
+- **Opt-in loop inputs for `/daily` (GH-310).** The daily unclosed-loop scanner takes `--close-loop` (or `REBALANCE_DAILY_CLOSE_LOOP=1`) and `--releases-scan <dirs>` (or `REBALANCE_RELEASES_SCAN_DIRS`). It merges close-loop flags and ledger tasks into one deduplicated, source-tagged `flagged_loops` list and re-checks every item against its own live GitHub read, so merged PRs and closed issues are never reported as open loops. Closed-without-delivery issues and ledger drift are listed as questions, not loops. If the `rebalance` CLI is unavailable, the scanner prints a single "input skipped" line and its output is unchanged.
 ## [0.98.4] - 2026-10-09
 
 ### Fixed
