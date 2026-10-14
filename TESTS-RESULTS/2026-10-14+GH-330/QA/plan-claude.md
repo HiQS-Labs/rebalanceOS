@@ -97,4 +97,12 @@ swept file: yes
 **Pre-existing defects sweep:**
 No pre-existing defects found in the artifact. Version bump 0.101.1 (plan line 53) is consistent with current 0.101.0 base (SUMMARY.md line 19). "Shadow setup 42 must stop 42 without setter" (plan line 52) is internally consistent with described fixture coverage. Rating owner chain (Releases CLI → ROADMAP shadow) matches recon contracts section (recon line 52).
 
+
+### Attestation · relay-drive — 2026-10-14T23:17:36Z
+task: RELAY-gh330-plan
+reviewer: claude
+status: Approved
+reviewed-head: 4c7bc5c705f6a72585e487e80f7eb595f3996ccb
+added-range: 6491+2231
+added-sha256: f26e53865caeaecbbe891386e87e17ea9fd4e35e9a7392a21ce560bbef4d111d
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
