@@ -2,7 +2,7 @@
 gh_issue: 325
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/325
 title: "Fleet enrollment: device-agnostic pulse clone path, enroll helper, doctor checks, self-repair on upgrade"
-status: "Captured — plan drafted, awaiting Codex plan QA"
+status: "Active — plan approved by Codex r3; implementing"
 created: 2026-10-13
 updated: 2026-10-13
 owner: noel
@@ -28,8 +28,8 @@ command sets pulse keys). Related: #282 (fleet delivery umbrella), #281 (per-dev
 
 | Issue | Scope | Clone / branch | State | PR |
 |---|---|---|---|---|
-| [#325](https://github.com/HiQS-Labs/rebalanceOS/issues/325) | items 1–6 below | `rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13` / `fix/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13` | plan QA | — |
-| [#246](https://github.com/HiQS-Labs/rebalanceOS/issues/246) | item 3 (same command) | same | plan QA | — |
+| [#325](https://github.com/HiQS-Labs/rebalanceOS/issues/325) | items 1–6 below | `rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13` / `fix/rebalanceOS-gh325-fleet-enroll-self-repair-2026-10-13` | implementing | — |
+| [#246](https://github.com/HiQS-Labs/rebalanceOS/issues/246) | item 3 (same command) | same | implementing | — |
 
 Base: `origin/development` @ `0589b44`.
 
