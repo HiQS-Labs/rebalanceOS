@@ -182,6 +182,11 @@ def local_tz() -> ZoneInfo:
     return ZoneInfo("UTC")
 
 
+def resolve_timezone(name: str | None) -> ZoneInfo:
+    """Resolve an explicit IANA name strictly, or use the device's local zone."""
+    return ZoneInfo(name) if name else local_tz()
+
+
 def to_local(dt: datetime, tz: ZoneInfo | None = None) -> datetime:
     """Convert *dt* to local timezone, defaulting to local_tz().
 

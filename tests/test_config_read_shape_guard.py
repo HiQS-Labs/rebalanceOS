@@ -32,6 +32,8 @@ NON_OBJECT_PAYLOADS = ["[1,2,3]", "42", '"x"', "null", "true", "[]"]
 def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
     config_path.write_text(payload, encoding="utf-8")
     assert config_module._read_config() == {}
+    with pytest.raises(ValueError, match="not a JSON object"):
+        config_module._read_config(strict=True)
 
 
 @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
@@ -44,11 +46,14 @@ def test_a_getter_survives_valid_json_of_the_wrong_shape(config_path, payload):
 def test_malformed_json_still_reads_as_an_empty_dict(config_path):
     config_path.write_text("{oops", encoding="utf-8")
     assert config_module._read_config() == {}
+    with pytest.raises(ValueError, match="not valid JSON"):
+        config_module._read_config(strict=True)
 
 
 def test_a_missing_file_reads_as_an_empty_dict(config_path):
     assert not config_path.exists()
     assert config_module._read_config() == {}
+    assert config_module._read_config(strict=True) == {}
 
 
 # --- Negative controls: the guard must not eat valid config ------------------
@@ -89,3 +94,14 @@ def test_a_valid_config_warns_about_nothing(config_path, capsys):
     config_path.write_text('{"vault_path": "/tmp/vault"}', encoding="utf-8")
     config_module._read_config()
     assert capsys.readouterr().err == ""
+
+
+def test_strict_read_refuses_bad_encoding_and_read_errors(config_path, monkeypatch):
+    config_path.write_bytes(b"\xff")
+    with pytest.raises(ValueError, match="not valid UTF-8"):
+        config_module._read_config(strict=True)
+    monkeypatch.setattr(
+        type(config_path), "read_text", lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("fixture denied"))
+    )
+    with pytest.raises(ValueError, match="could not be read"):
+        config_module._read_config(strict=True)

@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.101.1] - 2026-10-14
+### Fixed
+- Fleet enrollment refuses broken existing settings and invalid timezones before writing, preserves collector permissions and complete first backups, and reports recovery context on partial failure.
+- Existing fleet checkout setup uses the shared writer lock and stops on refresh failure; legacy page retirement requires migrating explicit readers first.
+- Existing test command fixtures support interpreter paths containing spaces.
+
 ## [0.101.0] - 2026-10-14
 
 ### Added

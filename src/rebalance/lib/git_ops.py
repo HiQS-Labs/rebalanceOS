@@ -5,6 +5,8 @@ import os
 import re
 import shlex
 import signal
+import stat
+import tempfile
 import subprocess
 import time
 from contextlib import contextmanager
@@ -82,19 +84,33 @@ def collector_clone(values: dict[str, str], directory: Path | None = None) -> Pa
 
 
 def set_collector_values(updates: dict[str, str], directory: Path | None = None) -> None:
-    """Set collector keys in ``config.sh``, keeping every other line.
+    """Replace collector settings with preserved mode and a completed first backup.
 
-    Every existing assignment of a key is rewritten (a later duplicate must not
-    override), missing keys are appended, values are shell-quoted because
-    collect.sh sources the file. The first write leaves ``config.sh.bak-gh325``.
+    Independent sibling copies are complete before publication. Linking the
+    staged backup refuses to overwrite an earlier backup; it never aliases the
+    live config inode. This is not a concurrent or two-file transaction.
     """
     directory = directory or collector_config_dir()
     path = directory / "config.sh"
-    text = path.read_text()
+    original = path.read_bytes()
+    mode = stat.S_IMODE(path.stat().st_mode)
     backup = directory / "config.sh.bak-gh325"
-    if not backup.exists():
-        backup.write_text(text)
-    lines = text.splitlines()
+
+    def stage(content: bytes) -> Path:
+        descriptor, name = tempfile.mkstemp(prefix=".config.sh-", dir=directory)
+        staged = Path(name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                os.fchmod(handle.fileno(), mode)
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            return staged
+        except BaseException:
+            staged.unlink(missing_ok=True)
+            raise
+
+    lines = original.decode("utf-8").splitlines()
     for key, value in updates.items():
         pattern = _collector_assignment(key)
         assignment = f"{key}={shlex.quote(value)}"
@@ -103,9 +119,20 @@ def set_collector_values(updates: dict[str, str], directory: Path | None = None)
             lines[i] = assignment
         if not hits:
             lines.append(assignment)
-    temp = path.with_name(path.name + ".tmp")
-    temp.write_text("\n".join(lines) + "\n")
-    temp.replace(path)
+    if not backup.exists():
+        staged = stage(original)
+        try:
+            try:
+                os.link(staged, backup)
+            except FileExistsError:
+                pass  # Another completed backup won; never overwrite it.
+        finally:
+            staged.unlink(missing_ok=True)
+    staged = stage(("\n".join(lines) + "\n").encode("utf-8"))
+    try:
+        staged.replace(path)
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 _DEVICE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")

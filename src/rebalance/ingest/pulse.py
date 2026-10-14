@@ -43,7 +43,7 @@ from rebalance.ingest.db import (
 )
 from rebalance.ingest.slack_users import compact_sleuth_reminder
 from rebalance.lib.time_ops import format_local, local_tz, parse_utc_iso
-from rebalance.lib.time_ops import _parse_iso
+from rebalance.lib.time_ops import _parse_iso, resolve_timezone as _resolve_timezone
 from rebalance.lib.git_ops import (
     GitPublishLockBusy,
     GitPublishLockError,
@@ -113,12 +113,6 @@ GITHUB_API_ROOT = "https://api.github.com"
 # ---------------------------------------------------------------------------
 # Time helpers
 # ---------------------------------------------------------------------------
-
-
-def _resolve_timezone(name: str | None) -> ZoneInfo:
-    if name:
-        return ZoneInfo(name)
-    return local_tz()
 
 
 def _local_day_bounds(tz: ZoneInfo, now: datetime | None = None) -> tuple[datetime, datetime, datetime]:

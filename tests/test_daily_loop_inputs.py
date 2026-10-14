@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -46,13 +47,15 @@ LIVE_PRS = {
 def _fake_cli(tmp_path: Path, payload: dict | None) -> Path:
     data = tmp_path / "payload.json"
     data.write_text(json.dumps(payload) if payload is not None else "")
-    script = tmp_path / "rebalance"
-    script.write_text(
-        f"#!{sys.executable}\nimport sys\n"
+    payload_script = tmp_path / "fake_rebalance.py"
+    payload_script.write_text(
+        "import sys\n"
         f"text = open({str(data)!r}).read()\n"
         "if '--repo' in sys.argv and sys.argv[sys.argv.index('--repo') + 1] == 'Acme/widget' and text:\n"
         "    print(text)\nelse:\n    sys.exit(1)\n"
     )
+    script = tmp_path / "rebalance"
+    script.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(payload_script))} "$@"\n')
     script.chmod(0o755)
     return script
 

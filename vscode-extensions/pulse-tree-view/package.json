@@ -45,7 +45,7 @@
         "pulseTreeView.pulseFilePath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path (or ~-relative) to the rendered pulse markdown file to display, e.g. ~/git-pulse-sync/live-pulse.md. This must be the file written by rebalance-OS's render_pulse_markdown()/pulse-sync (headed '# Live Pulse — ...' with Today/Yesterday/Upcoming Meetings/Assigned Issues sections) — NOT the raw per-device pulse-<hostname>.md tab-separated commit log, which has no sections. Empty = not configured."
+          "description": "Absolute path (or ~-relative) to the rendered pulse markdown file to display, fleet: <your-clone>/devices/<device-id>/live-pulse.md; legacy: <your-clone>/live-pulse.md. This must be the file written by rebalance-OS's render_pulse_markdown()/pulse-sync (headed '# Live Pulse — ...' with Today/Yesterday/Upcoming Meetings/Assigned Issues sections) — NOT the raw per-device pulse-<hostname>.md tab-separated commit log, which has no sections. Empty = not configured."
         }
       }
     }

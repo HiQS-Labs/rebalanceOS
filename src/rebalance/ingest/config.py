@@ -253,30 +253,33 @@ def _warn_discarded_config(config_path: Path, reason: str) -> None:
     )
 
 
-def _read_config() -> dict[str, Any]:
-    """Load config from disk; return {} if missing, unreadable, or not an object.
+def _read_config(*, strict: bool = False) -> dict[str, Any]:
+    """Read shared settings; strict admission refuses an invalid existing file.
 
-    The shape check is not decoration. Valid JSON whose top level is a list,
-    number, string, or null parses cleanly and then propagates a non-dict to
-    every getter that calls ``.get(...)`` on the result — roughly 40 of them —
-    raising ``AttributeError: 'list' object has no attribute 'get'`` from a
-    stack frame that names nothing about the actual problem (GH-161). The
-    sibling reader ``rebalance.paths._load_user_config`` has always guarded
-    this; this function is the one that did not.
+    Missing files allow bootstrap. Legacy getters retain their warn-once/default
+    behavior; mutation and discovery callers opt into errors without file content.
     """
     config_path = _resolved_config_path()
-    if not config_path.exists():
-        return {}
     try:
         data = json.loads(config_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        _warn_discarded_config(config_path, f"not valid JSON ({exc.msg} at line {exc.lineno})")
+    except FileNotFoundError:
         return {}
-    except OSError as exc:  # IOError is an alias of OSError
-        _warn_discarded_config(config_path, f"could not be read ({exc.strerror or exc})")
+    except (json.JSONDecodeError, UnicodeError, OSError) as exc:
+        if isinstance(exc, json.JSONDecodeError):
+            reason = f"not valid JSON ({exc.msg} at line {exc.lineno})"
+        elif isinstance(exc, UnicodeError):
+            reason = "not valid UTF-8"
+        else:
+            reason = f"could not be read ({exc.strerror or exc})"
+        if strict:
+            raise ValueError(f"Cannot read settings {config_path}: {reason}") from exc
+        _warn_discarded_config(config_path, reason)
         return {}
     if not isinstance(data, dict):
-        _warn_discarded_config(config_path, f"top level is {type(data).__name__}, not a JSON object")
+        reason = f"top level is {type(data).__name__}, not a JSON object"
+        if strict:
+            raise ValueError(f"Cannot read settings {config_path}: {reason}")
+        _warn_discarded_config(config_path, reason)
         return {}
     return data
 
@@ -1320,7 +1323,7 @@ def get_config_path() -> Path:
 # ---------------------------------------------------------------------------
 
 
-def get_pulse_config() -> dict[str, Any]:
+def get_pulse_config(*, strict: bool = False) -> dict[str, Any]:
     """Return the pulse-related config block.
 
     Keys (all optional; pulse rendering will fail loudly if a required one is
@@ -1345,7 +1348,7 @@ def get_pulse_config() -> dict[str, Any]:
       - git_pulse_clio_filename: filename of that log file within the
         subdir (default: "git-pulse-daily-log.md").
     """
-    config = _read_config()
+    config = _read_config(strict=strict)
     return {
         "github_login": config.get("github_login"),
         "slack_user_id": config.get("slack_user_id"),
@@ -1397,7 +1400,7 @@ def set_pulse_config(**values: Any) -> None:
         "git_pulse_clio_subdir",
         "git_pulse_clio_filename",
     }
-    config = _read_config()
+    config = _read_config(strict=True)
     for key, value in values.items():
         if key not in allowed:
             raise ValueError(f"Unknown pulse config key: {key}")
@@ -1407,6 +1410,13 @@ def set_pulse_config(**values: Any) -> None:
             config.pop(key, None)
             continue
         config[key] = str(value).strip() if isinstance(value, str) else value
+    if values.get("pulse_timezone") is not None:
+        from rebalance.lib.time_ops import resolve_timezone
+
+        try:
+            resolve_timezone(str(values["pulse_timezone"]).strip())
+        except (KeyError, ValueError) as exc:
+            raise ValueError("Invalid pulse timezone; use an IANA timezone name") from exc
     _write_config(config)
 
 

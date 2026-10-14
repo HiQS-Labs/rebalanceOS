@@ -29,8 +29,10 @@ rebalance-OS  ──reads──►  <this Mac's clone>/sync/sleuth/reminders-<ws
   `base_url` still uses the live API (that's how **dev** works — the dev box is
   reachable directly).
 - **Freshness:** `refresh_index` / the daily launchd sync does a best-effort
-  `git -C <repo> pull --rebase --autostash` before reading, so a read-only device
-  self-refreshes. On devices that also push pulses, the pulse sync already pulls.
+  `git fetch` and reads the upstream export blob without rebasing, stashing or changing
+  the worktree/index. Fetch failure is reported with an explicit local-cache fallback;
+  a successful fetch is not proof of successful ingest. Setup separately uses the existing
+  shared writer lock to refresh an already-cloned checkout before configuring the file source.
 
 ## Setup on a device
 
@@ -86,7 +88,7 @@ unchanged: `--base-url http://<dev-host>:2020 --token <token> --workspace neochr
 | `Sleuth reminders file is invalid JSON` | Partial write / merge conflict in the clone | `git -C "$CLONE" status`; resolve, then re-pull |
 | Want the live API instead (dev/debug) | — | `rebalance config set-sleuth --base-url http://<host>:2020 --token <token> --workspace <ws>` |
 
-**Freshness model:** the publisher stamps an hourly-rounded `exportGeneratedAt`; the consumer persists it and `rebalance doctor` compares **that** (not the local `last_synced_at`, which re-reads keep bumping) to now — so a dead publisher is visible. Before each read the sync does a best-effort, **non-destructive** refresh of the export clone (`git fetch` + checkout of only the export file — no `pull --rebase`, so it can't conflict with other jobs writing that repo); status is reported as `source_refresh`.
+**Freshness model:** the publisher stamps an hourly-rounded `exportGeneratedAt`; the consumer persists it and `rebalance doctor` compares **that** (not the local `last_synced_at`, which re-reads keep bumping) to now — so a dead publisher is visible. Before each read the sync does a best-effort, **non-destructive** refresh of the export clone (`git fetch` + `git show` of the upstream export blob, without worktree/index writes, rebase or autostash); status is reported as `source_refresh`.
 
 ## Related
 

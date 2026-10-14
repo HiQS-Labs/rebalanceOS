@@ -62,8 +62,8 @@ echo "  clone=$CLONE_DIR"
 
 # 1. Clone or refresh the export repo.
 if [ -d "$CLONE_DIR/.git" ]; then
-    echo "  repo already cloned — pulling latest"
-    git -C "$CLONE_DIR" pull --rebase --autostash --quiet || echo "  WARN: pull failed (continuing)" >&2
+    echo "  repo already cloned — refreshing under the shared writer lock"
+    "$REBALANCE" config refresh-pulse-clone --path "$CLONE_DIR"
 elif [ -e "$CLONE_DIR" ]; then
     echo "ERROR: $CLONE_DIR exists but is not a git repo. Move it aside or pass --clone-dir." >&2
     exit 1
@@ -94,4 +94,4 @@ echo "  verifying (sleuth-sync + doctor)"
 
 echo
 echo "Done. Reminders now read from: $EXPORT_FILE"
-echo "Keep it fresh: the daily sync auto-refreshes the clone; or 'git -C $CLONE_DIR pull'."
+echo "Keep it fresh: normal Sleuth sync fetches the upstream export without changing this checkout."
