@@ -1,0 +1,34 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ CloseLoopFlagTests.test_cli_text_truncation_hints_at_overflow _________
+
+self = <test_github_close_loop.CloseLoopFlagTests testMethod=test_cli_text_truncation_hints_at_overflow>
+
+    def test_cli_text_truncation_hints_at_overflow(self) -> None:
+        _seed(self.db_path)  # 4 closed_without_delivery flags already seeded
+        with db_connection(self.db_path, ensure_github_schema) as conn:
+            for number in range(301, 317):  # 16 more -> 20 total, 15 shown
+                _item(conn, "issue", number, state="closed", state_reason="completed", closed=FRESH)
+            conn.commit()
+        result = CliRunner().invoke(
+            app,
+            [
+                "github-close-loop",
+                "--repo",
+                REPO,
+                "--database",
+                str(self.db_path),
+                "--output",
+                "text",
+                "--since-days",
+                "15",
+            ],
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+>       self.assertIn("… and 5 more", result.output)
+E       AssertionError: '… and 5 more' not found in 'Repo: AcmeOrg/widget (as of 2026-10-16T00:28:36Z)\n12 close-the-loop flag(s) across 10 PRs and 29 issues in the local store.\nCounts: stale_pr=6, forgotten_draft=2, pr_needs_refinement=2, closed_without_delivery=0, started_not_shipped=2\n\nstale_pr\n  - PR #101 pull_request 101\n      Open PR not updated for 36 days (threshold 7).\n  - PR #102 pull_request 102\n      Open PR not updated for 15 days (threshold 7).\n  - PR #105 pull_request 105\n      Open PR not updated for 15 days (threshold 7).\n  - PR #106 pull_request 106\n      Open PR not updated for 15 days (threshold 7).\n  - PR #107 pull_request 107\n      Open PR not updated for 15 days (threshold 7).\n  - PR #110 pull_request 110\n      Open PR not updated for 15 days (threshold 7).\n\nforgotten_draft\n  - PR #103 pull_request 103\n      Draft PR not updated for 36 days (threshold 7).\n  - PR #104 pull_request 104\n      Draft PR not updated for 15 days (threshold 7).\n\npr_needs_refinement\n  - PR #105 pull_request 105\n      Open PR has changes requested.\n  - PR #106 pull_request 106\n      Open PR has failing checks.\n\nstarted_not_shipped\n  - Issue #211 issue 211\n      Branch `feat/gh211-thing` exists in the local corpus but no PR links or uses it; issue idle 36 days.\n  - Issue #213 issue 213\n      Branch `feat/gh213-new` exists in the local corpus but no PR links or uses it; issue idle 15 days.\n\nCounts are lower bounds: only items inside the local sync window are visible.\n'
+
+tests/test_github_close_loop.py:255: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_github_close_loop.py::CloseLoopFlagTests::test_cli_text_truncation_hints_at_overflow
+1 failed in 0.88s

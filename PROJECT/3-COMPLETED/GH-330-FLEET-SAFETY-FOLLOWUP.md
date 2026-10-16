@@ -2,9 +2,9 @@
 gh_issue: 330
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/330
 title: Fleet safety follow-up
-status: PR-ready; awaiting merge
+status: Completed
 created: 2026-10-14
-updated: 2026-10-14
+updated: 2026-10-15
 owner: noel
 doc_type: bugfix
 goal: Preserve operator configuration and backup integrity during enrollment and stop unlocked setup refresh.
@@ -26,7 +26,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Claude plan, implementation and explicit guide-gap QA approved with driver0; full root2801 + HiQS163 pass; version0.101.1 | Gated PR publication against development, then await merge and authorized cleanup |
+| PR331 merged as80ce446; issue330 closed; bot comments and dated test fixture corrected; latest CI green | Deployment remains separate; retain pending rollout work under GH-282/GH-328; safe clone retirement |
 
 Tracking [#330](https://github.com/HiQS-Labs/rebalanceOS/issues/330), follow-up to merged [#326](https://github.com/HiQS-Labs/rebalanceOS/pull/326). Related #328's remaining rollout/hash-check gaps stay separate.
 Base development1a496fac55e5d56eaebf6aaf3c444d9c5017e65d. Clone rebalanceOS-gh330-fleet-safety-followup-2026-10-14; branch fix/rebalanceOS-gh330-fleet-safety-followup-2026-10-14. Primary preserved; no deploy or live configuration/database operations.
@@ -62,3 +62,16 @@ Current-base plan confirmation: [Claude review](../../TESTS-RESULTS/2026-10-14+G
 ## Final handoff (2026-10-14)
 
 [Current qualification](../../TESTS-RESULTS/2026-10-14+GH-330/SUMMARY.md) retains exact commands, sanitized receipts, full-suite outputs and known limits. Native Claude plan reviewed4c7bc5c; implementation reviewed5e5db53; supplemental guides reviewed5fc59de. All accepted driver exits0; rejected guide close remains explicit and consumed one round (implementation total3). Code and guides are unchanged from the full qualification revisione2e72e8. Existing skips/xfails and PDDA backlog remain; no deployed/four-Mac qualification. No live config/CLIO database/history changes. Source/installed version0.101.1 verified. Required push gate and hosted CI are inspected on the published PR head; issue330 tracks that PR. Preserve this task clone and prior unique evidence until origin landing is verified; /merge-cleanup owns retirement. No merging/deployment performed.
+
+## Landed and reconciled (2026-10-15)
+
+[PR331](https://github.com/HiQS-Labs/rebalanceOS/pull/331) merged as80ce446ce57cb5e5f2f7f2716af7ea05c790ac66, head812a153. Issue330 closed as completed. Both minor CodeRabbit comments were fixed in00474b7. Hosted CI then exposed a dated existing close-loop CLI fixture after its15-day window expired; a two-line test-only clock pin restored7/7cases and passed independent native Claude review. [Final CI](https://github.com/HiQS-Labs/rebalanceOS/actions/runs/38829778912) passed all10jobs. No product change after original implementation QA. Supplemental receipts retained in the existing campaign.
+
+Merge-cleanup's dry run selected the older native CLI and refused its missing roadmap reconcile-state verb (#329). The already vendored reader ran that required read-only gate successfully against the disposable landing candidate; native check and three-way semantic check passed, and roadmap sync was a no-op. No schema/install change, suppressed error or skipped gate. The policy-selected merge helper landed the PR; this repo's existing roadmap sync/gen/check writer and PDDA checks own post-merge reconciliation. The root's previously generated view still carried generation69; regenerate it through the canonical CLI, not by hand.
+
+## Lessons Learned (For Future Agents)
+
+- Pin a CLI fixture's imported clock seam to its declared fixture time. Fixed timestamps plus a real wall clock create an expiry date for CI; do not change production windows or weaken assertions.
+- Audit receipts must name the committed result files, even when execution originally wrote temporary filenames.
+- Preserve historical QA snapshots, document small later corrections honestly, and distinguish a native CLI exit0 from nonessential session-end hook status.
+- Use available read-only capabilities and the repository-owned writer separately while the tracked Forge installation gap329 remains; never migrate the ledger merely to land a scoped fix. A merge is not a runtime deployment.

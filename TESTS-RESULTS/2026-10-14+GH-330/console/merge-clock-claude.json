@@ -1,0 +1,13 @@
+{
+  "reviewer": "Claude Code CLI headless",
+  "reviewed_head": "812a1538b7982c3d9196ffebeec7536ede022db8",
+  "exit": 0,
+  "verdict": "PASS",
+  "review": "**PASS.**\n\nAll four checks clear:\n\n1. **Compatibility** \u2014 `unittest.mock.patch` is stdlib since Python 3.3; `requires-python = \">=3.12\"` (pyproject.toml:11) has no issue. `enterContext()` is available from Python 3.11+ (`unittest.TestCase.enterContext`), so \u22653.12 satisfies it.\n\n2. **Automatic cleanup** \u2014 `self.enterContext(patch(...))` registers the patch's `__exit__` with the test case's cleanup stack. It starts in `setUp` and is torn down automatically after each test, before `tearDown` runs. No manual `stop()` needed; no leak between cases.\n\n3. **Actual call path** \u2014 The CLI path (`github_close_loop_cmd`) calls `infer_close_loop_flags` with no `now=` kwarg (github.py:293-299). That function falls through to `now = now or now_utc()` (github_readiness.py:401). The patch targets `rebalance.ingest.github_readiness.now_utc` \u2014 the name in the module's own namespace (imported at line 18 via `from rebalance.lib.time_ops import now_utc`). That is the correct target; patching the origin (`rebalance.lib.time_ops.now_utc`) would miss the already-bound reference. The mock fires for all CLI-routed calls that omit `now=`.\n\n4. **No production/assertion changes** \u2014 The diff is confined to: adding `from unittest.mock import patch` (line 6), `NOW = datetime(2026, 10, 2, ...)` constant (line 17), and `self.enterContext(patch(...))` in `setUp` (line 147). All existing `_seed`, helper, and assertion lines are unchanged.\n\nThe failing case (`test_cli_text_truncation_hints_at_overflow`) invoked the CLI without `now=`, so `now_utc()` returned the real clock; on Oct 16 the fixture's Oct 1 `closed=FRESH` rows fell outside `--since-days 15`. The patch fixes that by pinning `now_utc()` to `NOW` (Oct 2), making all fixture rows 1 day old \u2014 well inside the window \u2014 for every test method including the CLI ones.",
+  "producer_corrections": [
+    "Actual module result is7passed; prompt mistakenly said8.",
+    "TestCase cleanups run after tearDown, not before; per-test restoration still holds.",
+    "NOW was pre-existing; actual change only imports patch and pins the existing clock seam."
+  ],
+  "scope": "existing test-clock repair only; no production/assertion change"
+}

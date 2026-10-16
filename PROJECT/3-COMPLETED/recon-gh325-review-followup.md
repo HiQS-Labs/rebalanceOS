@@ -1,8 +1,8 @@
 ---
 title: "Recon: fleet enrollment review follow-up"
-status: "Recon complete; bounded fixture reproduction next"
+status: "Completed; retained as historical recon"
 created: 2026-10-14
-updated: 2026-10-14
+updated: 2026-10-15
 owner: agent
 doc_type: audit
 goal: "Trace PR 326 review findings before modifying its existing fleet/configuration seams."
@@ -19,7 +19,7 @@ Commit: `8ff740bff5e2e49bb70ab094e5d3810775450887`. Verify tier, graph plus curr
 
 | What was just completed | What's next |
 |---|---|
-| Existing PR, issue, clone and review hypotheses traced | Reproduce consequential failures using scratch configuration, then amend the canonical plan for Claude Code QA |
+| Recon informed independently reviewed safety fixes; follow-up landed in PR331 | Historical reference; no active recon work remains |
 
 ## Subject and change class
 
@@ -70,3 +70,7 @@ Reverting code does not undo already-applied config. Existing named collector ba
 ## Current-state radius
 
 Configuration commands and tolerant getters, fleet check-in collector configuration, safe private checkout refresh, pulse/deep-work timezone readers, upgrade/Sleuth instructions and explicitly configured VS Code sidebar readers; no capture/history migration.
+
+## Lessons Learned (For Future Agents)
+
+This is the pre-change baseline map. GH-330 and PR331 own the subsequent strict-admission, backup and locked-refresh fixes; do not resume this historical fixture-reproduction step as unfinished work.
