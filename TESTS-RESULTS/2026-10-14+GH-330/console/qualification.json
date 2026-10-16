@@ -18,7 +18,7 @@
         "-q"
       ],
       "exit": 0,
-      "log": "gh330-final-root.txt"
+      "log": "final-root.txt"
     },
     {
       "lane": "hiqs",
@@ -30,7 +30,7 @@
         "-q"
       ],
       "exit": 0,
-      "log": "gh330-final-hiqs.txt"
+      "log": "final-hiqs.txt"
     }
   ],
   "after": {

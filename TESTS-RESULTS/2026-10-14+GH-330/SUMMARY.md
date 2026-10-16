@@ -19,3 +19,7 @@ Current public doctor fixture fleet rowOK; overall exit1 for deliberately missin
 
 ## Limits
 Ordinary config getters remain tolerant; strict mutation/discovery rejects invalid existing data. Missing config still bootstraps. No atomic two-file/concurrent configuration transaction or ACL/ownership/directory-power-loss promise; old first backups require inspection. Scratch doctor confirms only fixture fleet row and retains missing DB/auth gaps, not deployed health. Existing skips/xfails/PDDA backlog remain explicit. Historical raw logs are sanitized and contain no live prompts/config/history.
+
+## Pre-merge review follow-through (2026-10-15)
+
+CodeRabbit comments4277447443/4277447451 accepted: remaining diagram/troubleshooting pull wording now matches fetch/blob reads and directs manual checkout refresh through the existing locked facade; qualification log fields now resolve to committed sibling receipts. Documentation/receipt-only corrections; runtime and tests remain unchanged. Existing guide QA receipts describe their historical snapshots; these small wording corrections receive doc-link and direct consistency checks before landing, with hosted CI on the updated head. No new runtime review cycle or full-suite rerun is needed.
