@@ -1,0 +1,27 @@
+# GH-330 fleet safety qualification
+
+Contents: Scope · Review · Checks · Limits
+
+## Scope
+Base development1a496fa. Targeted safety delta from preserved a696887, with current patch0.101.1 metadata, fresh issue/plan330 and separate path-safe existing Daily fixture. Relevant runtime modules were identical at the merged base; SOP integration preserves merge-batch guidance. No live config, fleet rollout, history/database or scheduled runtime change.
+
+## Review
+Claude current-base plan approved round1 with driver0, reviewed4c7bc5c; QA/plan-claude.md and console/plan-attestation.json. Earlier substantive plan approval and scratch sensitivity evidence retained in sibling2026-10-14+GH-325 campaign as historical evidence, not current full qualification.
+
+## Checks
+Current focused command: .venv/bin/python -m pytest tests/test_fleet_enroll.py tests/test_config_read_shape_guard.py tests/test_pulse_reconcile.py tests/test_git_publication_contract.py tests/test_daily_loop_inputs.py -q. 72passed,23subtests (console/focused.txt). Fixture-only baseline2failed/3passed; correction stays in existing fixture (console/fixture-baseline.txt). Current mypy src/ passes118files. Ledger check clean with8existing warnings; owned GH-330 row reads rated88/88/50/65, calc291, canonical working-doc pointer. ROADMAP insertion shifts existing positions; generated ledger timestamps/receipts account for that diff.
+
+Final implementation review Approved round1, driver0, reviewed5e5db53 (QA/implementation-claude.md; console/implementation-attestation.json). Its unread-guide gap was closed with seeded full sources: first supplemental text PASS was rejected (driver4 token close-mismatch), then final allowed implementation round3 approved with driver0, reviewed5fc59de (QA/docs-claude.md; console/docs-attestation.json; exact guide hashes retained). No scope/code changes during these passes. Nonblocking timezone in-memory ordering nit declined: private dict mutation precedes validation, disk write follows validation, existing preservation check proves the stated boundary. No additional mechanism earns its cost.
+
+Final qualifying suites on approved implementation e2e72e8 in separate full verify clone: root2801passed/20skipped/10xfailed/171subtests; HiQS163passed/1skipped/1xfailed. Both exit0; identity/clean-status bracket preserved (console/qualification.json). The full root suite includes embedding seams with declared extras; source and installed metadata both0.101.1. The HiQS private-name check did not run because its ignored input is absent; no privacy qualification claimed. Existing quarantine remains, not repaired. Console/final-root.txt and final-hiqs.txt retain exact skip/xfail reasons. Later commits change only QA/evidence/status; checked implementation and reviewed guides remain byte-identical.
+
+Current public doctor fixture fleet rowOK; overall exit1 for deliberately missing DB/auth, no global runtime claim. Byte-identical copied setup stops42 for shadow refresh42, no setter/direct pull; probe seam correction retained. Docs links and front-door checks pass. Existing PDDA backlog remains7frontmatter/10status errors, no new owned-plan errors. Mypy and ledger check passed with8existing ledger warnings. Required armed pre-push gate runs at push; hosted checks are tracked against the PR head on GitHub. No new suites/gates added; existing test modules extended for reproduced preservation/locking defects.
+
+## Limits
+Ordinary config getters remain tolerant; strict mutation/discovery rejects invalid existing data. Missing config still bootstraps. No atomic two-file/concurrent configuration transaction or ACL/ownership/directory-power-loss promise; old first backups require inspection. Scratch doctor confirms only fixture fleet row and retains missing DB/auth gaps, not deployed health. Existing skips/xfails/PDDA backlog remain explicit. Historical raw logs are sanitized and contain no live prompts/config/history.
+
+## Pre-merge review follow-through (2026-10-15)
+
+CodeRabbit comments4277447443/4277447451 accepted: remaining diagram/troubleshooting pull wording now matches fetch/blob reads and directs manual checkout refresh through the existing locked facade; qualification log fields now resolve to committed sibling receipts. Documentation/receipt-only corrections; runtime and tests remain unchanged. Existing guide QA receipts describe their historical snapshots; these small wording corrections receive doc-link and direct consistency checks before landing, with hosted CI on the updated head. No new runtime review cycle or full-suite rerun is needed.
+
+CI on the documentation-only head00474b7 exposed an existing clock-dependent CLI test: seeded closed_at2026-10-01 aged past --since-days15 at2026-10-16T00:25Z. The same failure reproduced alone in the disposable verify clone; runtime/test code was unchanged from the prior green head. Pin the existing test class's github_readiness.now_utc seam to its declared NOW2026-10-02. Do not change production filtering, loosen assertions or shift fixture dates. Focused module and independent Claude review qualify this test-only merge repair; hosted CI must pass before landing.

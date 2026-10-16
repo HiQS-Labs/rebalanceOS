@@ -1,0 +1,471 @@
+...FFF........F...F.....FFFFFF......FF.....F.....F [100%]
+=================================== FAILURES ===================================
+_ SetCollectorValuesTests.test_backup_failure_leaves_original_and_no_partial_backup (operation='os.fsync') _
+
+self = <test_fleet_enroll.SetCollectorValuesTests testMethod=test_backup_failure_leaves_original_and_no_partial_backup>
+
+    def test_backup_failure_leaves_original_and_no_partial_backup(self) -> None:
+        path = self.collector("fleet_mode=false\n")
+        original = path.read_bytes()
+        for operation in ("os.fsync", "os.link"):
+            with (
+                self.subTest(operation=operation),
+                patch("rebalance.lib.git_ops." + operation, side_effect=OSError("fixture failure")),
+            ):
+>               with self.assertRaises(OSError):
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               AssertionError: OSError not raised
+
+tests/test_fleet_enroll.py:121: AssertionError
+_ SetCollectorValuesTests.test_backup_failure_leaves_original_and_no_partial_backup _
+
+self = <test_fleet_enroll.SetCollectorValuesTests testMethod=test_backup_failure_leaves_original_and_no_partial_backup>
+
+    def test_backup_failure_leaves_original_and_no_partial_backup(self) -> None:
+        path = self.collector("fleet_mode=false\n")
+        original = path.read_bytes()
+        for operation in ("os.fsync", "os.link"):
+            with (
+                self.subTest(operation=operation),
+                patch("rebalance.lib.git_ops." + operation, side_effect=OSError("fixture failure")),
+            ):
+                with self.assertRaises(OSError):
+                    set_collector_values({"fleet_mode": "true"})
+>           self.assertEqual(path.read_bytes(), original)
+E           AssertionError: b'fleet_mode=true\n' != b'fleet_mode=false\n'
+
+tests/test_fleet_enroll.py:123: AssertionError
+----------------------------- Captured stdout call -----------------------------
+u
+_ SetCollectorValuesTests.test_replace_failure_keeps_complete_backup_and_original_mode _
+
+self = <test_fleet_enroll.SetCollectorValuesTests testMethod=test_replace_failure_keeps_complete_backup_and_original_mode>
+
+    def test_replace_failure_keeps_complete_backup_and_original_mode(self) -> None:
+        path = self.collector("fleet_mode=false\n")
+        path.chmod(0o640)
+        original = path.read_bytes()
+        with patch.object(Path, "replace", side_effect=OSError("fixture replace failure")):
+            with self.assertRaises(OSError):
+                set_collector_values({"fleet_mode": "true"})
+        self.assertEqual(path.read_bytes(), original)
+        backup = self.gp / "config.sh.bak-gh325"
+        self.assertEqual(backup.read_bytes(), original)
+>       self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o640)
+E       AssertionError: 420 != 416
+
+tests/test_fleet_enroll.py:137: AssertionError
+_ SetCollectorValuesTests.test_replaces_duplicates_appends_missing_and_backs_up _
+
+self = <test_fleet_enroll.SetCollectorValuesTests testMethod=test_replaces_duplicates_appends_missing_and_backs_up>
+
+    def test_replaces_duplicates_appends_missing_and_backs_up(self) -> None:
+        original = '# keep me\nrepos=("a b")\nsync_repo_dir="/old"\nfleet_mode=false\nfleet_mode=false\n'
+        path = self.collector(original)
+        path.chmod(0o600)
+        set_collector_values({"fleet_mode": "true", "sync_repo_dir": "/new dir", "fleet_sync_subdir": "sync"})
+        text = path.read_text()
+        self.assertIn("# keep me", text)
+        self.assertIn('repos=("a b")', text)
+        self.assertEqual(text.count("fleet_mode=true"), 2)
+        self.assertNotIn("fleet_mode=false", text)
+        self.assertEqual(
+            read_collector_config(),
+            {"sync_repo_dir": "/new dir", "fleet_mode": "true", "fleet_sync_subdir": "sync"},
+        )
+        self.assertEqual((self.gp / "config.sh.bak-gh325").read_text(), original)
+>       self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+E       AssertionError: 420 != 384
+
+tests/test_fleet_enroll.py:108: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'{"fixture":', args=()) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 1 :   collector config.sh: fleet_mode=true
+E                     collector config.sh: fleet_sync_subdir=sync
+E                     rebalance config:    pulse_target_path=/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+E                     rebalance config:    pulse_device_id=mac-a
+E                     rebalance config:    pulse_fleet_enabled=True
+E                   Preview only. Re-run with --apply to write these changes.
+E                   warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/rbos.config — not valid JSON (Expecting value at line 1). Falling back to defaults; every setting stored there is being skipped.
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'{"fixture":', args=('--apply',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 1 :   collector config.sh: fleet_mode=true
+E                     collector config.sh: fleet_sync_subdir=sync
+E                     rebalance config:    pulse_target_path=/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+E                     rebalance config:    pulse_device_id=mac-a
+E                     rebalance config:    pulse_fleet_enabled=True
+E                   ✓ enrolled as mac-a — run `rebalance doctor` to verify
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'{"fixture":', args=('--print-clone',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 2 : /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'[1,2,3]', args=()) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 1 :   rebalance config:    pulse_target_path=/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+E                     rebalance config:    pulse_device_id=mac-a
+E                     rebalance config:    pulse_fleet_enabled=True
+E                   Preview only. Re-run with --apply to write these changes.
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'[1,2,3]', args=('--apply',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 1 :   rebalance config:    pulse_target_path=/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+E                     rebalance config:    pulse_device_id=mac-a
+E                     rebalance config:    pulse_fleet_enabled=True
+E                   ✓ enrolled as mac-a — run `rebalance doctor` to verify
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'[1,2,3]', args=('--print-clone',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 0 != 2 : /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmpb5nx9f3g/home/pulse
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'\xff', args=()) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+                    self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+>                   self.assertIn("Cannot read settings", result.output)
+E                   AssertionError: 'Cannot read settings' not found in ''
+
+tests/test_fleet_enroll.py:256: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'\xff', args=('--apply',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+                    self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+>                   self.assertIn("Cannot read settings", result.output)
+E                   AssertionError: 'Cannot read settings' not found in ''
+
+tests/test_fleet_enroll.py:256: AssertionError
+_ FleetEnrollCliTests.test_invalid_existing_settings_refuse_all_admission_without_writes (payload=b'\xff', args=('--print-clone',)) _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_invalid_existing_settings_refuse_all_admission_without_writes>
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+>                   self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+E                   AssertionError: 1 != 2 :
+
+tests/test_fleet_enroll.py:255: AssertionError
+_ FleetEnrollCliTests.test_partial_apply_and_missing_postcondition_report_recovery _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_partial_apply_and_missing_postcondition_report_recovery>
+
+    def test_partial_apply_and_missing_postcondition_report_recovery(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        body = f'device_id="mac-a"\nsync_repo_dir="{clone}"\nfleet_mode=false\n'
+        path = self.collector(body)
+        self.rbos(github_login="fixture-before")
+        before = config_module.CONFIG_PATH.read_bytes()
+        with patch.object(config_module, "set_pulse_config", side_effect=OSError("fixture second writer failure")):
+            result = self.run_cli("--apply")
+        self.assertEqual(result.exit_code, 1, result.output)
+>       self.assertIn("Enrollment incomplete", result.output)
+E       AssertionError: 'Enrollment incomplete' not found in '  collector config.sh: fleet_mode=true\n  collector config.sh: fleet_sync_subdir=sync\n  rebalance config:    pulse_target_path=/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/tmp5o5w8xec/home/pulse\n  rebalance config:    pulse_device_id=mac-a\n  rebalance config:    pulse_fleet_enabled=True\n'
+
+tests/test_fleet_enroll.py:285: AssertionError
+_ FleetEnrollCliTests.test_set_pulse_rejects_bad_timezone_before_any_setting_changes _
+
+self = <test_fleet_enroll.FleetEnrollCliTests testMethod=test_set_pulse_rejects_bad_timezone_before_any_setting_changes>
+
+    def test_set_pulse_rejects_bad_timezone_before_any_setting_changes(self) -> None:
+        self.rbos(github_login="fixture-before")
+        before = config_module.CONFIG_PATH.read_bytes()
+        result = CliRunner().invoke(
+            app, ["config", "set-pulse", "--github-login", "fixture-after", "--timezone", "America/Los_Angelesx"]
+        )
+>       self.assertEqual(result.exit_code, 2, result.output)
+E       AssertionError: 0 != 2 : ✓ pulse config updated — run `rebalance doctor` to verify
+
+tests/test_fleet_enroll.py:269: AssertionError
+______ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[[1,2,3]] ______
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s0/rbos.config')
+payload = '[1,2,3]'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s0/rbos.config — top level is list, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+________ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[42] _________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s1/rbos.config')
+payload = '42'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s1/rbos.config — top level is int, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+________ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict["x"] ________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s2/rbos.config')
+payload = '"x"'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s2/rbos.config — top level is str, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+_______ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[null] ________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s3/rbos.config')
+payload = 'null'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s3/rbos.config — top level is NoneType, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+_______ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[true] ________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s4/rbos.config')
+payload = 'true'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s4/rbos.config — top level is bool, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+________ test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[[]] _________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s5/rbos.config')
+payload = '[]'
+
+    @pytest.mark.parametrize("payload", NON_OBJECT_PAYLOADS)
+    def test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict(config_path, payload):
+        config_path.write_text(payload, encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not a JSON object"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:36: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_valid_json_of_the_wrong_s5/rbos.config — top level is list, not a JSON object. Falling back to defaults; every setting stored there is being skipped.
+_______________ test_malformed_json_still_reads_as_an_empty_dict _______________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_malformed_json_still_read0/rbos.config')
+
+    def test_malformed_json_still_reads_as_an_empty_dict(config_path):
+        config_path.write_text("{oops", encoding="utf-8")
+        assert config_module._read_config() == {}
+        with pytest.raises(ValueError, match="not valid JSON"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:50: TypeError
+----------------------------- Captured stderr call -----------------------------
+warning: ignoring /private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_malformed_json_still_read0/rbos.config — not valid JSON (Expecting property name enclosed in double quotes at line 1). Falling back to defaults; every setting stored there is being skipped.
+__________________ test_a_missing_file_reads_as_an_empty_dict __________________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_a_missing_file_reads_as_a0/rbos.config')
+
+    def test_a_missing_file_reads_as_an_empty_dict(config_path):
+        assert not config_path.exists()
+        assert config_module._read_config() == {}
+>       assert config_module._read_config(strict=True) == {}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:56: TypeError
+____________ test_strict_read_refuses_bad_encoding_and_read_errors _____________
+
+config_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_strict_read_refuses_bad_e0/rbos.config')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a352190>
+
+    def test_strict_read_refuses_bad_encoding_and_read_errors(config_path, monkeypatch):
+        config_path.write_bytes(b"\xff")
+        with pytest.raises(ValueError, match="not valid UTF-8"):
+>           config_module._read_config(strict=True)
+E           TypeError: _read_config() got an unexpected keyword argument 'strict'
+
+tests/test_config_read_shape_guard.py:102: TypeError
+_____ test_refresh_cli_preserves_dirty_and_locked_checkout_then_refreshes ______
+
+tmp_path = PosixPath('/private/var/folders/69/3l_82qtj7fzglnt_jjg07jh40000gn/T/pytest-of-noelsaw/pytest-64/test_refresh_cli_preserves_dir0')
+
+    def test_refresh_cli_preserves_dirty_and_locked_checkout_then_refreshes(tmp_path: Path) -> None:
+        from typer.testing import CliRunner
+        from rebalance.cli import app
+        from rebalance.lib.git_ops import git_publish_lock
+    
+        _origin, seed, clone = _origin_and_clone(tmp_path)
+        _commit(seed, "upstream.txt", "new export\n")
+        _git(seed, "push", "origin", "main")
+        before = _git(clone, "rev-parse", "HEAD")
+        (clone / "base.txt").write_text("unfinished local output\n")
+        runner = CliRunner()
+        dirty = runner.invoke(app, ["config", "refresh-pulse-clone", "--path", str(clone)])
+>       assert dirty.exit_code == 1, dirty.output
+E       AssertionError: Usage: root config [OPTIONS] COMMAND [ARGS]...
+E         Try 'root config --help' for help.
+E         ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+E         │ No such command 'refresh-pulse-clone'.                                       │
+E         ╰──────────────────────────────────────────────────────────────────────────────╯
+E         
+E       assert 2 == 1
+E        +  where 2 = <Result SystemExit(2)>.exit_code
+
+tests/test_pulse_reconcile.py:108: AssertionError
+=========================== short test summary info ============================
+SUBFAILED(operation='os.fsync') tests/test_fleet_enroll.py::SetCollectorValuesTests::test_backup_failure_leaves_original_and_no_partial_backup
+FAILED tests/test_fleet_enroll.py::SetCollectorValuesTests::test_backup_failure_leaves_original_and_no_partial_backup
+FAILED tests/test_fleet_enroll.py::SetCollectorValuesTests::test_replace_failure_keeps_complete_backup_and_original_mode
+FAILED tests/test_fleet_enroll.py::SetCollectorValuesTests::test_replaces_duplicates_appends_missing_and_backs_up
+SUBFAILED(payload=b'{"fixture":', args=()) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'{"fixture":', args=('--apply',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'{"fixture":', args=('--print-clone',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'[1,2,3]', args=()) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'[1,2,3]', args=('--apply',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'[1,2,3]', args=('--print-clone',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'\xff', args=()) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'\xff', args=('--apply',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+SUBFAILED(payload=b'\xff', args=('--print-clone',)) tests/test_fleet_enroll.py::FleetEnrollCliTests::test_invalid_existing_settings_refuse_all_admission_without_writes
+FAILED tests/test_fleet_enroll.py::FleetEnrollCliTests::test_partial_apply_and_missing_postcondition_report_recovery
+FAILED tests/test_fleet_enroll.py::FleetEnrollCliTests::test_set_pulse_rejects_bad_timezone_before_any_setting_changes
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[[1,2,3]]
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[42]
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict["x"]
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[null]
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[true]
+FAILED tests/test_config_read_shape_guard.py::test_valid_json_of_the_wrong_shape_reads_as_an_empty_dict[[]]
+FAILED tests/test_config_read_shape_guard.py::test_malformed_json_still_reads_as_an_empty_dict
+FAILED tests/test_config_read_shape_guard.py::test_a_missing_file_reads_as_an_empty_dict
+FAILED tests/test_config_read_shape_guard.py::test_strict_read_refuses_bad_encoding_and_read_errors
+FAILED tests/test_pulse_reconcile.py::test_refresh_cli_preserves_dirty_and_locked_checkout_then_refreshes
+25 failed, 35 passed, 12 subtests passed in 3.78s

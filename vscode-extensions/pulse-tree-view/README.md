@@ -31,7 +31,7 @@ Set the absolute (or `~`-relative) path via the
 
 ```json
 {
-  "pulseTreeView.pulseFilePath": "~/git-pulse-sync/live-pulse.md"
+  "pulseTreeView.pulseFilePath": "<your-clone>/devices/<device-id>/live-pulse.md"
 }
 ```
 
@@ -92,7 +92,8 @@ Phase 2). Two ways to re-read it:
    "Extension Development Host" VS Code window with the extension loaded.
 6. In that new window, open Settings (`Cmd+,`) and set
    `pulseTreeView.pulseFilePath` to a real pulse markdown file, e.g.
-   `~/git-pulse-sync/live-pulse.md`.
+   `<your configured clone>/devices/<canonical-device-id>/live-pulse.md` in fleet mode
+   (legacy mode may use the root `live-pulse.md`).
 7. Open the Explorer sidebar — a **"Pulse"** view appears with the 4
    sections. Use the refresh icon (or "Pulse: Refresh" from the command
    palette) after editing the setting or the underlying file.
@@ -112,3 +113,8 @@ npm test
 Explicitly out of scope for Phase 0+1 (see the GH-123 issue's phased
 plan): live file-watcher refresh, click-through navigation to open
 source items in a browser, `.vsix` packaging. All planned for Phase 2/3.
+
+For fleet mode, choose the rendered page at `<your configured clone>/devices/<canonical-device-id>/live-pulse.md`.
+Legacy mode can still use the root `live-pulse.md`. Update this explicit setting and refresh/verify
+sections before retiring a root page; the sidebar does not automatically choose another device's file.
+Raw collector `pulse-<id>.md` pages remain a different format.

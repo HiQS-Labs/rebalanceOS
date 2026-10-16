@@ -479,6 +479,22 @@ def config_clear_github_token() -> None:
     typer.echo("✓ Stored PAT cleared. `get-github-token` will now fall back to gh CLI.")
 
 
+@config_app.command("refresh-pulse-clone")
+def config_refresh_pulse_clone(
+    path: Path = typer.Option(..., "--path", help="This Mac's existing fleet checkout"),
+) -> None:
+    """Refresh the fleet checkout under its shared writer lock; never autostash."""
+    from rebalance.ingest.pulse import PulseReconcileError, reconcile_pulse_mirror
+    from rebalance.lib.git_ops import GitPublishLockError, GitSubprocessError
+
+    try:
+        reconcile_pulse_mirror(path)
+    except (PulseReconcileError, GitPublishLockError, *GitSubprocessError, OSError) as exc:
+        typer.echo(f"✗ Cannot refresh fleet checkout: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo("✓ fleet checkout refreshed")
+
+
 @config_app.command("set-pulse")
 def config_set_pulse(
     github_login: str = typer.Option("", "--github-login", help="GitHub login the pulse attributes work to"),
@@ -496,7 +512,10 @@ def config_set_pulse(
         if not (resolved / ".git").exists():
             raise typer.BadParameter(f"not a git clone: {resolved}")
         target = str(resolved)
-    set_pulse_config(github_login=github_login or None, pulse_target_path=target, pulse_timezone=timezone or None)
+    try:
+        set_pulse_config(github_login=github_login or None, pulse_target_path=target, pulse_timezone=timezone or None)
+    except (ValueError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     typer.echo("✓ pulse config updated — run `rebalance doctor` to verify")
 
 
@@ -523,11 +542,15 @@ def config_fleet_enroll(
         set_collector_values,
     )
 
-    cfg = get_pulse_config()
+    try:
+        cfg = get_pulse_config(strict=True)
+    except (ValueError, OSError) as exc:
+        typer.echo(f"✗ {exc}", err=True)
+        raise typer.Exit(2 if print_clone else 1) from exc
     if print_clone:
         try:
             clone = discover_pulse_clone(cfg)
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             typer.echo(f"✗ {exc}", err=True)
             raise typer.Exit(2)
         if clone is None:
@@ -545,7 +568,7 @@ def config_fleet_enroll(
             err=True,
         )
         raise typer.Exit(1)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         typer.echo(f"✗ {exc}", err=True)
         raise typer.Exit(1)
     if not collector and not pulse:
@@ -558,12 +581,31 @@ def config_fleet_enroll(
     if not apply:
         typer.echo("Preview only. Re-run with --apply to write these changes.")
         return
-    if collector:
-        set_collector_values(collector)
-    if pulse:
-        set_pulse_config(**pulse)
-    fleet = fleet_settings(get_pulse_config())
-    assert fleet is not None
+    collector_attempted = False
+    pulse_attempted = False
+    try:
+        if collector:
+            collector_attempted = True
+            set_collector_values(collector)
+        if pulse:
+            pulse_attempted = True
+            set_pulse_config(**pulse)
+        fleet = fleet_settings(get_pulse_config(strict=True))
+        if fleet is None:
+            raise ValueError("fleet settings missing after enrollment")
+    except (ValueError, OSError) as exc:
+        typer.echo(f"✗ Enrollment incomplete: {exc}", err=True)
+        if collector_attempted:
+            typer.echo(
+                "Collector update was attempted; inspect its current state. Recovery backup: "
+                f"{collector_config_dir() / 'config.sh.bak-gh325'}",
+                err=True,
+            )
+        if pulse_attempted:
+            typer.echo(
+                f"Rebalance settings write was attempted; inspect {get_config_path()} before retrying.", err=True
+            )
+        raise typer.Exit(1) from exc
     typer.echo(f"✓ enrolled as {fleet['device_id']} — run `rebalance doctor` to verify")
 
 

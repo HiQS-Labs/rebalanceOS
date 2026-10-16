@@ -91,3 +91,30 @@ def test_rebase_in_progress_defers(tmp_path: Path) -> None:
     (clone / ".git" / "rebase-merge").mkdir()
     with pytest.raises(PulseReconcileError, match="already in progress"):
         reconcile_pulse_mirror(clone)
+
+
+def test_refresh_cli_preserves_dirty_and_locked_checkout_then_refreshes(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+    from rebalance.cli import app
+    from rebalance.lib.git_ops import git_publish_lock
+
+    _origin, seed, clone = _origin_and_clone(tmp_path)
+    _commit(seed, "upstream.txt", "new export\n")
+    _git(seed, "push", "origin", "main")
+    before = _git(clone, "rev-parse", "HEAD")
+    (clone / "base.txt").write_text("unfinished local output\n")
+    runner = CliRunner()
+    dirty = runner.invoke(app, ["config", "refresh-pulse-clone", "--path", str(clone)])
+    assert dirty.exit_code == 1, dirty.output
+    assert (clone / "base.txt").read_text() == "unfinished local output\n"
+    assert _git(clone, "rev-parse", "HEAD") == before
+    assert not _git(clone, "stash", "list").strip()
+    (clone / "base.txt").write_text("base\n")
+    with git_publish_lock(clone):
+        busy = runner.invoke(app, ["config", "refresh-pulse-clone", "--path", str(clone)])
+    assert busy.exit_code == 1, busy.output
+    assert "busy" in busy.output
+    assert _git(clone, "rev-parse", "HEAD") == before
+    refreshed = runner.invoke(app, ["config", "refresh-pulse-clone", "--path", str(clone)])
+    assert refreshed.exit_code == 0, refreshed.output
+    assert (clone / "upstream.txt").read_text() == "new export\n"

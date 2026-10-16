@@ -149,6 +149,8 @@ git pull
 #    and points Sleuth at it. It stops without cloning or changing anything when the config
 #    is broken or names two different clones. Only when nothing is configured at all does it
 #    use ~/git-pulse-sync; pass --clone-dir <folder> to choose another.
+#    Existing clones refresh under the shared writer lock, without autostash. Lock contention,
+#    dirty/in-progress Git state or refresh failure stops before Sleuth settings change.
 #    Also overrides a machine previously pointed at the Web API.
 bash scripts/setup_sleuth_file_source.sh --workspace neochrome
 #    This reads the published Sleuth export directly from the companion repo —

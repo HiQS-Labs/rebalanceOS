@@ -1,0 +1,8 @@
+{
+  "scope": "byte-identical setup copied to scratch project with script-resolved shadow CLI",
+  "refresh_exit": 42,
+  "setup_exit": 42,
+  "set_sleuth_called": false,
+  "direct_pull_called": false,
+  "probe_correction": "Initial PATH/REBALANCE_BIN override did not replace script-pinned .venv CLI; that probe refused its fake non-Git directory (exit1) and was not counted as mocked-refresh evidence."
+}

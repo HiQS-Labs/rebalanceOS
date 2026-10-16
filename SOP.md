@@ -379,8 +379,14 @@ Fleet mode stops updating the Python-written root pages in the pulse repo: `live
 show delivered fleet output for seven consecutive days (the #282 qualification window):
 
 1. Confirm no Mac still has `pulse_fleet_enabled` false (doctor on each, or `fleet:*` rows).
-2. In one commit to the pulse repo, delete root `live-pulse.md` and `live-pulse-*.md`.
-3. Keep `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`: the collector still
+2. Inventory every reader of the root pages before removing them. For each VS Code sidebar,
+   set `pulseTreeView.pulseFilePath` to this Mac's configured clone plus
+   `devices/<canonical-device-id>/live-pulse.md` (use its collector identity, not a guessed hostname).
+   Refresh the sidebar and verify its rendered sections; migrate any other explicit root-page
+   paths too. A configured reader still using a root page blocks retirement.
+3. Only after those reader checks, delete root `live-pulse.md` and `live-pulse-*.md` in one commit
+   to the private pulse repo, retaining the normal Git rollback history.
+4. Keep `pulse-<id>.md`, `devices/<id>.yaml`, `devices/<id>/` and `snapshots/`: the collector still
    writes them in fleet mode, and `health-check.py`, `recap.py`, `view.sh` and `pulse_health` read them.
 
 `pulse_filename` is already removed from each Mac's config by `fleet-enroll`.
@@ -440,3 +446,22 @@ Studio follow-through (0.97.2): source and package metadata can disagree in an e
 
 The procedure is a draft SOP for now: [#293](https://github.com/HiQS-Labs/rebalanceOS/issues/293) (when to declare, a time-boxed window, exit gates).
 This pointer will be replaced by the landed doc path once #293 lands.
+
+### Fleet configuration repair failures (GH-330)
+
+Enrollment/discovery now refuses an existing malformed, non-object or unreadable Rebalance config;
+missing config still allows bootstrap. Preserve and repair the named file before retrying; never
+replace it with defaults to make enrollment appear successful. Pulse timezone input is validated
+before settings writes. Ordinary getters retain their existing warning/default behavior.
+
+New collector backups are completed independent copies before publication, and replacement preserves
+Unix permission bits. An older `config.sh.bak-gh325` may predate this guarantee: inspect it before
+manual recovery; the command does not overwrite it or claim retroactive integrity. Ownership/ACLs,
+concurrent config writers and two-file/power-loss transactions are not qualified here. A partial apply
+reports attempted writes and the backup location; inspect both current files before retrying. It never
+automatically restores a potentially stale first backup over newer settings.
+
+Sleuth setup refreshes an existing checkout with `rebalance config refresh-pulse-clone --path <clone>`,
+which calls the existing shared-lock mirror helper. A busy publisher, existing Git operation, dirty
+checkout or failed pull stops setup before writing Sleuth settings; preserve pending work and report
+it. Normal Sleuth reads fetch upstream blobs without rebasing or stashing the checkout.

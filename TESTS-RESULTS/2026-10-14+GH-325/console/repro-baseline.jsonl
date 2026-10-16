@@ -1,0 +1,7 @@
+{"case": "malformed-config-discovery", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "exit": 3, "preserved": true, "expected_exit": 2}
+{"case": "malformed-config-apply", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "exit": 0, "preserved": false, "expected_preserved": true}
+{"case": "invalid-timezone", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "exit": 0, "preserved": false, "expected_exit": 2, "expected_preserved": true}
+{"case": "collector-permissions", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "mode": "0o644", "expected_mode": "0o600"}
+{"case": "interrupted-first-backup", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "complete_backup": false, "expected_complete": true}
+{"case": "partial-apply", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "exit": 1, "exception": "OSError", "collector_changed": true, "rbos_preserved": true, "has_recovery_context": false}
+{"case": "setup-pull-failure-continues", "revision": "8ff740bff5e2e49bb70ab094e5d3810775450887", "git_pull_exit": 42, "setup_exit": 0, "set_sleuth_called": true, "autostash_requested": true, "expected_set_sleuth_called": false}

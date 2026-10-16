@@ -17,8 +17,8 @@ Sleuth box (systemd timer, every 5 min)
    └─ GET  http://127.0.0.1:2020/.../reminders?format=rebalance   (loopback, on the box)
    └─ PUT  Hypercart-Dev-Tools/rebalance-git-pulse : sync/sleuth/reminders-<ws>.json   (GitHub contents API)
                                                   │
-                                        git pull  ▼
-rebalance-OS  ──reads──►  <this Mac's clone>/sync/sleuth/reminders-<ws>.json   (local clone)
+                          git fetch + upstream blob  ▼
+rebalance-OS  ──reads──►  upstream sync/sleuth/reminders-<ws>.json   (local file fallback)
 ```
 
 - **Publisher** lives in the `sleuth-app` repo under `deploy/reminders-export/`
@@ -29,8 +29,10 @@ rebalance-OS  ──reads──►  <this Mac's clone>/sync/sleuth/reminders-<ws
   `base_url` still uses the live API (that's how **dev** works — the dev box is
   reachable directly).
 - **Freshness:** `refresh_index` / the daily launchd sync does a best-effort
-  `git -C <repo> pull --rebase --autostash` before reading, so a read-only device
-  self-refreshes. On devices that also push pulses, the pulse sync already pulls.
+  `git fetch` and reads the upstream export blob without rebasing, stashing or changing
+  the worktree/index. Fetch failure is reported with an explicit local-cache fallback;
+  a successful fetch is not proof of successful ingest. Setup separately uses the existing
+  shared writer lock to refresh an already-cloned checkout before configuring the file source.
 
 ## Setup on a device
 
@@ -80,13 +82,13 @@ unchanged: `--base-url http://<dev-host>:2020 --token <token> --workspace neochr
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Sleuth reminders file not found: …` | The export repo isn't cloned/pulled on this device | `git clone …/rebalance-git-pulse.git "$CLONE"` (or `git -C "$CLONE" pull`), with `CLONE=$(rebalance config fleet-enroll --print-clone)` |
-| `doctor`: `published export is stale — heartbeat … (Nh ago)` | The publisher timer is dead **or** the local sync/clone is stuck (the publisher stamps an hourly `exportGeneratedAt`; doctor warns past ~3h) | Check the publisher: `systemctl list-timers sleuth-reminders-export.timer` on the Sleuth box. Locally, the sync auto-refreshes the clone — see `source_refresh` in the refresh result; force with `git -C "$CLONE" pull` |
+| `Sleuth reminders file not found: …` | The clone or configured local fallback is missing | Use the setup command above to resolve/create the clone. To refresh an existing checkout manually: `rebalance config refresh-pulse-clone --path "$CLONE"` |
+| `doctor`: `published export is stale — heartbeat … (Nh ago)` | The publisher timer is dead **or** the local sync/clone is stuck (the publisher stamps an hourly `exportGeneratedAt`; doctor warns past ~3h) | Check the publisher: `systemctl list-timers sleuth-reminders-export.timer` on the Sleuth box. Locally, normal sync fetches and reads the upstream blob — inspect `source_refresh` and any fallback error. For a manual checkout refresh use `rebalance config refresh-pulse-clone --path "$CLONE"` |
 | `… refusing to reconcile (wrong file/endpoint?)` / `missing filters.activeOnly` / `source.type …` | Contract guard tripped — wrong workspace file, truncated/partial export, or publisher drift. **No DB rows were changed.** | Confirm `base_url` points at the right `reminders-<workspace>.json` and the publisher is healthy; the guard is intentional — it refuses to retire reminders from a bad payload |
-| `Sleuth reminders file is invalid JSON` | Partial write / merge conflict in the clone | `git -C "$CLONE" status`; resolve, then re-pull |
+| `Sleuth reminders file is invalid JSON` | Partial write / merge conflict in the clone | Inspect the reported upstream/local source and `git -C "$CLONE" status`; repair the invalid export at its source, then rerun sync. For a checkout refresh use `rebalance config refresh-pulse-clone --path "$CLONE"` |
 | Want the live API instead (dev/debug) | — | `rebalance config set-sleuth --base-url http://<host>:2020 --token <token> --workspace <ws>` |
 
-**Freshness model:** the publisher stamps an hourly-rounded `exportGeneratedAt`; the consumer persists it and `rebalance doctor` compares **that** (not the local `last_synced_at`, which re-reads keep bumping) to now — so a dead publisher is visible. Before each read the sync does a best-effort, **non-destructive** refresh of the export clone (`git fetch` + checkout of only the export file — no `pull --rebase`, so it can't conflict with other jobs writing that repo); status is reported as `source_refresh`.
+**Freshness model:** the publisher stamps an hourly-rounded `exportGeneratedAt`; the consumer persists it and `rebalance doctor` compares **that** (not the local `last_synced_at`, which re-reads keep bumping) to now — so a dead publisher is visible. Before each read the sync does a best-effort, **non-destructive** refresh of the export clone (`git fetch` + `git show` of the upstream export blob, without worktree/index writes, rebase or autostash); status is reported as `source_refresh`.
 
 ## Related
 

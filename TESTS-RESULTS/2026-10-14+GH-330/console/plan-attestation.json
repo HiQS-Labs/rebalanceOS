@@ -1,0 +1,17 @@
+{
+  "added_len": 2231,
+  "added_sha256": "f26e53865caeaecbbe891386e87e17ea9fd4e35e9a7392a21ce560bbef4d111d",
+  "added_start": 6491,
+  "artifact_sha256": null,
+  "attested_at": "2026-10-14T23:17:36Z",
+  "driver_pid": 52699,
+  "isolated": true,
+  "relay_file_rel": "TESTS-RESULTS/2026-10-14+GH-330/QA/plan-claude.md",
+  "reviewed_head": "4c7bc5c705f6a72585e487e80f7eb595f3996ccb",
+  "reviewer": "claude",
+  "schema": "relay-drive/attest@1",
+  "status": "Approved",
+  "task": "RELAY-gh330-plan",
+  "trailer_sha256": "d0cc7f0b328c2f6dcfeda048075a8e76bce3bb53f6c2c36f86177547e8ff8030",
+  "driver_exit": 0
+}

@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -143,6 +144,7 @@ def _seed(db_path: Path) -> None:
 
 class CloseLoopFlagTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.enterContext(patch("rebalance.ingest.github_readiness.now_utc", return_value=NOW))
         self._tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self._tmp.name) / "rebalance.db"
 

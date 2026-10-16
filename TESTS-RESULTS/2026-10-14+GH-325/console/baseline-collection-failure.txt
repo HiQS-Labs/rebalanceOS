@@ -1,0 +1,66 @@
+
+==================================== ERRORS ====================================
+______________ ERROR collecting HiQS/tests/test_eval_retrieval.py ______________
+ImportError while importing test module '<task-clone>-verify/HiQS/tests/test_eval_retrieval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+HiQS/tests/test_eval_retrieval.py:13: in <module>
+    from tests.eval_retrieval import (
+HiQS/tests/eval_retrieval.py:25: in <module>
+    from hiqs.search import _fts_search, _vec_search, cap_per_document, rrf_fuse
+HiQS/hiqs/search.py:12: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_______________ ERROR collecting HiQS/tests/test_github_docs.py ________________
+ImportError while importing test module '<task-clone>-verify/HiQS/tests/test_github_docs.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+HiQS/tests/test_github_docs.py:10: in <module>
+    from hiqs.search import search
+HiQS/hiqs/search.py:12: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+______________ ERROR collecting HiQS/tests/test_judge_pairwise.py ______________
+ImportError while importing test module '<task-clone>-verify/HiQS/tests/test_judge_pairwise.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+HiQS/tests/test_judge_pairwise.py:10: in <module>
+    from judge_pairwise import (
+HiQS/tests/judge_pairwise.py:30: in <module>
+    from hiqs.search import search  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+HiQS/hiqs/search.py:12: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+__________________ ERROR collecting HiQS/tests/test_search.py __________________
+ImportError while importing test module '<task-clone>-verify/HiQS/tests/test_search.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+HiQS/tests/test_search.py:7: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <task-clone>-verify/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR HiQS/tests/test_eval_retrieval.py
+ERROR HiQS/tests/test_github_docs.py
+ERROR HiQS/tests/test_judge_pairwise.py
+ERROR HiQS/tests/test_search.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+1 warning, 4 errors in 3.93s

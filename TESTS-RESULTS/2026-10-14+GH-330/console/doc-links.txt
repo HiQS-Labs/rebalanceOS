@@ -1,0 +1,2 @@
+checked 664 relative markdown links under <task>
+no broken links, no machine-local paths

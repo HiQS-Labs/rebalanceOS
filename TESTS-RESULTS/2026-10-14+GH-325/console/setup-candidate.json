@@ -1,0 +1,9 @@
+{
+  "case": "setup-refresh-failure-stops",
+  "source_revision": "working implementation after approved plan a02fb48",
+  "refresh_cli_exit": 42,
+  "setup_exit": 42,
+  "set_sleuth_called": false,
+  "direct_git_pull_called": false,
+  "expected_set_sleuth_called": false
+}

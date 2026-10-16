@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import stat
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -92,6 +93,7 @@ class SetCollectorValuesTests(_FleetFixture):
     def test_replaces_duplicates_appends_missing_and_backs_up(self) -> None:
         original = '# keep me\nrepos=("a b")\nsync_repo_dir="/old"\nfleet_mode=false\nfleet_mode=false\n'
         path = self.collector(original)
+        path.chmod(0o600)
         set_collector_values({"fleet_mode": "true", "sync_repo_dir": "/new dir", "fleet_sync_subdir": "sync"})
         text = path.read_text()
         self.assertIn("# keep me", text)
@@ -103,6 +105,40 @@ class SetCollectorValuesTests(_FleetFixture):
             {"sync_repo_dir": "/new dir", "fleet_mode": "true", "fleet_sync_subdir": "sync"},
         )
         self.assertEqual((self.gp / "config.sh.bak-gh325").read_text(), original)
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE((self.gp / "config.sh.bak-gh325").stat().st_mode), 0o600)
+        set_collector_values({"fleet_mode": "false"})
+        self.assertEqual((self.gp / "config.sh.bak-gh325").read_text(), original)
+
+    def test_backup_failure_leaves_original_and_no_partial_backup(self) -> None:
+        path = self.collector("fleet_mode=false\n")
+        original = path.read_bytes()
+        for operation in ("os.fsync", "os.link"):
+            with (
+                self.subTest(operation=operation),
+                patch("rebalance.lib.git_ops." + operation, side_effect=OSError("fixture failure")),
+            ):
+                with self.assertRaises(OSError):
+                    set_collector_values({"fleet_mode": "true"})
+            self.assertEqual(path.read_bytes(), original)
+            self.assertFalse((self.gp / "config.sh.bak-gh325").exists())
+            self.assertEqual(list(self.gp.glob(".config.sh-*")), [])
+
+    def test_replace_failure_keeps_complete_backup_and_original_mode(self) -> None:
+        path = self.collector("fleet_mode=false\n")
+        path.chmod(0o640)
+        original = path.read_bytes()
+        with patch.object(Path, "replace", side_effect=OSError("fixture replace failure")):
+            with self.assertRaises(OSError):
+                set_collector_values({"fleet_mode": "true"})
+        self.assertEqual(path.read_bytes(), original)
+        backup = self.gp / "config.sh.bak-gh325"
+        self.assertEqual(backup.read_bytes(), original)
+        self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o640)
+        self.assertEqual(list(self.gp.glob(".config.sh-*")), [])
+        set_collector_values({"fleet_mode": "true"})
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
+        self.assertEqual(backup.read_bytes(), original)
 
 
 class DiscoverPulseCloneTests(_FleetFixture):
@@ -206,6 +242,56 @@ class FleetEnrollCliTests(_FleetFixture):
         self.assertEqual(self.run_cli("--print-clone").exit_code, 2)
         self.collector(f'sync_repo_dir="{self.clone(self.root / "other")}"\n')
         self.assertEqual(self.run_cli("--print-clone").exit_code, 2)
+
+    def test_invalid_existing_settings_refuse_all_admission_without_writes(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        path = self.collector(f'device_id="mac-a"\nsync_repo_dir="{clone}"\n')
+        original_collector = path.read_bytes()
+        for payload in (b'{"fixture":', b"[1,2,3]", b"\xff"):
+            config_module.CONFIG_PATH.write_bytes(payload)
+            for args in ((), ("--apply",), ("--print-clone",)):
+                with self.subTest(payload=payload, args=args):
+                    result = self.run_cli(*args)
+                    self.assertEqual(result.exit_code, 2 if args == ("--print-clone",) else 1, result.output)
+                    self.assertIn("Cannot read settings", result.output)
+                    self.assertEqual(config_module.CONFIG_PATH.read_bytes(), payload)
+                    self.assertEqual(path.read_bytes(), original_collector)
+        with self.assertRaises(ValueError):
+            config_module.set_pulse_config(github_login="fixture")
+        self.assertEqual(config_module.CONFIG_PATH.read_bytes(), b"\xff")
+
+    def test_set_pulse_rejects_bad_timezone_before_any_setting_changes(self) -> None:
+        self.rbos(github_login="fixture-before")
+        before = config_module.CONFIG_PATH.read_bytes()
+        result = CliRunner().invoke(
+            app, ["config", "set-pulse", "--github-login", "fixture-after", "--timezone", "America/Los_Angelesx"]
+        )
+        self.assertEqual(result.exit_code, 2, result.output)
+        self.assertIn("IANA timezone", result.output)
+        self.assertEqual(config_module.CONFIG_PATH.read_bytes(), before)
+        valid = CliRunner().invoke(app, ["config", "set-pulse", "--timezone", "UTC"])
+        self.assertEqual(valid.exit_code, 0, valid.output)
+        self.assertEqual(self.rbos_values()["pulse_timezone"], "UTC")
+
+    def test_partial_apply_and_missing_postcondition_report_recovery(self) -> None:
+        clone = self.clone(self.home / "pulse")
+        body = f'device_id="mac-a"\nsync_repo_dir="{clone}"\nfleet_mode=false\n'
+        path = self.collector(body)
+        self.rbos(github_login="fixture-before")
+        before = config_module.CONFIG_PATH.read_bytes()
+        with patch.object(config_module, "set_pulse_config", side_effect=OSError("fixture second writer failure")):
+            result = self.run_cli("--apply")
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("Enrollment incomplete", result.output)
+        self.assertIn("Recovery backup", result.output)
+        self.assertIn("write was attempted", result.output)
+        self.assertNotEqual(path.read_text(), body)
+        self.assertEqual(config_module.CONFIG_PATH.read_bytes(), before)
+        path.write_text(body)
+        with patch("rebalance.lib.git_ops.fleet_settings", return_value=None):
+            missing = self.run_cli("--apply")
+        self.assertEqual(missing.exit_code, 1, missing.output)
+        self.assertIn("fleet settings missing after enrollment", missing.output)
 
 
 class DoctorPulseFleetTests(_FleetFixture):

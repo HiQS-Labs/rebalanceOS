@@ -1,0 +1,43 @@
+{
+  "before": {
+    "head": "e2e72e832e9605a02e50407de993bfc5bcc8e229",
+    "origin": "<task>",
+    "bare": "false",
+    "status": ""
+  },
+  "source_version": "0.101.1",
+  "installed_version": "0.101.1",
+  "commands": [
+    {
+      "lane": "root",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "log": "final-root.txt"
+    },
+    {
+      "lane": "hiqs",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "HiQS/tests",
+        "-q"
+      ],
+      "exit": 0,
+      "log": "final-hiqs.txt"
+    }
+  ],
+  "after": {
+    "head": "e2e72e832e9605a02e50407de993bfc5bcc8e229",
+    "origin": "<task>",
+    "bare": "false",
+    "status": ""
+  },
+  "identity_preserved": true
+}

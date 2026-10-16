@@ -1,0 +1,19 @@
+{
+  "baseline_implementation": "8ff740bff5e2e49bb70ab094e5d3810775450887",
+  "red_command": "PYTHONPATH=src .venv/bin/python -m pytest tests/test_fleet_enroll.py tests/test_config_read_shape_guard.py tests/test_pulse_reconcile.py -q",
+  "test_sha256": {
+    "tests/test_fleet_enroll.py": "41259e572ad39135d42ef8f3d79dfbdefa5def990203334f150dda15f5baceb1",
+    "tests/test_config_read_shape_guard.py": "0d31b18a2cd9b74f426dcfb933a4a12af7eeb34b0a08400ceaebdadd19daa518",
+    "tests/test_pulse_reconcile.py": "1a2d11dec38fa5918d5e1142c4b1672a8d061f19be51e80c203e24f12584ae84"
+  },
+  "red_result": "25 failed,35 passed,12 subtests; intended sensitivity controls against old implementation",
+  "focused_commands": [
+    ".venv/bin/python -m pytest tests/test_fleet_enroll.py tests/test_config_read_shape_guard.py tests/test_pulse_reconcile.py tests/test_git_publication_contract.py -q",
+    ".venv/bin/python -m pytest tests/test_time_ops_property.py tests/test_time_ops_relative_options.py tests/test_time_ops_migration.py tests/test_time_ops_consolidation.py tests/test_pulse_self_repair.py -q"
+  ],
+  "focused_results": [
+    "67 passed,23 subtests",
+    "40 passed,29 subtests"
+  ],
+  "baseline_extra_results": "8 embedding tests passed after declared extras install; original full root had4 missing-extra failures,2758 passed,20 skips,10xfails; HiQS163 passed,1skip,1xfail"
+}
