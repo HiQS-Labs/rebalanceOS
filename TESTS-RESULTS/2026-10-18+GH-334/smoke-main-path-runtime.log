@@ -1,0 +1,12 @@
+## step 0 (revised): RB from ~/.config/rebalance/runtime-root = /Users/noelsaw/rebalance-runtime
+  plist ProgramArguments[0]: /Users/noelsaw/rebalance-runtime/.venv/bin/python
+  doctor rc=1
+  ok       pulse | configured (/Users/noelsaw/git-pulse-sync)
+  error    scheduler:pulse-sync | installed on this device but NOT loaded in launchd
+## step 1
+  behind/ahead: 85	11
+  dirty: 0
+  runtime drift: RUNTIME: 11 commit(s) BEHIND origin/development — fleet is running 9dd2665 from 2026-10-07
+  com.rebalance-os.pulse-sync: installed, NOT-loaded
+  com.user.git-pulse: installed, NOT-loaded
+## planned: 2.1 load -w both jobs (fleet); 2.3 enrolled -> fleet rows checked; 3 fleet: refresh-pulse-clone -> pulse-sync -> collector; drift reported only

@@ -124,6 +124,25 @@ Nothing existing can carry this without new code. The doctor is read-only (`--js
 | R2 | `pgrep` cannot see a cwd | **Accepted**: `lsof +D <checkout>` is the live-owner check. The smoke covers a relative-path git process, a held lock and patch retention |
 | — | Gates and recovery not run by the reviewer | Expected: disposable-clone evidence is captured at implementation |
 
+#### Independent QA (agy) round 1: post-approval revision
+
+Agy returned PASS with two Nits. Nit 1 was **upgraded to Should** after it was verified on this Mac:
+- `~/.config/rebalance/runtime-root` points at `~/rebalance-runtime`. The installed pulse-sync plist runs from that clone.
+- Its `temp/rbos.config` has `pulse_fleet_enabled: true`, and `~/.config/git-pulse/config.sh` has `fleet_mode=true`.
+- Both `com.rebalance-os.pulse-sync` and `com.user.git-pulse` are installed but not loaded.
+- The runtime is 11 commits behind `development` and predates GH-325, so its doctor has no `pulse fleet` row.
+
+Diagnosing the dev clone would have reported the Mac as not enrolled and reloaded only pulse-sync. In fleet mode pulse-sync only queues, so nothing would be delivered.
+
+**Changes:**
+- Step 0 resolves `RB` in this order: `$REBALANCE_ROOT`, then `runtime-root`, then the CLI clone. It is confirmed against the plist's `ProgramArguments`.
+- `FLEET` falls back to `pulse_fleet_enabled` in `$RB/temp/rbos.config`.
+- Step 1 reports runtime drift (`stack.sh drift`, read-only; deploying stays with the operator).
+- Step 2.1 reloads every job the mode needs, adding the collector in fleet mode. A collector that is not installed means stop and report.
+- Nit 2: a missing upstream means report and stop.
+
+The main-path smoke was re-run with the runtime root (`TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log`).
+
 ### Changes
 
 1. `experimental/git-pulse/git-pulse-sync-repair/SKILL.md`: the procedure above. Frontmatter `name` and `description`; under about 150 lines.

@@ -21,13 +21,18 @@ procedure in step 2.4.
 
 ## 0. Resolve
 
-- `RB` = `$REBALANCE_ROOT`, or else this device's RebalanceOS clone that holds `.venv/bin/rebalance`.
-  If none exists, stop: "RebalanceOS CLI not found".
+- `RB` = the clone the scheduled jobs actually run from. Use `$REBALANCE_ROOT`, else the path in
+  `~/.config/rebalance/runtime-root` when that file exists, else this device's RebalanceOS clone
+  that holds `.venv/bin/rebalance`. Confirm that `$RB` matches the path in the installed pulse-sync
+  plist's `ProgramArguments` (`/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' <plist>`).
+  Diagnosing a different clone reads the wrong config: fleet mode lives in `$RB/temp/rbos.config`.
+  If no CLI exists, stop: "RebalanceOS CLI not found".
 - Run `"$RB/.venv/bin/rebalance" doctor --json` from `$RB`. Keep the rows `scheduler:pulse-sync`,
   `pulse`, `pulse fleet*` and collector health.
 - `PULSE` = the path in the `pulse` row (`configured (<path>)`). If that row says "missing keys",
   go straight to 2.2.
-- `FLEET` = whether the `pulse fleet` row says this Mac is enrolled.
+- `FLEET` = whether the `pulse fleet` row says this Mac is enrolled. A runtime older than GH-325
+  has no such row, so read `pulse_fleet_enabled` in `$RB/temp/rbos.config` instead.
 
 ## 1. Diagnose (read-only)
 
@@ -38,7 +43,10 @@ On `$PULSE`, with `G=$(git -C "$PULSE" rev-parse --absolute-git-dir)`:
 - `git -C "$PULSE" symbolic-ref -q HEAD` fails, meaning HEAD is detached.
 - `git -C "$PULSE" status --porcelain`, which shows a dirty tree.
 - `git -C "$PULSE" fetch -q` then `git -C "$PULSE" rev-list --left-right --count @{u}...HEAD`,
-  which gives behind and ahead counts.
+  which gives behind and ahead counts. If no upstream is configured, report it and stop.
+- Runtime drift: `bash "$RB/scripts/stack.sh" drift` (read-only). Report a runtime that is behind
+  `origin/development` as a finding for the operator; deploying it (SOP.md runtime pull) is not
+  part of this repair.
 - Push policy: `PULSE_PUSH` in `~/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist`. Off-fleet,
   `false` disables delivery (`scripts/pulse_sync.sh:37-42`). In fleet mode the collector pushes.
 
@@ -46,13 +54,17 @@ Print one findings table (check, observed value, planned action) **before any ch
 
 ## 2. Repair (once each, only for diagnosed faults)
 
-**2.1 Scheduler** (`scheduler:pulse-sync`):
-- Installed but not loaded: `launchctl load -w ~/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist`.
-  `-w` clears a launchd disable that plain `load` ignores (doctor's hint, `src/rebalance/doctor.py:842-848`).
-- Not installed: `bash "$RB/scripts/stack.sh" install pulse-sync`. Its preflight runs first. Never
-  use `--force` or a whole-stack restart.
-- Verify once with `launchctl print gui/$(id -u)/com.rebalance-os.pulse-sync`. If the command
-  refuses or the job is still unregistered, stop and report.
+**2.1 Scheduler.** Cover every job this mode needs: `com.rebalance-os.pulse-sync` always, and in
+fleet mode also the collector `com.user.git-pulse`, which is the only pusher there. For each job:
+- Installed but not loaded: `launchctl load -w ~/Library/LaunchAgents/<label>.plist`. `-w` clears a
+  launchd disable that plain `load` ignores (doctor's hint, `src/rebalance/doctor.py:842-848`).
+- Not installed:
+  - pulse-sync: `bash "$RB/scripts/stack.sh" install pulse-sync`. Its preflight runs first. Never
+    use `--force` or a whole-stack restart.
+  - collector: stop and report. Installing it is `experimental/git-pulse/install.sh`, the
+    operator's step.
+- Verify once with `launchctl print gui/$(id -u)/<label>`. If the command refuses or the job is
+  still unregistered, stop and report.
 
 **2.2 `pulse` "missing keys"**: ask the operator for the GitHub login and this Mac's pulse clone
 path; never guess them. Run `"$RB/.venv/bin/rebalance" config set-pulse --github-login <login>

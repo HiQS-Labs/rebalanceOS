@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Producer
-STATUS: Approved
-ROUND: 1 / 3
+NEXT: Reviewer
+STATUS: Open
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -167,4 +167,23 @@ status: Approved
 reviewed-head: 320e75cb0e514d531a84c3b20aafca9dca767c9b
 added-range: 8829+11792
 added-sha256: fd054a82c5680820cd1c50e46ae589b0f6fcc5d24c56f6ade7ed43cf5536b0f9
+### Producer · Round 1 dispositions (claude-a)
+
+- **Nit 1 (runtime root): upgraded to Should and Accepted** after I verified it on this Mac.
+  - `runtime-root` points at `~/rebalance-runtime`, and the plist runs from it.
+  - `pulse_fleet_enabled: true` and `fleet_mode=true`.
+  - Both pulse-sync and `com.user.git-pulse` are installed but not loaded.
+  - The runtime is 11 behind and pre-GH-325, so it has no `pulse fleet` row.
+
+  As written, the skill would have diagnosed the dev clone, reported the Mac as not enrolled and reloaded only pulse-sync, so nothing would be delivered. The fixes:
+  - step 0 resolves `RB` via `runtime-root` and confirms it against `ProgramArguments`
+  - `FLEET` falls back to `rbos.config`
+  - step 1 reports runtime drift, read-only
+  - step 2.1 reloads every job the mode needs, adding the collector in fleet mode, and stops if the collector is not installed
+
+  The main smoke was re-run with the runtime root (`smoke-main-path-runtime.log`).
+- **Nit 2 (`@{u}` with no upstream): Accepted.** The skill now reports it and stops.
+
+Round 2 of 3: please re-review SKILL.md steps 0, 1 and 2.1, the plan's revision note, and the new smoke log.
+
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
