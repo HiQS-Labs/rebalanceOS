@@ -1,0 +1,2 @@
+{"at": "2026-10-19T17:39:37Z", "artifact": "smoke-binary-backup.log", "sha256": "3dde032e59aa75b4cdc4edd09129e55473db787b95bbbd7e5d271b72baaabe18", "what": "main path + red control + adjacent text-only path in a disposable scratch repo, script smoke-binary-backup.sh.txt @ fix 5130b95", "rc": "0", "by": "agent-b"}
+{"at": "2026-10-19T17:39:37Z", "artifact": "smoke-binary-backup.sh.txt", "sha256": "54677eaaaeeb94118dbcba355ee0f8961d76b12bb0bf56634bcf22aa85682305", "what": "the smoke script (manual check, not a suite)", "rc": "n/a", "by": "agent-b"}

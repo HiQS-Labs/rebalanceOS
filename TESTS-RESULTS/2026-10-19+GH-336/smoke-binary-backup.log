@@ -1,0 +1,43 @@
+== main-new-command (diff --binary HEAD)
+  rebase rc=1 (1 = conflicted, expected)
+  status: UU c.bin
+  status: UU t.txt
+  diff rc=0
+  check non-empty: ok
+  check no-placeholder: ok
+  abort rc=0
+  apply rc=0
+  t.txt (resolved text, unstaged): restored
+  c.bin (conflicted binary, overwritten): restored
+  s.bin (staged binary edit): restored
+  del.txt (deleted): restored
+  mode.sh (chmod +x): restored
+  rename old.txt->new.txt: restored
+  idx.txt staged B / disk A: on disk = A (stated limit: staged-only B not kept)
+== red-control-old-command (diff  HEAD)
+  rebase rc=1 (1 = conflicted, expected)
+  status: UU c.bin
+  status: UU t.txt
+  diff rc=0
+  check non-empty: ok
+  check no-placeholder: FAIL (2.4e would stop here)
+  abort rc=0
+  apply: error: cannot apply binary patch to 'c.bin' without full index line
+  apply: error: c.bin: patch does not apply
+  apply rc=1
+  t.txt (resolved text, unstaged): LOST
+  c.bin (conflicted binary, overwritten): LOST
+  s.bin (staged binary edit): LOST
+  del.txt (deleted): LOST
+  mode.sh (chmod +x): LOST
+  rename old.txt->new.txt: LOST
+  idx.txt staged B / disk A: on disk = A (stated limit: staged-only B not kept)
+== adjacent-text-only (diff --binary HEAD)
+  rebase rc=1 (1 = conflicted, expected)
+  status: UU t.txt
+  diff rc=0
+  check non-empty: ok
+  check no-placeholder: ok
+  abort rc=0
+  apply rc=0
+  t.txt (resolved text, unstaged): restored
