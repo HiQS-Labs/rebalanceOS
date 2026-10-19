@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 2
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -136,5 +136,25 @@ Handing off to Producer (claude-a): disposition S1 and the remaining review note
   - local deployment is reported separately from app discovery and other devices' pulse receipt
 
 Round 2 (last): please re-review the revised plan.
+
+### Reviewer · Round 2
+
+VERDICT: PASS
+Basis: Approve the bounded wording-change plan. S1 is resolved; U1's recovery limit is explicit and its clone verification is planned; N1's deployment sequence is expanded. No remaining Blocker or Should. Approval is of the plan, not an attestation that recovery or deployment has run.
+swept file: yes
+
+Re-read the entire revised GH-336 plan, entire source SKILL and GH-334 plan (including their pre-existing procedure and dispositions), and SOP evidence rules plus GH-334 exception. No additional evidenced pre-existing Blocker or Should found in this bounded review. Verify-tier graph preflight: project `rebalanceOS` points to another checkout; coverage generation `2026-09-02T03:54:57Z` reports missing freshness for the three artifact paths and changed SOP metadata. Used current local documents directly; no structural-code claim depends on that stale graph.
+
+- [Pass] S1 closed — Plan `PROJECT/1-INBOX/GH-336-BINARY-SAFE-REBASE-BACKUP.md:147` now permits reduced delivery only after applicable findings are dispositioned and smoke, red control and static gate pass; `:149` explicitly says “nothing ships unverified.” The final-QA stop at `:148` remains intact. Deadline expiry cannot substitute for recovery evidence.
+- [Pass] U1 disposition is sufficient at plan time — Plan `:87-90` promises on-disk tracked-file state and explicitly excludes a staged version differing from disk. `:102-106` adds deletion, mode and rename inputs alongside the original three, requires restoration at the saved HEAD, and records hashes and exit statuses plus the staged/disk limit. The [Git diff manual](https://git-scm.com/docs/git-diff#_description) describes the commit comparison as working tree versus commit, separately from the cached/index form; its [binary option](https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---binary) supplies an applicable binary patch with full blob IDs. These support the design, without independently reproducing the Producer's scratch claims.
+- [Pass] Fix and verification remain proportionate — Plan `:83-86` changes the patch-generation owner and supplies the correct saved-HEAD restoration base; `:107-112` retains the old-command red control, text-only adjacent path and durable campaign/provenance. The nonempty/no-placeholder check is an omission guard, not a completeness proof; the restore smoke supplies the latter for its stated inputs. The source omission remains at `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:99-100`, mirrored at `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:95`. SOP `:361-372` delegates the procedure without quoting the old command, so no SOP command replacement is needed. Fold-ins at plan `:92-99` remain small and removable on dispute.
+- [Pass] N1's workflow is incorporated — Plan `:117-127` now previews intake, inspects warnings, checks source revision, folder parity and links, and separates local deployment from discovery and remote receipt. Acceptance at `:160-161` requires parity, not just occurrence of the changed line.
+- [Nit] At execution, do not use the parenthetical `intake.py list` at plan `:124` as the folder-parity proof by itself. The Skills Army HQ rulebook's “Definition of done” requires a whole-folder comparison against the verified source; its status rule warns that status does not compare receipt digests against deployed bytes. Perform that existing comparison when producing the deployment receipt. No new automation is needed.
+- [Nit] Plan `:66-67` retains the historical universal belief “captures every tracked edit.” Qualify that recon wording with the on-disk-state limit already stated at `:87-90`, so it cannot be quoted apart from its disposition. The operative scope and smoke already contain the limit; this is editorial consistency.
+- [Unverified — needs clone run] Recovery of the six inputs, the staged/disk counterexample, red control and text-only adjacent path were not executed by this reviewer. Producer claims in the previous block remain claims pending the campaign receipt required at plan `:110-111`. No Git commands, suites, executable fixtures or recovery probes were run. Live issue refresh also failed: `gh api repos/HiQS-Labs/rebalanceOS/issues/336 --jq '{title,body,state}'`, exit 1, returned “error connecting to api.github.com”; the web fallback returned “Failed to fetch ... Cache miss.” No new claim about live issue state is made.
+
+Root cause: the plain diff omits binary payloads; Fix site: step 2.4e and its mirrored specification; Why not upstream/downstream: backup refs preserve commits, while this command captures uncommitted disk content before abort. The tar fallback at plan `:146` is a separate, unapproved contingency requiring its stated re-QA, not part of this approval.
+
+Relay closed (Approved), no further review turn needed. Producer (claude-a) may implement the approved plan and capture the required disposable-clone evidence. Only this relay file was edited; the harness owns the commit.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
