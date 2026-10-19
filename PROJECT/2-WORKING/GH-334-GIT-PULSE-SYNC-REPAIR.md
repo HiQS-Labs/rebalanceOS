@@ -92,7 +92,7 @@ Nothing existing can carry this without new code. The doctor is read-only (`--js
       - (b) No live git process is working on the checkout. Check with `lsof +D <checkout>`, which lists processes whose cwd or open files are inside it, and stop on any `git` entry. `pgrep -fl 'git.*(rebase|am)'` is supporting evidence only, since it cannot see a cwd.
       - (c) Re-read the state under the lock. The rebase must still be present, with readable `orig-head` and `head-name`. If the original-tip metadata cannot be read, stop.
       - (d) Create branches `pulse-repair-backup/<UTC>-orig` at `orig-head` and `pulse-repair-backup/<UTC>-head` at the current HEAD, then verify both refs resolve to those SHAs.
-      - (e) Save in-progress conflict edits: write `git diff HEAD` to `<gitdir>/pulse-repair-<UTC>.patch`. Untracked files survive an abort and are left alone.
+      - (e) Save in-progress conflict edits: write `git diff --binary HEAD` to `<gitdir>/pulse-repair-<UTC>.patch`. Without `--binary`, binary edits are saved as `Binary files … differ` with no content and lost on abort (GH-336). The patch must contain no such line. It holds tracked files' on-disk state, not a staged version that differs from disk. Untracked files survive an abort and are left alone.
       - (f) Run `git rebase --abort` once. Verify the branch named in `head-name` is back at `orig-head` and no rebase directory remains.
       - A merge, cherry-pick or revert in progress, or a dirty tree or detached HEAD outside this conflicted-rebase case: report the exact state and stop. Never reset, stash or discard.
 3. **Resync, once, through the scheduled jobs.** Run only when the scheduler is loaded, no Git operation is in progress and the tree is clean.

@@ -24,7 +24,8 @@ procedure in step 2.4.
 - `RB` = the clone the scheduled jobs actually run from. Use `$REBALANCE_ROOT`, else the path in
   `~/.config/rebalance/runtime-root` when that file exists, else this device's RebalanceOS clone
   that holds `.venv/bin/rebalance`. Confirm that `$RB` matches the path in the installed pulse-sync
-  plist's `ProgramArguments` (`/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' <plist>`).
+  plist's `ProgramArguments` (`/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' <plist>`). If
+  they differ, use the plist's root as `$RB`; that is the clone the jobs run.
   Diagnosing a different clone reads the wrong config: fleet mode lives in `$RB/temp/rbos.config`.
   If no CLI exists, stop: "RebalanceOS CLI not found".
 - Run `"$RB/.venv/bin/rebalance" doctor --json` from `$RB`. Keep the rows `scheduler:pulse-sync`,
@@ -58,6 +59,8 @@ Print one findings table (check, observed value, planned action) **before any ch
 fleet mode also the collector `com.user.git-pulse`, which is the only pusher there. For each job:
 - Installed but not loaded: `launchctl load -w ~/Library/LaunchAgents/<label>.plist`. `-w` clears a
   launchd disable that plain `load` ignores (doctor's hint, `src/rebalance/doctor.py:842-848`).
+  The collector has `RunAtLoad` true, so loading it starts a run at once. Record its step 3
+  baselines before loading it, and treat that run as the one step 3 observes.
 - Not installed:
   - pulse-sync: `bash "$RB/scripts/stack.sh" install pulse-sync`. Its preflight runs first. Never
     use `--force` or a whole-stack restart.
@@ -71,7 +74,7 @@ path; never guess them. Run `"$RB/.venv/bin/rebalance" config set-pulse --github
 --target-path <path>` once. Re-run doctor and continue only if `pulse` now reads `configured (<path>)`.
 
 **2.3 `pulse fleet`** (UPGRADE.md "Fleet self-repair"):
-- Enrolled with WARN/FAIL: run `rebalance config fleet-enroll --apply` once.
+- Enrolled with WARN/FAIL: run `"$RB/.venv/bin/rebalance" config fleet-enroll --apply` once.
 - Not enrolled: report it. Enrollment is the operator's per-Mac decision. Do not enroll.
 - "collector config missing": stop. The collector must be installed first.
 
@@ -96,8 +99,14 @@ c. **Re-read the state under the lock.** `R=$G/rebase-merge` (or `rebase-apply`)
 d. **Back up, verified.** Run `S=$(date -u +%Y%m%dT%H%M%SZ)`, then
    `git -C "$PULSE" branch "pulse-repair-backup/$S-orig" "$(cat "$R/orig-head")"` and
    `git -C "$PULSE" branch "pulse-repair-backup/$S-head" HEAD`. Both refs must resolve to those SHAs.
-e. **Save the conflict edits.** Run `git -C "$PULSE" diff HEAD > "$G/pulse-repair-$S.patch"`. The patch
-   must be non-empty when `git diff HEAD` is non-empty. Untracked files survive the abort.
+e. **Save the conflict edits.** Run `git -C "$PULSE" diff --binary HEAD > "$G/pulse-repair-$S.patch"`.
+   `--binary` is required: without it a changed binary file is saved as `Binary files … differ`, with no
+   content, and the abort then loses it (GH-336). The patch must be non-empty when `git diff HEAD` is
+   non-empty, and must contain no `Binary files … differ` line; otherwise stop. It holds the on-disk
+   state of every tracked file (content, deletions, modes, renames), not a staged version that differs
+   from disk. Untracked files survive the abort. To restore later:
+   `git -C "$PULSE" worktree add --detach <dir> "pulse-repair-backup/$S-head"`, then
+   `git -C <dir> apply "$G/pulse-repair-$S.patch"`.
 f. **Abort once.** Run `git -C "$PULSE" rebase --abort`. Verify the branch in `head-name` points at
    `orig-head` and that no rebase directory remains.
 
@@ -111,7 +120,7 @@ Run this step only if the scheduler is loaded, no Git operation is in progress a
 - **Off-fleet:** run pulse-sync (label `com.rebalance-os.pulse-sync`) once. If the effective
   `PULSE_PUSH` is false, report "delivery disabled". Never claim it was delivered.
 - **Fleet:**
-  1. Run `rebalance config refresh-pulse-clone --path "$PULSE"`, the shared-lock reconcile.
+  1. Run `"$RB/.venv/bin/rebalance" config refresh-pulse-clone --path "$PULSE"`, the shared-lock reconcile.
   2. Run pulse-sync once to render and queue.
   3. Check the collector `com.user.git-pulse` is loaded and its paths exist, then run it once to deliver.
   Stop on any missing, failed or deferred prerequisite.

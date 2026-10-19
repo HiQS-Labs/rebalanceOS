@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# GH-336 smoke: step 2.4e backup patch, run in a disposable scratch repo (never a real pulse clone).
+# Usage: bash smoke-binary-backup.sh.txt <empty scratch dir>
+# Runs three scenarios. Each makes a conflicted rebase, applies operator edits, saves the backup the
+# way SKILL.md 2.4d-e says, aborts as in 2.4f, then restores onto a detached worktree at the -head
+# backup and compares byte hashes.
+set -u
+W="$1"; [ -d "$W" ] && [ -z "$(ls -A "$W")" ] || { echo "need an empty dir"; exit 2; }
+h() { [ -e "$1" ] && shasum -a 256 "$1" | cut -d" " -f1 || echo absent; }
+base_repo() { # $1=dir; leaves a conflicted rebase in progress
+  git init -q "$1" && cd "$1" && git config user.email t@t && git config user.name t
+  printf 'a\n' > t.txt; head -c 64 /dev/urandom > c.bin; head -c 64 /dev/urandom > s.bin
+  printf 'd\n' > del.txt; printf 'm\n' > mode.sh; printf 'r\n' > old.txt; printf 'A\n' > idx.txt
+  git add . && git commit -qm base && git checkout -qb up
+  printf 'up\n' > t.txt; [ "${TEXT_ONLY:-0}" = 1 ] || head -c 64 /dev/urandom > c.bin
+  git commit -qam up && git checkout -q -
+  printf 'local\n' > t.txt; [ "${TEXT_ONLY:-0}" = 1 ] || head -c 64 /dev/urandom > c.bin
+  git commit -qam local
+  git rebase up >/dev/null 2>&1; echo "  rebase rc=$? (1 = conflicted, expected)"; git status --porcelain | sed 's/^/  status: /'
+}
+run() { # $1=name $2=diff flags ("--binary" or "") ; TEXT_ONLY=1 for the adjacent path
+  local name="$1" flags="$2"; echo "== $name (diff $flags HEAD)"
+  ( base_repo "$W/$name"
+    PULSE="$PWD"; G=$(git -C "$PULSE" rev-parse --absolute-git-dir)
+    printf 'resolved\n' > t.txt
+    if [ "${TEXT_ONLY:-0}" != 1 ]; then
+      head -c 64 /dev/urandom > c.bin; head -c 64 /dev/urandom > s.bin; git add s.bin
+      git rm -q del.txt; chmod +x mode.sh; git mv old.txt new.txt
+      printf 'B\n' > idx.txt; git add idx.txt; printf 'A\n' > idx.txt   # staged differs from disk: stated limit
+    fi
+    E_t=$(h t.txt); E_c=$(h c.bin); E_s=$(h s.bin); E_n=$(h new.txt)
+    S=$(date -u +%Y%m%dT%H%M%SZ)
+    git -C "$PULSE" branch "pulse-repair-backup/$S-head" HEAD
+    # SKILL.md 2.4e, verbatim except for the flag under test:
+    git -C "$PULSE" diff $flags HEAD > "$G/pulse-repair-$S.patch"; echo "  diff rc=$?"
+    [ -s "$G/pulse-repair-$S.patch" ] && echo "  check non-empty: ok" || echo "  check non-empty: FAIL"
+    if grep -q '^Binary files .* differ$' "$G/pulse-repair-$S.patch"; then echo "  check no-placeholder: FAIL (2.4e would stop here)"; else echo "  check no-placeholder: ok"; fi
+    git -C "$PULSE" rebase --abort; echo "  abort rc=$?"
+    git -C "$PULSE" worktree add -q --detach "$W/$name-restore" "pulse-repair-backup/$S-head"
+    git -C "$W/$name-restore" apply "$G/pulse-repair-$S.patch" 2>&1 | sed 's/^/  apply: /'; echo "  apply rc=${PIPESTATUS[0]}"
+    cd "$W/$name-restore"
+    # content checks print full sha256 expected (pre-abort disk) vs actual (restored)
+    c() { local a; a=$(h "$1"); [ "$a" = "$2" ] && r=restored || r=LOST; echo "  $1 ($3): $r  expected=$2 actual=$a"; }
+    c t.txt "$E_t" "resolved text, unstaged"
+    if [ "${TEXT_ONLY:-0}" != 1 ]; then
+      c c.bin "$E_c" "conflicted binary, overwritten"
+      c s.bin "$E_s" "staged binary edit"
+      c new.txt "$E_n" "rename target content"
+      # property checks (no content to hash)
+      echo "  del.txt deleted: $([ -e del.txt ] && echo LOST || echo restored) (exists=$([ -e del.txt ] && echo yes || echo no))"
+      echo "  mode.sh executable: $([ -x mode.sh ] && echo restored || echo LOST) (mode=$(stat -f %Lp mode.sh))"
+      echo "  rename source old.txt gone: $([ -e old.txt ] && echo LOST || echo restored)"
+      echo "  idx.txt staged B / disk A: on disk = $(cat idx.txt) (stated limit: staged-only B not kept)"
+    fi )
+}
+run main-new-command --binary
+run red-control-old-command ""
+TEXT_ONLY=1 run adjacent-text-only --binary
