@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Codex plan QA r1: 1 Should, 1 Unverified and 1 Nit, all accepted (dispositions in the relay). Plan revised. | Codex plan QA r2 (last round), then implement. |
+| Codex plan QA **Approved** in round 2, attested against `f0c4ea0` ([relay](../../TESTS-RESULTS/2026-10-19+GH-336/qa/gh336-plan-qa-relay.md)). The r2 recon-wording Nit is applied. | On the operator's go: implement, run the smoke check, final Codex QA, then the PR. At deploy, do the whole-folder comparison against the source (r2 Nit 1); `intake.py list` alone is not enough. |
 
 ## Observed problem
 
@@ -63,8 +63,9 @@ CELL:    reversible x crossing (the vendored copy rides the pulse repo to every 
 GROUND:  the command appears in SKILL.md:99-100 (procedure) and the GH-334 plan :95 (spec). SOP.md
          does not quote it. The installed copies are Skills Army links to Deployed Skills/
          git-pulse-sync-repair (6 app roots on this Mac); other devices get it via the pulse pull.
-FALSIFY: belief "git diff --binary HEAD captures every tracked edit during a conflicted rebase,
-         and git apply restores it onto the -head backup". It SURVIVED in a scratch repo:
+FALSIFY: belief "git diff --binary HEAD captures the on-disk state of every tracked file during a
+         conflicted rebase, and git apply restores it onto the -head backup". A staged version that
+         differs from disk is excluded (plan QA r1 U1). The belief SURVIVED in a scratch repo:
          - setup: conflicted text file resolved but unstaged, conflicted binary overwritten,
            unrelated binary staged
          - result: patch, abort, then apply onto a worktree at bk-head restored all three byte for byte
