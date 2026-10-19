@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -74,7 +74,7 @@ Operational envelope: a single operator's per-device agent skill, run on their o
 Operator decisions are fixed:
 - authority to repair and resync
 - location `experimental/git-pulse/`
-- a stuck rebase may be aborted after verified backups (an SOP exception)
+- a stuck rebase may be aborted after verified backups (an SOP exception)  [Unverified — no citation]
 - install after merge via the Skills Army HQ CLI
 - RebalanceOS is on every device
 
@@ -115,5 +115,48 @@ Reviewer block: plain lines; `VERDICT: PASS` or `VERDICT: FAIL` and `Basis:` eac
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+swept file: yes
+
+Reviewed the whole embedded brief, `experimental/git-pulse/git-pulse-sync-repair/SKILL.md` (all 127 lines), `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md` (all 163 lines), `SOP.md` (lines 1–480), `ROADMAP.md` (line 41), `TESTS-RESULTS/2026-10-18+GH-334/` (`SUMMARY.md`, `provenance.jsonl`, `smoke-main-path.log`, `smoke-rebase-recovery.log`, `smoke-rebase-recovery.sh.txt`, and both prior QA relays), plus the referenced source files (`src/rebalance/doctor.py`, `scripts/stack.sh`, `scripts/pulse_sync.sh`, `scripts/com.rebalance-os.pulse-sync.plist.template`, `experimental/git-pulse/com.user.git-pulse.plist.template`, `experimental/git-pulse/collect.sh`, `src/rebalance/lib/git_ops.py`, `src/rebalance/ingest/pulse.py`, `src/rebalance/cli/config_cmds.py`, `UPGRADE.md`, `SCHEDULER.md`). No pre-existing defects requiring changes in the touched files were found beyond the two non-blocking Nits below.
+
+Findings:
+- [Nit] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:24-28` — On a dual-clone machine (dev checkout vs declared `~/.config/rebalance/runtime-root`), `temp/rbos.config` is resolved per-CWD (`src/rebalance/ingest/config.py:217-220`), whereas installed LaunchAgents execute against the declared runtime root (`~/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist:10-16`). On this Mac today, running `doctor` from `/Users/noelsaw/Documents/GH Repos/rebalanceOS` reads `pulse_fleet_enabled: None` (not enrolled, as recorded in `TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path.log:2-5`), while `/Users/noelsaw/rebalance-runtime/temp/rbos.config` has `pulse_fleet_enabled: True` and `~/.config/git-pulse/config.sh` has `fleet_mode=true` (and the runtime root is currently 11 commits behind `origin/development` at `9dd2665`, pre-GH-325). Because `publish_pulse` in `pulse-sync` runs in the runtime root, a fleet-enrolled runtime will queue commits locally (`push=False` at `src/rebalance/ingest/pulse.py:958-959`) and rely on `com.user.git-pulse` (`~/Library/LaunchAgents/com.user.git-pulse.plist`, currently also unloaded in `launchctl`) to push. Hinting in Step 0 to prefer `~/.config/rebalance/runtime-root` when present (or pull runtime drift per `SOP.md:227-233`) would avoid diagnosing the dev clone's config when the scheduled jobs run from the runtime clone; however, even as written, Step 4's single recheck (`SKILL.md:123-126`) honestly surfaces any remaining ahead count if `pulse-sync` queues instead of pushing.
+- [Nit] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:40` — If a pulse clone branch ever had no upstream tracking ref configured, `git -C "$PULSE" rev-list --left-right --count @{u}...HEAD` exits 128 (`fatal: no upstream configured for branch`). On a normal clone (`main...origin/main`) it succeeds, and under the skill's stop-on-error posture an unconfigured upstream simply halts diagnosis for the operator.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:49-55` and `99-119` — End-to-end walkthrough of the off-fleet diagnosis state (`scheduler:pulse-sync` installed but not loaded, `pulse` configured, fleet not enrolled, clean tree, 39 behind / 10 ahead, `PULSE_PUSH` unset) produces the right sequence: Step 2.1 runs `launchctl load -w ~/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist` (`src/rebalance/doctor.py:844-846`), Step 2.3 reports non-enrollment without enrolling (`UPGRADE.md:203-206`), and Step 3 kickstarts `gui/$(id -u)/com.rebalance-os.pulse-sync`. Having `<key>RunAtLoad</key><false/>` (`scripts/com.rebalance-os.pulse-sync.plist.template:44-45`) only suppresses automatic execution at `load` time; `launchctl kickstart gui/$(id -u)/com.rebalance-os.pulse-sync` explicitly triggers an immediate run of a loaded calendar-interval job. Off-fleet with `PULSE_PUSH` unset, `scripts/pulse_sync.sh:41` sets `push=True`, `publish_git_paths` (`src/rebalance/lib/git_ops.py:718-732`) attempts `git push`, catches the non-fast-forward rejection, and calls `git_pull_rebase_safe(repo_path, resolve_conflicts=resolve_page)` (`src/rebalance/lib/git_ops.py:618-660`, `src/rebalance/ingest/pulse.py:878-907`), which runs `git -c rebase.autoStash=false pull --rebase` under `rebalance-publish.lock` and replays the local commits over upstream (aborting cleanly via `_cleanup_failed_rebase` if any non-replaceable conflict occurs).
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:34-43` and `69-90` — Shell syntax and quoting are copy-paste accurate: `G=$(git -C "$PULSE" rev-parse --absolute-git-dir)` (`SKILL.md:34`), `"$G/rebalance-publish.lock"` (`SKILL.md:77`), `export PULSE G` (`SKILL.md:71`) passes both variables into the `subprocess.call(["bash","-c",sys.argv[2]])` child while `R` and `S` are defined inside that same `bash -c` script (`SKILL.md:83-89`) and `$(cat "$R/orig-head")` is properly quoted (`SKILL.md:85`). `launchctl print gui/$(id -u)/<label>` and `launchctl kickstart gui/$(id -u)/<label>` (`SKILL.md:54,112,114`) use valid macOS launchd domain/service-target syntax, and `StandardOutPath`/`StandardErrorPath` (`SKILL.md:108-110`) match the top-level dict keys in `scripts/com.rebalance-os.pulse-sync.plist.template:47-51` and `experimental/git-pulse/com.user.git-pulse.plist.template:17-20`.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:66-93` and `SOP.md:361-371` — Safety invariants and doc agreement hold: Step 2.4 acquires `$G/rebalance-publish.lock` with `LOCK_EX | LOCK_NB` (`SKILL.md:74-76`), checks `lsof +D "$PULSE"` (`SKILL.md:80-81`), re-reads `$R/orig-head` and `$R/head-name` under the lock (`SKILL.md:82-83`), verifies both `pulse-repair-backup/$S-orig` and `pulse-repair-backup/$S-head` (`SKILL.md:84-86`), saves `git -C "$PULSE" diff HEAD > "$G/pulse-repair-$S.patch"` (`SKILL.md:87-88`), and aborts once (`SKILL.md:89-90`). `SOP.md:361-371`, `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:90-97`, and `SKILL.md:66-93` agree on all four prerequisites and on preserving merges, cherry-picks, reverts, and dirty/detached states outside the conflicted rebase. If the hourly job fires concurrently, both `pulse-sync` (`src/rebalance/ingest/pulse.py:816,825-832`) and `collect.sh` (`experimental/git-pulse/collect.sh:404-407`) use non-blocking `LOCK_EX | LOCK_NB` on the same lock and defer with exit 75 (`scripts/pulse_sync.sh:55-56`), which Step 3 (`SKILL.md:117`) explicitly classifies as busy/deferred without killing or restarting the job. While `job_guard.py` caps `pulse-sync` at 1800s (`scripts/com.rebalance-os.pulse-sync.plist.template:13`), a normal `pulse-sync` run takes ~5s (`pulse_sync_2026-10-18.log` recorded `elapsed_seconds: 4.56`), and at the 10-minute polling deadline (`SKILL.md:114,118-119`) the skill leaves a still-running job untouched and reports `"running"`.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:1-127`, `ROADMAP.md:41`, and `TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md:1-12` — Scope is minimal and matches GH-334: one 127-line `SKILL.md`, one `SOP.md` exception paragraph, one `ROADMAP.md` entry, and campaign evidence in `TESTS-RESULTS/2026-10-18+GH-334/`, with zero new scripts, LaunchAgents, or Python code paths.
+- [Unverified — needs clone run] Live scheduler loading (`launchctl load -w`), `kickstart` execution, and runtime completion attribution were not run in this review turn (as `TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md:10` also notes, those mutate the host). No test suites or mutating git commands were executed.
+
+Read-only probe command (environment: `PYTHONDONTWRITEBYTECODE=1`, `TMPDIR="$PWD/.relay-scratch/tmp"`), exit 0:
+```bash
+git -C ~/git-pulse-sync rev-list --left-right --count @{u}...HEAD
+git -C ~/git-pulse-sync merge-tree --write-tree HEAD @{u}
+(cd "/Users/noelsaw/rebalance-runtime" && git rev-parse --short HEAD)
+(cd "/Users/noelsaw/Documents/GH Repos/rebalanceOS" && bash scripts/stack.sh drift)
+```
+Decisive output:
+```text
+85	11
+9eabcafa59fe8f44b702a3510c51004774b11516
+9dd2665
+RUNTIME: 11 commit(s) BEHIND origin/development — fleet is running 9dd2665 from 2026-10-07
+         deploy: git -C "/Users/noelsaw/rebalance-runtime" pull --ff-only origin development
+```
+(`merge-tree --write-tree` exiting 0 with tree `9eabcafa59fe8f44b702a3510c51004774b11516` confirms the 11 local commits in `~/git-pulse-sync` have zero file-level conflict against the 85 upstream commits on `origin/main`.)
+
+Answers:
+1. **Would it work on a real Mac, end to end?** Yes. Walking the diagnosed off-fleet state (`scheduler:pulse-sync` installed/unloaded, `pulse` configured, fleet not enrolled, clean tree, 39 behind / 10 ahead, `PULSE_PUSH` unset) runs `launchctl load -w`, skips enrollment, and kickstarts `com.rebalance-os.pulse-sync` (`RunAtLoad=false` only affects load-time firing, not `kickstart`). In off-fleet mode with `PULSE_PUSH` unset, `publish_pulse` commits the rendered page, attempts `git push`, catches the non-fast-forward rejection, and rebases cleanly over upstream via `git_pull_rebase_safe` (`git merge-tree --write-tree HEAD @{u}` exits 0 with no conflicts). Note (Nit 1): on this specific Mac, `~/.config/rebalance/runtime-root` points to `/Users/noelsaw/rebalance-runtime` (which has `pulse_fleet_enabled: True` in its `temp/rbos.config` and trails `origin/development` by 11 commits), whereas the dev clone has `pulse_fleet_enabled: None` and `com.user.git-pulse` is also currently unloaded; once the runtime root is pulled to `origin/development` and used as `$RB` (or after `com.user.git-pulse` is loaded), fleet-mode resync (Step 3 Fleet: `refresh-pulse-clone` → `pulse-sync` → `com.user.git-pulse`) handles it directly.
+2. **Copy-paste correctness.** Every shell line in `SKILL.md` is valid as written: `$G` resolves via `--absolute-git-dir` (`SKILL.md:34`), `export PULSE G` (`SKILL.md:71`) exports `PULSE` and `G` to the `bash -c` child while `R` and `S` are assigned inside that child (`SKILL.md:83-88`), `"$(cat "$R/orig-head")"` is quoted (`SKILL.md:85`), `StandardOutPath`/`StandardErrorPath` match the top-level plist keys (`scripts/com.rebalance-os.pulse-sync.plist.template:47-51`, `experimental/git-pulse/com.user.git-pulse.plist.template:17-20`), and `launchctl print`/`kickstart` use `gui/$(id -u)/<label>` (`SKILL.md:54,112,114`).
+3. **Safety gaps.** None that can lose work or corrupt state. Uncommitted conflict edits are saved to `$G/pulse-repair-$S.patch` (`SKILL.md:87-88`), `orig-head` and `HEAD` are saved and verified as `pulse-repair-backup/$S-{orig,head}` branches (`SKILL.md:84-86`), untracked files survive `git rebase --abort`, and all other in-progress operations or dirty states outside the conflicted rebase stop untouched (`SKILL.md:92-93`). Concurrent hourly runs cannot race the abort because both writers acquire `$G/rebalance-publish.lock` with `LOCK_NB` and exit 75 when busy (`src/rebalance/lib/git_ops.py:282-284`, `experimental/git-pulse/collect.sh:404-407`). The 10-minute observation window is safe for an 1800s-capped job because the skill never kills or restarts a still-running job at the deadline (`SKILL.md:118-119`).
+4. **Doc agreement.** `SKILL.md:49-93`, `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:80-107`, `SOP.md:361-371`, `UPGRADE.md:185-210`, and `src/rebalance/doctor.py:842-848,2176-2262` all agree on the repair commands and the four stuck-rebase prerequisites.
+5. **Over or under-built.** Commensurate with a single-operator per-device skill: 127 lines, no new code or scripts, and all requirements of GH-334 are covered.
+
+VERDICT: PASS
+Basis: `SKILL.md`, `SOP.md`, and the plan agree on all commands and safety prerequisites; shell invocations and lock/backup semantics are sound; no Blocker or Should found.
+
+Relay closed (Approved), no further turn needed — handing off to Producer (claude-a).
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
