@@ -2,8 +2,9 @@
 gh_issue: 334
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/334
 title: "git-pulse-sync-repair: agent skill that diagnoses and repairs a stalled Git Pulse Sync"
-status: "Proposed (1-INBOX — not yet active)"
+status: "Active — implementing on feat/rebalanceOS-gh334-git-pulse-sync-repair-2026-10-18"
 created: 2026-10-18
+updated: 2026-10-18
 owner: noel
 doc_type: bugfix
 goal: >
@@ -19,6 +20,12 @@ roadmap_exempt: false
 ---
 
 # GH-334: git-pulse-sync-repair skill
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Plan QA (codex) Approved in round 3/3, attested against `b246a70` ([relay](../../TESTS-RESULTS/2026-10-18+GH-334/qa/gh334-plan-qa-relay.md)). Promoted to 2-WORKING. | Write `experimental/git-pulse/git-pulse-sync-repair/SKILL.md` and the SOP.md exception. Smoke-test it (read-only diagnosis on this Mac; disposable stuck-rebase recovery plus the merge red control). Then final QA and the PR. |
 
 ## Observed problem (2026-10-18, noels-Mac-Studio)
 
@@ -48,7 +55,9 @@ roadmap_exempt: false
 
 **Smallest viable bet:** one `SKILL.md`, an ordered procedure over the existing commands, plus one SOP.md paragraph. No code. GH-241 rules out new scripts, LaunchAgents and helpers.
 
-**Alternatives rejected:**
+## Phase 0 - Prior Art Review
+
+Nothing existing can carry this without new code. The doctor is read-only (`--json` only), and the repairs are spread across `stack.sh`, `config set-pulse`, `fleet-enroll` and `refresh-pulse-clone`. The skill orders those calls and adds no new layer. Alternatives rejected:
 - A `rebalance doctor --fix` command: new code and a new write path, more than the operator asked for.
 - Reviving `RepairFSM` (`src/rebalance/repair.py`): unwired, and documented as automatic when it is not. That is a separate issue.
 - 3-Eyes `launchd-triage`: stood down (AGENTS.md:225-255).
