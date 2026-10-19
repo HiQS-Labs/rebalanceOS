@@ -159,4 +159,12 @@ Basis: `SKILL.md`, `SOP.md`, and the plan agree on all commands and safety prere
 
 Relay closed (Approved), no further turn needed — handing off to Producer (claude-a).
 
+
+### Attestation · relay-drive — 2026-10-19T14:49:01Z
+task: RELAY-rb-gh334-agy-qa-r1
+reviewer: agy
+status: Approved
+reviewed-head: 320e75cb0e514d531a84c3b20aafca9dca767c9b
+added-range: 8829+11792
+added-sha256: fd054a82c5680820cd1c50e46ae589b0f6fcc5d24c56f6ade7ed43cf5536b0f9
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
