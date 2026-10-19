@@ -1,0 +1,14 @@
+## step 0: resolve
+RB=/Users/noelsaw/Documents/GH Repos/rebalanceOS
+doctor rc=1
+  ok       pulse | configured (/Users/noelsaw/git-pulse-sync)
+  warning  pulse fleet | this Mac is not enrolled in fleet mode
+  error    scheduler:pulse-sync | installed on this device but NOT loaded in launchd
+## step 1: diagnose PULSE=/Users/noelsaw/git-pulse-sync G=/Users/noelsaw/git-pulse-sync/.git
+  op-in-progress check done
+  HEAD attached: main
+  dirty paths: 0
+  behind/ahead: 39	10
+  plist present: yes
+  PULSE_PUSH: unset
+  launchctl print: NOT-registered

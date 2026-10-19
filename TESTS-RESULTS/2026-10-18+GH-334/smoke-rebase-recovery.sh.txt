@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# GH-334 adjacent-path smoke: SKILL.md step 2.4 run as written against disposable repos.
+set -u
+W=$(mktemp -d "${TMPDIR:-/tmp}/gh334-smoke.XXXXXX"); cd "$W"
+git init -q --bare remote.git
+git clone -q remote.git pulse 2>/dev/null; cd pulse; git config user.email s@s; git config user.name s
+echo base > f.txt; git add f.txt; git commit -qm base; git branch -M main; git push -q -u origin main
+git clone -q ../remote.git ../other; (cd ../other && git config user.email o@o && git config user.name o && echo theirs > f.txt && git commit -qam theirs && git push -q)
+echo mine > f.txt; git commit -qam mine
+git pull -q --rebase >/dev/null 2>&1   # conflicts -> rebase stuck
+PULSE="$W/pulse"; G=$(git -C "$PULSE" rev-parse --absolute-git-dir); export PULSE G
+echo "conflict edit in progress" > "$PULSE/f.txt"   # unrelated-to-index conflict resolution edit
+ORIG_MAIN=$(git -C "$PULSE" rev-parse refs/heads/main)
+echo "setup: rebase dir present=$([ -d "$G/rebase-merge" ] && echo yes || echo no) orig-head=$(cat "$G/rebase-merge/orig-head" 2>/dev/null | cut -c1-8) refs/heads/main=${ORIG_MAIN:0:8}"
+
+STEPS='set -e
+lsof +D "$PULSE" 2>/dev/null | awk "NR>1 && \$1==\"git\"" | grep -q . && { echo "live git owner — stop"; exit 3; }
+R="$G/rebase-merge"; [ -d "$R" ] || R="$G/rebase-apply"
+[ -d "$R" ] && [ -r "$R/orig-head" ] && [ -r "$R/head-name" ] || { echo "rebase metadata unreadable — stop"; exit 4; }
+S=$(date -u +%Y%m%dT%H%M%SZ); O=$(cat "$R/orig-head"); H=$(git -C "$PULSE" rev-parse HEAD); HN=$(cat "$R/head-name")
+git -C "$PULSE" branch "pulse-repair-backup/$S-orig" "$O"; git -C "$PULSE" branch "pulse-repair-backup/$S-head" "$H"
+[ "$(git -C "$PULSE" rev-parse "pulse-repair-backup/$S-orig")" = "$O" ] && [ "$(git -C "$PULSE" rev-parse "pulse-repair-backup/$S-head")" = "$H" ] || { echo "backup verify failed — stop"; exit 5; }
+git -C "$PULSE" diff HEAD > "$G/pulse-repair-$S.patch"
+[ -s "$G/pulse-repair-$S.patch" ] || [ -z "$(git -C "$PULSE" diff HEAD)" ] || { echo "patch empty — stop"; exit 6; }
+git -C "$PULSE" rebase --abort
+[ "$(git -C "$PULSE" rev-parse "$HN")" = "$O" ] && [ ! -d "$G/rebase-merge" ] && [ ! -d "$G/rebase-apply" ] || { echo "abort verify failed"; exit 7; }
+echo "OK backups=$S-orig/$S-head patch=$(wc -c < "$G/pulse-repair-$S.patch")B restored $HN -> ${O:0:8}"'
+LOCKRUN() { python3 -c 'import fcntl,os,subprocess,sys
+fd=os.open(sys.argv[1],os.O_RDWR|os.O_CREAT,0o644)
+try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+except BlockingIOError: sys.exit("lock busy: a writer owns this rebase — stop")
+sys.exit(subprocess.call(["bash","-c",sys.argv[2]]))' "$G/rebalance-publish.lock" "$STEPS"; }
+state() { echo "refs=$(git -C "$PULSE" for-each-ref --format='%(refname:short)' | tr '\n' ' ') rebase=$([ -d "$G/rebase-merge" ] && echo yes || echo no)"; }
+
+echo "== RED 1: lock held by another writer"; python3 -c 'import fcntl,os,sys,time
+fd=os.open(sys.argv[1],os.O_RDWR|os.O_CREAT,0o644); fcntl.flock(fd,fcntl.LOCK_EX); time.sleep(8)' "$G/rebalance-publish.lock" & HP=$!; sleep 1
+B=$(state); LOCKRUN; echo "rc=$?"; [ "$(state)" = "$B" ] && echo "unchanged: yes" || echo "unchanged: NO"; wait $HP
+echo "== RED 2: live git process with cwd in checkout (relative command line)"; mkfifo "$W/fifo"; (cd "$PULSE" && exec git cat-file --batch < "$W/fifo") & GP=$!; exec 9>"$W/fifo"; sleep 1
+B=$(state); LOCKRUN; echo "rc=$?"; [ "$(state)" = "$B" ] && echo "unchanged: yes" || echo "unchanged: NO"; exec 9>&-; wait $GP 2>/dev/null
+echo "== MAIN: abandoned conflicted rebase, lock free, no live owner"; LOCKRUN; echo "rc=$?"; state
+P=$(ls "$G"/pulse-repair-*.patch); grep -q 'conflict edit in progress' "$P" && echo "patch retains conflict edit: yes" || echo "patch retains conflict edit: NO"
+echo "main now $(git -C "$PULSE" rev-parse --short main) (was ${ORIG_MAIN:0:8}); commit 'mine' reachable: $(git -C "$PULSE" log --format=%s main | grep -c '^mine$')"
+echo "== RED 3: merge in progress (not a rebase) -> skill reports and stops"; git -C "$PULSE" merge -q origin/main >/dev/null 2>&1
+for x in rebase-merge rebase-apply MERGE_HEAD; do [ -e "$G/$x" ] && echo "  detected: $x"; done
+[ -e "$G/MERGE_HEAD" ] && [ ! -d "$G/rebase-merge" ] && echo "  classification: merge in progress -> outside the 2.4 exception: report and stop (no command run)"
+B=$(state); echo "  state unchanged by skill: $([ "$(state)" = "$B" ] && echo yes)"
+rm -rf "$W"

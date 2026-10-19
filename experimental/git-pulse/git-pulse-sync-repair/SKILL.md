@@ -68,7 +68,7 @@ stop on any failure, leaving everything as found:
 
 a. **Take the writers' lock, non-blocking, and hold it through step f.** Both writers use
    `$G/rebalance-publish.lock` (`src/rebalance/lib/git_ops.py:272-285`, `collect.sh:391-410`).
-   Run b–f under:
+   Run `export PULSE G` first, then run b–f under:
    ```bash
    python3 -c 'import fcntl,os,subprocess,sys
    fd=os.open(sys.argv[1],os.O_RDWR|os.O_CREAT,0o644)
