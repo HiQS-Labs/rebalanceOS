@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -185,5 +185,43 @@ added-sha256: fd054a82c5680820cd1c50e46ae589b0f6fcc5d24c56f6ade7ed43cf5536b0f9
 - **Nit 2 (`@{u}` with no upstream): Accepted.** The skill now reports it and stops.
 
 Round 2 of 3: please re-review SKILL.md steps 0, 1 and 2.1, the plan's revision note, and the new smoke log.
+
+### Reviewer · Round 2
+swept file: yes
+
+Re-reviewed the full `experimental/git-pulse/git-pulse-sync-repair/SKILL.md` (139 lines), `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md` (182 lines), `SOP.md` (lines 355–375), `TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md` (14 lines), `TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log` (13 lines), and `TESTS-RESULTS/2026-10-18+GH-334/provenance.jsonl` (5 lines). No pre-existing or newly introduced defects were found in any touched file.
+
+Findings:
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:24-35` — Step 0 now resolves `RB` in the right order (`$REBALANCE_ROOT`, then `~/.config/rebalance/runtime-root`, then the device's RebalanceOS clone with `.venv/bin/rebalance`), confirms `$RB` against `/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' <plist>` (`SKILL.md:26-27`), and falls back to `pulse_fleet_enabled` in `$RB/temp/rbos.config` when the runtime predates GH-325 (`SKILL.md:34-35`).
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:45-49` — Step 1 now explicitly stops and reports when no upstream is configured (`SKILL.md:46`, resolving Round 1 Nit 2), and checks runtime drift read-only via `bash "$RB/scripts/stack.sh" drift` (`SKILL.md:47-49`) while keeping runtime deployment (`SOP.md` runtime pull) out of the skill's write scope.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:57-66` — Step 2.1 now covers both `com.rebalance-os.pulse-sync` and, in fleet mode, the collector `com.user.git-pulse` (`SKILL.md:57-58`), loading installed-but-unloaded jobs with `launchctl load -w ~/Library/LaunchAgents/<label>.plist` (`SKILL.md:59-60`) and stopping if the fleet collector is not installed (`SKILL.md:64-65`). Note that on a pre-GH-325 runtime such as `/Users/noelsaw/rebalance-runtime` at `9dd2665` (11 commits behind `origin/development`), `rebalance config` does not yet include `refresh-pulse-clone`, so Step 3 Fleet (`SKILL.md:114-117`: `Stop on any missing, failed or deferred prerequisite`) will stop cleanly on that missing subcommand until the operator pulls the runtime reported in Step 1 (`SKILL.md:47-49`) or merges and updates the runtime checkout.
+- [Pass] `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:127-145`, `TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md:10`, `TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log:1-12`, and `TESTS-RESULTS/2026-10-18+GH-334/provenance.jsonl:4` — The plan's post-approval revision note, `SUMMARY.md` table row, and `smoke-main-path-runtime.log` match each other and `provenance.jsonl` (`sha256` `cafdd6acb5e941dce1af90434b5b3876b3544d11761f3fdc9ee7b4fd1a544b57`).
+
+Read-only probe command (environment: `PYTHONDONTWRITEBYTECODE=1`, `TMPDIR="$PWD/.relay-scratch/tmp"`), exit 0:
+```bash
+shasum -a 256 TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log
+/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' ~/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist
+```
+Decisive output:
+```text
+cafdd6acb5e941dce1af90434b5b3876b3544d11761f3fdc9ee7b4fd1a544b57  TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log
+Array {
+    /Users/noelsaw/rebalance-runtime/.venv/bin/python
+    /Users/noelsaw/rebalance-runtime/utils/job_guard.py
+    --name
+    scheduler-pulse-sync
+    --max-runtime-seconds
+    1800
+    --lifecycle-job
+    pulse-sync
+    --
+    /Users/noelsaw/rebalance-runtime/scripts/pulse_sync.sh
+}
+```
+
+VERDICT: PASS
+Basis: Both Round 1 findings (runtime-root resolution with fleet collector reload, and unconfigured upstream handling) are cleanly integrated into `SKILL.md:24-66`, documented in `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:127-145`, and backed by `TESTS-RESULTS/2026-10-18+GH-334/smoke-main-path-runtime.log` (`provenance.jsonl:4`); no Blocker or Should remains.
+
+Relay closed (Approved), no further turn needed — handing off to Producer (claude-a).
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
