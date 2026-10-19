@@ -2,7 +2,7 @@
 gh_issue: 336
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/336
 title: "git-pulse-sync-repair 2.4e: stuck-rebase backup patch drops binary edits (needs --binary)"
-status: "Captured — plan in QA on fix/rebalanceOS-gh336-binary-safe-rebase-backup-2026-10-19"
+status: "Ready for review — PR on fix/rebalanceOS-gh336-binary-safe-rebase-backup-2026-10-19"
 created: 2026-10-19
 updated: 2026-10-19
 owner: noel
@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Codex plan QA **Approved** in round 2, attested against `f0c4ea0` ([relay](../../TESTS-RESULTS/2026-10-19+GH-336/qa/gh336-plan-qa-relay.md)). The r2 recon-wording Nit is applied. | On the operator's go: implement, run the smoke check, final Codex QA, then the PR. At deploy, do the whole-folder comparison against the source (r2 Nit 1); `intake.py list` alone is not enough. |
+| Fix implemented (`5130b95`). Smoke: 6 inputs restored with full-hash and property checks; the old-command red control loses all edits and fails the new check; the text-only path is fine ([summary](../../TESTS-RESULTS/2026-10-19+GH-336/SUMMARY.md)). Static gate PASS. Plan QA **Approved** r2 (`f0c4ea0`); final QA (codex) **Approved** r2, attested against `9a37da6` ([relay](../../TESTS-RESULTS/2026-10-19+GH-336/qa/gh336-final-qa-relay.md)). | PR against development; operator merges. Then redeploy via Skills Army HQ with the whole-folder comparison. |
 
 ## Observed problem
 
