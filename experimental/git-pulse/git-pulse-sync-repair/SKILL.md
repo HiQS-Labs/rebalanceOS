@@ -82,7 +82,7 @@ b. **Check for a live owner.** If `lsof +D "$PULSE"` lists any `git` process (cw
 c. **Re-read the state under the lock.** `R=$G/rebase-merge` (or `rebase-apply`) must still exist,
    with readable `$R/orig-head` and `$R/head-name`. If not, stop.
 d. **Back up, verified.** Run `S=$(date -u +%Y%m%dT%H%M%SZ)`, then
-   `git -C "$PULSE" branch "pulse-repair-backup/$S-orig" "$(cat $R/orig-head)"` and
+   `git -C "$PULSE" branch "pulse-repair-backup/$S-orig" "$(cat "$R/orig-head")"` and
    `git -C "$PULSE" branch "pulse-repair-backup/$S-head" HEAD`. Both refs must resolve to those SHAs.
 e. **Save the conflict edits.** Run `git -C "$PULSE" diff HEAD > "$G/pulse-repair-$S.patch"`. The patch
    must be non-empty when `git diff HEAD` is non-empty. Untracked files survive the abort.

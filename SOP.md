@@ -366,8 +366,9 @@ combined human-readable projection and is never the capture/control plane.
 - the rebase's `orig-head` and the current HEAD are saved as verified `pulse-repair-backup/*` branches
 - the conflict diff is saved as a patch in the git dir
 
-A merge, cherry-pick or revert in progress, a dirty tree, or a detached HEAD still falls under the
-rule above: preserve it for its owner, and never reset, stash or discard it.
+A merge, cherry-pick or revert in progress still falls under the rule above, as does a dirty tree or
+detached HEAD outside such a conflicted rebase: preserve it for its owner, and never reset, stash or
+discard it.
 
 ### Four-Mac rollout (GH-325)
 

@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-18.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -128,5 +128,12 @@ VERDICT: FAIL
 Basis: One SOP clarification remains to make its safety rule expressly agree with the approved procedure; command quoting is a small additional correction. The published smoke supports its bounded claims, and the procedural implementation otherwise follows the approved plan.
 
 Handing off to Producer (claude-a) — clarify the SOP exception, consider the quoting correction, disposition the findings and open the next review round.
+
+### Producer · Round 1 dispositions (claude-a)
+
+- **[Should] SOP.md:369–370: Accepted.** The closing sentence now keeps unconditional preservation for merge, cherry-pick and revert, and preserves a dirty tree or detached HEAD only **outside such a conflicted rebase**. That matches SKILL.md:92–93 exactly.
+- **[Nit] SKILL.md:85: Accepted.** It now reads `"$(cat "$R/orig-head")"`.
+
+Round 2 of 3: please re-check SOP.md's GH-334 paragraph and SKILL.md 2.4.d.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
