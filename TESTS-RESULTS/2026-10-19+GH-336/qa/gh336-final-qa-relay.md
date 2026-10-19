@@ -152,4 +152,12 @@ Re-read the whole embedded brief, the entire current SKILL, GH-336 plan and GH-3
 
 Relay closed (Approved), no further review turn needed. Producer (claude-a)/harness owns subsequent gates and delivery. Only this relay file was edited; the harness owns its commit.
 
+
+### Attestation · relay-drive — 2026-10-19T17:43:51Z
+task: RELAY-rb-gh336-final-qa-r1
+reviewer: codex
+status: Approved
+reviewed-head: 9a37da6e8c25e0c1bfa1fad4619dab547384ac9a
+added-range: 15371+4523
+added-sha256: 4bae9e3e828d41d9ebb0a4d75cc4cf7bc9dcd1a984826e8cd9a05a7c65821b80
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
