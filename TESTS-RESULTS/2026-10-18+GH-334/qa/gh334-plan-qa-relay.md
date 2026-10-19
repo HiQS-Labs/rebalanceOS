@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-18.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -198,5 +198,23 @@ Handing off to Producer (claude-a) — correct the per-job completion observatio
 - **The Unverified note is taken into the implementation smoke.** The live-owner check is now `lsof +D <checkout>`, because `pgrep` cannot see a cwd. The disposable recovery run covers a relative-path git process, a held lock, and a check that the saved patch retains the conflict edits. The merge red control stays.
 
 Round 3 of 3: please re-review the completion-observation and live-owner clauses.
+
+### Reviewer · Round 3
+swept file: yes
+
+Reviewed the entire embedded brief, all prior turns and the entire current plan (lines 1–153), including verification and rollback. No additional pre-existing plan defects found. Verify-tier review used current seeded source directly: graph discovery lists no project for this worktree; the nearest rebalanceOS graph is another checkout, generation 2026-09-02T03:54:57Z. Coverage reports missing/changed metadata and excluded scripts, so it does not establish current-source freshness. No Git commands, suites, executable fixtures, repairs or scheduler mutations were run.
+
+Findings:
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:92–98 — Round 2's completion finding is addressed: installed per-job output/error paths, the renderer's dated runtime log, pre-kickstart run/state/offset baseline, separate already-running handling, new-run evidence and a ten-minute completion deadline are explicit. Collector log names match experimental/git-pulse/com.user.git-pulse.plist.template:17–20; renderer output and exit classification match scripts/pulse_sync.sh:26–80. This approves the planned observation contract, not a measured launchd result.
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:82–88 — The live-owner clause now checks cwd/open-file evidence with lsof rather than relying on a command-line path match. Lock acquisition, state re-read, verified original/current-tip refs, saved conflict diff and abort verification remain ordered prerequisites. The shared lock matches src/rebalance/lib/git_ops.py:272–285 and experimental/git-pulse/collect.sh:391–410. The SOP exception at plan line 121 carries the same prerequisites; no broader abort authority is introduced.
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:73–80,89–102 — The retained loader/config branches and render-then-deliver order remain grounded: doctor.py:842–848 supplies load -w; config_cmds.py:499–519 implements set-pulse; SCHEDULER.md:174–180 assigns fleet delivery to the collector. Non-fleet push policy, failed/deferred prerequisite stops and the final single recheck remain explicit.
+- [Unverified — needs clone run] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:115–116,133–139 — Live-owner detection, held-lock refusal, conflict-edit patch retention and merge red control require the planned disposable-clone recovery evidence. Fast/failed/already-running job attribution likewise has no runtime qualification from this review. Preserve these limitations in implementation evidence under TESTS-RESULTS/2026-10-18+GH-334/; no live repair or delivery success is claimed.
+
+Answers: 1) Commands, labels/domain and per-job log paths are source-grounded; installation handles the missing job and load -w handles installed/unloaded recovery. Completion is now explicitly observed. 2) Fleet reconciles, renders/queues, then delivers through its loaded local collector; non-fleet uses pulse-sync with effective push policy. refresh-pulse-clone reconciles and is not fleet-gated (src/rebalance/ingest/pulse.py:75–103). 3) Original tip/current HEAD backups, held writer lock, live-owner inspection and abort verification are specified; execution safety remains subject to the named recovery smoke. 4) One repair attempt, one resync sequence, bounded polling and one final recheck are complete at plan level. 5) One skill plus the adjacent narrow SOP exception remains within the operator's fixed scope; no further changes requested.
+
+VERDICT: PASS
+Basis: The remaining procedure finding is resolved; the whole plan meets the stated plan-review Definition of Done. Approval does not substitute for implementation qualification or the harness gates.
+
+Relay closed (Approved), no further review turn needed. Handing the approved plan back to Producer (claude-a) for implementation and disposable-clone qualification.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
