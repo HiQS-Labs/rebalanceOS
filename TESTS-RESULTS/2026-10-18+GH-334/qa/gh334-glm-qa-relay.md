@@ -159,4 +159,12 @@ Basis: The 864ff96 runtime-root resolution is correct and live-verified on the t
 
 Relay closed (Approved), no further turn needed — returning coordination to Producer (claude-a) for the harness gate and post-merge workflow.
 
+
+### Attestation · relay-drive — 2026-10-19T15:16:48Z
+task: RELAY-rb-gh334-glm-qa-r1
+reviewer: commandcode
+status: Approved
+reviewed-head: 6dca5050dabfceffe0aa2c05fc9c2c149236fcc8
+added-range: 9648+9874
+added-sha256: 2053e79eceb939c8752b7b2286600205281f03d15a49e0072434fb442c0d79b9
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
