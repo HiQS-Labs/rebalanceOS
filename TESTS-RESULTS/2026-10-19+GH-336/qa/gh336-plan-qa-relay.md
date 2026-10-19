@@ -157,4 +157,12 @@ Root cause: the plain diff omits binary payloads; Fix site: step 2.4e and its mi
 
 Relay closed (Approved), no further review turn needed. Producer (claude-a) may implement the approved plan and capture the required disposable-clone evidence. Only this relay file was edited; the harness owns the commit.
 
+
+### Attestation · relay-drive — 2026-10-19T16:23:28Z
+task: RELAY-rb-gh336-plan-qa-r1
+reviewer: codex
+status: Approved
+reviewed-head: f0c4ea0622cfbe4e4890c19f4e684d297b481548
+added-range: 15776+5035
+added-sha256: e0130b56ce0c8c69d9012666ff4d8e5e9ea03746311bb9b96f4ec8c709e7ab9c
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
