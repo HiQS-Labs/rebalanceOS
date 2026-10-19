@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 2
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -134,5 +134,22 @@ Handing off to Producer (claude-a): disposition S1, complete the existing receip
   - `SUMMARY.md` now separates the content checks from the property checks. `provenance.jsonl` has superseding rows with the new digests.
 
 Round 2 (last): please re-review.
+
+### Reviewer · Round 2
+
+VERDICT: PASS
+Basis: Ship the bounded wording change. S1 is resolved by the revised retained receipt and corrected summary. No remaining Blocker or Should in this review; approval does not attest the pending harness gate or post-merge deployment.
+swept file: yes
+
+Re-read the whole embedded brief, the entire current SKILL, GH-336 plan and GH-334 procedure/dispositions, campaign script/log/summary/provenance and plan-QA transcript; checked the SOP evidence rules/GH-334 exception and relevant ROADMAP entries. No additional evidenced pre-existing Blocker or Should found. Verify-tier graph preflight: indexed project rebalanceOS points to another checkout; coverage generation 2026-09-02T03:54:57Z reports missing freshness for the campaign/SKILL/plans and changed SOP/ROADMAP metadata. Used current local documents directly. No Git commands were run, so exact branch diff and approved-commit identity were not independently checked.
+
+- [Pass] S1 closed — Full expected/actual sha256 values now appear for all four content cases, including renamed content, at smoke-binary-backup.sh.txt:31,43-48 and smoke-binary-backup.log:10-13 (all paths in TESTS-RESULTS/2026-10-19+GH-336/). Log :14-17 separately records deletion, mode, rename-source absence and the index/disk limit; :5,8-9 retains diff/abort/apply statuses. SUMMARY.md:8 now correctly separates content hashes from property checks. No procedure change was needed.
+- [Pass] Retained receipt supports the bounded contrast — smoke-binary-backup.log:24-38 records placeholder rejection, apply rc=1 and mismatching/absent content plus failed properties under the old command. Log :39-47 records the text-only path with apply rc=0 and matching full hash. Script :35-40,56-58 uses the planned command with the selected flag and restores against the exact backup-ref spelling created at :33. These are audited retained results, not a reviewer recovery rerun.
+- [Pass] Receipt integrity and consistency — provenance.jsonl:4-5 explicitly supersede the old digest rows. Read-only probe command: after `export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"`, `python3 - <<'PY' > "$TMPDIR/gh336-review-probe.txt"` loaded the JSONL, selected the last row per artifact, compared hashlib.sha256(Path.read_bytes()).hexdigest() to its sha256, and parsed log pairs with `expected=([0-9a-f]{64}) actual=([0-9a-f]{64}|absent)`; it asserted 4 matching main pairs, 4 differing/absent red pairs, 1 matching adjacent pair and the retained properties/apply statuses. Exit 0. Decisive output: "smoke-binary-backup.sh.txt latest provenance matches: True"; "smoke-binary-backup.log latest provenance matches: True"; "main-new-command (diff --binary HEAD): 4 full hash pairs; all match"; "red-control-old-command (diff  HEAD): 4 full hash pairs; all differ/absent"; "adjacent-text-only (diff --binary HEAD): 1 full hash pairs; all match"; "retained property checks and apply statuses match summary: True". This measures receipt consistency, not recovery.
+- [Pass] Procedure and consistency remain aligned — experimental/git-pulse/git-pulse-sync-repair/SKILL.md:99-109 uses the binary patch, placeholder rejection, explicit disk/index limit and saved-HEAD restore base, matching GH-336 plan Scope 1 at PROJECT/1-INBOX/GH-336-BINARY-SAFE-REBASE-BACKUP.md:84-91. SKILL :24-31,62-63,77,123 contains the three bounded fold-ins. GH-334 plan PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md:95 mirrors the binary flag/check/limit; SOP.md:361-371 preserves the same lock, live-owner and verified-backup prerequisites. No new inconsistency found.
+- [Nit] The manual smoke reports outcomes rather than enforcing them through its process status: smoke-binary-backup.sh.txt:43 prints LOST without returning failure, and :56-58 finishes with the adjacent scenario. Treat rc=0 as execution completion only; inspect the printed comparisons and command statuses, as this review did. No new suite or implementation change requested.
+- [Unverified — needs clone run] No executable fixture, suite, gate or recovery operation was run by this reviewer. The static gate at provenance.jsonl:3 is an older-revision attestation; the harness owns the final gate. Deployment acceptance at PROJECT/1-INBOX/GH-336-BINARY-SAFE-REBASE-BACKUP.md:161-162 remains post-merge.
+
+Relay closed (Approved), no further review turn needed. Producer (claude-a)/harness owns subsequent gates and delivery. Only this relay file was edited; the harness owns its commit.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
