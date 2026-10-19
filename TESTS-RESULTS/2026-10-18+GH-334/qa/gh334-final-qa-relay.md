@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-18.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -93,5 +93,40 @@ Reviewer block: plain lines; `VERDICT: PASS` or `VERDICT: FAIL` and `Basis:` eac
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+swept file: yes
+
+Reviewed the whole embedded brief, skill (all 129 lines), approved plan, SOP, roadmap entry, summary, provenance, smoke logs and retained recovery harness. SWE review, Verify tier with seeded-source fallback: no graph project matches this worktree. The nearest rebalanceOS graph is a different checkout, generation 2026-09-02T03:54:57Z; coverage reports changed metadata for git_ops.py, config_cmds.py and pulse.py. Relevant current source was read directly. No additional pre-existing defects found in the reviewed documents beyond the findings below. No Git commands, suites, executable fixtures, live repairs or scheduler mutations were run.
+
+- [Should] SOP.md:369–370 contradicts the skill's qualified rebase exception. It unconditionally says “a dirty tree, or a detached HEAD still falls under the rule above: preserve it for its owner”. A conflicted rebase is itself dirty and normally detached; experimental/git-pulse/git-pulse-sync-repair/SKILL.md:92–93 correctly limits that refusal to states **outside this conflicted rebase**. Make the SOP use the same qualifier, retaining unconditional preservation for merges/cherry-picks/reverts. This clarifies the already approved authority rather than broadening it.
+  Observed input: SOP.md:369 lists dirty/detached states without the outside-rebase qualifier. The published recovery input is a conflicted rebase with an uncommitted conflict edit (TESTS-RESULTS/2026-10-18+GH-334/smoke-rebase-recovery.sh.txt:10–11); smoke-rebase-recovery.log:10–15 records the intended authorized abort and saved edit. Read literally, the final SOP sentence prohibits that recovery.
+  Affected scope: interpreting dirty/detached state inside a stuck rebase meeting all four prerequisites at SOP.md:364–367; all other states remain preserved.
+  Falsifier: the SOP must permit the published MAIN recovery after all four prerequisites and still prohibit the published MERGE_HEAD control (smoke-rebase-recovery.log:16–19). An express exclusion of the qualified conflicted rebase from its preservation sentence would make this correction unnecessary; that qualifier is currently absent.
+- [Nit] experimental/git-pulse/git-pulse-sync-repair/SKILL.md:85 — Quote the metadata path in `$(cat $R/orig-head)` as `$(cat "$R/orig-head")`. Unlike the surrounding quoted checkout paths, this expansion splits paths containing spaces. This is static shell review, not a reproduced recovery failure. The stop-on-failure rule limits the immediate consequence to stopping recovery; no new machinery is requested.
+- [Pass] experimental/git-pulse/git-pulse-sync-repair/SKILL.md:24–64,69–90,97–129 — Plan fidelity is retained: doctor first, missing-key setter, load -w versus install, no automatic enrollment, ordered lock/live-owner/metadata/backups/patch/abort, fleet reconcile → render → deliver, baseline before kickstart, bounded observation and one recheck. `export PULSE G` supplies the bash child; the waiting Python parent retains its lock through subprocess completion. Shared-lock paths match src/rebalance/lib/git_ops.py:272–285 and experimental/git-pulse/collect.sh:391–410. Upstream on the left at skill line 40 makes the count behind then ahead. Loader hint and setter match src/rebalance/doctor.py:842–848 and src/rebalance/cli/config_cmds.py:499–519. No reset/stash, repeated repair loop or other-clone action is authorized (skill:17–20).
+- [Pass] TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md:8–12 — Published logs support the stated observations: smoke-main-path.log:3–15 records the unloaded scheduler, clean attached checkout and 39/10 counts; smoke-rebase-recovery.log:2–15 records held-lock/live-owner refusals and successful backup/patch/abort. The merge control is explicitly classification-only with no repair command run (log:16–19), not an exercised abort path. The retained harness shows that same limit. Summary line 10 expressly withholds live repair and completion-attribution qualification. This review claims no new runtime recovery result.
+- [Pass] experimental/git-pulse/git-pulse-sync-repair/SKILL.md:3–8 and TESTS-RESULTS/2026-10-18+GH-334/provenance.jsonl:1–3 — The folded description has 466 characters, below 1024; the three retained artifact hashes match their provenance records. Narrow read-only probe below exited 0; decisive output: `description characters: 466`, and `sha256 matches: True` for smoke-main-path.log, smoke-rebase-recovery.log and smoke-rebase-recovery.sh.txt. This checks retained bytes, not execution truth.
+
+Probe command (environment: PYTHONDONTWRITEBYTECODE=1, TMPDIR="$PWD/.relay-scratch/tmp"):
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import hashlib,json
+p=Path('experimental/git-pulse/git-pulse-sync-repair/SKILL.md')
+s=p.read_text(); desc=s.split('description: >\n',1)[1].split('\n---',1)[0]; desc=' '.join(x.strip() for x in desc.splitlines())
+print('description characters:',len(desc))
+base=Path('TESTS-RESULTS/2026-10-18+GH-334')
+for row in map(json.loads,(base/'provenance.jsonl').read_text().splitlines()):
+ print(row['artifact'], 'sha256 matches:', hashlib.sha256((base/row['artifact']).read_bytes()).hexdigest()==row['sha256'])
+PY
+```
+
+- [Unverified — needs clone run] Gates and recovery were not rerun in this reviewer worktree. The seeded brief enumerates only skill/docs/evidence changes; repository-wide change containment remains the harness's check. Fast/failed/already-running completion attribution remains unqualified as SUMMARY.md:10 states. No additional suite, daemon or code is requested.
+
+VERDICT: FAIL
+Basis: One SOP clarification remains to make its safety rule expressly agree with the approved procedure; command quoting is a small additional correction. The published smoke supports its bounded claims, and the procedural implementation otherwise follows the approved plan.
+
+Handing off to Producer (claude-a) — clarify the SOP exception, consider the quoting correction, disposition the findings and open the next review round.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
