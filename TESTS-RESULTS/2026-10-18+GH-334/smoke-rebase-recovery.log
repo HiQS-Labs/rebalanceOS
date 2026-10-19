@@ -1,0 +1,19 @@
+setup: rebase dir present=yes orig-head=27ba66a2 refs/heads/main=27ba66a2
+== RED 1: lock held by another writer
+lock busy: a writer owns this rebase — stop
+rc=1
+unchanged: yes
+== RED 2: live git process with cwd in checkout (relative command line)
+live git owner — stop
+rc=3
+unchanged: yes
+== MAIN: abandoned conflicted rebase, lock free, no live owner
+OK backups=20261019T031035Z-orig/20261019T031035Z-head patch=     128B restored refs/heads/main -> 27ba66a2
+rc=0
+refs=main pulse-repair-backup/20261019T031035Z-head pulse-repair-backup/20261019T031035Z-orig origin origin/main  rebase=no
+patch retains conflict edit: yes
+main now 27ba66a (was 27ba66a2); commit 'mine' reachable: 1
+== RED 3: merge in progress (not a rebase) -> skill reports and stops
+  detected: MERGE_HEAD
+  classification: merge in progress -> outside the 2.4 exception: report and stop (no command run)
+  state unchanged by skill: yes

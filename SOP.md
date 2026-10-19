@@ -358,6 +358,18 @@ combined human-readable projection and is never the capture/control plane.
    collector and preserved pending history until reconciled; never reset, stash or discard it.
    `config.sh.bak-gh325` is the pre-enrollment collector config.
 
+**GH-334 exception: aborting a stuck pulse rebase.** The `git-pulse-sync-repair` skill
+(`experimental/git-pulse/git-pulse-sync-repair/SKILL.md`) is the only process that may abort a
+**rebase** left in progress in the pulse checkout. It may do so only when all of these hold:
+- it holds the writers' shared lock (`<gitdir>/rebalance-publish.lock`), taken non-blocking
+- no live git process is in the checkout (`lsof +D`)
+- the rebase's `orig-head` and the current HEAD are saved as verified `pulse-repair-backup/*` branches
+- the conflict diff is saved as a patch in the git dir
+
+A merge, cherry-pick or revert in progress still falls under the rule above, as does a dirty tree or
+detached HEAD outside such a conflicted rebase: preserve it for its owner, and never reset, stash or
+discard it.
+
 ### Four-Mac rollout (GH-325)
 
 Mac Studio is enrolled. Roll out the rest one Mac at a time, in this order: Mac Mini →
