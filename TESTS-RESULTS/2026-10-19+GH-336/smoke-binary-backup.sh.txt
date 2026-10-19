@@ -6,7 +6,7 @@
 # backup and compares byte hashes.
 set -u
 W="$1"; [ -d "$W" ] && [ -z "$(ls -A "$W")" ] || { echo "need an empty dir"; exit 2; }
-h() { shasum -a 256 "$1" 2>/dev/null | cut -c1-16 || echo absent; }
+h() { [ -e "$1" ] && shasum -a 256 "$1" | cut -d" " -f1 || echo absent; }
 base_repo() { # $1=dir; leaves a conflicted rebase in progress
   git init -q "$1" && cd "$1" && git config user.email t@t && git config user.name t
   printf 'a\n' > t.txt; head -c 64 /dev/urandom > c.bin; head -c 64 /dev/urandom > s.bin
@@ -28,7 +28,7 @@ run() { # $1=name $2=diff flags ("--binary" or "") ; TEXT_ONLY=1 for the adjacen
       git rm -q del.txt; chmod +x mode.sh; git mv old.txt new.txt
       printf 'B\n' > idx.txt; git add idx.txt; printf 'A\n' > idx.txt   # staged differs from disk: stated limit
     fi
-    E_t=$(h t.txt); E_c=$(h c.bin); E_s=$(h s.bin)
+    E_t=$(h t.txt); E_c=$(h c.bin); E_s=$(h s.bin); E_n=$(h new.txt)
     S=$(date -u +%Y%m%dT%H%M%SZ)
     git -C "$PULSE" branch "pulse-repair-backup/$S-head" HEAD
     # SKILL.md 2.4e, verbatim except for the flag under test:
@@ -39,14 +39,17 @@ run() { # $1=name $2=diff flags ("--binary" or "") ; TEXT_ONLY=1 for the adjacen
     git -C "$PULSE" worktree add -q --detach "$W/$name-restore" "pulse-repair-backup/$S-head"
     git -C "$W/$name-restore" apply "$G/pulse-repair-$S.patch" 2>&1 | sed 's/^/  apply: /'; echo "  apply rc=${PIPESTATUS[0]}"
     cd "$W/$name-restore"
-    v() { [ "$1" = "$2" ] && echo restored || echo LOST; }
-    echo "  t.txt (resolved text, unstaged): $(v "$(h t.txt)" "$E_t")"
+    # content checks print full sha256 expected (pre-abort disk) vs actual (restored)
+    c() { local a; a=$(h "$1"); [ "$a" = "$2" ] && r=restored || r=LOST; echo "  $1 ($3): $r  expected=$2 actual=$a"; }
+    c t.txt "$E_t" "resolved text, unstaged"
     if [ "${TEXT_ONLY:-0}" != 1 ]; then
-      echo "  c.bin (conflicted binary, overwritten): $(v "$(h c.bin)" "$E_c")"
-      echo "  s.bin (staged binary edit): $(v "$(h s.bin)" "$E_s")"
-      echo "  del.txt (deleted): $([ -e del.txt ] && echo LOST || echo restored)"
-      echo "  mode.sh (chmod +x): $([ -x mode.sh ] && echo restored || echo LOST)"
-      echo "  rename old.txt->new.txt: $([ ! -e old.txt ] && [ -e new.txt ] && echo restored || echo LOST)"
+      c c.bin "$E_c" "conflicted binary, overwritten"
+      c s.bin "$E_s" "staged binary edit"
+      c new.txt "$E_n" "rename target content"
+      # property checks (no content to hash)
+      echo "  del.txt deleted: $([ -e del.txt ] && echo LOST || echo restored) (exists=$([ -e del.txt ] && echo yes || echo no))"
+      echo "  mode.sh executable: $([ -x mode.sh ] && echo restored || echo LOST) (mode=$(stat -f %Lp mode.sh))"
+      echo "  rename source old.txt gone: $([ -e old.txt ] && echo LOST || echo restored)"
       echo "  idx.txt staged B / disk A: on disk = $(cat idx.txt) (stated limit: staged-only B not kept)"
     fi )
 }

@@ -7,12 +7,13 @@
   check no-placeholder: ok
   abort rc=0
   apply rc=0
-  t.txt (resolved text, unstaged): restored
-  c.bin (conflicted binary, overwritten): restored
-  s.bin (staged binary edit): restored
-  del.txt (deleted): restored
-  mode.sh (chmod +x): restored
-  rename old.txt->new.txt: restored
+  t.txt (resolved text, unstaged): restored  expected=3a6b975479a644e01da8a06ae3df67f52785abb2c35bf359efdfe40adea1da8c actual=3a6b975479a644e01da8a06ae3df67f52785abb2c35bf359efdfe40adea1da8c
+  c.bin (conflicted binary, overwritten): restored  expected=d92518d3ce69120f37cf1d12dae80e657ec8ae320c97779535cfec2fce15bef3 actual=d92518d3ce69120f37cf1d12dae80e657ec8ae320c97779535cfec2fce15bef3
+  s.bin (staged binary edit): restored  expected=54d066d7fb3fd91cd5f7134875c19422fb7de84e28930a96e222b37a9725c827 actual=54d066d7fb3fd91cd5f7134875c19422fb7de84e28930a96e222b37a9725c827
+  new.txt (rename target content): restored  expected=8e54b0ca18020275e4aef1ca0eb5e197e066c065c1864817652a8a39c55402cd actual=8e54b0ca18020275e4aef1ca0eb5e197e066c065c1864817652a8a39c55402cd
+  del.txt deleted: restored (exists=no)
+  mode.sh executable: restored (mode=755)
+  rename source old.txt gone: restored
   idx.txt staged B / disk A: on disk = A (stated limit: staged-only B not kept)
 == red-control-old-command (diff  HEAD)
   rebase rc=1 (1 = conflicted, expected)
@@ -24,13 +25,16 @@
   abort rc=0
   apply: error: cannot apply binary patch to 'c.bin' without full index line
   apply: error: c.bin: patch does not apply
+  apply: error: cannot apply binary patch to 's.bin' without full index line
+  apply: error: s.bin: patch does not apply
   apply rc=1
-  t.txt (resolved text, unstaged): LOST
-  c.bin (conflicted binary, overwritten): LOST
-  s.bin (staged binary edit): LOST
-  del.txt (deleted): LOST
-  mode.sh (chmod +x): LOST
-  rename old.txt->new.txt: LOST
+  t.txt (resolved text, unstaged): LOST  expected=3a6b975479a644e01da8a06ae3df67f52785abb2c35bf359efdfe40adea1da8c actual=6dcab36746762397d531bb3d0e00c31b7aea21ab3371c1149e3ca1ba20417b61
+  c.bin (conflicted binary, overwritten): LOST  expected=b55b98dc352a5f592882514e0ecbd03188f960918c95219e67a5fc20fea49287 actual=c0b884d12aadb7288934362ab4d9565670830d6651710899079ff3f55746fd98
+  s.bin (staged binary edit): LOST  expected=4197ae76c77d3f3f584abd3a78443fce29c9eeb2bb94ef690132efe7ac42536d actual=33c5d65f23a9b6ddfa6bcf52f48bb8bc8bb1ade6dc740c632cad4e85070ec6f4
+  new.txt (rename target content): LOST  expected=8e54b0ca18020275e4aef1ca0eb5e197e066c065c1864817652a8a39c55402cd actual=absent
+  del.txt deleted: LOST (exists=yes)
+  mode.sh executable: LOST (mode=644)
+  rename source old.txt gone: LOST
   idx.txt staged B / disk A: on disk = A (stated limit: staged-only B not kept)
 == adjacent-text-only (diff --binary HEAD)
   rebase rc=1 (1 = conflicted, expected)
@@ -40,4 +44,4 @@
   check no-placeholder: ok
   abort rc=0
   apply rc=0
-  t.txt (resolved text, unstaged): restored
+  t.txt (resolved text, unstaged): restored  expected=3a6b975479a644e01da8a06ae3df67f52785abb2c35bf359efdfe40adea1da8c actual=3a6b975479a644e01da8a06ae3df67f52785abb2c35bf359efdfe40adea1da8c

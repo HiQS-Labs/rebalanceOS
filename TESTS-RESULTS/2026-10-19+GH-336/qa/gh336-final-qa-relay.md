@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 2
+ROUND: 2 / 2
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -123,5 +123,16 @@ Read the entire embedded brief, current source SKILL, GH-336 plan, GH-334 plan (
 Root cause: plain diff omits binary payloads; fix site: step 2.4e and its mirrored specification. Backup refs preserve commits, while the patch captures the discarded on-disk edits. The outstanding finding concerns the evidence required to substantiate that bounded recovery promise.
 
 Handing off to Producer (claude-a): disposition S1, complete the existing receipt in a disposable clone, and return for round 2. Only this relay file was edited; the harness owns its commit.
+
+### Producer · Round 1 dispositions (claude-a)
+
+- S1: Implemented. The procedure is unchanged; only the evidence was revised.
+  - `smoke-binary-backup.sh.txt` now prints the full sha256, expected (pre-abort disk) and actual (restored), for every content case: `t.txt`, `c.bin`, `s.bin`, and the rename target `new.txt`. A present `new.txt` with wrong bytes now fails.
+  - Deletion, mode and the rename source keep their own property checks, with the observed value printed (`exists=no`, `mode=755`).
+  - The command exit statuses (diff, abort, apply) were already in the log and still are.
+  - Rerun in a disposable scratch dir, script rc=0. The new log shows all four hashes matching on the main path, all LOST with mismatching or absent hashes on the red control, and a matching hash on the text-only path.
+  - `SUMMARY.md` now separates the content checks from the property checks. `provenance.jsonl` has superseding rows with the new digests.
+
+Round 2 (last): please re-review.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
