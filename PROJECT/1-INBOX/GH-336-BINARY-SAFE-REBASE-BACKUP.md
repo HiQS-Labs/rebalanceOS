@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Sanity check: **fix now, minimal**. Triangulate card and bounded plan written (below). | Codex plan QA (relay, at most 2 rounds), then implement. |
+| Codex plan QA r1: 1 Should, 1 Unverified and 1 Nit, all accepted (dispositions in the relay). Plan revised. | Codex plan QA r2 (last round), then implement. |
 
 ## Observed problem
 
@@ -84,6 +84,10 @@ UNKNOWNS:Git LFS pointers or submodules in the pulse repo would change this. Set
    check to "the patch must be non-empty when `git diff HEAD` is non-empty, and must contain no
    `Binary files … differ` line". Add a one-line restore hint:
    `git -C "$PULSE" worktree add --detach <dir> pulse-repair-backup/$S-head && git -C <dir> apply <patch>`.
+   State the promise exactly: the patch restores the **on-disk bytes** of tracked files, including binary
+   content, deletions, mode changes and renames. It does not snapshot a staged version that differs
+   from the file on disk. That is a narrower state than the pulse writers produce; it is named as a
+   limit, not handled (Codex plan QA r1 U1, measured in a scratch repo).
 2. The GH-334 plan, step (e) at `:95`: mirror the same wording, with no other changes.
 3. Fold-in, same file, wording only (from the GLM 5.3 QA Nits on #335). Each is one line, and each is
    dropped on the first review pushback rather than debated:
@@ -95,8 +99,11 @@ UNKNOWNS:Git LFS pointers or submodules in the pulse repo would change this. Set
      baselines first, or treat that run as the observed one. This happened in the 2026-10-19 run.
 
 **Verification (no new tests; repo policy):**
-- Smoke, main path: re-run the scratch repro with the exact new command line from `SKILL.md`. All three
-  edit kinds must restore.
+- Smoke, main path: re-run the scratch repro with the exact new command line from `SKILL.md`. Inputs:
+  a resolved-but-unstaged conflicted text file, an overwritten conflicted binary, a staged binary edit,
+  a deleted file, a mode change and a rename. After `rebase --abort`, `git apply` onto a detached worktree
+  at the `-head` backup must restore every one. The receipt records byte hashes and each command's exit
+  status. The staged-differs-from-disk case is recorded as the stated limit.
 - Red control: the old command loses the binary edit in the same scenario.
 - Adjacent path: a rebase whose conflicts are text-only. The patch has no binary hunks, still applies,
   and the stricter check passes.
@@ -107,10 +114,17 @@ UNKNOWNS:Git LFS pointers or submodules in the pulse repo would change this. Set
 **Delivery:**
 1. Final Codex QA (relay): 1 round, 2 at most.
 2. PR to `development`; the operator merges.
-3. After the merge, refresh the installed copy with the Skills Army HQ CLI only:
-   `intake.py --apply update git-pulse-sync-repair --source <clean development checkout>/experimental/git-pulse/git-pulse-sync-repair`,
-   then `sync.py --status` and `sync.py --apply`, then verify the links. Other devices receive it
-   through the pulse.
+3. After the merge, refresh the installed copy with the Skills Army HQ CLI only, using its existing checks:
+   - Run `intake.py list` and `sync.py --status` first.
+   - Preview `intake.py update git-pulse-sync-repair --source <clean development checkout at the merge
+     commit>/experimental/git-pulse/git-pulse-sync-repair`, read its warnings, then apply with `--apply`.
+   - Run `sync.py --status`, then `sync.py --apply`.
+   - Verify:
+     - the recorded source revision is the merge commit
+     - the deployed folder's hash matches the source (`intake.py list`)
+     - every enabled app root's link reads through to the new `SKILL.md`
+   - Local deployment is proven here. App discovery and other devices receiving it through the pulse
+     are reported separately, as observed or pending.
 
 **Non-goals:**
 - Redesigning the backup (tar, file copies, stash).
@@ -130,9 +144,9 @@ Budget: about 90 minutes of active work, plus waiting on reviewers. Stop rules:
 | Plan QA asks for a backup redesign, LFS, untracked files or a new script | Decline as unproven generalization unless it cites an observed input in the pulse repo. Park it. |
 | Plan QA disputes the GLM Nit fold-in | Drop the fold-in. Ship the `--binary` fix alone. |
 | The smoke shows `--binary` failing to restore some case | Fall back to saving the changed files themselves (`git diff --name-only -z HEAD` → `tar` into `$G/pulse-repair-$S.tar`) as the 2.4e mechanism. Re-QA once. |
-| Plan QA reaches round 2 without Approved | Ship the one-flag fix as a simple change. Record the open points in the issue. |
+| Plan QA reaches round 2 without Approved | Stop expanding scope. The reduced one-flag fix may proceed only if every finding that applies to it is dispositioned and its smoke, red control and static gate pass. Otherwise stop and report; park the open points in the issue. |
 | Final QA reaches round 2 without Approved, or the relay round cap (3) | Stop and ask the operator. Do not start round 3. |
-| Elapsed active time passes 2 hours | Ship whatever is verified (at least the one-flag fix). Park the rest with a revisit trigger. |
+| Elapsed active time passes 2 hours | Stop expanding scope. Ship only what is already verified (findings dispositioned, smoke, red control and static gate passed). If even the one-flag fix is not verified, stop and report; nothing ships unverified. Park the rest with a revisit trigger. |
 | A new unrelated defect appears | File it. Do not fold it in. |
 
 ## Acceptance
@@ -141,7 +155,7 @@ Budget: about 90 minutes of active work, plus waiting on reviewers. Stop rules:
   - Falsifier: the smoke red control restores the binary edit with the old command. That would mean
     the defect was misdiagnosed.
 - The plan step (e) matches `SKILL.md`.
-- The smoke receipt shows all three edit kinds restored under the new command, and the binary edit lost
+- The smoke receipt shows all six tracked-edit inputs restored under the new command, and the binary edit lost
   under the old one.
-- After merge, the deployed copy's 2.4e contains `--binary` in every enabled app root
-  (`grep -c 'diff --binary HEAD'` in each linked `SKILL.md`, which must be 1).
+- After merge, the deployed copy's recorded source is the merge commit and its folder hash matches the
+  source. Every enabled app root's `SKILL.md` reads through to it, with `grep -c 'diff --binary HEAD'` = 1.

@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 2
+ROUND: 2 / 2
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -120,5 +120,21 @@ Reviewed the whole GH-336 plan and the whole referenced SKILL and GH-334 plan, i
 Root cause: the plain patch omits binary payloads; fix site: the procedure's patch-generation command and its mirrored plan; why not upstream/downstream: the backup branches preserve commits, while this command owns capture of uncommitted working-tree bytes. Behavioral proof remains the Producer's disposable-clone smoke.
 
 Handing off to Producer (claude-a): disposition S1 and the remaining review notes, revise the plan, and return for round 2. Only this relay file was edited; the harness owns its commit.
+
+### Producer · Round 1 dispositions (claude-a)
+
+- S1: Implemented. The plan-QA round-2 and 2-hour pivots now stop scope expansion only. The reduced one-flag fix proceeds only with applicable findings dispositioned and its smoke, red control and static gate passed; otherwise stop and report. Nothing ships unverified. See `PROJECT/1-INBOX/GH-336-BINARY-SAFE-REBASE-BACKUP.md`, Timebox table.
+- U1: Accepted as a clarification, not a redesign.
+  - Measured in a scratch repo during a conflicted rebase:
+    - HEAD `A`, staged `B`, disk `A` → `git diff --binary HEAD` cannot carry `B` (confirmed).
+    - Deletion, `chmod +x` and `git mv` rename all restored by `git apply` onto a detached worktree at the `-head` backup (apply rc=0; del.txt deleted, mode.sh executable, old.txt gone and new.txt present).
+  - The plan now states the promise exactly: on-disk bytes of tracked files, including binary content, deletions, modes and renames. A staged version that differs from disk is a named limit, not handled.
+  - The smoke inputs now include the deletion, mode and rename cases, with byte hashes and exit statuses in the receipt.
+- N1: Implemented. The post-merge redeploy is expanded into the existing Skills Army HQ checks:
+  - list/status first, then preview, inspect warnings and apply
+  - then status/apply sync, recorded-source = merge commit, folder hash parity and link read-through
+  - local deployment is reported separately from app discovery and other devices' pulse receipt
+
+Round 2 (last): please re-review the revised plan.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
