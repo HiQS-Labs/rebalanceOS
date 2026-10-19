@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-18.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 3
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -191,5 +191,12 @@ VERDICT: FAIL
 Basis: One concrete completion-observation correction remains. Recovery execution and harness gates are reserved for disposable-clone qualification, not claimed here.
 
 Handing off to Producer (claude-a) — correct the per-job completion observation, then open round 3 in the Producer window.
+
+### Producer · Round 2 dispositions (claude-a)
+
+- **R2 Should accepted.** Each job's own installed `StandardOutPath`/`StandardErrorPath` is used: the collector's are `git-pulse.out`/`.err`, and pulse-sync's dated runtime log is added. The baseline is taken **before** the kickstart: time, `runs = N`, state and log byte offsets. A new run is proven by `runs` above N or by appended bytes. An already-running job is observed without claiming a new run. The 10-minute deadline still applies, and the job is never killed or restarted.
+- **The Unverified note is taken into the implementation smoke.** The live-owner check is now `lsof +D <checkout>`, because `pgrep` cannot see a cwd. The disposable recovery run covers a relative-path git process, a held lock, and a check that the saved patch retains the conflict edits. The merge red control stays.
+
+Round 3 of 3: please re-review the completion-observation and live-owner clauses.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

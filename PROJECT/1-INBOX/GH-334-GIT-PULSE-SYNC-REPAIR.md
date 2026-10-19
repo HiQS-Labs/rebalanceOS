@@ -80,7 +80,7 @@ roadmap_exempt: false
       - "collector config missing": stop.
    4. **Stuck rebase in the pulse checkout (operator exception, GH-334).** All of the following must hold, in order; stop on any failure:
       - (a) Take the writers' shared advisory lock `<gitdir>/rebalance-publish.lock`, non-blocking (`git_ops.py:272-285`, `collect.sh:391-410`), with an inline `python3 -c` `fcntl.flock(LOCK_EX|LOCK_NB)` held for steps b–f. If the lock is busy, stop: a writer owns the rebase. Never delete the lock file.
-      - (b) No live git process is working on the checkout. Check with `pgrep -fl 'git.*(rebase|am)'` filtered to this path, plus `lsof +D <gitdir>/rebase-*`. On any hit, stop.
+      - (b) No live git process is working on the checkout. Check with `lsof +D <checkout>`, which lists processes whose cwd or open files are inside it, and stop on any `git` entry. `pgrep -fl 'git.*(rebase|am)'` is supporting evidence only, since it cannot see a cwd.
       - (c) Re-read the state under the lock. The rebase must still be present, with readable `orig-head` and `head-name`. If the original-tip metadata cannot be read, stop.
       - (d) Create branches `pulse-repair-backup/<UTC>-orig` at `orig-head` and `pulse-repair-backup/<UTC>-head` at the current HEAD, then verify both refs resolve to those SHAs.
       - (e) Save in-progress conflict edits: write `git diff HEAD` to `<gitdir>/pulse-repair-<UTC>.patch`. Untracked files survive an abort and are left alone.
@@ -89,12 +89,13 @@ roadmap_exempt: false
 3. **Resync, once, through the scheduled jobs.** Run only when the scheduler is loaded, no Git operation is in progress and the tree is clean.
    - **Non-fleet:** `launchctl kickstart gui/$(id -u)/com.rebalance-os.pulse-sync`. If the effective `PULSE_PUSH` is false, report that delivery is disabled, rather than claiming it was delivered.
    - **Fleet:** first `rebalance config refresh-pulse-clone --path <clone>` (a shared-lock reconcile; it is not limited to fleet mode, `src/rebalance/ingest/pulse.py:75-103`). Then run pulse-sync once to render and queue. Then, after checking that the collector `com.user.git-pulse` is loaded and its paths exist, kickstart it once to deliver. If the collector is missing, or any prerequisite fails or is deferred, stop.
-   - **Completion is observed, not assumed.** Kickstart returning 0 only means launchd accepted the job. For each kickstarted job:
-     - Note the start time.
-     - Poll `launchctl print gui/$(id -u)/<label>` every 30 s, for at most 10 minutes, until the job is no longer running.
-     - Read its last exit code, plus the entries in the dated runtime log (`temp/logs/pulse_sync_YYYY-MM-DD.log`, `scripts/pulse_sync.sh:26,49`) and `pulse_{stdout,stderr}.log` that are newer than the start time.
-     - Exit 75 means busy or deferred, not failed. At the deadline, report running/unknown without killing or restarting the job.
-     - An older success entry never counts.
+   - **Completion is observed, not assumed.** Kickstart returning 0 only means launchd accepted the job. For each job, baseline it **before** its kickstart:
+     - Resolve the job's own `StandardOutPath`/`StandardErrorPath` from its installed plist, plus the dated runtime log `temp/logs/pulse_sync_YYYY-MM-DD.log` for pulse-sync (`scripts/pulse_sync.sh:26,49`). The collector writes `git-pulse.out`/`.err` (`experimental/git-pulse/com.user.git-pulse.plist.template:17-20`).
+     - Record the time, the `runs = N` count from `launchctl print gui/$(id -u)/<label>`, its state, and each log's byte size.
+     - If the job is already running, observe and report that run without claiming a new invocation.
+     - After the kickstart, poll every 30 s for at most 10 minutes. A **new** run is proven by `runs` rising above N, or by bytes appended past the recorded offsets. Completion is proven by state not running plus `last exit code`.
+     - Read only the appended log bytes. Exit 75 means busy or deferred, not failed.
+     - With no new-run evidence, or at the deadline: report not started, running or unknown. Never kill or restart the job, and never count an older success.
 4. **Recheck once and stop.**
    - Re-run the doctor rows and ahead/behind, and report before → after.
    - Anything still WARN/FAIL: report the exact row and values.
@@ -110,6 +111,8 @@ roadmap_exempt: false
 | 4 | Kickstart is not completion; dated runtime log | **Accepted**: bounded 10-minute observation from `launchctl print` exit plus fresh log entries; 75 = busy; no kill or restart |
 | 5 | Missing pulse config can never reach `set-pulse` | **Accepted**: doctor first; the missing-keys branch runs `set-pulse` once, then re-verifies |
 | — | `refresh-pulse-clone` "fleet only" wording | Corrected: it is a shared-lock reconcile, not limited to fleet mode |
+| R2 | Completion attribution: per-job logs, baseline before kickstart | **Accepted**: per-job installed log paths, pre-kickstart `runs`/offset baseline, new-run proof, already-running case |
+| R2 | `pgrep` cannot see a cwd | **Accepted**: `lsof +D <checkout>` is the live-owner check. The smoke covers a relative-path git process, a held lock and patch retention |
 | — | Gates and recovery not run by the reviewer | Expected: disposable-clone evidence is captured at implementation |
 
 ### Changes
