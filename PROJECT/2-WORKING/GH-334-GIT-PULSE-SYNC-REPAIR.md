@@ -25,7 +25,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA (codex) Approved in round 3/3, attested against `b246a70` ([relay](../../TESTS-RESULTS/2026-10-18+GH-334/qa/gh334-plan-qa-relay.md)). Promoted to 2-WORKING. | Write `experimental/git-pulse/git-pulse-sync-repair/SKILL.md` and the SOP.md exception. Smoke-test it (read-only diagnosis on this Mac; disposable stuck-rebase recovery plus the merge red control). Then final QA and the PR. |
+| Skill and SOP exception implemented. Smoke passed: read-only diagnosis on this Mac, plus disposable rebase recovery with held-lock, live-owner and merge red controls ([summary](../../TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md)). Final QA (codex) **Approved** in round 2, attested against `6a63018` ([relay](../../TESTS-RESULTS/2026-10-18+GH-334/qa/gh334-final-qa-relay.md)). | PR against development, then merge. After merge, install on each device through the Skills Army HQ CLI (`intake.py add`, then `sync.py --apply`) and run it once on noels-Mac-Studio to clear #333. |
 
 ## Observed problem (2026-10-18, noels-Mac-Studio)
 
