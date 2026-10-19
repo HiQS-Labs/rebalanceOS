@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-18.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 2 / 3
 
@@ -169,5 +169,27 @@ All five Shoulds were checked against the source and **Accepted**. The plan's pr
 Also corrected: `refresh-pulse-clone` is not limited to fleet mode. The verdict vocabulary is PASS/FAIL, per the TAKE YOUR TURN block.
 
 Reviewer: please re-review the revised procedure only. Round 2 of 3.
+
+### Reviewer · Round 2
+swept file: yes
+
+Reviewed the entire revised plan (lines 1–150), embedded brief and prior turns, rather than only the revised procedure. Source-grounded Verify review with direct-source fallback: `list_projects` identifies no graph for this reviewer checkout; the available rebalanceOS graph is a different checkout, generation 2026-09-02T03:54:57Z. Coverage reports changed Python/collector metadata and excluded `scripts/`; current seeded sources were read instead. No Git commands, executable fixtures, test suites, repairs or live scheduler mutations were run. No additional pre-existing plan defects found beyond the finding and qualification below.
+
+Findings:
+- [Should] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:92-97 — Completion observation still specifies the wrong logs for the fleet check-in job and takes its baseline too late. The clause applies to “each kickstarted job”, but line 95 names only the renderer's logs; the collector template instead sets `StandardOutPath` to `{{LOG_DIR}}/git-pulse.out` and `StandardErrorPath` to `{{LOG_DIR}}/git-pulse.err` (experimental/git-pulse/com.user.git-pulse.plist.template:17-20). Capture the observation time, existing launchd state/run counter and log offsets **before** kickstart; resolve each job's own installed output/error paths, with the additional dated runtime log for pulse-sync. Require evidence of a new run and its completion, rather than merely finding the job stopped with a previous last-exit value. If already running, observe/report that state without claiming a new invocation. Keep the existing deadline and fail/defer stops.
+  Observed input: line 91 kickstarts the collector; lines 92–95 apply the renderer-only log list to it and say “Note the start time” after kickstart. The seeded collector plist's actual log suffixes are `git-pulse.out` and `git-pulse.err`, not `pulse_stdout.log`/`pulse_stderr.log`.
+  Affected scope: completion attribution for the two scheduled jobs, particularly a short run completed before the first observation, an already-running job, or a collector run whose diagnostics never enter the renderer logs.
+  Falsifier: a disposable/mocked observation with an old exit-0 renderer log and a fresh failing collector run must report the collector failure using its installed logs; a fast successful new run must remain attributable even when complete before the first poll; kickstart acceptance without a new run must not qualify as new completion. A procedure already doing this would make the change unnecessary, but lines 93–95 currently do not specify it.
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:73-76 — The loader and missing-key changes address the earlier command/control-flow findings: doctor supplies the exact `launchctl load -w` hint (src/rebalance/doctor.py:842-848), and the existing setter validates a supplied clone before writing (src/rebalance/cli/config_cmds.py:499-519). This is source grounding, not a live loader qualification.
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:82-88 — The revised procedure explicitly holds the existing nonblocking lock through metadata re-read, verified original/current-tip refs and abort. That matches the publisher lock contract at src/rebalance/lib/git_ops.py:272-285 and experimental/git-pulse/collect.sh:391-410. The proposed SOP exception at plan line 118 carries these prerequisites; other operations remain outside the exception.
+- [Pass] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:89-101 — Fleet now orders reconcile → render/queue → collector delivery, with failed/deferred prerequisites stopping the sequence. Non-fleet checks effective push policy. SCHEDULER.md:174-180 assigns the fleet push to the collector, while scripts/pulse_sync.sh:37-49 invokes the renderer with the non-fleet environment policy. The ten-minute deadline and one final recheck retain bounded scope.
+- [Unverified — needs clone run] PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md:83-87,134 — Neither live-owner detection nor conflict-edit restoration has been runtime-qualified here. During implementation's disposable recovery run, include a Git process invoked from the checkout with a relative command line (the proposed `pgrep` path filter alone cannot identify its cwd), a held publication lock, and preserved conflict edits. Check that the saved patch actually retains the intended edits before treating abort as safe; branch backups preserve commits, not uncommitted edits. Retain the existing merge red control. No empirical safety result is claimed in this review.
+
+Answers: 1) Loader, kickstart labels/domain and renderer log names are grounded in the seeded sources; the completion instructions still need the per-job correction above. 2) Fleet now renders then delivers; non-fleet uses pulse-sync with its push policy, without enrollment. refresh-pulse-clone is a shared-lock reconcile (src/rebalance/ingest/pulse.py:75-103), not a pusher. 3) The planned original/head refs and lock lifetime address round 1; live-owner detection and edit preservation still require the already-planned disposable recovery evidence. 4) Repair/resync/recheck bounds are explicit; completion attribution is the remaining procedure correction. 5) One skill and a narrow adjacent SOP exception remain commensurate with the fixed operator scope; no new subsystem is requested.
+
+VERDICT: FAIL
+Basis: One concrete completion-observation correction remains. Recovery execution and harness gates are reserved for disposable-clone qualification, not claimed here.
+
+Handing off to Producer (claude-a) — correct the per-job completion observation, then open round 3 in the Producer window.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
