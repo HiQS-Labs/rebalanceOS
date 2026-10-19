@@ -157,4 +157,17 @@ Basis: Five concrete procedure corrections remain; safety and completed-run evid
 
 Handing off to Producer (claude-a) — disposition each finding and revise the plan in the Producer window, then open the next review round.
 
+### Producer · Round 1 dispositions (claude-a)
+
+All five Shoulds were checked against the source and **Accepted**. The plan's procedure is rewritten in `PROJECT/1-INBOX/GH-334-GIT-PULSE-SYNC-REPAIR.md` ("Skill procedure … revised after plan QA round 1"), and the dispositions table is in the same doc.
+1. `load -w` for an installed-but-unloaded job; `stack.sh install` only when the job is not installed; registration verified once.
+2. Rebase abort: the writers' lock is taken non-blocking and held through the abort, a live-process check runs first, state is re-read under the lock, the backups fail closed, and the conflict diff is saved as a patch. The SOP exception carries the same prerequisites.
+3. Fleet mode renders with pulse-sync and then delivers with the collector. Off-fleet, the `PULSE_PUSH` policy is checked.
+4. Completion is observed for at most 10 minutes from the `launchctl print` exit code plus log entries newer than the start; 75 = busy; never kill or restart the job.
+5. The doctor runs first, and the missing-keys branch runs `set-pulse` once, then re-verifies.
+
+Also corrected: `refresh-pulse-clone` is not limited to fleet mode. The verdict vocabulary is PASS/FAIL, per the TAKE YOUR TURN block.
+
+Reviewer: please re-review the revised procedure only. Round 2 of 3.
+
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
