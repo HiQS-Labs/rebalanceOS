@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -74,7 +74,7 @@ Operational envelope: a single operator's per-device agent skill, run on their o
 Operator decisions are fixed:
 - the skill may repair and then resync
 - location `experimental/git-pulse/`
-- a stuck rebase may be aborted after verified backups (the SOP exception)
+- a stuck rebase may be aborted after verified backups (the SOP exception)  [Unverified — no citation]
 - install after merge via the Skills Army HQ CLI
 - RebalanceOS is on every device
 
@@ -110,5 +110,53 @@ Reviewer block: plain lines; `VERDICT: PASS` or `VERDICT: FAIL` and `Basis:` eac
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer — Round 1 (commandcode)
+swept file: yes
+
+Swept the whole embedded brief, `experimental/git-pulse/git-pulse-sync-repair/SKILL.md` (all 138 lines), `PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md` (all 181 lines), `SOP.md` (the GH-334 exception, lines 355-380), `ROADMAP.md:41`, all of `TESTS-RESULTS/2026-10-18+GH-334/` (SUMMARY, provenance, all smoke logs, retained harness), both prior QA relays (read for coverage context only; this review was performed independently against the current head), and the supporting code the skill names: `src/rebalance/doctor.py` (830-865, 2145-2255), `src/rebalance/lib/git_ops.py` (262-306, 570-654), `src/rebalance/ingest/pulse.py` (70-114, 860-965), `src/rebalance/ingest/config.py` (195-229), `src/rebalance/cli/config_cmds.py` (470-580), `scripts/stack.sh` (drift + header), `scripts/pulse_sync.sh`, both plist templates, `experimental/git-pulse/collect.sh` (230-262, 385-415), `scripts/lib/install_common.sh`, `UPGRADE.md` (185-212). No pre-existing defects requiring change were found in any touched file or in the supporting regions the skill depends on.
+
+Findings:
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:24-35` — The 864ff96 fix holds on this Mac, verified live: `REBALANCE_ROOT` is unset in agent shells, `~/.config/rebalance/runtime-root` contains `/Users/noelsaw/rebalance-runtime`, and the installed plist's `ProgramArguments:0` is `/Users/noelsaw/rebalance-runtime/.venv/bin/python` — so `$RB` resolves to the runtime clone and the plist check confirms it. `FLEET` falls back correctly: the runtime doctor (pre-GH-325, `9dd2665`) has no `pulse fleet` row, and `$RB/temp/rbos.config:137` has `pulse_fleet_enabled: true` (`fleet_mode=true` at `~/.config/git-pulse/config.sh:67`). `launchctl print gui/$(id -u)/{com.rebalance-os.pulse-sync,com.user.git-pulse}` both return "Could not find service", so 2.1 correctly plans `load -w` on both jobs. Running doctor from `$RB` is load-bearing and correct: `src/rebalance/ingest/config.py:217-220` resolves `temp/rbos.config` per-CWD.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:47-49` — The drift check works from `$RB` even though the runtime is 11 commits behind: the runtime's own `scripts/stack.sh` at `9dd2665` contains the `drift` subcommand (probe: `grep -c 'drift)' /Users/noelsaw/rebalance-runtime/scripts/stack.sh` → `1`), and `runtime_drift()` fetches before counting (`git -C "$REBALANCE_DIR" fetch --quiet origin development`, `scripts/stack.sh:475-479`), so the count is fresh rather than measured against stale remote refs.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:119-131` — Step 3 baselines are real: `launchctl print gui/501/com.rebalance-os.daily-sync` shows literal `runs = 4` and `state = not running`, matching the skill's `runs = N` phrasing; the installed pulse-sync plist's `StandardOutPath`/`StandardErrorPath` are `temp/logs/pulse_{stdout,stderr}.log` under the runtime root (`scripts/com.rebalance-os.pulse-sync.plist.template:47-51`), the collector's are `git-pulse.out`/`.err` (`experimental/git-pulse/com.user.git-pulse.plist.template:17-20`), and the dated runtime log `pulse_sync_YYYY-MM-DD.log` comes from `scripts/lib/scheduler_common.sh:60-66`. PlistBuddy `'Print :ProgramArguments'` is the correct key path against the real installed plist (probe output quoted below). The 2.4 flock wrapper crosses variables correctly: `export PULSE G` (SKILL.md:83) reaches the `bash -c` child while `R`/`S` are assigned inside it, and `"$(cat "$R/orig-head")"` is quoted (SKILL.md:98). All `$RB`/`$PULSE`/`$G` path expansions are quoted, including against the space-containing `GH Repos` path style.
+- [Pass] `experimental/git-pulse/git-pulse-sync-repair/SKILL.md:78-105` — Safety verified against the code it cites: `src/rebalance/lib/git_ops.py:271-290` takes `LOCK_EX|LOCK_NB` on `<gitdir>/rebalance-publish.lock`; `experimental/git-pulse/collect.sh:393-410` takes the same lock and defers with exit 75; `src/rebalance/lib/git_ops.py:576-580` and `collect.sh:238-250` refuse rebase/merge/cherry-pick/revert/detached states with "preserve it for its owner". No step can lose local commits: the abort is reachable only after verified backup refs and the conflict patch, untracked files survive, and an hourly fire during 2.4 defers on the busy lock rather than racing. In fleet mode `publish_pulse` forces `push = False` (`src/rebalance/ingest/pulse.py:956-959`), so step 3's "render and queue" holds even though the installed plist has no `PULSE_PUSH` key (probe: `Print :EnvironmentVariables:PULSE_PUSH` → "Does Not Exist"), consistent with `scripts/pulse_sync.sh:37-42`.
+- [Pass] State-walk answer (brief Q1): on this exact Mac step 3 fleet stops cleanly at 3.1 — `$RB`'s CLI at `9dd2665` (pre-GH-325) has none of `set-pulse`/`fleet-enroll`/`refresh-pulse-clone` (probe: `config --help` lists none of the three; all were introduced in commits `1a496fa` and `80ce446`, which postdate `9dd2665`) — and step 1's drift finding already names the deploy command. The stop is honest and matches the plan's outcome ("recovers in one agent pass, or stops with the exact remaining blocker"). Even stopped at 3.1, the completed 2.1 repairs the device: loading the collector (`RunAtLoad` true, `com.user.git-pulse.plist.template:15-16`) fires it immediately, and it reconciles and delivers under the same writers' lock (`collect.sh` `pull_safely`), which is the #333/#334 outcome.
+- [Pass] Doc agreement: `SOP.md:361-371` states all four prerequisites and preserves other states only "outside such a conflicted rebase", matching `SKILL.md:104-105`; the doctor's own hint (`src/rebalance/doctor.py:844-846`) matches 2.1's `load -w`; `UPGRADE.md:185-212` matches 2.3 (repair-only `fleet-enroll --apply`, no auto-enrollment); `SUMMARY.md` and `smoke-main-path-runtime.log` agree; all 4 `provenance.jsonl` sha256 hashes verify (probe below).
+- [Nit] `SKILL.md:74,114` — Steps 2.3 and 3.1 use bare `rebalance config …` while step 0 (`SKILL.md:30`) and 2.2 (`SKILL.md:70`) use `"$RB/.venv/bin/rebalance"`. `rebalance` is not on PATH on this Mac (probe: `command -v rebalance` → not found), so the bare form fails fast and an agent falls back to `$RB`'s CLI; but writing the full `"$RB/.venv/bin/rebalance"` in 2.3/3.1 removes the last place a different clone's CLI could be picked up.
+- [Nit] `SKILL.md:26-28` — Step 0 says "Confirm that `$RB` matches the path in the installed pulse-sync plist's ProgramArguments" but names no action on mismatch. On this Mac they match (probed), so there is no observed failure; one sentence ("on mismatch, adopt the plist's root as `$RB` and re-run doctor from it") would close the gap that made the original round-1 bug possible.
+- [Nit] `SKILL.md:59-60` — `launchctl load -w` on the collector fires it immediately (`RunAtLoad` true, `com.user.git-pulse.plist.template:15-16`), so a step-3 baseline recorded after 2.1 can already include a load-triggered run. Step 3's "If the job is already running, observe that run and do not claim a new one" (`SKILL.md:125`) covers the interaction; a note in 2.1 would prevent misattributing that run to the later kickstart.
+- [Unverified — needs clone run] Live `launchctl load -w`, `kickstart` execution and completion attribution were not exercised in this turn (they mutate the device; `TESTS-RESULTS/2026-10-18+GH-334/SUMMARY.md:11` reserves them for the operator's post-merge run). No suite or executable fixture was run; the harness gate follows this turn.
+
+Read-only probes (environment: `PYTHONDONTWRITEBYTECODE=1`, `TMPDIR="$PWD/.relay-scratch/tmp"`), all exit 0 unless noted:
+```bash
+cat /Users/noelsaw/.config/rebalance/runtime-root
+/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' /Users/noelsaw/Library/LaunchAgents/com.rebalance-os.pulse-sync.plist
+launchctl print gui/$(id -u)/com.rebalance-os.daily-sync | grep -E 'state|runs'
+launchctl print gui/$(id -u)/com.rebalance-os.pulse-sync        # not loaded
+grep -n 'pulse_fleet_enabled' /Users/noelsaw/rebalance-runtime/temp/rbos.config
+grep -c 'drift)' /Users/noelsaw/rebalance-runtime/scripts/stack.sh
+/Users/noelsaw/rebalance-runtime/.venv/bin/rebalance config --help | grep -oE 'set-pulse|fleet-enroll|refresh-pulse-clone'
+command -v rebalance
+git rev-parse --short HEAD   # worktree head 6dca505 = 0765c30 + this relay seed
+```
+Decisive output:
+```text
+/Users/noelsaw/rebalance-runtime
+/Users/noelsaw/rebalance-runtime/.venv/bin/python
+state = not running / runs = 4
+Could not find service "com.rebalance-os.pulse-sync" in domain for user gui: 501
+137:  "pulse_fleet_enabled": true,
+1
+(no subcommands listed — grep empty)
+rebalance: not on PATH
+```
+
+Answers: (1) yes — every step picks the right action, the right clone and the right order on this Mac; the fleet resync stops honestly at 3.1 (pre-GH-325 runtime) with drift reported, and 2.1 alone unblocks delivery via the load-triggered collector. (2) every probed shell line is correct as written. (3) no step can lose commits or race the hourly job; 2.4 stops on everything outside a conflicted rebase. (4) SKILL, plan, SOP exception, SUMMARY and the doctor's own hints agree. (5) commensurate with a single-operator per-device skill; nothing GH-334 asks for is missing and nothing needs cutting beyond the three Nits.
+
+VERDICT: PASS
+Basis: The 864ff96 runtime-root resolution is correct and live-verified on the target Mac; all shell invocations probe out as written; the 2.4 abort gate matches the writers' real lock and refusals; the docs agree; no Blocker or Should — the three Nits are optional wording clarifications that do not affect the skill working as written.  [Unverified — no citation]
+
+Relay closed (Approved), no further turn needed — returning coordination to Producer (claude-a) for the harness gate and post-merge workflow.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
