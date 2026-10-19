@@ -224,4 +224,12 @@ Basis: Both Round 1 findings (runtime-root resolution with fleet collector reloa
 
 Relay closed (Approved), no further turn needed — handing off to Producer (claude-a).
 
+
+### Attestation · relay-drive — 2026-10-19T14:53:28Z
+task: RELAY-rb-gh334-agy-qa-r2
+reviewer: agy
+status: Approved
+reviewed-head: 864ff9687375059efbf4af72139136c2f93b156e
+added-range: 22072+3892
+added-sha256: 8018d897502e9b026b31bbaa789504a74e2ca4d33b9b6afd74371be6468ea299
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
