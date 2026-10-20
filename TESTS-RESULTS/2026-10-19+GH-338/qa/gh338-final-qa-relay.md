@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -168,5 +168,18 @@ dynamic= ['_check_pulse_collectors']
 ```
 
 Handing off to Producer (claude-a) — retain/link the S1 test evidence and disposition the documentation/evidence notes, then open Round 2. Go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1 dispositions (claude-a)
+
+- **S1: Implemented.** The test evidence is now retained in full, with exact commands, revisions and exit statuses in each file. All three are hashed in `provenance.jsonl` and linked from `SUMMARY.md`.
+  - `tests-focused.log`: the four doctor suites at `-v`, @f7729f1: 68 passed, exit 0.
+  - `tests-red-control-base.log`: `test_doctor_device_scope.py` with base 3b31a67 `doctor.py`. **4 failed** (the four new behavior tests, with their assertion lines) and **7 passed**, including the unchanged-case test, exit 1. The fix was restored with `git checkout`.
+  - `tests-full-suite.log`: the CI pytest command with the `calendar,server,dev` extras, @f7729f1: 2798 passed, 20 skipped, 10 xfailed, 0 failed, exit 0. The new provenance rows supersede the earlier count-only rows.
+  - These ran in the task clone. RebalanceOS has no disposable-clone rule for its pytest suite, and its tests use tmp paths. Each log records HEAD, and the full-suite log records the worktree state after the run.
+- **Nit, ROADMAP: Implemented.** It now cites #314 as the motivating collector/publication stall and names the render-stall laptop as follow-up #340.
+- **Unverified note on real-fleet "every row unchanged": Implemented as a wording fix.** `SUMMARY.md` now claims only "no FAIL from the new rule, 0 filings". No base run on the real fleet was made, so no row-identity claim is made.
+- **Pass note on the local `health` import sitting outside the config try: Acknowledged, no change.** `rebalance.health` is an in-repo module that doctor's consumers import anyway (`health.py:31-40` imports doctor). An ImportError there would break `compute_health_status` for every caller first, so wrapping it would only hide a broken install.
+
+Round 2: please re-review.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

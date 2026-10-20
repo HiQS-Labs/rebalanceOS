@@ -1,0 +1,84 @@
+# focused suites @ f7729f1b34b365b0e7c3565cc369ec3f5608eee5 2026-10-20T04:52:11Z
+$ .venv/bin/python -m pytest -p no:cacheprovider -v tests/test_doctor_device_scope.py tests/test_doctor_exit_pins.py tests/test_doctor_pulse_severity.py tests/test_doctor.py
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.1.1, pluggy-1.7.0 -- /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19/.venv/bin/python
+hypothesis profile 'default'
+rootdir: /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19
+configfile: pyproject.toml
+plugins: hypothesis-6.170.5, anyio-4.15.1
+collecting ... collected 68 items
+
+tests/test_doctor_device_scope.py::test_foreign_pulse_collector_is_informational_not_a_warning PASSED [  1%]
+tests/test_doctor_device_scope.py::test_stale_collector_still_warns_on_its_own_device PASSED [  2%]
+tests/test_doctor_device_scope.py::test_intermittent_laptop_window_differs_from_always_on_collector PASSED [  4%]
+tests/test_doctor_device_scope.py::test_scoped_foreign_collector_silent_past_72h_fails_from_another_mac PASSED [  5%]
+tests/test_doctor_device_scope.py::test_foreign_silence_bound_is_strictly_greater_than_72h PASSED [  7%]
+tests/test_doctor_device_scope.py::test_unscoped_foreign_collector_silent_past_72h_is_not_capped PASSED [  8%]
+tests/test_doctor_device_scope.py::test_acknowledged_silent_foreign_collector_is_demoted_to_a_notice PASSED [ 10%]
+tests/test_doctor_device_scope.py::test_own_device_and_never_pushed_foreign_rows_are_unchanged PASSED [ 11%]
+tests/test_doctor_device_scope.py::test_device_scoped_job_stays_informational_even_with_a_stale_plist PASSED [ 13%]
+tests/test_doctor_device_scope.py::test_device_scoped_job_with_a_stale_plist_still_fails_on_its_OWNER PASSED [ 14%]
+tests/test_doctor_device_scope.py::test_unscoped_scheduler_job_keeps_existing_missing_job_warning PASSED [ 16%]
+tests/test_doctor_exit_pins.py::BlastRadiusEnumerationTests::test_dynamic_severity_sites_match_the_pin PASSED [ 17%]
+tests/test_doctor_exit_pins.py::BlastRadiusEnumerationTests::test_literal_warn_error_sites_match_the_pin PASSED [ 19%]
+tests/test_doctor_exit_pins.py::BlastRadiusEnumerationTests::test_pulse_state_table_error_states_are_the_known_three PASSED [ 20%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_broken_configured_probe_fails_toward_surfacing PASSED [ 22%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_configured_empty_source_is_an_error PASSED [ 23%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_every_freshness_source_declares_a_configured_probe PASSED [ 25%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_fresh_install_black_box_exits_zero PASSED [ 26%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_gmail_mcp_mode_selected_but_empty_is_an_error PASSED [ 27%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_gmail_oauth_default_unconnected_is_a_skip PASSED [ 29%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_missing_table_on_configured_source_stays_an_error PASSED [ 30%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_missing_table_on_unconfigured_source_is_also_a_skip PASSED [ 32%]
+tests/test_doctor_exit_pins.py::OnboardingPolicyTests::test_unconfigured_empty_source_is_a_clean_skip PASSED [ 33%]
+tests/test_doctor_exit_pins.py::FleetDemotionTests::test_sleuth_export_staleness_is_not_suppressible_by_local_reread PASSED [ 35%]
+tests/test_doctor_exit_pins.py::FleetDemotionTests::test_stale_publisher_export_is_a_warning_not_an_error PASSED [ 36%]
+tests/test_doctor_exit_pins.py::StatusUnavailableTests::test_empty_status_disables_suppression_without_hiding PASSED [ 38%]
+tests/test_doctor_exit_pins.py::StatusUnavailableTests::test_fail_check_still_fails_without_status PASSED [ 39%]
+tests/test_doctor_exit_pins.py::StatusUnavailableTests::test_malformed_status_never_crashes_the_verdict PASSED [ 41%]
+tests/test_doctor_pulse_severity.py::RawStateWordDoesNotLeakTests::test_detail_leads_with_canonical_severity_not_raw_pulse_state PASSED [ 42%]
+tests/test_doctor_pulse_severity.py::RawStateWordDoesNotLeakTests::test_no_raw_state_word_appears_anywhere_in_user_facing_text PASSED [ 44%]
+tests/test_doctor_pulse_severity.py::SeverityInversionTests::test_healthy_collector_is_not_reported_at_warning_severity PASSED [ 45%]
+tests/test_doctor_pulse_severity.py::SeverityInversionTests::test_stale_is_a_warning_not_an_error PASSED [ 47%]
+tests/test_doctor_pulse_severity.py::SeverityInversionTests::test_unhealthy_local_collectors_carry_error_severity 
+tests/test_doctor_pulse_severity.py::SeverityInversionTests::test_unhealthy_local_collectors_carry_error_severity PASSED [ 48%]
+tests/test_doctor_pulse_severity.py::DeviceFirstSeverityTests::test_cap_does_not_touch_non_error_severities PASSED [ 50%]
+tests/test_doctor_pulse_severity.py::DeviceFirstSeverityTests::test_local_device_keeps_error PASSED [ 51%]
+tests/test_doctor_pulse_severity.py::DeviceFirstSeverityTests::test_other_device_error_is_capped_at_warning 
+tests/test_doctor_pulse_severity.py::DeviceFirstSeverityTests::test_other_device_error_is_capped_at_warning PASSED [ 52%]
+tests/test_doctor_pulse_severity.py::MappingContractTests::test_every_pulse_state_maps_to_a_canonical_severity 
+tests/test_doctor_pulse_severity.py::MappingContractTests::test_every_pulse_state_maps_to_a_canonical_severity PASSED [ 54%]
+tests/test_doctor_pulse_severity.py::MappingContractTests::test_qualified_state_classifies_on_its_leading_word PASSED [ 55%]
+tests/test_doctor_pulse_severity.py::MappingContractTests::test_qualifier_is_preserved_in_detail_text PASSED [ 57%]
+tests/test_doctor_pulse_severity.py::MappingContractTests::test_unknown_state_is_not_assumed_healthy PASSED [ 58%]
+tests/test_doctor_pulse_severity.py::PulseHealthLeftUntouchedTests::test_pulse_health_still_owns_its_five_state_model PASSED [ 60%]
+tests/test_doctor.py::DoctorReportTests::test_report_carries_no_verdict_of_its_own PASSED [ 61%]
+tests/test_doctor.py::DoctorCheckTests::test_fresh_db_warns_on_empty_state PASSED [ 63%]
+tests/test_doctor.py::DoctorCheckTests::test_migrated_db_reports_schema_ok PASSED [ 64%]
+tests/test_doctor.py::DoctorCheckTests::test_populated_db_reports_ok PASSED [ 66%]
+tests/test_doctor.py::DoctorCheckTests::test_stale_github_data_warns PASSED [ 67%]
+tests/test_doctor.py::DoctorCheckTests::test_unresolvable_db_fails PASSED [ 69%]
+tests/test_doctor.py::DoctorCliTests::test_doctor_cli_prints_degraded_signal_health_warning PASSED [ 70%]
+tests/test_doctor.py::IntegrationCheckTests::test_calendar_token_presence PASSED [ 72%]
+tests/test_doctor.py::IntegrationCheckTests::test_figma_file_keys_without_token_warns PASSED [ 73%]
+tests/test_doctor.py::IntegrationCheckTests::test_figma_token_and_files_reports_source PASSED [ 75%]
+tests/test_doctor.py::IntegrationCheckTests::test_figma_token_without_file_keys_warns PASSED [ 76%]
+tests/test_doctor.py::IntegrationCheckTests::test_figma_unconfigured_is_clean_skip PASSED [ 77%]
+tests/test_doctor.py::IntegrationCheckTests::test_gmail_check_never_crashes PASSED [ 79%]
+tests/test_doctor.py::IntegrationCheckTests::test_pulse_missing_config_warns PASSED [ 80%]
+tests/test_doctor.py::IntegrationCheckTests::test_slack_users_warns_only_for_indexed_sleuth_activity_without_cache PASSED [ 82%]
+tests/test_doctor.py::IntegrationCheckTests::test_sleuth_complete_keyring_ok PASSED [ 83%]
+tests/test_doctor.py::IntegrationCheckTests::test_sleuth_incomplete_env_warns PASSED [ 85%]
+tests/test_doctor.py::IntegrationCheckTests::test_sleuth_missing_env_warns PASSED [ 86%]
+tests/test_doctor.py::AuthFailureCheckTests::test_active_failure_warns_per_source PASSED [ 88%]
+tests/test_doctor.py::AuthFailureCheckTests::test_all_recovered_emits_single_ok PASSED [ 89%]
+tests/test_doctor.py::AuthFailureCheckTests::test_never_crashes_on_reader_error PASSED [ 91%]
+tests/test_doctor.py::AuthFailureCheckTests::test_no_history_emits_no_checks PASSED [ 92%]
+tests/test_doctor.py::PulseCollectorCheckTests::test_alive_is_ok_degraded_and_alert_warn PASSED [ 94%]
+tests/test_doctor.py::PulseCollectorCheckTests::test_empty_when_no_collectors PASSED [ 95%]
+tests/test_doctor.py::PulseCollectorCheckTests::test_never_crashes_on_reader_error PASSED [ 97%]
+tests/test_doctor.py::DiagnosticsIndexTests::test_index_lists_surfaces_and_is_informational PASSED [ 98%]
+tests/test_doctor.py::DiagnosticsIndexTests::test_index_never_raises_if_auth_log_unavailable PASSED [100%]
+
+==================== 68 passed, 11 subtests passed in 2.28s ====================
+exit=0
