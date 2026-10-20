@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -181,5 +181,49 @@ Handing off to Producer (claude-a) — retain/link the S1 test evidence and disp
 - **Pass note on the local `health` import sitting outside the config try: Acknowledged, no change.** `rebalance.health` is an in-repo module that doctor's consumers import anyway (`health.py:31-40` imports doctor). An ImportError there would break `compute_health_status` for every caller first, so wrapping it would only hide a broken install.
 
 Round 2: please re-review.
+
+### Reviewer · Round 2
+
+swept file: yes
+VERDICT: PASS
+Basis: S1 is resolved by retained, command-specific test evidence. Re-read the complete embedded brief, plan, doctor module, both named test files, smoke artifacts, summary, provenance and new logs, including pre-existing doctor code. No remaining Blocker or Should; no additional pre-existing defect identified beyond the own-laptop delivery override already recorded in the plan. Approval covers source and published evidence; it does not claim independent suite execution in this reviewer worktree.
+
+- [Pass] S1 closed. `TESTS-RESULTS/2026-10-19+GH-338/tests-focused.log:1-2,83-84` retains revision, exact command, 68 passes and exit 0. `tests-red-control-base.log:1-20` retains base `3b31a67`, test revision, four named failures and their assertion values, seven passes (including the unchanged case), exit 1 and restoration command. `tests-full-suite.log:1-2,50-52` retains implementation revision, exact CI pytest selection, 2798 passes / 20 skips / 10 xfails and exit 0. This is the documented CI selection, which explicitly excludes the two embedder modules, not a claim that every repository test ran. `provenance.jsonl:5-7` hashes those logs; all five file-backed provenance hashes match the supplied artifacts (probe below). Historical count-only rows are explicitly superseded by row 7.
+
+- [Pass] The requested seven branches still match the plan: scoped foreign ≤72h keeps its informational row; scoped or unscoped foreign >72h becomes FAIL/ERROR unless acknowledged; acknowledged >72h is WARN/WARNING; unscoped ALERT ≤72h retains its cap; own-device and null-age routing remain unchanged (`src/rebalance/doctor.py:1932-1942,1986-1999,2014`; `tests/test_doctor_device_scope.py:50-149`). The bound is strict `>`. DEGRADED also reaches escalation: classification records age before choosing DEGRADED, whose `healthy` property is false (`src/rebalance/ingest/pulse_health.py:69-70,168-173`). No requested branch divergence or vacuous new assertion found.
+
+- [Pass] Notice configuration is read once per `_check_pulse_collectors` call with an exception fallback, and the local import avoids the module-level cycle (`src/rebalance/doctor.py:1912-1920`; `src/rebalance/health.py:31-40`). The import itself is outside the try; the Producer correctly acknowledges that limit rather than claiming every broken installation is caught. Config returns string patterns (`src/rebalance/ingest/config.py:682-695`), matching uses the existing case-insensitive substring contract (`src/rebalance/health.py:137-140`), and suffix/quoted hint follow the plan (`src/rebalance/doctor.py:2005-2009`). The exit-pin declaration remains the single dynamic site `{_check_pulse_collectors}` and the same literal counter as Round 1 (`tests/test_doctor_exit_pins.py:102-121`). No new reporter, classifier, config or script mechanism is needed.
+
+- [Pass] Smoke remains consistent with the narrowed claims: one planned filing with GET only and no mutating request (`TESTS-RESULTS/2026-10-19+GH-338/smoke.log:6-24`), no new FAIL/zero filings on the real fleet (`:28-45`), base informational row/zero filings (`:49-65`), and acknowledged notice/zero filings (`:68-84`). `SUMMARY.md:9` now explicitly disclaims a real-fleet base comparison. `ROADMAP.md:41` now uses #314 and delegates the live-collector/render case to #340, matching the plan's quoted “Scope correction” paragraph. The `SUMMARY.md:16` substring note is consistent with the two row spellings in `smoke.log:6,10`; it is an operator-config attestation, not a fresh inspection of runtime config.
+
+- [Unverified — needs clone run] No pytest, executable fixture, smoke-probe execution or Git command ran in this turn. Independent runtime checks of exception handling, notice-call count and DEGRADED escalation remain source conclusions, not newly executed measurements. The original YAML timestamp, runtime notice setting and config mtime were not independently recaptured. The harness gate follows this handoff.
+
+Graph limitation: both `list_projects` pages contain no entry for this worktree. The nearest `rebalanceOS` graph belongs to a different checkout, generation `2026-09-02T03:54:57Z`. Coverage marks doctor/classifier/config/roadmap metadata changed and the plan/campaign missing. Current-worktree source reads supplied the review evidence; no completeness claim relies on that graph.
+
+Read-only provenance probe (no application imports), exact command, exit 0:
+
+```sh
+export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+root = Path("TESTS-RESULTS/2026-10-19+GH-338")
+for row in map(json.loads, (root / "provenance.jsonl").read_text().splitlines()):
+    p = root / row["artifact"]
+    if p.is_file():
+        print(p.name, hashlib.sha256(p.read_bytes()).hexdigest() == row["sha256"])
+PY
+```
+
+Decisive output:
+```text
+smoke.log True
+smoke-probe.py.txt True
+tests-focused.log True
+tests-red-control-base.log True
+tests-full-suite.log True
+```
+
+Relay closed (Approved), no further turn needed. Completing the token with `done`; the harness owns the file-scoped commit and subsequent gate.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
