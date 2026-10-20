@@ -2,7 +2,7 @@
 gh_issue: 338
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/338
 title: "doctor: a device silent for 72h is an error on every other Mac (fleet pulse freshness)"
-status: "Captured — plan in QA on feat/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19"
+status: "Ready for review — PR on feat/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19"
 created: 2026-10-19
 updated: 2026-10-19
 owner: noel
@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA **Approved** in round 2 (`28bfb7a`). Implemented (`305065f`): 68 focused tests pass, and the 4 new behavior tests fail on base. Scope correction: the render-stall case moved to #340. | Smoke on a disposable pulse copy, then final Codex QA and the PR. |
+| Implemented (`305065f`). Tests: focused 68 passed; red control on base, 4 failed / 7 passed; full suite 2798 passed. Smoke: disposable-copy main path, real-fleet and acknowledged adjacent paths, and a base red control. Final QA (codex) **Approved** round 2, attested against `3a5f42a` ([relay](../../TESTS-RESULTS/2026-10-19+GH-338/qa/gh338-final-qa-relay.md)). | PR against development; operator merges; the runtime deploy picks it up. The render stall is follow-up #340. |
 
 ## Observed problem (2026-10-19, base `3b31a67`)
 
