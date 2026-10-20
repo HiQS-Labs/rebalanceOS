@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -220,5 +220,65 @@ Handing off to Producer (claude-a) — address B1, S1 and S2, disposition the re
 - **Nit, pre-existing `ALIVE_NOT_PUBLISHING` rewrite on the owning laptop (`doctor.py:1928-1937`): Recorded, not changed.** It is out of scope and documented in the plan's recon as a qualified limitation.
 
 Round 2: please re-review.
+
+### Reviewer · Round 2
+
+swept file: yes
+VERDICT: PASS
+Basis: Re-read the entire embedded brief, the complete revised plan and all prior dispositions; checked the bounded doctor/classifier/reconciler/reporter paths and existing test contracts against current-worktree source. B1, S1 and S2 are resolved at plan level. No remaining Blocker or Should. This approves the plan, not an implementation or deployment.
+
+- [Pass] B1 resolved: the plan now explicitly emits FAIL/ERROR for an unacknowledged foreign age >72h and WARN/WARNING when acknowledged (PROJECT/1-INBOX/GH-338-DOCTOR-PULSE-DELIVERY-ROWS.md:81-88,96-108). That matches the adapter dropping severity and the default filing threshold (scripts/health_issue_reporter.py:519-526,739-749). The narrow adapter/threshold probe below plans one filing for error, none for warning or ok; it does not execute the proposed doctor change.
+- [Pass] S1 resolved: the hint uses shlex.quote(name) and its planned test round-trips the exact row name (plan:87,104). The probe below returns True for the real apostrophe/double-quote name.
+- [Pass] S2 resolved: the clone probe intercepts _request, permits the label GET and prohibits mutating requests (plan:118-124; scripts/health_issue_reporter.py:317-320,727-735,359-364). It calls the adapter/sync seam rather than reporter main, so main's transition logging, token resolution and log flush are outside this probe (reporter:936-952,974). For execution, honor the plan's clone-only configuration requirement explicitly; inherited REBALANCE_CONFIG must not point at runtime state.
+- [Pass] The proposed ordering matches the behavior table for the current registry: laptop windows are 24h (src/rebalance/doctor.py:96-108), hence cannot make a >72h row healthy; DEGRADED maps to ERROR (:1867), and aged non-degraded scans become ALERT before delivery classification (src/rebalance/ingest/pulse_health.py:170-182). NO PUSHES has null age (:165-167); own devices fail the foreign predicate. The existing short-circuit and cap remain for the adjacent cases (doctor.py:1913-1916,1964-1969).
+- [Pass] Local _matches_notice import avoids the existing health-to-doctor import cycle, and WARN/WARNING is precisely the notice-demotion contract (src/rebalance/health.py:31-40,137-140,239-252; plan:79,84). The single constructor's proposed nested conditional still contains WARN and keeps variable severity, matching the existing AST enumeration (tests/test_doctor_exit_pins.py:67-82,112-131). The new boundary and reconciler assertions plus base red control are specified (plan:104-125); their outcomes remain to be measured.
+- [Pass] Full-plan sweep found no additional pre-existing defect in the bounded paths beyond the own-laptop delivery rewrite and raw-status/severity mismatch already recorded in Round 1. The revised recon records both the delivery limitation and consumer distinction (plan:50-57). Neither needs a classifier, reporter, registry or scheduler change for this fix.
+
+- [Unverified — needs clone run] Focused/full suites, runtime exit pins, implementation behavior, fleet smoke, acknowledgement smoke and base red control were not run here. Live fleet timestamps and incident durations were not remeasured. The harness/disposable-clone gate owns those checks. The graph project is another checkout, generation 2026-09-02T03:54:57Z; its coverage reports changed doctor/classifier/config, an absent plan and excluded scripts. Graph lookup was provisional; current-worktree direct source reads supplied the material evidence. No graph completeness claim.
+
+Probe ledger: narrow AST extraction of existing reporter functions only; no application imports, fixture execution, network request or persistent state write. file_issue and issue-body rendering are stubbed, so this measures adapter/threshold behavior, not HTTP serialization or real filing. Command (exit 0):
+
+```sh
+export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+mkdir -p "$TMPDIR"
+python3 - <<'PROBE'
+import ast, builtins, types, shlex
+from pathlib import Path
+p = Path("scripts/health_issue_reporter.py")
+names = {"run_doctor_checks", "_run_github_sync", "ensure_label"}
+nodes = [n for n in ast.parse(p.read_text()).body if isinstance(n, ast.FunctionDef) and n.name in names]
+row = types.SimpleNamespace(name="fleet:Noel's MBP 16\" M1 Pro", status="error", severity="error", detail="silent >72h", hint="repair")
+fake = types.SimpleNamespace(run_doctor=lambda: types.SimpleNamespace(checks=[row]))
+def importer(name, *args, **kwargs):
+    return fake if name == "rebalance.doctor" else builtins.__import__(name, *args, **kwargs)
+calls, actions = [], []
+env = {"__builtins__": dict(vars(builtins), __import__=importer), "_request": lambda *a: calls.append(a) or {}, "LABEL": "rebalance-health", "ISSUE_TITLE_PREFIX": "health:", "_issue_body": lambda *a: "", "file_issue": lambda *a: None}
+module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *nodes], type_ignores=[])
+exec(compile(ast.fix_missing_locations(module), str(p), "exec"), env)
+args = types.SimpleNamespace(repo="example/repo", dry_run=True, warn=False, llm_triage=False, close=False)
+log = types.SimpleNamespace(add_action=lambda *a: actions.append(a))
+for label, status, severity in [("unacknowledged", "error", "error"), ("acknowledged", "warning", "warning"), ("base scoped foreign", "ok", "notice")]:
+    row.status, row.severity = status, severity
+    calls.clear()
+    actions.clear()
+    checks = env["run_doctor_checks"]()
+    result = env["_run_github_sync"]("fake-token", args, checks, log, "fixed-time")
+    print(label, "=>", result, "actions:", actions, "requests:", calls)
+command = "rebalance config add-health-notice " + shlex.quote(row.name)
+print("quoted command round-trip:", shlex.split(command) == ["rebalance", "config", "add-health-notice", row.name])
+PROBE
+```
+
+Decisive output:
+```text
+unacknowledged => (1, 0, 0, 0) actions: [('filed', 'fleet:Noel\'s MBP 16" M1 Pro', None)] requests: [('GET', '/repos/example/repo/labels/rebalance-health', 'fake-token')]
+acknowledged => (0, 0, 0, 0) actions: [] requests: [('GET', '/repos/example/repo/labels/rebalance-health', 'fake-token')]
+base scoped foreign => (0, 0, 0, 0) actions: [] requests: [('GET', '/repos/example/repo/labels/rebalance-health', 'fake-token')]
+quoted command round-trip: True
+```
+
+Root cause: foreign scope suppression and severity capping hide long-silent devices; Fix site: the existing doctor row construction and plan verification; Why not upstream/downstream: the classifier already exposes scan age and error states, while FAIL status satisfies the unchanged reporter contract.
+
+Relay closed (Approved), no further review turn needed. Producer (claude-a) may proceed with implementation and the disposable-clone verification gate.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
