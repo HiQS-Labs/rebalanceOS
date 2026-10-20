@@ -226,4 +226,12 @@ tests-full-suite.log True
 
 Relay closed (Approved), no further turn needed. Completing the token with `done`; the harness owns the file-scoped commit and subsequent gate.
 
+
+### Attestation · relay-drive — 2026-10-20T04:59:35Z
+task: RELAY-rb-gh338-final-qa
+reviewer: codex
+status: Approved
+reviewed-head: 3a5f42a4b5e99069786dbfe822acc488d4d131f3
+added-range: 17044+5178
+added-sha256: d332a2ad0692ed7bcbba3f98fa19e9c9332e1902e733207f4eed9da00600dc22
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
