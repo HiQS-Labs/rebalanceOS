@@ -1,0 +1,4 @@
+{"at": "2026-10-20T04:49:49Z", "artifact": "smoke.log", "sha256": "b1e879df8750e5dfdc7d8102bdd15b7ac87265f5d8dd8395c704a3145f275ffc", "what": "main (disposable copy, backdated laptop) + adjacent real fleet + adjacent acknowledged + base red control; reporter _request recorded, dry-run", "rc": "0", "by": "agent-b"}
+{"at": "2026-10-20T04:49:49Z", "artifact": "smoke-probe.py.txt", "sha256": "c9c8657e8beb5b445f5368cf9fb49f7982cda9867e2666e90cabc2c859b74858", "what": "smoke probe (manual check, not a suite)", "rc": "n/a", "by": "agent-b"}
+{"at": "2026-10-20T04:49:49Z", "artifact": "(pytest) tests/test_doctor_device_scope.py etc.", "sha256": "n/a", "what": "focused 68 passed on 305065f; 4 new tests FAIL on base doctor.py (red control)", "rc": "0", "by": "agent-b"}
+{"at": "2026-10-20T04:49:49Z", "artifact": "(pytest) full CI command", "sha256": "n/a", "what": "2798 passed, 20 skipped, 10 xfailed, 0 failed on 869a933", "rc": "0", "by": "agent-b"}

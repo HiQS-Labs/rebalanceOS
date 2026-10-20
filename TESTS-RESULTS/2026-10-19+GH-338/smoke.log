@@ -1,0 +1,86 @@
+# GH-338 smoke — task clone, probe TESTS-RESULTS/2026-10-19+GH-338/smoke-probe.py.txt
+# disposable pulse copy: git clone --no-local of the real pulse clone; devices/noels-mbp-16-m1-pro.yaml last_scan_utc backdated to 2026-10-15T04:41:40Z
+
+########## MAIN PATH: fix, disposable copy, laptop silent 5 days (doctor.py @ 869a933, 2026-10-20T04:41:40Z)
+sync repo: /private/tmp/claude-501/-Users-noelsaw-Documents-GH-Repos-XYZ-forge/8f6d3469-3e57-4ce1-ad8f-e4409bdadebd/scratchpad/gh338-smoke/pulse-copy
+ROW 'fleet:Noel\'s MBP 16" M1 Pro' status=error severity=error disposition=problem
+    detail: not collecting — last scan 2026-10-14 9:41 PM · 5d ago; silent >72h — reported from noels-mac-studio
+    hint: run the git-pulse-sync-repair skill on noels-mbp-16-m1-pro, or acknowledge with: rebalance config add-health-notice 'fleet:Noel'"'"'s MBP 16" M1 Pro'
+ROW 'fleet:noel’s MacBook Pro 14"' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-macbook-pro-14
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s Mac Mini' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:00 PM · 1h ago
+ROW 'fleet:noel’s Mac Studio' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:48 PM · 53m ago
+doctor verdict: error
+Fetching health issues from GitHub...
+  0 open, 0 recently closed
+  [dry-run] would file: 'health: fleet:Noel\'s MBP 16" M1 Pro'
+  FILED  ERROR  fleet:Noel's MBP 16" M1 Pro  → (dry-run)
+reporter (filed, closed, skipped, triaged_skip): (1, 0, 0, 0)
+reporter fleet actions: [('filed', 'fleet:Noel\'s MBP 16" M1 Pro', None)]
+reporter requests: [('GET', '/repos/HiQS-Labs/rebalanceOS/labels/rebalance-health')]
+mutating requests: []
+
+########## ADJACENT 1: fix, real pulse clone (no false alarm) (doctor.py @ 869a933, 2026-10-20T04:42:46Z)
+sync repo: real (resolve_sync_repo_dir)
+ROW 'fleet:Noel\'s MBP 16" M1 Pro' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-mbp-16-m1-pro
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s MacBook Pro 14"' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-macbook-pro-14
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s Mac Studio' status=warning severity=warning disposition=problem
+    detail: alive but not publishing — last scan 2026-10-19 8:48 PM · 54m ago, queued, awaiting collector
+    hint: check that device's fleet check-in job (transport: git-pulse, launchd `com.user.git-pulse`); `python experimental/git-pulse/health-check.py` for the full view
+ROW 'fleet:noel’s Mac Mini' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:00 PM · 1h ago
+doctor verdict: warning
+Fetching health issues from GitHub...
+  0 open, 0 recently closed
+reporter (filed, closed, skipped, triaged_skip): (0, 0, 0, 0)
+reporter fleet actions: []
+reporter requests: [('GET', '/repos/HiQS-Labs/rebalanceOS/labels/rebalance-health')]
+mutating requests: []
+
+########## RED CONTROL: base doctor.py, disposable copy (doctor.py @ 3b31a67, 2026-10-20T04:43:10Z)
+sync repo: /private/tmp/claude-501/-Users-noelsaw-Documents-GH-Repos-XYZ-forge/8f6d3469-3e57-4ce1-ad8f-e4409bdadebd/scratchpad/gh338-smoke/pulse-copy
+ROW 'fleet:Noel\'s MBP 16" M1 Pro' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-mbp-16-m1-pro
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s MacBook Pro 14"' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-macbook-pro-14
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s Mac Mini' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:00 PM · 1h ago
+ROW 'fleet:noel’s Mac Studio' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:48 PM · 54m ago
+doctor verdict: warning
+Fetching health issues from GitHub...
+  0 open, 0 recently closed
+reporter (filed, closed, skipped, triaged_skip): (0, 0, 0, 0)
+reporter fleet actions: []
+reporter requests: [('GET', '/repos/HiQS-Labs/rebalanceOS/labels/rebalance-health')]
+mutating requests: []
+
+########## ADJACENT 2: acknowledged (doctor.py @ 869a933, 2026-10-20T04:44:01Z)
+$ .venv/bin/rebalance config add-health-notice 'fleet:Noel'"'"'s MBP 16" M1 Pro'   # exact command from the row's hint, run in the task clone
+health notice added: 'fleet:Noel\'s MBP 16" M1 Pro' ✓
+config file written: temp/rbos.config (task clone, not the runtime root)
+sync repo: /private/tmp/claude-501/-Users-noelsaw-Documents-GH-Repos-XYZ-forge/8f6d3469-3e57-4ce1-ad8f-e4409bdadebd/scratchpad/gh338-smoke/pulse-copy
+ROW 'fleet:Noel\'s MBP 16" M1 Pro' status=warning severity=warning disposition=notice
+    detail: not collecting — last scan 2026-10-14 9:41 PM · 5d ago; silent >72h — reported from noels-mac-studio
+    hint: run the git-pulse-sync-repair skill on noels-mbp-16-m1-pro, or acknowledge with: rebalance config add-health-notice 'fleet:Noel'"'"'s MBP 16" M1 Pro'
+ROW 'fleet:noel’s MacBook Pro 14"' status=ok severity=warning disposition=ok
+    detail: not applicable on noels-mac-studio; owned by noels-macbook-pro-14
+    hint: view the fleet health from the owning device
+ROW 'fleet:noel’s Mac Mini' status=ok severity=notice disposition=notice
+    detail: collecting normally — last scan 2026-10-19 8:00 PM · 1h ago
+doctor verdict: warning
+reporter (filed, closed, skipped, triaged_skip): (0, 0, 0, 0)
+reporter fleet actions: []
+reporter requests: [('GET', '/repos/HiQS-Labs/rebalanceOS/labels/rebalance-health')]
+mutating requests: []
+$ .venv/bin/rebalance config remove-health-notice (cleanup)
+health notice removed: 'fleet:Noel\'s MBP 16" M1 Pro' ✓
