@@ -26,7 +26,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Recon re-scoped #338. Both proposed signals already exist; the gap is one scoping rule. Operator decisions recorded (error, 72h). | Codex plan QA, then implement. |
+| Codex plan QA r1: 1 Blocker and 2 Shoulds accepted (status FAIL for the reporter, shell-quoted hint, honest reporter probe); Nits applied. | Codex plan QA r2, then implement. |
 
 ## Observed problem (2026-10-19, base `3b31a67`)
 
@@ -47,7 +47,13 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 - **The gap, part 1** (`doctor.py` ~:1908-1915): for a device in `_DEVICE_SCOPE_REGISTRY` (both MacBooks and the Mac Studio), `_other_device_check()` returns `OK "not applicable on <here>"` on every other Mac, whatever the device's age. `tests/test_doctor_device_scope.py::test_foreign_pulse_collector_is_informational_not_a_warning` pins this at 48h ALERT.
 - **The gap, part 2** (~:1960-1966, GH-5 Phase F): an *unscoped* foreign device (the Mac Mini) that goes ALERT is capped at WARNING on other Macs. `scripts/health_issue_reporter.py:739` files only on `error` by default (SCHEDULER.md:22, "FAIL-only"), so a foreign WARNING is never filed either.
 - **Acknowledgement already exists for warnings.** `rebalance config add-health-notice <pattern>` (`cli/config_cmds.py:673`) demotes matching **warning**-severity checks to notices (`health.py:213-252`). Error severity is never demoted there.
-- **Consumers of doctor's exit code:** the CLI (`cli/__init__.py:136-211`) and the hourly `health-check` reporter. Nothing in `scripts/*.sh`, `scripts/lib`, `.githooks` or `experimental/git-pulse` gates on it (`git grep`).
+- **Consumers** (corrected by Codex plan QA r1):
+  - The CLI (`cli/__init__.py:158-159`) and the web dashboard (`scripts/pulse_web.py:3193,3223`) read the **reconciled severity**.
+  - The hourly reporter reads the **raw row status** (`health_issue_reporter.py:519-526,739`). It does not read doctor's exit code.
+  - The terminal dashboard renders index health only (`scripts/dashboard.py:1040,1212`).
+  - `experimental/git-pulse/health-check.py:250-254,304-309` classifies independently.
+  - Nothing in `scripts/*.sh`, `scripts/lib` or `.githooks` gates on doctor's exit.
+- **Pre-existing limitation, not changed here:** on its own device inside the laptop window, a non-degraded `ALIVE_NOT_PUBLISHING` laptop is rewritten to healthy (`doctor.py:1928-1937`). So delivery problems on a laptop are not always visible in its own doctor. Stuck delivery is still covered fleet-wide by the >72h rule once the device's published YAML ages, as in #314.
 - **Exit-pin tests:** `tests/test_doctor_exit_pins.py:112` lists `_check_pulse_collectors` as the one dynamic-severity site, and `:121-131` pins ALERT/DEGRADED/NO PUSHES as its WARN+ERROR states. The change must reuse the function's single `Check(...)` constructor so these pins stay valid.
 
 ## Operator decisions (2026-10-19)
@@ -70,15 +76,15 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 
 **Scope**, `src/rebalance/doctor.py` only:
 1. Add the constant `_FOREIGN_SILENCE_HOURS = 72.0` next to `_DEVICE_SCOPE_REGISTRY`, with a comment citing #338 and the operator decision.
-2. In `_check_pulse_collectors`, per device:
+2. In `_check_pulse_collectors`, read the notice patterns once per call: `get_health_notice_patterns()`, plus `_matches_notice` imported **locally** inside the function (`health.py:31-40` imports doctor, so a top-level import would create a cycle). Then, per device:
    - `foreign = health.device_id != current_device_id`
    - `long_silent = foreign and health.age_hours is not None and health.age_hours > _FOREIGN_SILENCE_HOURS`
-   - `acknowledged = _matches_notice(name, get_health_notice_patterns())`, reusing the existing `health.py` helper and config reader
+   - `acknowledged = _matches_notice(name, patterns)`
 3. The `_other_device_check` short-circuit runs only when `not long_silent`. Inside 72h, a scoped foreign device keeps its exact current "not applicable" row.
-4. The GH-5 Phase F cap (foreign ERROR → WARNING) is skipped when `long_silent and not acknowledged`. When acknowledged, the cap applies, and the reconciler then demotes the warning to a notice through the existing pattern. That is the operator's acknowledge path, with no new config.
+4. When `long_silent and not acknowledged`, the row's **status is `FAIL`** and its severity `ERROR`. The status must be FAIL because `scripts/health_issue_reporter.py:519-526` forwards only `c.status`, and `:739` files only raw status `error` (Codex plan QA r1 B1, proven by its probe: status warning + severity error filed nothing). The GH-5 Phase F cap is skipped for that case. When acknowledged, the row stays WARN with the cap at WARNING, and the reconciler demotes it to a notice through the existing pattern. That is the operator's acknowledge path, with no new config. The constructor's status argument becomes `OK if healthy else (FAIL if escalate else WARN)`, so it is still the single dynamic-WARN site the AST walker in `tests/test_doctor_exit_pins.py:55-85` enumerates.
 5. When `long_silent`:
    - the detail gains `; silent >72h — reported from <current_device_id>`
-   - the hint names the repair skill and the acknowledgement command: `run git-pulse-sync-repair on <device_id>, or acknowledge with: rebalance config add-health-notice '<name>'`
+   - the hint names the repair skill and the acknowledgement command, built with `shlex.quote(name)` (already imported at `doctor.py:20`): `run git-pulse-sync-repair on <device_id>, or acknowledge with: rebalance config add-health-notice <shlex-quoted name>`. The real row name contains both an apostrophe and a double quote (Codex plan QA r1 S1).
    - all of this goes through the existing single `Check(...)` constructor
 6. A NO PUSHES foreign device (`age_hours is None`) is unchanged; it cannot be measured.
 
@@ -87,18 +93,19 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 | Device / state | Today | After |
 |---|---|---|
 | scoped, ≤72h (any state) | OK "not applicable" | unchanged |
-| scoped, >72h | OK "not applicable" | **WARN, severity ERROR**: auto-filed, and that Mac's doctor exit is FAIL |
+| scoped, >72h | OK "not applicable" | **FAIL, severity ERROR**: auto-filed by the reporter, and that Mac's doctor exit is FAIL |
 | scoped, >72h, acknowledged | OK "not applicable" | WARN, severity WARNING → a notice (muted) |
 | unscoped, ALERT ≤72h | WARN, capped at WARNING | unchanged |
-| unscoped, >72h | WARN, capped at WARNING | **WARN, severity ERROR** |
+| unscoped, >72h | WARN, capped at WARNING | **FAIL, severity ERROR**: auto-filed |
 | own device (any) | unchanged | unchanged |
 | foreign NO PUSHES | unchanged | unchanged |
 
 **Tests**, extending the existing `tests/test_doctor_device_scope.py`; this repo keeps pytest suites:
-- scoped foreign at 80h → severity ERROR, detail contains "silent >72h"
+- scoped foreign at 80h → status FAIL and severity ERROR, detail contains "silent >72h", and `shlex.split` of the hint's command recovers the exact row name, including for a name with `'` and `"`
+- scoped foreign at exactly 72.0h → still "not applicable"; at 72.1h → FAIL (the contract is strict `>`)
 - scoped foreign at 48h → still OK "not applicable"; the existing test stays as written
-- unscoped foreign at 80h → ERROR, not capped
-- scoped foreign at 80h with a matching notice pattern → WARNING
+- unscoped foreign at 80h → FAIL/ERROR, not capped
+- scoped foreign at 80h with a matching notice pattern → WARN/WARNING, and `compute_health_status` puts it in `notices`, not `problems`
 - own device at 80h → unchanged from today's local behavior
 - foreign NO PUSHES → unchanged
 - `tests/test_doctor_exit_pins.py` passes unchanged. That is the falsifier for "one constructor, no new literal ERROR site".
@@ -108,12 +115,13 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 - **Smoke, main path:**
   - run `.venv/bin/rebalance doctor --json` from the task clone on noels-mac-studio, reading the real pulse clone (read-only)
   - expect `fleet:Noel's MBP 16" M1 Pro` with severity error and the "silent >72h" detail, and verdict FAIL
-  - then run `python scripts/health_issue_reporter.py --dry-run` and expect it to plan one "health: fleet:…" issue with no API call
+  - then a reporter probe, run from the task clone so its transition and run-log writes land in the clone's `temp/`. The probe imports `scripts/health_issue_reporter.py` from the task clone and replaces its `_request` with a recorder that returns `{}`, feeds it `run_doctor_checks()`, and calls `_run_github_sync(..., dry_run=True, warn=False)`.
+  - Expect the recorder to show only the label `GET`, with **no mutating request**, and the result to plan one "health: fleet:…" filing. A stock `--dry-run` is not zero-API: `ensure_label` does a GET (`:317-320`) and needs a token (`:952`), per Codex plan QA r1 S2.
 - **Smoke, adjacent path:**
-  - add a health notice for that row in the **task clone's** `temp/rbos.config`; never the runtime's
+  - add a health notice for that row in the **task clone's** `temp/rbos.config`, using the exact command from the row's hint; never the runtime's config
   - expect a notice disposition and no FAIL from this row
-  - the reporter dry-run plans nothing for it
-- **Red control:** the same smoke on base `3b31a67` shows "not applicable", and the reporter plans nothing.
+  - the reporter probe plans nothing for it
+- **Red control:** the same smoke on base `3b31a67` shows "not applicable", and the reporter probe plans nothing.
 - Record the commands, output and provenance under `TESTS-RESULTS/2026-10-19+GH-338/`.
 
 **Non-goals:**

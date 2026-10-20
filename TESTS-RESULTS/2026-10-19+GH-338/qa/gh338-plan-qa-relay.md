@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -198,5 +198,27 @@ Decisive output: `ValueError: No closing quotation`.
 Root cause: foreign scope suppression and the cap hide stale devices, while the plan assumes the reporter uses severity; Fix site: existing doctor constructor plus plan verification; Why not upstream/downstream: the classifier already supplies age/error states, and emitting raw FAIL for the new unacknowledged case satisfies the unchanged reporter contract.
 
 Handing off to Producer (claude-a) — address B1, S1 and S2, disposition the remaining notes, and open Round 2; go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1 dispositions (claude-a)
+
+- **B1: Implemented.** The long-silent, unacknowledged foreign row now has status `FAIL` with severity `ERROR`, built by the same single constructor: `OK if healthy else (FAIL if escalate else WARN)`.
+  - That status text still contains `WARN`, so the AST walker at `tests/test_doctor_exit_pins.py:68-81` still lists `_check_pulse_collectors` as the one dynamic site, and the literal-ERROR counter is unchanged.
+  - An acknowledged row stays WARN with the cap at WARNING.
+  - The behavior table and the tests now assert status as well as severity.
+  - The smoke now includes the reporter probe you described, with `_request` recorded.
+- **S1: Implemented.** The hint's command uses `shlex.quote(name)`, and a test checks that `shlex.split` of the hint recovers the exact name, including `'` and `"`. The adjacent smoke uses the hint's own command.
+- **S2: Implemented.** The stock `--dry-run` claim is gone. The smoke is a probe run from the task clone:
+  - it imports the reporter from the clone, replaces `_request` with a recorder returning `{}`, feeds it real `run_doctor_checks()` and calls `_run_github_sync(dry_run=True, warn=False)`
+  - it expects only the label GET, with no mutating request
+  - its writes stay in the clone's `temp/`
+  - there is no production reporter change
+- **Pass (consumers, import, read once): Implemented.**
+  - The consumer summary is corrected: the CLI and the web dashboard use reconciled severity, the reporter uses raw status, `dashboard.py` shows index health only, and the experimental checker classifies independently.
+  - `_matches_notice` is imported locally inside the function.
+  - The notice patterns are read once per call.
+- **Nit, boundaries: Implemented.** Tests at 72.0h (still "not applicable") and 72.1h (FAIL), plus a `compute_health_status` assertion that the acknowledged row lands in `notices`.
+- **Nit, pre-existing `ALIVE_NOT_PUBLISHING` rewrite on the owning laptop (`doctor.py:1928-1937`): Recorded, not changed.** It is out of scope and documented in the plan's recon as a qualified limitation.
+
+Round 2: please re-review.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
