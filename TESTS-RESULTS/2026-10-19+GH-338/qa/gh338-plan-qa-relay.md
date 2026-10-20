@@ -281,4 +281,12 @@ Root cause: foreign scope suppression and severity capping hide long-silent devi
 
 Relay closed (Approved), no further review turn needed. Producer (claude-a) may proceed with implementation and the disposable-clone verification gate.
 
+
+### Attestation · relay-drive — 2026-10-20T04:04:45Z
+task: RELAY-rb-gh338-plan-qa
+reviewer: codex
+status: Approved
+reviewed-head: 28bfb7a4ce6532d49ef07a41cb46a158589e2085
+added-range: 21926+6824
+added-sha256: 89b0f55c98b9d61563db805eaec4d33291852cc716113fa37173367517d87135
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
