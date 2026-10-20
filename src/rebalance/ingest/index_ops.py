@@ -2128,12 +2128,14 @@ def _semantic_adapter(db_path: Path, **opts: Any) -> dict[str, Any]:
 
 
 def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
-    """Export calendar + email snapshots to the sync subfolder in the pulse repo."""
+    """Export calendar, email, and watched-repos snapshots to the pulse sync subfolder."""
     from rebalance.ingest.config import get_pulse_config, get_sync_subdir
     from rebalance.ingest.sync_snapshot import (
+        SYNC_SOURCES,
         commit_and_push_sync,
         export_calendar_snapshot,
         export_email_snapshot,
+        export_watched_repos,
         get_device_id,
     )
 
@@ -2164,7 +2166,8 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
             "steps": [
                 f"export_calendar_snapshot(window_days=90) → {sync_dir}/calendar/{device_id}.json",
                 f"export_email_snapshot(limit=1000) → {sync_dir}/email/{device_id}.json",
-                f"publish this device calendar/email files{'' if fleet else ' and latest pointers'} → {target_repo}",
+                f"export_watched_repos → {sync_dir}/repos/{device_id}.json",
+                f"publish this device calendar/email/repos files{'' if fleet else ' and latest pointers'} → {target_repo}",
             ],
         }
 
@@ -2176,7 +2179,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         with git_publish_lock(target_repo):
             owned = [
                 f"{sync_subdir}/{source}/{name}.json"
-                for source in ("calendar", "email")
+                for source in SYNC_SOURCES
                 for name in ((device_id,) if fleet else (device_id, "latest"))
             ]
             error = publication_state_error(target_repo, owned)
@@ -2191,6 +2194,9 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
                     return {"scope": "sync", "dry_run": False, "error": delivery["git_error"], "git": delivery}
             cal_path = export_calendar_snapshot(database_path, sync_dir, device_id=device_id)
             email_path = export_email_snapshot(database_path, sync_dir, device_id=device_id)
+            repos_path = export_watched_repos(
+                sync_dir, get_watched_repos(database_path)["watched"], device_id=device_id
+            )
 
             import json as _json
 
@@ -2221,6 +2227,7 @@ def _refresh_sync(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
         "device_id": device_id,
         "calendar_snapshot": str(cal_path.relative_to(target_repo)),
         "email_snapshot": str(email_path.relative_to(target_repo)),
+        "repos_snapshot": str(repos_path.relative_to(target_repo)),
         "git": git_result,
         "elapsed_seconds": round(time.monotonic() - started, 2),
     }

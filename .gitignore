@@ -23,6 +23,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.venv/
 rebalance.db
 rebalance.db.*.bak
 build/

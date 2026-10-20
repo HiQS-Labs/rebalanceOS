@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.102.0] - 2026-10-20
+
+### Added
+
+- The daily sync now publishes the list of watched GitHub repos so the Slack bot can follow new issues on them.
+
 ## [0.101.1] - 2026-10-14
 ### Fixed
 - Fleet enrollment refuses broken existing settings and invalid timezones before writing, preserves collector permissions and complete first backups, and reports recovery context on partial failure.

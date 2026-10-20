@@ -1,8 +1,9 @@
 """Device snapshot exporter for the multi-device sync plane (Issue #39).
 
-Writes machine-readable JSON snapshots of calendar and email state to a
-subfolder within the existing pulse repo so non-ingesting devices can
-consume fresh derived data without needing Google credentials.
+Writes machine-readable JSON snapshots of calendar, email, and watched-repo
+state to a subfolder within the existing pulse repo so non-ingesting devices
+(and Sleuth) can consume fresh derived data without needing Google credentials
+or a live RebalanceOS process.
 
 Directory layout (under {pulse_target_path}/{sync_subdir}/):
     calendar/
@@ -11,18 +12,24 @@ Directory layout (under {pulse_target_path}/{sync_subdir}/):
     email/
         <device_id>.json       per-device snapshot (newest N messages)
         latest.json            pointer to the freshest device snapshot
+    repos/
+        <device_id>.json       per-device watched GitHub repo allowlist
+        latest.json            pointer to the freshest device snapshot
 
 Snapshot format (schema_version=1):
     {
       "schema_version": 1,
-      "source": "calendar" | "email",
+      "source": "calendar" | "email" | "repos",
       "device_id": "<hostname-slug>",
       "generated_at": "<iso8601-utc>",
       "window_days": 90,          # calendar only
       "limit": 1000,              # email only
       "row_count": <int>,
-      "rows": [ ... ]             # see column lists below
+      "rows": [ ... ]             # see column lists / repos notes below
     }
+
+For ``source: "repos"``, ``rows`` is a sorted list of canonical ``owner/repo``
+strings (no issue, commit, or activity content).
 
 latest.json format:
     {
@@ -54,6 +61,14 @@ from rebalance.lib.time_ops import now_iso, now_utc, parse_utc_iso
 SCHEMA_VERSION = 1
 DEFAULT_CALENDAR_WINDOW_DAYS = 90
 DEFAULT_EMAIL_LIMIT = 1000
+
+SYNC_SOURCES: tuple[str, ...] = ("calendar", "email", "repos")
+"""Every source directory this exporter owns under ``{sync_subdir}/``.
+
+Single source of truth for publication (``commit_and_push_sync``), pointer
+conflict resolution, and the orchestrator's owned-path guard. Adding a source
+here is what makes its files committed and pushed.
+"""
 
 
 def get_device_id() -> str:
@@ -217,6 +232,52 @@ def export_email_snapshot(
 
 
 # ---------------------------------------------------------------------------
+# Watched-repos snapshot
+# ---------------------------------------------------------------------------
+
+
+def export_watched_repos(
+    sync_dir: Path,
+    repos: list[str],
+    *,
+    device_id: str | None = None,
+) -> Path:
+    """Export the watched GitHub repo set to ``sync_dir/repos/<device_id>.json``.
+
+    Consumers (the Sleuth GitHub issue stream) union ``rows`` across every
+    device file to build their default repo allowlist. Only canonical
+    ``owner/repo`` names are written; no issue, commit, or activity content.
+
+    Args:
+        sync_dir: The ``{pulse_target_path}/{sync_subdir}`` directory.
+        repos: Canonical repo names, normally ``get_watched_repos()["watched"]``.
+        device_id: Override for tests; defaults to ``get_device_id()``.
+
+    Returns:
+        Path of the written snapshot file.
+    """
+    dev_id = device_id or get_device_id()
+    generated_at = now_iso()
+    # sort by lowercased form, then by the original string so casing variants
+    # have a deterministic order (set iteration order is not stable across runs).
+    rows = sorted(
+        {r.strip() for r in repos if isinstance(r, str) and r.strip()},
+        key=lambda name: (name.lower(), name),
+    )
+    payload: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "source": "repos",
+        "device_id": dev_id,
+        "generated_at": generated_at,
+        "row_count": len(rows),
+        "rows": rows,
+    }
+    out_path = _write_snapshot(sync_dir, "repos", dev_id, payload)
+    _update_latest_pointer(sync_dir / "repos", dev_id, generated_at)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -295,7 +356,7 @@ def commit_and_push_sync(
     names = (device_id,) if fleet else (device_id, "latest")
     paths = [
         f"{sync_subdir}/{source}/{name}.json"
-        for source in ("calendar", "email")
+        for source in SYNC_SOURCES
         for name in names
         if (target_repo / sync_subdir / source / f"{name}.json").exists()
     ]
@@ -314,7 +375,7 @@ def _resolve_pointer_conflicts(target_repo: Path, sync_subdir: str) -> bool:
     """Resolve only generated pointers; malformed device evidence fails closed."""
     result = run_git(target_repo, "diff", "--name-only", "--diff-filter=U", "-z")
     conflicts = set(result.stdout.rstrip("\0").split("\0")) - {""}
-    allowed = {f"{sync_subdir}/{source}/latest.json" for source in ("calendar", "email")}
+    allowed = {f"{sync_subdir}/{source}/latest.json" for source in SYNC_SOURCES}
     if result.returncode or not conflicts or not conflicts <= allowed:
         return False
     pointers = {}

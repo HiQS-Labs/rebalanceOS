@@ -56,7 +56,9 @@ def test_existing_rebase_is_not_aborted(tmp_path: Path):
 
 def test_snapshot_commit_excludes_reminder_export(tmp_path: Path):
     remote, local = _make_repos(tmp_path)
-    for source in ("calendar", "email"):
+    from rebalance.ingest.sync_snapshot import SYNC_SOURCES
+
+    for source in SYNC_SOURCES:
         directory = local / "sync" / source
         directory.mkdir(parents=True)
         (directory / "device.json").write_text(
@@ -70,8 +72,28 @@ def test_snapshot_commit_excludes_reminder_export(tmp_path: Path):
     reminder.write_text("foreign export\n")
     result = commit_and_push_sync(local, "sync", device_id="device", generated_at="2026-09-24T12:00:00Z")
     assert result.get("pushed") is True
-    assert "sync/sleuth/reminders.json" not in _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
+    tree = _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
+    assert "sync/sleuth/reminders.json" not in tree
+    assert "sync/repos/device.json" in tree
     assert reminder.read_text() == "foreign export\n"
+
+
+def test_snapshot_commit_skips_missing_repos_file(tmp_path: Path):
+    remote, local = _make_repos(tmp_path)
+    for source in ("calendar", "email"):
+        directory = local / "sync" / source
+        directory.mkdir(parents=True)
+        (directory / "device.json").write_text(
+            json.dumps({"device_id": "device", "source": source, "generated_at": "2026-09-24T12:00:00Z", "rows": []})
+        )
+        (directory / "latest.json").write_text(
+            json.dumps({"device_id": "device", "snapshot_file": "device.json", "generated_at": "2026-09-24T12:00:00Z"})
+        )
+    result = commit_and_push_sync(local, "sync", device_id="device", generated_at="2026-09-24T12:00:00Z")
+    assert result.get("pushed") is True
+    tree = _git(["ls-tree", "-r", "--name-only", "HEAD"], cwd=remote).stdout
+    assert "sync/calendar/device.json" in tree
+    assert "sync/repos/device.json" not in tree
 
 
 def test_offline_page_retry_does_not_grow_backlog(tmp_path: Path):
@@ -133,8 +155,10 @@ def test_peer_pointer_conflict_preserves_both_snapshots(tmp_path: Path):
     _git(["config", "user.name", "Peer"], cwd=peer)
     _git(["config", "user.email", "peer@example.invalid"], cwd=peer)
 
+    from rebalance.ingest.sync_snapshot import SYNC_SOURCES
+
     def snapshot(repo, device, stamp):
-        for source in ("calendar", "email"):
+        for source in SYNC_SOURCES:
             directory = repo / "sync" / source
             directory.mkdir(parents=True)
             (directory / f"{device}.json").write_text(
@@ -151,7 +175,7 @@ def test_peer_pointer_conflict_preserves_both_snapshots(tmp_path: Path):
     snapshot(local, "local", "2026-09-24T04:30:00-07:00")
     result = commit_and_push_sync(local, "sync", device_id="local", generated_at="2026-09-24T04:30:00-07:00")
     assert result["pushed"], result
-    for source in ("calendar", "email"):
+    for source in SYNC_SOURCES:
         assert (local / f"sync/{source}/local.json").exists()
         assert (local / f"sync/{source}/peer.json").exists()
         assert json.loads((local / f"sync/{source}/latest.json").read_text())["device_id"] == "peer"
@@ -252,6 +276,21 @@ def test_malformed_pointer_defers_without_discarding_payload(tmp_path: Path, mon
     assert result["deferred"] and result["error"]
     assert pointer.read_text() == '{"device_id": "a"'
     assert json.loads((local / "sync/calendar/device.json").read_text())["device_id"] == "device"
+
+
+def test_refresh_sync_dry_run_lists_repos_step(tmp_path: Path, monkeypatch):
+    from rebalance.ingest.index_ops import _refresh_sync
+
+    local = tmp_path / "pulse"
+    local.mkdir()
+    monkeypatch.setattr("rebalance.ingest.config.get_pulse_config", lambda: {"pulse_target_path": str(local)})
+    monkeypatch.setattr("rebalance.ingest.config.get_sync_subdir", lambda: "sync")
+    monkeypatch.setattr("rebalance.ingest.sync_snapshot.get_device_id", lambda: "device")
+    result = _refresh_sync(tmp_path / "unused.db", dry_run=True)
+    assert result["dry_run"] is True
+    joined = "\n".join(result["steps"])
+    assert "export_watched_repos" in joined
+    assert "sync/repos/device.json" in joined.replace(str(local) + "/", "")
 
 
 def test_owned_filename_is_literal_not_a_git_glob(tmp_path: Path):
