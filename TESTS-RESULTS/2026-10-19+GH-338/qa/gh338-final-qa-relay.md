@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-19.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -109,5 +109,64 @@ Reviewer block: plain lines; `VERDICT: PASS` or `VERDICT: FAIL` and `Basis:` eac
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+VERDICT: FAIL
+Basis: Block final approval on retained test evidence, not on a demonstrated implementation defect. Read the complete embedded brief, plan, doctor module, device-scope and exit-pin tests, smoke probe/log, summary and provenance, including pre-existing code. No additional pre-existing defect identified beyond the own-laptop delivery override already documented in the plan. One Should remains; no requested production behavior change.
+
+- [Should] S1 — Retain auditable test output and exact commands. `TESTS-RESULTS/2026-10-19+GH-338/SUMMARY.md:6-7,12` asserts 68 focused passes, four base failures, and 2798 full-suite passes; `provenance.jsonl:3-4` only repeats those counts with `sha256: "n/a"` and labels the command "full CI command". Neither contains the actual invocation, pytest output, failed test identities or full-suite log. `smoke.log:1-86` contains smoke output only. This cannot establish the test claims under SOP's published-evidence rule. Fix: retain the existing focused, base-red and full-suite outputs with exact commands, revisions and exit statuses in this campaign, and link/hash them. If the original output is unavailable, have the disposable-clone/harness run produce it; do not run suites in this reviewer worktree. The base expectation is **four failures plus one unchanged-case pass**, not five failures. This is an evidence request, not a behavior-change request.
+
+- [Pass] Behavior table matches for the current registry: strict foreign `age_hours > 72.0`, bypassing scoped suppression only past the bound (`src/rebalance/doctor.py:1932-1942`); unacknowledged FAIL/ERROR and acknowledged WARN/WARNING (`:1986-1999,2014`); own-device and null-age cases retain prior routing. Laptop windows are 24h (`:96-108`), so they cannot override a >72h result. DEGRADED is also unhealthy and maps to ERROR (`src/rebalance/ingest/pulse_health.py:69-70,170-173`; doctor `:1875`), and escalation does not depend on ALERT. No branch divergence found in the requested seven cases.
+
+- [Pass] Local `_matches_notice` import avoids a top-level doctor/health cycle; the config read is once per call and exception-guarded (`src/rebalance/doctor.py:1912-1920`). Its getter returns string patterns (`src/rebalance/ingest/config.py:682-695`), consumed by the existing substring matcher (`src/rebalance/health.py:137-140`). The suffix is exactly `silent >72h — reported from <current_device_id>` and the hint uses `shlex.quote(name)` (`doctor.py:2005-2009`). These are source conclusions, not a claim that all import failures are caught: the local health import itself is outside the config try block.
+
+- [Pass] Tests assert observable status/severity, the 72.0/72.1 boundary, quoted-name round-trip, notice membership and unchanged own/null-age behavior (`tests/test_doctor_device_scope.py:95-149`). No vacuous new assertion found. The unchanged-case test is intentionally green on base. The exit-pin source still declares exactly `{_check_pulse_collectors}` and the same literal counter (`tests/test_doctor_exit_pins.py:102-121`); the independent AST probe below returns those same sets. This does not prove historical byte-for-byte equality or passing runtime suites.
+
+- [Pass] Retained smoke supports one planned filing, label GET only, no mutating request (`TESTS-RESULTS/2026-10-19+GH-338/smoke.log:6-24`); real-fleet zero filings/no new FAIL (`:28-45`); backdated base row "not applicable" and zero filings (`:49-65`); acknowledged WARN/WARNING notice and zero filings (`:68-84`). The probe intercepts `_request` before invoking the reporter (`smoke-probe.py.txt:28-41`). These are dry-run plans, not real issue creation. Both retained artifact hashes match provenance (probe below).
+
+- [Nit] Correct stale scope wording at `ROADMAP.md:41`: it still calls the MBP16 a "dead laptop ... 12 days" invisible to this rule. The amended plan's "Scope correction" and `SUMMARY.md:14` instead identify a live collector/render stall delegated to #340. Update that roadmap sentence to use #314 as the motivating collector incident and identify the laptop as follow-up render scope. The `SUMMARY.md:16` notice explanation is logically accurate: case-insensitive substring `MacBook Pro` matches the 14-inch row in `smoke.log:31`; it does not match the 16-inch row's `MBP` spelling.
+
+- [Unverified — needs clone run] Independent focused/full-suite execution, base-red execution and runtime exception-path checks were not run, per the reviewer constraints. The full-suite 2798 count remains an attestation pending S1. No retained real-fleet **base** run proves the stronger `SUMMARY.md:9` claim that every row is unchanged; the supplied real-fleet log supports only no new FAIL/no filing. The original live YAML timestamp and runtime notice configuration/mtime were not independently captured here; scope classification and current operator configuration should be distinguished from the quoted smoke observations. No new script, classifier, reporter or config mechanism is needed.
+
+Graph limitation: `list_projects` had no entry for this review worktree. Nearest `rebalanceOS` is a different checkout, generation `2026-09-02T03:54:57Z`; coverage reported changed doctor/config/classifier/roadmap metadata and missing campaign files. Direct current-worktree source reads supplied evidence instead; no completeness claim from that graph.
+
+Probe ledger — non-mutating source AST/hash reads only, no application imports, fixture execution, tests or Git. Command (exit 0):
+
+```sh
+export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+python3 - <<'PY'
+import ast, hashlib, json
+from pathlib import Path
+root=Path('TESTS-RESULTS/2026-10-19+GH-338')
+for row in map(json.loads,(root/'provenance.jsonl').read_text().splitlines()):
+    p=root/row['artifact']
+    if p.is_file(): print(p.name, 'sha256_matches=',hashlib.sha256(p.read_bytes()).hexdigest()==row['sha256'])
+t=ast.parse(Path('src/rebalance/doctor.py').read_text())
+literal={}; dynamic=set()
+for f in ast.walk(t):
+    if not isinstance(f,(ast.FunctionDef,ast.AsyncFunctionDef)): continue
+    for n in ast.walk(f):
+        if not isinstance(n,ast.Call) or not isinstance(n.func,ast.Name) or n.func.id!='Check': continue
+        s=ast.unparse(n.args[1]) if len(n.args)>=2 else next((ast.unparse(k.value) for k in n.keywords if k.arg=='status'),'')
+        v=next((ast.unparse(k.value) for k in n.keywords if k.arg=='severity'),None)
+        if 'WARN' in s and s!='WARNING':
+            if v=='ERROR': literal[f.name]=literal.get(f.name,0)+1
+            elif v is not None and v not in {'WARNING','NOTICE','None'}: dynamic.add(f.name)
+print('literal=',literal)
+print('dynamic=',sorted(dynamic))
+PY
+```
+
+Decisive output:
+```text
+smoke.log sha256_matches= True
+smoke-probe.py.txt sha256_matches= True
+literal= {'_check_collector_freshness': 2, '_check_auth_failures': 1, '_check_three_eyes_supervision': 1}
+dynamic= ['_check_pulse_collectors']
+```
+
+Handing off to Producer (claude-a) — retain/link the S1 test evidence and disposition the documentation/evidence notes, then open Round 2. Go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
