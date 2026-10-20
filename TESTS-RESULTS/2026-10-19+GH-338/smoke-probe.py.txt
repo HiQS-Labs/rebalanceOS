@@ -1,0 +1,41 @@
+# GH-338 smoke probe (manual check, not a suite). Run from the TASK CLONE root:
+#   .venv/bin/python TESTS-RESULTS/2026-10-19+GH-338/smoke-probe.py.txt
+# Reads the real pulse clone read-only (or SMOKE_SYNC_REPO, a disposable copy); config/state writes land in this clone's temp/.
+# The reporter's _request is replaced by a recorder (no real GitHub call).
+import importlib.util, json, os, sys, types
+from pathlib import Path
+from unittest.mock import patch
+sys.path.insert(0, "scripts")  # health_issue_reporter imports scripts/_bootstrap
+SYNC = os.environ.get("SMOKE_SYNC_REPO")  # disposable pulse copy; unset = real pulse clone
+if SYNC:
+    patch("rebalance.ingest.pulse_health.resolve_sync_repo_dir", return_value=Path(SYNC)).start()
+print("sync repo:", SYNC or "real (resolve_sync_repo_dir)")
+from rebalance.doctor import run_doctor
+from rebalance.health import check_dispositions, compute_health_status
+from datetime import datetime, timezone
+
+report = run_doctor()
+health = compute_health_status(report.checks, {}, datetime.now(timezone.utc))
+disp = {id(c): d for c, d in check_dispositions(report.checks, health)}
+fleet = [c for c in report.checks if c.name.startswith("fleet:")]
+for c in fleet:
+    print(f"ROW {c.name!r} status={c.status} severity={c.severity} disposition={disp[id(c)]}")
+    print(f"    detail: {c.detail}")
+    if c.hint:
+        print(f"    hint: {c.hint}")
+print("doctor verdict:", health.verdict)
+
+spec = importlib.util.spec_from_file_location("hir", "scripts/health_issue_reporter.py")
+hir = importlib.util.module_from_spec(spec); spec.loader.exec_module(hir)
+calls = []
+hir._request = lambda *a, **k: calls.append(a) or {}
+actions = []
+log = types.SimpleNamespace(add_action=lambda *a: actions.append(a))
+args = types.SimpleNamespace(repo="HiQS-Labs/rebalanceOS", dry_run=True, warn=False, llm_triage=False, close=False)
+checks = hir.run_doctor_checks()
+result = hir._run_github_sync("recorder-token", args, checks, log, "smoke")
+fleet_actions = [a for a in actions if str(a[1]).startswith("fleet:")]
+print("reporter (filed, closed, skipped, triaged_skip):", result)
+print("reporter fleet actions:", fleet_actions)
+print("reporter requests:", [(a[0], a[1]) for a in calls])
+print("mutating requests:", [a for a in calls if a[0] != "GET"])

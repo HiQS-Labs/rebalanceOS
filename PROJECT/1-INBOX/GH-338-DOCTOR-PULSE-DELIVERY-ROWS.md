@@ -26,17 +26,13 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Codex plan QA r1: 1 Blocker and 2 Shoulds accepted (status FAIL for the reporter, shell-quoted hint, honest reporter probe); Nits applied. | Codex plan QA r2, then implement. |
+| Plan QA **Approved** in round 2 (`28bfb7a`). Implemented (`305065f`): 68 focused tests pass, and the 4 new behavior tests fail on base. Scope correction: the render-stall case moved to #340. | Smoke on a disposable pulse copy, then final Codex QA and the PR. |
 
 ## Observed problem (2026-10-19, base `3b31a67`)
 
-`rebalance doctor` on noels-mac-studio, run from the runtime root, reports:
-```
-fleet:Noel's MBP 16" M1 Pro | ok | not applicable on noels-mac-studio; owned by noels-mbp-16-m1-pro
-```
-That device's newest pulse on origin/main is **2026-10-07 11:00** (12 days old, `git log -1 origin/main -- live-pulse-noels-mbp-16-m1-pro.md` → 2ada78a7e). No Mac flags it.
+`rebalance doctor` shows every device-scoped Mac as `not applicable on <here>` on every other Mac, whatever its age. An unscoped Mac's ALERT is capped at WARNING there. The hourly reporter files only raw status `error`, so a Mac whose collector stops is never filed from the rest of the fleet. #314 is the observed case: the Mac Studio was "alive but not publishing" for about 16 days (Sep 16 → Oct 2), and its published YAML aged on every other Mac without a filed issue.
 
-The same blindness hid #314, where the Mac Studio was "alive but not publishing" for about 16 days (Sep 16 → Oct 2).
+**Scope correction (smoke, 2026-10-19).** The quiet laptop first cited here (newest rendered pulse Oct 7) is **not** a dead collector: its `devices/<id>.yaml` `last_scan_utc` is `2026-10-18T08:13:01Z`, about 44 h old. What stopped is its pulse **render**, the #333 shape. #338 does not cover a render stall while the collector runs. Per the operator's decision that is follow-up #340, not added scope here.
 
 ## Recon (what already exists, and the exact gap)
 
@@ -59,11 +55,12 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 ## Operator decisions (2026-10-19)
 
 1. When another Mac has been silent past the bound, **report an error (auto-file)**. This reverses GH-5 Phase F's foreign cap for this one case only.
-2. The bound is **72 hours**. It tolerates a laptop closed over a weekend and would have caught the MBP16 on Oct 10 and #314 on about day 3.
+2. The bound is **72 hours**. It tolerates a laptop closed over a weekend, and it would have caught #314 on about day 3.
+3. A render stall while the collector runs is a follow-up (#340), not this PR.
 
 ## Sanity check / solution fit
 
-- **Outcome sought:** a Mac that stops collecting reaches the operator within about 3 days, without anyone running a check by hand.
+- **Outcome sought:** a Mac whose collector stops, or whose published state stops reaching the fleet, reaches the operator within about 3 days, without anyone running a check by hand. Render stalls are #340.
 - **Smallest bet:** one rule change inside `_check_pulse_collectors`, plus tests.
 - **Alternatives rejected:**
   - a new doctor row: it would duplicate the existing `fleet:` rows
@@ -113,11 +110,12 @@ The same blindness hid #314, where the Mac Studio was "alive but not publishing"
 **Verification:**
 - Focused suites: `tests/test_doctor_device_scope.py`, `tests/test_doctor_exit_pins.py`, `tests/test_doctor_pulse_severity.py`, `tests/test_doctor.py`. The full gate follows the repo's pre-push and CI.
 - **Smoke, main path:**
-  - run `.venv/bin/rebalance doctor --json` from the task clone on noels-mac-studio, reading the real pulse clone (read-only)
-  - expect `fleet:Noel's MBP 16" M1 Pro` with severity error and the "silent >72h" detail, and verdict FAIL
+  - Run `TESTS-RESULTS/2026-10-19+GH-338/smoke-probe.py.txt` from the task clone against a **disposable `git clone --no-local` copy** of the pulse clone. In the copy, one scoped laptop's `devices/<id>.yaml` `last_scan_utc` is backdated to 5 days ago. No real device is past 72 h today; see the scope correction.
+  - Expect that row as FAIL/ERROR with "silent >72h" and a quoted acknowledgement hint, and the doctor verdict FAIL.
+- **Smoke, adjacent path 1 (real fleet, no false alarm):** the same probe against the real pulse clone. No `fleet:` row may become FAIL from the new rule, and every row must match base behavior.
   - then a reporter probe, run from the task clone so its transition and run-log writes land in the clone's `temp/`. The probe imports `scripts/health_issue_reporter.py` from the task clone and replaces its `_request` with a recorder that returns `{}`, feeds it `run_doctor_checks()`, and calls `_run_github_sync(..., dry_run=True, warn=False)`.
   - Expect the recorder to show only the label `GET`, with **no mutating request**, and the result to plan one "health: fleet:…" filing. A stock `--dry-run` is not zero-API: `ensure_label` does a GET (`:317-320`) and needs a token (`:952`), per Codex plan QA r1 S2.
-- **Smoke, adjacent path:**
+- **Smoke, adjacent path 2 (acknowledged):**
   - add a health notice for that row in the **task clone's** `temp/rbos.config`, using the exact command from the row's hint; never the runtime's config
   - expect a notice disposition and no FAIL from this row
   - the reporter probe plans nothing for it
