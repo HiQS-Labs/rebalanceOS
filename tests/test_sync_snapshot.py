@@ -9,8 +9,10 @@ from pathlib import Path
 
 from rebalance.ingest.sync_snapshot import (
     SCHEMA_VERSION,
+    SYNC_SOURCES,
     export_calendar_snapshot,
     export_email_snapshot,
+    export_watched_repos,
     get_device_id,
     read_latest_snapshot,
     _update_latest_pointer,
@@ -282,6 +284,47 @@ class TestCalendarSnapshot(unittest.TestCase):
         latest = json.loads((self.sync_dir / "calendar" / "latest.json").read_text())
         self.assertEqual(latest["device_id"], "mac")
         self.assertEqual(latest["snapshot_file"], "mac.json")
+
+
+class TestWatchedReposSnapshot(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.sync_dir = self.tmp / "sync"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_writes_snapshot_file(self) -> None:
+        out = export_watched_repos(self.sync_dir, ["HiQS-Labs/rebalanceOS"], device_id="mac")
+        self.assertTrue(out.exists())
+        self.assertEqual(out, self.sync_dir / "repos" / "mac.json")
+
+    def test_snapshot_schema_and_sort(self) -> None:
+        out = export_watched_repos(
+            self.sync_dir,
+            ["Zebra/z", "Alpha/a", "alpha/a", "  ", "Beta/b"],
+            device_id="mac",
+        )
+        data = json.loads(out.read_text())
+        self.assertEqual(data["schema_version"], SCHEMA_VERSION)
+        self.assertEqual(data["source"], "repos")
+        self.assertEqual(data["device_id"], "mac")
+        self.assertEqual(data["row_count"], len(data["rows"]))
+        # case-insensitive sort; exact duplicate strings collapsed; casing variants kept as distinct strings
+        self.assertEqual(data["rows"], ["Alpha/a", "alpha/a", "Beta/b", "Zebra/z"])
+
+    def test_empty_list_writes_empty_rows(self) -> None:
+        out = export_watched_repos(self.sync_dir, [], device_id="mac")
+        data = json.loads(out.read_text())
+        self.assertEqual(data["rows"], [])
+        self.assertEqual(data["row_count"], 0)
+        latest = json.loads((self.sync_dir / "repos" / "latest.json").read_text())
+        self.assertEqual(latest["device_id"], "mac")
+        self.assertEqual(latest["snapshot_file"], "mac.json")
+
+    def test_sync_sources_includes_repos(self) -> None:
+        self.assertEqual(SYNC_SOURCES, ("calendar", "email", "repos"))
 
 
 class TestEmailSnapshot(unittest.TestCase):
