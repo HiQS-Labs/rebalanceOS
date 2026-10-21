@@ -9,6 +9,7 @@ from rebalance.doctor import (
     FAIL,
     OK,
     WARN,
+    WARNING,
     _DeviceScope,
     _DEVICE_SCOPE_REGISTRY,
     _check_pulse_collectors,
@@ -17,7 +18,7 @@ from rebalance.doctor import (
 from rebalance.ingest.pulse_health import CollectorHealth
 
 
-def _health(device_id: str, *, age_hours: float, state: str = "STALE") -> CollectorHealth:
+def _health(device_id: str, *, age_hours: float | None, state: str = "STALE") -> CollectorHealth:
     health = CollectorHealth(
         device_id=device_id,
         device_name=device_id,
@@ -77,6 +78,75 @@ def test_intermittent_laptop_window_differs_from_always_on_collector() -> None:
     assert laptop_check.status == OK
     assert "intermittent-device window 24h" in laptop_check.detail
     assert workstation_check.status == WARN
+
+
+def _collector_checks(devices: list[CollectorHealth], current: str, patterns: list[str] | None = None):
+    with (
+        patch("rebalance.ingest.pulse_health.read_collector_health", return_value=devices),
+        patch("rebalance.ingest.config.get_health_notice_patterns", return_value=patterns or []),
+    ):
+        return _check_pulse_collectors(current_device_id=current)
+
+
+# GH-338: a device silent past 72h is a FAIL on every other Mac, so the
+# health-check reporter (which files raw status `error` only) files it.
+
+
+def test_scoped_foreign_collector_silent_past_72h_fails_from_another_mac() -> None:
+    import shlex
+
+    health = _health("noels-mbp-16-m1-pro", age_hours=80, state="ALERT")
+    health.device_name = "Noel's MBP 16\" M1 Pro"
+    check = _collector_checks([health], "noels-mac-studio")[0]
+
+    assert check.status == FAIL
+    assert check.severity == ERROR
+    assert "silent >72h — reported from noels-mac-studio" in check.detail
+    command = check.hint.split("acknowledge with: ", 1)[1]
+    assert shlex.split(command) == ["rebalance", "config", "add-health-notice", check.name]
+
+
+def test_foreign_silence_bound_is_strictly_greater_than_72h() -> None:
+    at_bound = _collector_checks([_health("noels-mbp-16-m1-pro", age_hours=72.0, state="ALERT")], "noels-mac-studio")
+    past = _collector_checks([_health("noels-mbp-16-m1-pro", age_hours=72.1, state="ALERT")], "noels-mac-studio")
+
+    assert at_bound[0].status == OK
+    assert "not applicable" in at_bound[0].detail
+    assert past[0].status == FAIL
+
+
+def test_unscoped_foreign_collector_silent_past_72h_is_not_capped() -> None:
+    capped = _collector_checks([_health("mini", age_hours=30, state="ALERT")], "noels-mac-studio")[0]
+    silent = _collector_checks([_health("mini", age_hours=80, state="ALERT")], "noels-mac-studio")[0]
+
+    assert (capped.status, capped.severity) == (WARN, WARNING)  # GH-5 Phase F cap, unchanged
+    assert (silent.status, silent.severity) == (FAIL, ERROR)
+
+
+def test_acknowledged_silent_foreign_collector_is_demoted_to_a_notice() -> None:
+    from datetime import datetime, timezone
+
+    from rebalance.health import compute_health_status
+
+    health = _health("noels-mbp-16-m1-pro", age_hours=80, state="ALERT")
+    check = _collector_checks([health], "noels-mac-studio", patterns=["fleet:noels-mbp"])[0]
+
+    assert (check.status, check.severity) == (WARN, WARNING)
+    verdict = compute_health_status([check], {}, datetime.now(timezone.utc), notice_patterns=["fleet:noels-mbp"])
+    assert check in verdict.notices
+    assert check not in verdict.problems
+
+
+def test_own_device_and_never_pushed_foreign_rows_are_unchanged() -> None:
+    own = _collector_checks([_health("noels-mac-studio", age_hours=80, state="ALERT")], "noels-mac-studio")[0]
+    never = _collector_checks([_health("noels-mbp-16-m1-pro", age_hours=None, state="NO PUSHES")], "noels-mac-studio")[
+        0
+    ]
+
+    assert (own.status, own.severity) == (WARN, ERROR)
+    assert "silent >" not in own.detail
+    assert never.status == OK
+    assert "not applicable" in never.detail
 
 
 def test_device_scoped_job_stays_informational_even_with_a_stale_plist() -> None:

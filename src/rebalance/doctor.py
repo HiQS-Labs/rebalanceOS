@@ -111,6 +111,14 @@ _DEVICE_SCOPE_REGISTRY: dict[tuple[str, str], _DeviceScope] = {
     # expectation — so the merged job intentionally carries no scope entry here.
 }
 
+# GH-338: a collector silent this long is reported as a FAIL from every other
+# Mac, overriding both the scoped "not applicable" row and the GH-5 Phase F
+# foreign cap, so the hourly health-check reporter (which files raw status
+# `error` only) files it. 72h tolerates a laptop closed over a weekend
+# (operator decision, 2026-10-19). Acknowledge a device known to be off with
+# `rebalance config add-health-notice <row name>`.
+_FOREIGN_SILENCE_HOURS = 72.0
+
 
 def _local_device_id() -> str:
     """Return the git-pulse-compatible identity for this host.
@@ -1901,6 +1909,15 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         current_device_id = current_device_id or _local_device_id()
     except (ValueError, OSError) as exc:
         return [Check("fleet configuration", FAIL, str(exc))]
+    # Local import: health.py imports doctor, so a top-level import would cycle.
+    from rebalance.health import _matches_notice
+
+    try:
+        from rebalance.ingest.config import get_health_notice_patterns
+
+        notice_patterns = get_health_notice_patterns()
+    except Exception:  # noqa: BLE001 — config must never break doctor
+        notice_patterns = []
     checks: list[Check] = []
     for health in devices:
         # Every pulse row is a report about its own collector device.  The
@@ -1910,10 +1927,19 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
         # machine's git-pulse job; the name states the scope instead of the
         # mechanism. Renaming re-keys the health issue-reporter's dedup once.
         name = f"fleet:{health.device_name}"
-        other_device = _other_device_check(name, scope, current_device_id)
-        if other_device is not None:
-            checks.append(other_device)
-            continue
+        # GH-338: a foreign device silent past _FOREIGN_SILENCE_HOURS is a fleet
+        # problem every Mac can see, so it skips the "not applicable" row.
+        long_silent = (
+            health.device_id != current_device_id
+            and health.age_hours is not None
+            and health.age_hours > _FOREIGN_SILENCE_HOURS
+        )
+        escalate = long_silent and not _matches_notice(name, notice_patterns)
+        if not long_silent:
+            other_device = _other_device_check(name, scope, current_device_id)
+            if other_device is not None:
+                checks.append(other_device)
+                continue
 
         if health.age_hours is None:
             age = "never pushed"
@@ -1961,22 +1987,33 @@ def _check_pulse_collectors(*, current_device_id: str | None = None) -> list[Che
             severity = NOTICE
         else:
             severity = raw_severity  # type: ignore[assignment]
-            if health.device_id != current_device_id and severity == ERROR:
+            if escalate:
+                # GH-338: silent past the bound and not acknowledged. FAIL, not
+                # WARN, because the reporter forwards raw status only.
+                severity = ERROR
+            elif health.device_id != current_device_id and severity == ERROR:
                 # Device-first health (GH-5 Phase F): the local verdict is graded on
                 # local state. A dead collector on ANOTHER machine stays visible in
                 # problems but is capped at WARNING so it cannot fail this device's
                 # exit; the same state on the device running doctor keeps ERROR.
                 severity = WARNING
+        hint = (
+            "check that device's fleet check-in job (transport: git-pulse, launchd "
+            "`com.user.git-pulse`); `python experimental/git-pulse/health-check.py` "
+            "for the full view"
+        )
+        if long_silent:
+            detail += f"; silent >{_FOREIGN_SILENCE_HOURS:g}h — reported from {current_device_id}"
+            hint = (
+                f"run the git-pulse-sync-repair skill on {health.device_id}, or acknowledge with: "
+                f"rebalance config add-health-notice {shlex.quote(name)}"
+            )
         checks.append(
             Check(
                 name,
-                OK if healthy else WARN,
+                OK if healthy else (FAIL if escalate else WARN),
                 detail,
-                ""
-                if healthy
-                else "check that device's fleet check-in job (transport: git-pulse, launchd "
-                "`com.user.git-pulse`); `python experimental/git-pulse/health-check.py` "
-                "for the full view",
+                "" if healthy else hint,
                 severity=severity,
             )
         )

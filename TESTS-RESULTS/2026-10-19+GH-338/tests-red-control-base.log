@@ -1,0 +1,20 @@
+# RED CONTROL: tests/test_doctor_device_scope.py with doctor.py from base 3b31a67 (tests @ f7729f1b34b365b0e7c3565cc369ec3f5608eee5) 2026-10-20T04:52:22Z
+$ git show 3b31a67:src/rebalance/doctor.py > src/rebalance/doctor.py && .venv/bin/python -m pytest -p no:cacheprovider -v -rN tests/test_doctor_device_scope.py
+tests/test_doctor_device_scope.py::test_foreign_pulse_collector_is_informational_not_a_warning PASSED [  9%]
+tests/test_doctor_device_scope.py::test_stale_collector_still_warns_on_its_own_device PASSED [ 18%]
+tests/test_doctor_device_scope.py::test_intermittent_laptop_window_differs_from_always_on_collector PASSED [ 27%]
+tests/test_doctor_device_scope.py::test_scoped_foreign_collector_silent_past_72h_fails_from_another_mac FAILED [ 36%]
+tests/test_doctor_device_scope.py::test_foreign_silence_bound_is_strictly_greater_than_72h FAILED [ 45%]
+tests/test_doctor_device_scope.py::test_unscoped_foreign_collector_silent_past_72h_is_not_capped FAILED [ 54%]
+tests/test_doctor_device_scope.py::test_acknowledged_silent_foreign_collector_is_demoted_to_a_notice FAILED [ 63%]
+tests/test_doctor_device_scope.py::test_own_device_and_never_pushed_foreign_rows_are_unchanged PASSED [ 72%]
+tests/test_doctor_device_scope.py::test_device_scoped_job_stays_informational_even_with_a_stale_plist PASSED [ 81%]
+tests/test_doctor_device_scope.py::test_device_scoped_job_with_a_stale_plist_still_fails_on_its_OWNER PASSED [ 90%]
+tests/test_doctor_device_scope.py::test_unscoped_scheduler_job_keeps_existing_missing_job_warning PASSED [100%]
+/Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19/tests/test_doctor_device_scope.py:102: AssertionError: assert 'ok' == 'error'
+/Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19/tests/test_doctor_device_scope.py:115: AssertionError: assert 'ok' == 'error'
+/Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19/tests/test_doctor_device_scope.py:123: AssertionError: assert ('warning', 'warning') == ('error', 'error')
+/Users/noelsaw/Documents/GH Repos/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19/tests/test_doctor_device_scope.py:134: AssertionError: assert ('ok', 'warning') == ('warning', 'warning')
+========================= 4 failed, 7 passed in 1.04s ==========================
+exit=1
+$ git checkout -- src/rebalance/doctor.py   # fix restored
