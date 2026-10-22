@@ -4,6 +4,7 @@ Mirrors XYZ Forge's GH-269 invariants. Read-only: every command here only reads 
 (`roadmap sync` is a no-op in releases mode, which is exactly what is asserted).
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -17,7 +18,10 @@ MARKER = re.compile(r"^\s*ROADMAP_SOURCE\s*=\s*releases\s*(#.*)?$", re.M)
 def _app(*args):
     return subprocess.run(
         [sys.executable, str(APP), "--root", str(REPO), *args],
-        cwd=REPO, capture_output=True, text=True, timeout=120,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
 
 
@@ -47,7 +51,11 @@ def test_roadmap_list_reads_the_db():
 def test_roadmap_coverage_reads_the_db_not_the_file():
     r = subprocess.run(
         ["bash", str(REPO / "utils" / "pdda" / "pdda.sh"), "roadmap-coverage"],
-        cwd=REPO, capture_output=True, text=True, timeout=120, env={"PDDA_MODE": "full", "PATH": "/usr/bin:/bin"},
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env={**os.environ, "PDDA_MODE": "full"},
     )
     out = r.stdout + r.stderr
     assert "SUMMARY [pdda-check-roadmap-coverage]" in out
