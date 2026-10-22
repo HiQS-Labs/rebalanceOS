@@ -1,0 +1,148 @@
+keyed	310	#310 — Opt-in RELEASES ledger scan + /daily close-loop inputs
+keyed	316	#316 — HiQS work activity naming with a backwards-compatibility adapter
+keyed	315	#315 — CLIO history and HiQS activity lookup skill
+keyed	312	#312 — CI/CD posture audit ladder — quarantine expiry + static pre-push gate (Rung 1 + Stage 1)
+keyed	307	#307 — Close-the-loop flags from the local GitHub corpus
+keyed	296	#296 — job_guard refuses healthy runs on small-swap Macs — scale swap corroboration, fix the inner embedding guard
+keyed	282	#282 — Fleet Pulse delivery
+keyed	255	#255 — One install path — per-job installers folded into `stack.sh`
+keyed	236	#236 — Broken runtime virtualenv strands scheduler fleet at EX_CONFIG
+keyed	233	#233 — Daily established-work status reader
+keyed	199	#199 — CLIO first-prompt capture
+keyed	215	#215 — Guarded jobs that self-report lifecycle events log a second start/terminal pair
+keyed	210	#210 — Terra Low evidence-bound actual-work synthesis
+keyed	211	#211 — Mac Studio bounded runtime recovery before Terra work synthesis
+keyed	204	#204 — Focus 5 full clone detection & parent grouping
+keyed	196	#196 — Shutdown — end-of-day triage and next-session continuity
+keyed	144	#144 — CI critical path halving — embeddings seam lane split
+keyed	141	#141 — CLIO prompt logs ingestion into RebalanceOS semantic index
+keyed	139	#139 — CLIO multi-agent capture — ZCode, Codex, Agy alongside Claude Code
+keyed	120	#120 — Focus 5 umbrella — horizontal layout mode + CLIO writer fix
+unkeyed-HiQS-Suite/rebalanceOS		Refactor & Rename 'vault-sync' to 'obsidian-vault-embeddings' + Lightweight Embedding Engine
+unkeyed-HiQS-Suite/rebalanceOS		Subsystem consolidation — too many subsystems reinventing the same concept
+dekey-HiQS-Suite/rebalanceOS	5	PR2 — one status vocabulary across every user-facing surface (predecessor GH-5)
+keyed	300	#300 — GPT 6 Luna High held-out storyline trial
+keyed	232	#232 — CLIO journey follow-up
+keyed	230	#230 — CLIO journey replay
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Architectural Audit: Complexity, DRY, and System Stability
+unkeyed-no-url		HiQS build — marathon decomposition
+unkeyed-no-url		HiQS — clean-room rebuild of the signal pipeline
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Commit history coverage — backfill direct + merge commits
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Cognee integration path for long-term memory
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Signal-health nuance — collector panel over-states urgency
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Git Pulse Daily Summary false "No git activity found today"
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		VS Code extension: native Tree View pane for git-pulse/rebalance device data
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Source health measures row COUNT, not row QUALITY
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Collector health bundle
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		HiQS — unify all six signals into one ranked pipeline
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Auto-promote watched repos to active projects
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Focus 5 off-roster reason badge
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Adopt gsd-core patterns: hook guard + PDDA conventions + skills inventory + capabilities manifest
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		XYZ ⇄ Rebalance integration
+unkeyed-no-url		Project health axes — concrete spec
+unkeyed-no-url		Collector Path and Portability Audit — Phase 6
+unkeyed-no-url		Focus 5 Float — reminders drawer (Apple + Obsidian)
+unkeyed-no-url		Repo links open VS Code with "focus-if-open"
+unkeyed-no-url		Unified UI refresh + restart (system-wide)
+unkeyed-no-url		Focus 5 Native (standalone Mac App Store track)
+unkeyed-no-url		Focus 5 Float — reference-design UI refresh
+unkeyed-no-url		Focus 5 Float — same-session resolution-change resilience
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		MARATHON-2026-07-21 bundle
+keyed-via-doc-source+link-added	23	#23 — publication durability
+keyed	348	#348 — Retire ROADMAP.md: RELEASES SQLite ledger becomes the only work ledger
+keyed	329	#329 — Install XYZ Forge RELEASES overlay properly + migrate releases.db
+keyed	202	#202 — Claude session identity/status snapshot
+keyed	194	#194 — daily: machine CPU-health scanner — surface runaway CPU-bound processes in the /daily cycle
+keyed	158	#158 — Monitored-repo rules: how repos are selected, added, and managed (and which rules to tweak)
+keyed	174	#174 — Test-suite directory-independence check: decide the cheap version before paying for the full differential
+keyed	126	#126 — CI ratchet: make canonical-path rules block new subsystem duplication
+keyed	148	#148 — github-sync burns the GitHub API budget: 5–7k calls/hour, runs overrun the hourly tick, 403s leave repos stale
+keyed	177	#177 — doctor warns daily when the runtime trails origin/development
+keyed	182	#182 — project_registry contested claims — 7 repos claimed by two projects each
+keyed	150	#150 — Activity-signal read-layer consolidation
+unkeyed-HiQS-Suite/rebalanceOS		Build 0.74.0 Hardened Core
+unkeyed-HiQS-Suite/rebalanceOS		Build 0.75.0 Fleet Engine
+unkeyed-HiQS-Suite/rebalanceOS		Sustained-activity auto-promotion
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		`three_eyes pause` does not stop launchd firing the job
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		launchd fleet: keep/merge/retire decision for all 14 jobs
+unkeyed-no-url		/10days marathon-2026-07-25
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		health_issue_reporter dedupes on title
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		doctor: crash-looping KeepAlive daemon reports OK
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Vault ingest lag and stuck pending-embed chunks unmonitored
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		302 GitHub documents fetched but never projected into the semantic index
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Tests in a git worktree silently import the main checkout
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		github_sync holds the SQLite write lock across network I/O
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Scheduler jobs crash on a rare CPython EINTR at bootstrap
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Pulse dashboard: 2 residual presentation gaps from the consistency pass (issue #135)
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Explicit --database at a nonexistent path silently falls back
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		CLIO projection: no malformed-source-row test
+unkeyed-no-url		Simplify intake, definition, and exclusion of repos
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Local Qwen embedding proof on this Mac
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		3-Eyes — unified local job supervisor
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		[CRITICAL] HiQS loses direct GitHub commits and file-level change signals
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Skill: rebalance live-signal-active-git (morning brief)
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Focus 5 Float: Dock reopen + panel resize
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Ingest Claude Code Cloud jobs (web sessions) + status
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Pulse dashboard redesign — master (one module per day)
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Web app theme color picker
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Pulse dashboard consistency refactor
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Collector health signal reports a working system as broken
+dekey-Hypercart-Dev-Tools/rebalance-OS	144	one-shot sentinel prompt (predecessor GH-144)
+unkeyed-no-url		Collector sentinel — scheduled detect → triage → repair → PR loop
+unkeyed-no-url		ROADMAP→dashboard collector
+unkeyed-no-url		CLIO — durable, idempotent writes to the shared Obsidian note
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		CLIO prompt projection silently loses historical entries
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		rebalance-embed reaches 46.9 GB phys_footprint — MLX Metal buffer cache never released
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Instrument MLX memory per batch — the dominant consumer is unobserved
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Hard MLX memory limit — fail the job, not the machine
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		doctor reads an empty launchctl list as "no jobs loaded"
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Rebalance memory — unified project (8 lanes)
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Skill: rebalance — optional PDDA lifecycle signal (third axis)
+keyed	338	#338 — doctor: surface a Mac silent >72h on every other Mac
+keyed	336	#336 — git-pulse-sync-repair: binary-safe stuck-rebase backup
+keyed	334	#334 — git-pulse-sync-repair skill
+keyed	325	#325 — Fleet enrollment: device-agnostic pulse clone path, enroll helper, doctor checks, self-repair on upgrade
+keyed	330	#330 — Fleet safety follow-up
+keyed	289	#289 — Fix CI development red failure: Python interpreter seam for scheduler tests
+keyed	241	#241 — Audit and consolidate reader scripts and add mechanical script-inventory CI ratchet gate
+keyed	229	#229 — Executive portfolio planning matrix view & local API
+keyed	157	#157 — The embeddings job is gated on machine-wide compressor pressure it does not cause
+keyed	162	#162 — Test suite gaps & Hypothesis adoption
+keyed	161	#161 — `_read_config()` returns a non-dict for valid JSON of the wrong shape
+keyed	159	#159 — hiqs_digest: the watched-set filter guards one section; every headline collector filters on date only
+keyed	136	#136 — SQLite gateway routing — nine direct-connect bypasses retired behind a CI ratchet
+unkeyed-HiQS-Suite/rebalanceOS		Build 0.73.0 Subsystem Unification
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		github_embeddings vector bloat — reclaim, backfill, re-embed
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Hard kernel panic — unbounded concurrent embedding runs
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Audit: no launchd job declares a memory limit, nice value, or single-instance lock
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Focus5Float telemetry viewer: .md support
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Architecture diagram: show incoming (not-yet-active) XYZ HQ data
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		daily-sync fails daily — "database is locked" from collision with hourly github-sync
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Centralize UTC→local time display
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Obsidian Vault Daily Activity Sync
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Multi-device Git Pulse daily synthesis → Obsidian vault
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		focus5 refresh worktree-drop + repo-name font shrink
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		GSD Core pattern review
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Focus 5 newest-dirty-repo banner
+unkeyed-no-url		Client auto-discovery
+unkeyed-no-url		Watch-list coverage guard
+dekey-Hypercart-Dev-Tools/rebalance-OS	96	git-pulse stages PDDA registry projection (predecessor GH-96)
+dekey-Hypercart-Dev-Tools/rebalance-OS	94	priority_tier soft down-weight (predecessor GH-94)
+dekey-Hypercart-Dev-Tools/rebalance-OS	93	MCP probe tools (predecessor GH-93)
+unkeyed-no-url		Gemini "What to do next" → fixed vault file
+unkeyed-no-url		Apple Reminders unified integration
+unkeyed-no-url		Focus 5 Float (floating macOS card stack)
+unkeyed-no-url		Focus 5 Float — Telemetry tab
+unkeyed-no-url		CLIO migration + Focus 5 Float — Prompt Log tab
+unkeyed-no-url		Focus 5 Float — offline cache & manual server start
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Focus 5 — identity-agnostic ranking vector
+unkeyed-no-url		Focus 5 active repos bug remediation
+unkeyed-no-url		Team Calendar as a Signal (HiQS)
+unkeyed-no-url		Unified front-door, portability & auth hardening
+unkeyed-no-url		AI-agent front door (ROUTER.md)
+unkeyed-HiQS-Suite/rebalanceOS		Fused retrieval measurement — PAUSED by operator decision 2026-08-20, do not restart unasked
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Signal-quality contract (observe-first source health)
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Zapier ingest: alternative email & calendar streams
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		Cross-day velocity / unfinished-work signal
+unkeyed-Hypercart-Dev-Tools/rebalance-OS		HiQS marketing label
+unkeyed-no-url		Project / track name
