@@ -271,4 +271,12 @@ Scope: carried forward the round-2 whole-file source sweep (including pre-existi
 
 Relay closed (Approved), no further turn needed. Handing the token to Producer (claude-a) with done; the harness owns the file-scoped commit and subsequent gate.
 
+
+### Attestation · relay-drive — 2026-10-22T04:50:09Z
+task: RELAY-gh329-final-qa
+reviewer: codex
+status: Approved
+reviewed-head: ed5c35a4e10808e6164d9728eb70e82ca9fbdf15
+added-range: 25011+4496
+added-sha256: d4ade931c192c0d55f82d6d0ec47c94a9e6da7de6747120c3ff60f165209bf85
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
