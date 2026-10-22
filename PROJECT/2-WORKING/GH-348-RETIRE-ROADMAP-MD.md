@@ -205,3 +205,17 @@ after merge), and this repo's old `releases_app.py` lacks the verbs the governed
   Mitigation: the file is deleted, and the pytest asserts it stays absent.
 - **Re-key misattribution:** the transform keys only from the entry's own first link and skips duplicates. The
   receipt lists every keyed and skipped entry for review.
+
+## Lessons Learned (For Future Agents)
+
+- **"Install it the supported way" can be impossible by construction.** `xyz-vendor.sh`/`xyz-sync` write only the
+  gitignored `.xyz/`, but the governed skills run the tracked root `utils/py/releases_app.py` first. Check which copy
+  a tool actually resolves before choosing an install path. Re-vendor by hand at a pinned SHA, and mark every local delta.
+- **A vendored file inherits this repo's ratchets.** Forge's app passed Forge's gates but failed this repo's GH-136
+  sqlite-gateway ratchet, and only the full suite caught it. Run the full suite, not just the focused tests, after a re-vendor.
+- **A mirror ledger only reconciles what it can key.** 137 of 143 rows had no `gh_number`, so the DB could never see
+  drift. Key rows only from evidence (the entry's own HiQS-Labs URL); never key predecessor-org numbers.
+- **Prove conservation per entry, not by totals.** Final QA rejected an aggregate "141/141" until the snapshots,
+  comparison source and per-entry receipt were retained (`TESTS-RESULTS/2026-10-21+GH-329/conservation/`).
+- **`git clone --no-local` gives a filesystem-path `origin`.** Any identity check that reads `origin` (reconcile-state,
+  merge-cleanup retirement) silently skips or refuses there. Set `origin` to GitHub in disposable clones that run them.
