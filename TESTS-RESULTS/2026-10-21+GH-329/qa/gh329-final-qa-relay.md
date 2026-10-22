@@ -61,7 +61,13 @@ ROUND: 1 / 3
   `rekey-receipt.tsv` + `gh348_rekey.py.txt` (one-off transform and every keying decision),
   `console/` (migrate, check before/after, per-entry assertions, final sync, sync-after-flip, coverage,
   issue-doc-sync, reconcile-state dry-run/apply/after, pdda run branch vs base), `RECON.md`.
-  Full-suite result is appended below by the Producer before your turn.
+  Full suite, run in a disposable `--no-local` clone:
+  - Run 1 at `8e8b697`: 7 failed (`console/pytest-full-run1-8e8b697.txt`). 3 were the GH-136 sqlite-gateway ratchet on
+    the re-vendored app, fixed in `62de070` with GATEWAY-OK markers. 4 were conftest-quarantine failures that reproduce
+    on base `44c318d` when `tests/` and `HiQS/tests` share one invocation; they are filed as #349 and are pre-existing.
+  - Run 2 at `62de070` (`console/pytest-full-run2-62de070.txt`): `tests/` 2815 passed, 0 failed; `HiQS/tests` 163 passed.
+  - Other gates at HEAD: ruff check/format clean, `check_script_inventory --check` clean, `check_doc_links` clean,
+    `frontdoor-check.sh` rc 0, `pdda.sh run` with no new errors vs base (`console/pdda-run-branch-vs-base.txt`).
 - Forge prior art (read-only, outside your worktree): `$FORGE` = `/private/tmp/claude-501/-Users-noelsaw-Documents-GH-Repos-rebalanceOS/fd0b2af5-dab6-48a5-bdad-092951e3fb8a/scratchpad/forge-dev` at `1573dd4b7`.
   Compare `utils/py/releases_app.py` against `$FORGE/utils/py/releases_app.py` (the only intended delta is the
   block marked `rebalanceOS local delta (#322)`), and `utils/pdda/pdda.sh` `check_roadmap_coverage` and the GH-492 block
