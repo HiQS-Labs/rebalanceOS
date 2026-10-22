@@ -2,9 +2,9 @@
 gh_issue: 348
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/348
 title: "Retire ROADMAP.md: make the RELEASES SQLite ledger the only work ledger (with #329 as phase 1)"
-status: "Active — implemented; final Codex QA in progress (r2)"
+status: Complete
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-22
 owner: noel
 doc_type: refactor
 goal: >
