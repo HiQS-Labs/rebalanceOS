@@ -12,7 +12,7 @@ description: >
 
 Git Pulse Sync is RebalanceOS's cross-device pulse repository. Skills Army HQ's `Deployed Skills`
 collection also rides in it. This skill uses only existing commands (GH-334, plan in
-`PROJECT/2-WORKING/GH-334-GIT-PULSE-SYNC-REPAIR.md`). It adds no scripts, jobs or code.
+`PROJECT/3-COMPLETED/GH-334-GIT-PULSE-SYNC-REPAIR.md`). It adds no scripts, jobs or code.
 
 **Contract: one pass.** Make one repair attempt per fault, one resync, one recheck, then stop and
 report. Never loop or retry. Never guess config values. Never choose between clones, move or
