@@ -1,5 +1,8 @@
 # PDDA Install / Extraction Manifest
 
+> **This repo (rebalanceOS) runs PDDA in releases mode since GH-348:** the roadmap ledger is `releases.db`, not
+> `ROADMAP.md`. The steps below that seed or scan `ROADMAP.md` describe a legacy-mode install in another repo.
+
 This file is the portable install manifest for PDDA.
 
 Use it when an LLM agent needs to extract the PDDA files from this repo and install them into a

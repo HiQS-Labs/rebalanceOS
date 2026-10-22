@@ -1,0 +1,14 @@
+OK: foreign_keys pragma asserted per connection
+OK: generation trio consistent at 84 (DB <-> dump)
+OK: receipt chain intact (85 receipt(s), business-state digest matches, 4 merge fork(s) tolerated under the merge-rebuild receipt)
+warn: rule=mig-ref-stale: MIG-CAA831 is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-956EAB is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-2BD48A is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-1439BE is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-F936E9 is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-0C1FED is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=mig-ref-stale: MIG-BDD32C is 58 days old (> 7) — disposition the migration debt before the strict flip
+warn: rule=release-target-passed: 0.70.0 Green Board is still a draft and 37 day(s) past its target of 2026-09-15 — the plan has drifted from the calendar
+warn: rule=release-target-passed: 0.71.0 Subtraction is still a draft and 7 day(s) past its target of 2026-10-15 — the plan has drifted from the calendar
+info: 10 grandfather_entries pending disposition (the strict flip requires none pending)
+check: clean (0 failures, 9 warning(s))

@@ -8,7 +8,8 @@ The core idea is simple:
 
 - deterministic scripts enforce the parts that should never require judgment
 - an LLM reviewer flags structural or planning-quality gaps that are hard to express as regex alone
-- `ROADMAP.md` stays a pointer/index, while project detail lives in the individual project docs
+- the roadmap ledger (`releases.db` rows since GH-348; `ROADMAP.md` before) stays a pointer/index, while project
+  detail lives in the individual project docs
 
 ## Goals
 
@@ -36,7 +37,8 @@ PDDA assumes four lifecycle buckets:
 
 Within that model:
 
-- `ROADMAP.md` is the index of current, completed, attempted, and deferred work
+- the roadmap ledger (`releases.db`, read with `releases_app.py roadmap list`) is the index of current, queued,
+  completed, attempted, and deferred work
 - project detail lives in the individual `PROJECT/**` documents
 - a working doc is the canonical source of truth for that effort until it is completed, deferred, or superseded
 - `blank.md` placeholders are scaffolding and should be ignored by PDDA checks
@@ -235,8 +237,8 @@ non-trivial bug/fix opens an issue *first*, and that issue gets an in-repo point
 stream lives in GitHub (machine-queryable state, labels, commit↔issue linkage); the execution
 surface of record stays in `PROJECT/**`. This is the **issue-first SOP**; the bug-fix stance above
 states the principle, and this section owns the *format*. To prevent duplicate intake and forgotten
-work, every captured `GH-*.md` doc is also **parked immediately in `ROADMAP.md`** as a one-line queue
-entry until it is promoted, deferred, or closed.
+work, every captured `GH-*.md` doc is also **parked immediately in the roadmap ledger** (`releases.db`) as a
+queue row until it is promoted, deferred, or closed.
 
 **Floor (what needs an issue).** The operational test is **lines of code touched**: any change
 beyond a **2–3 line** fix opens a GitHub issue first, and its local plan doc is named after that
@@ -265,17 +267,18 @@ Lifecycle:
 
 - The `GH-` inbox doc is the **capture**, not the active-work doc. It carries no `## Status` table while
   it sits in `1-INBOX` (the inbox is the rough/untriaged bucket).
-- Capture time also adds a **one-line `ROADMAP.md` queue pointer** linking that inbox doc. This is a
+- Capture time also adds a **queue row** linking that inbox doc: `python3 utils/py/releases_app.py roadmap add
+  --issue-num N --issue-url U --title T --created YYYY-MM-DD --doc-path P`, then `roadmap rate`. This is a
   temporary parking slot: it makes fresh intake visible to humans and automation before promotion,
   which is the duplicate-prevention guard.
 - When execution starts, **promote** it to `PROJECT/2-WORKING/` — keep the `GH-` prefix for provenance —
   and it must then satisfy the full active-doc contract (frontmatter, exact status table, QA gates if
-  phased), **carrying `gh_issue` forward**. The `ROADMAP.md` pointer is therefore required twice:
-  first as a queued parking entry at capture, then as an active-work ledger entry after promotion.
+  phased), **carrying `gh_issue` forward**. The ledger row is therefore required twice:
+  first as a queued row at capture, then (after `roadmap repoint` + `roadmap move`) as an active-work row.
   This is the concrete mechanism behind "GitHub issues are not a substitute for the local active-work
   doc once execution starts" (bug-fix stance above).
 - If a captured issue is never actioned it ages out of `1-INBOX` like any other untriaged note; if it is
-  closed without work, move the doc to `PROJECT/4-MISC` and remove its queue pointer from `ROADMAP.md`.
+  closed without work, move the doc to `PROJECT/4-MISC` and `roadmap move` its row out of the queue.
 
 A foreign-repo issue (not `origin`) is the rare exception: the `source:` URL disambiguates it, since the
 bare `GH-<number>` only guarantees uniqueness within the canonical repo.
@@ -382,6 +385,9 @@ Expected exceptions:
 
 #### E. `pdda.sh roadmap`
 
+> **Legacy mode only.** In this repo (releases mode since GH-348) there is no `ROADMAP.md`; the check reports
+> `info` "not found; nothing to check" and passes. Ledger rows are written only by the `releases_app.py roadmap` verbs.
+
 Purpose:
 - enforce the `ROADMAP.md` pointer/ledger contract deterministically (the cheap, hourly guard that
   does not need an LLM), so detail cannot silently leak back into the roadmap
@@ -419,17 +425,18 @@ Why warn-only:
 #### G. `pdda.sh roadmap-coverage`
 
 Purpose:
-- enforce the *coverage* direction of the `ROADMAP.md` contract: every active doc in `PROJECT/2-WORKING`
-  must be reflected by a pointer in `ROADMAP.md`, so the ledger can never silently fall behind the
+- enforce the *coverage* direction of the ledger contract: every active doc in `PROJECT/2-WORKING`
+  must be reflected by a pointer in the ledger, so the ledger can never silently fall behind the
   working set. This is the inverse of `pdda.sh roadmap` (which keeps execution detail from leaking
   *into* the roadmap); together they guard the pointer/working-set relationship in both directions.
 
 Minimum behavior:
 - list the working docs (`PROJECT/2-WORKING/*.md`, `blank.md` excluded)
-- `error` on any working doc whose repo-relative path (`PROJECT/2-WORKING/<name>.md`) does not appear in
-  `ROADMAP.md` (override the roadmap location via `PDDA_ROADMAP`) — the action is "add a one-line ledger
-  entry linking it"
-- `error` if `ROADMAP.md` is missing entirely
+- `error` on any working doc (and any `1-INBOX/GH-*.md` capture) whose repo-relative path appears in no
+  ledger row. In releases mode (this repo, GH-348: `.pdda-mode` has `ROADMAP_SOURCE=releases`, or
+  `ROADMAP.md` is absent) that means no `releases.db` `roadmap_items.doc_path`/`raw_text` contains it; the action is
+  "park it with `releases roadmap add`". Legacy mode only: the path must appear in `ROADMAP.md` (`PDDA_ROADMAP`).
+- `error` if the selected ledger is unreadable: no readable `releases.db` (or `sqlite3` missing) in releases mode
 
 Expected exceptions:
 - a working doc that should not appear in the ledger opts out with `roadmap_exempt: true` in its
@@ -861,7 +868,16 @@ onto the rails deliberately.
 
 ## ROADMAP.md contract
 
-`ROADMAP.md` is a pointer file, not a plan body.
+> **GH-348 (2026-10-21): `ROADMAP.md` is retired in this repo.** The ledger is `releases.db` (dumped to
+> `releases.sql`), and `.pdda-mode` carries `ROADMAP_SOURCE=releases`. Everything below applies to
+> ledger **rows** (`roadmap list` / `add` / `update` / `move` / `rate` / `repoint`).
+> - `pdda.sh roadmap-coverage` reads `doc_path`/`raw_text` from the DB.
+> - `pdda.sh issue-doc-sync` reports CLOSED issues whose row is not Completed.
+> - `pdda.sh roadmap` and the LLM rubric have no file to scan and pass trivially.
+> - Rows are keyed only from a `#N`/`GH-N` title prefix backed by a HiQS-Labs issue URL. Predecessor-org rows stay
+>   unkeyed (receipt: `TESTS-RESULTS/2026-10-21+GH-329/`).
+
+`ROADMAP.md` was a pointer file, not a plan body; ledger rows keep that contract.
 
 It should contain:
 
@@ -900,7 +916,7 @@ How this is enforced (so it cannot quietly rot in either direction):
 - **deterministic (no gap missing)** — `pdda.sh roadmap-coverage` errors when either an
   active `PROJECT/2-WORKING` doc has no pointer here, or a captured `PROJECT/1-INBOX/GH-*.md` doc is
   not parked here as a queue entry (honors `roadmap_exempt: true`)
-- **LLM** — `utils/pdda/pdda-doc-ready.sh` reviews `ROADMAP.md` against the full pointer contract for the
+- **LLM** (legacy mode only; skipped when the file is absent) — `utils/pdda/pdda-doc-ready.sh` reviews `ROADMAP.md` against the full pointer contract for the
   fuzzier "this paragraph is really execution detail" cases (honors the carve-out)
 - the file itself carries a top banner restating the contract, so a human editing it sees the rule
 
@@ -925,7 +941,7 @@ It should contain:
 It should not contain:
 
 - per-file diffs or deep execution detail that belongs in the entry's `PROJECT/**` doc
-- aspirational plans — those live in the project doc and the `ROADMAP.md` ledger
+- aspirational plans — those live in the project doc and the roadmap ledger
 
 Maintained append-only:
 
@@ -1040,7 +1056,7 @@ A doc is "automation ready" when:
 - any discovery or spike phase has its findings written back into the doc
 - links to canonical related docs are present where needed
 - there are no hardcoded absolute paths
-- `ROADMAP.md` is pointing at it rather than duplicating it
+- the roadmap ledger is pointing at it rather than duplicating it
 
 ## Failure modes PDDA is trying to prevent
 
@@ -1048,7 +1064,7 @@ A doc is "automation ready" when:
 - too many half-live docs in `PROJECT/2-WORKING`
 - plans that look complete but have no verification gates
 - stale working docs silently lingering forever
-- roadmap sprawl where detail leaks into `ROADMAP.md`
+- roadmap sprawl where detail leaks into roadmap ledger rows
 - agent sessions restarting the same reasoning because the doc never captured "what changed"
 
 ## Proposed extensions not yet locked
@@ -1068,7 +1084,7 @@ These are likely useful for full automation, but they are still policy choices:
 These need a decision before the automation should be considered stable:
 
 1. Should `PROJECT/PDDA-ACTIVITY.jsonl` remain append-only forever, or rotate by month once the volume grows?
-2. Should `ROADMAP.md` remain root-level canonical only, or do you also want a project-local roadmap index under `PROJECT/`?
+2. *(Resolved by GH-348: the ledger is `releases.db`.)* Should `ROADMAP.md` remain root-level canonical only, or do you also want a project-local roadmap index under `PROJECT/`?
 
 Resolved:
 

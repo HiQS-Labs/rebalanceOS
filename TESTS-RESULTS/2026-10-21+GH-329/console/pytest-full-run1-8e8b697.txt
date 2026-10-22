@@ -1,0 +1,163 @@
+........................................................................ [  2%]
+.......................xx.x.x..x.x..xxx.F............................... [  4%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+.............................................................. [ 11%]
+................................................FFFF.................... [ 14%]
+...................................................................... [ 16%]
+................................................................................................................................ [ 20%]
+................................................................ [ 22%]
+............................................................. [ 24%]
+........................................................................ [ 27%]
+................................................. [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 38%]
+........................................................................ [ 40%]
+...................................................................... [ 43%]
+........................................................................ [ 45%]
+.................................................................... [ 47%]
+........................................................................ [ 50%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+........................................................................ [ 57%]
+...................................... [ 58%]
+...............................................................sssssssss [ 60%]
+sssssss................................................................. [ 63%]
+........................................................................ [ 65%]
+..........s....................x..................................... [ 67%]
+...................................................................................................................................... [ 72%]
+..................................................................... [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 81%]
+.......................................................FF............... [ 84%]
+.......................................................... [ 86%]
+........................................... [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+..................................ssss.............................s.. [ 94%]
+.................................x...................................... [ 97%]
+........................................................................ [ 99%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+____________________ test_cli_check_passes_on_current_tree _____________________
+
+    def test_cli_check_passes_on_current_tree():
+        result = subprocess.run(
+            [sys.executable, str(CHECKER_PATH), "--check"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: utils/py/releases_app.py:1: NEW sqlite3.connect bypass (4 site(s)) — route through a gateway (GH-136)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['<GH Repos>/rebalanceOS/.venv/bin/python', '/Users/noelsaw/Documents/GH ...t='utils/py/releases_app.py:1: NEW sqlite3.connect bypass (4 site(s)) — route through a gateway (GH-136)\n', stderr='').returncode
+
+tests/test_banned_imports_ratchet.py:52: AssertionError
+_____________________ test_quarantine_active_before_expiry _____________________
+
+    def test_quarantine_active_before_expiry():
+>       assert conftest.gh178_quarantine_expired(_expiry() - timedelta(seconds=1)) is False
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:19: AttributeError
+__________________ test_quarantine_boundary_exact_is_expired ___________________
+
+    def test_quarantine_boundary_exact_is_expired():
+        # now == expiry means expired: a marker that survives its own expiry instant
+        # is how quarantines silently become permanent.
+>       assert conftest.gh178_quarantine_expired(_expiry()) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:25: AttributeError
+_____________________ test_quarantine_expired_after_expiry _____________________
+
+    def test_quarantine_expired_after_expiry():
+>       assert conftest.gh178_quarantine_expired(_expiry() + timedelta(days=1)) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:29: AttributeError
+_________________ test_quarantine_reason_carries_p13_elements __________________
+
+    def test_quarantine_reason_carries_p13_elements():
+>       reason = conftest.gh178_quarantine_reason()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_reason'
+
+tests/test_conftest_quarantine.py:33: AttributeError
+__________________ test_current_tree_matches_baseline_exactly __________________
+
+checker = <module 'check_banned_imports_ratchet' from '<GH Repos>/rebalanceOS-gh329-retire-roadmap-md-2026-10-21-verify/utils/pdda/check_banned_imports.py'>
+
+    def test_current_tree_matches_baseline_exactly(checker):
+        actual = checker.scan_sqlite_calls(REPO_ROOT)
+        baseline = checker.load_baseline(BASELINE_PATH)
+>       assert actual == baseline
+E       AssertionError: assert {'utils/py/re...es_app.py': 4} == {}
+E         
+E         Left contains 1 more item:
+E         {'utils/py/releases_app.py': 4}
+E         Use -v to get more diff
+
+tests/test_sqlite_gateway_ratchet.py:48: AssertionError
+____________________ test_cli_check_passes_on_current_tree _____________________
+
+    def test_cli_check_passes_on_current_tree():
+        result = subprocess.run(
+            [sys.executable, str(CHECKER_PATH), "--check"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: utils/py/releases_app.py:1: NEW sqlite3.connect bypass (4 site(s)) — route through a gateway (GH-136)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['<GH Repos>/rebalanceOS/.venv/bin/python', '/Users/noelsaw/Documents/GH ...t='utils/py/releases_app.py:1: NEW sqlite3.connect bypass (4 site(s)) — route through a gateway (GH-136)\n', stderr='').returncode
+
+tests/test_sqlite_gateway_ratchet.py:59: AssertionError
+=============================== warnings summary ===============================
+tests/test_portfolio_matrix.py:8
+  <GH Repos>/rebalanceOS-gh329-retire-roadmap-md-2026-10-21-verify/tests/test_portfolio_matrix.py:8: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_mlx_cache_cap.py:115: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [5] tests/test_mlx_cache_cap.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_cache_cap.py:205: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [4] tests/test_mlx_instrumentation.py: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [3] tests/test_mlx_instrumentation.py:162: MLX embeddings pipeline superseded by SentenceTransformer (GH-81)
+SKIPPED [1] tests/test_pre_push_gate.py:307: repo venv with ruff not available
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] HiQS/tests/test_affinity.py:123: UNKNOWN, not pass: private_names.txt absent, so no name check ran. Create it (one lowercase name per line, gitignored) to enforce locally; the Phase 6 pre-extraction history scan remains the blocking gate.
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only - GH-178: known-failing since GH-124 (536de83); quarantined by GH-177 — owner: noel; issue: #178; expires 2026-11-01T00:00:00Z
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+FAILED tests/test_banned_imports_ratchet.py::test_cli_check_passes_on_current_tree
+FAILED tests/test_conftest_quarantine.py::test_quarantine_active_before_expiry
+FAILED tests/test_conftest_quarantine.py::test_quarantine_boundary_exact_is_expired
+FAILED tests/test_conftest_quarantine.py::test_quarantine_expired_after_expiry
+FAILED tests/test_conftest_quarantine.py::test_quarantine_reason_carries_p13_elements
+FAILED tests/test_sqlite_gateway_ratchet.py::test_current_tree_matches_baseline_exactly
+FAILED tests/test_sqlite_gateway_ratchet.py::test_cli_check_passes_on_current_tree
+7 failed, 2971 passed, 22 skipped, 11 xfailed, 1 warning, 171 subtests passed in 290.82s (0:04:50)
+pytest rc=1

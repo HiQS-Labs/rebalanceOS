@@ -11,7 +11,7 @@
 >    — work in flight is invisible to a code search. An entire `rebalance/lib/*_ops` consolidation
 >    campaign was resumed from scratch in 2026-08 because its remaining phases were sitting in
 >    unmerged PRs on the *other* repo.
-> 2. **`ROADMAP.md` → "In progress"** — the ledger of campaigns already under way.
+> 2. **The roadmap ledger's "In progress" rows** (`python3 utils/py/releases_app.py roadmap list`) — the campaigns already under way. `utils/pdda/prior-art-check.sh` reads them from `releases.db`.
 > 3. **`grep -rn "<the concept>" --include="*.py" .` across `src/`, `utils/`, `HiQS/`** — a helper
 >    you are about to write may exist in a package you were not looking at. A clean-room import
 >    gate (`HiQS/tests/test_clean_room.py`) was duplicated in 2026-08 by someone who never looked
@@ -34,7 +34,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - `GUIDING-PRINCIPLES.md` = the *why* behind architecture and design decisions; includes the AI doc-review heuristics appendix
 - `README.md` = human-facing repo/product overview and install path
 - `CLAUDE.md` = the Claude Code entry stub; it defers to `AGENTS.md` for all behavioral rules
-- `ROADMAP.md` = pointer ledger of in-progress, completed, attempted, and deferred work
+- `releases.db` (dumped to `releases.sql`) = the work ledger of in-progress, queued, completed, attempted, and deferred work — read with `releases_app.py roadmap list`, write only with `roadmap add|update|move|rate|repoint`. `ROADMAP.md` was retired in GH-348 (`.pdda-mode` carries `ROADMAP_SOURCE=releases`); do not recreate it.
 - `CHANGELOG.md` = the end-of-iteration running log
 - `RELEASES.md` = forward-looking release-planning ledger (governed by `PROJECT/PDDA.md`)
 - `PROJECT/**` docs = canonical execution detail for a specific effort
@@ -45,7 +45,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 1. Read `ROUTER.md` to understand the repo's operating order and canonical files. -> expect one clear next file, not a repo-wide scavenger hunt.
 2. Read `AGENTS.md` before making recommendations or edits. -> expect the MCP tool surface, the onboarding flow, explicit assumptions, and verified-claims-only discipline.
 3. Read `ARCHITECTURE.md` for orientation, then `src/rebalance/ingest/index_ops.py` — the `COLLECTORS` registry is the data-plane spine. -> expect to extend a source with one `register_collector(...)` call, not edits to the dispatch chain.
-4. Read `ROADMAP.md` to find the active effort. -> expect links outward to the canonical `PROJECT/**` docs; `ROADMAP.md` is a pointer ledger, not a plan body.
+4. Run `python3 utils/py/releases_app.py roadmap list` to find the active effort or parked intake. -> expect each row to link outward to its canonical `PROJECT/**` doc; the ledger is a pointer index, not a plan body.
 5. Read the linked `PROJECT/**` document that owns the work you are touching. -> expect a near-top `## Status` table telling you what was just completed and what is next.
 6. If the task touches project docs, read `PROJECT/PDDA.md` and follow the PDDA contract. -> expect `PROJECT/2-WORKING` docs to have frontmatter, the exact status table, and QA gates when phased.
 7. Before reporting success on code or runtime work, run `rebalance doctor` and `pytest tests/`. -> expect doctor clean and the suite green; do not claim completion if either fails or was skipped.
@@ -54,9 +54,9 @@ This file is the first entry point for an AI agent working in this repo: it tell
 ## Canonical rules
 
 - This repo **is** an MCP server. Use the MCP tools (`index_status`, `refresh_index`, `semantic_query`, …) for data refresh and retrieval, and `rebalance doctor` for setup/health. Do not write ad-hoc `rebalance ...` shell pipelines or grep for setup scripts.
-- Do not put phase checklists, build steps, or deep execution notes in `ROADMAP.md`.
-- Every active doc in `PROJECT/2-WORKING/` must be reflected by a one-line pointer in `ROADMAP.md` — or opt out with `roadmap_exempt: true` in its frontmatter. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
-- Every captured GitHub issue doc in `PROJECT/1-INBOX/GH-*.md` is first-class intake and must also be parked in `ROADMAP.md` as a one-line queue entry immediately at capture, then promoted or removed later. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
+- Do not put phase checklists, build steps, or deep execution notes in roadmap ledger rows.
+- Every active doc in `PROJECT/2-WORKING/` must be reflected by a roadmap ledger row that links it (`roadmap repoint`/`update`/`move` when a capture is promoted) — or opt out with `roadmap_exempt: true` in its frontmatter. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
+- Every captured GitHub issue doc in `PROJECT/1-INBOX/GH-*.md` is first-class intake and must also be parked as a queue row immediately at capture — `python3 utils/py/releases_app.py roadmap add --issue-num N --issue-url U --title T --created YYYY-MM-DD --doc-path P` (lands in "Queue / parked intake"), then `roadmap rate --issue-num N --rated P/S/A/E` — and promoted or removed later with `roadmap move`. Closed-issue drift is reported by `utils/pdda/pdda.sh issue-doc-sync` and fixed with `roadmap reconcile-state`. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
 - Do not create a second competing plan when a canonical `PROJECT/**` doc already exists.
 - Do not build a redundant solution when extending an existing one is viable (enforced by PDDA Phase 0 review). If >50% of the new solution overlaps with an existing one, the plan MUST include deprecating/deleting the old one.
 - SQLite has exactly two gateways, and they are **separate stores by design** — `src/rebalance/ingest/db/` opens this project's own index (path resolved from `REBALANCE_DB`), while `HiQS/hiqs/db.py` opens the HiQS clean-room rebuild's app-data store, staged to spin out to its own repo. They address different database files and are not converged (settled in GH-136, 2026-08-30). New SQLite access goes through one of them: a direct `sqlite3.connect` anywhere else is pinned by `utils/pdda/check_banned_imports.py --check` against `utils/pdda/sqlite_connect_baseline.json` and fails CI — additions *and* stale baselines both block.
@@ -124,7 +124,7 @@ utils/pdda/pdda.sh help
 
 ## Routing hints
 
-- If the task is about current priorities or active work, start in `ROADMAP.md`, then follow the linked `PROJECT/**` doc.
+- If the task is about current priorities or active work, start with `python3 utils/py/releases_app.py roadmap list`, then follow the linked `PROJECT/**` doc.
 - If the task is about data sources, refresh, or "why is X empty?", start with `rebalance doctor`, then `src/rebalance/ingest/index_ops.py` (the `COLLECTORS` registry).
 - If the task is about retrieval or synthesis (the read side), start in `src/rebalance/querier.py`.
 - If the task is about the MCP tool surface or operator onboarding, start in `AGENTS.md`.

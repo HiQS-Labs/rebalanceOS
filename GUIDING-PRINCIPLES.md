@@ -66,7 +66,7 @@ When reviewing any repo doc (roadmap entries, plans, architecture notes, audits,
 2. **Canonical store respected?** Reads/writes route through `refresh_index` / the collector registry, not leaf ingest functions. Bypass needs explicit justification.
 3. **New scope classified?** Each scope is exactly one of raw source / derived scan / projection / export, and states whether it's `all`-eligible. If unstated, ask first.
 4. **Done verifiable?** Names runnable gates (`rebalance doctor`, `pytest`, PDDA, smoke test). None = low-quality signal.
-5. **Drift reduced, not created?** No duplicated docs, no execution detail added to ROADMAP.md, no reinventing a path ARCHITECTURE.md already documents.
+5. **Drift reduced, not created?** No duplicated docs, no execution detail added to roadmap ledger rows, no reinventing a path ARCHITECTURE.md already documents.
 6. **Next action singular?** One explicit next step, not buried in prose; status cells non-empty.
 7. **Operator control explicit?** No silent retry, auto-repair, or masked failure; destructive ops surface before executing.
 8. **Four pillars pass?** Each output is Attested, Ranked, Fresh, Structured. Fail one → not done.
@@ -85,4 +85,4 @@ When reviewing any repo doc (roadmap entries, plans, architecture notes, audits,
 - "Done" has no verification step.
 - Adding a source requires editing the query layer, LLM synthesis, or MCP transport (Principle 3 violation).
 - Hardcoded absolute paths or credentials (instead of resolving via `paths.py`), silent destructive operations, or opaque timing assumptions.
-- ROADMAP.md would need execution detail to make the plan legible.
+- A roadmap ledger row would need execution detail to make the plan legible.

@@ -1,0 +1,60 @@
+"""GH-348 conservation check (evidence script, run as: python3 -I compare.py.txt <repo-root>).
+
+Inputs (all retained beside this file):
+  ROADMAP-base-44c318d.md.txt         ROADMAP.md at task start (origin/development 44c318d)
+  ROADMAP-final-legacy-268f968.md.txt ROADMAP.md as committed in 268f968: the normalised file that the final
+                                      legacy `roadmap sync` imported (the last ROADMAP.md before deletion in 74b999e)
+  <repo-root>/releases.db             the ledger at the reviewed HEAD (read-only)
+Parser: the repo's own utils/py/releases_app.py parse_roadmap_ledger (the importer itself).
+Normalisation (only what the GH-348 re-key transform changed in titles):
+  strip a leading `#N — ` / `GH-N ` key prefix; strip a trailing ` (predecessor GH-N)` / ` (GH-N)` / ` (#N)`.
+Ratings: the `rated P/S/A/E` token in each entry's raw text vs the DB rating_* columns of the matched row.
+Prints one line per entry (MATCH / MISSING / RATING-MISMATCH) for both snapshots, then totals.
+"""
+import importlib.util, re, sqlite3, sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+here = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location("ra", root / "utils/py/releases_app.py")
+ra = importlib.util.module_from_spec(spec); spec.loader.exec_module(ra)
+RAT = re.compile(r"rated\s+(\d+)/(\d+)/(\d+)/(\d+)")
+
+def norm(t):
+    t = re.sub(r"^(?:GH-|#)\d+\s*(?:[—:·-]\s*)?", "", t)
+    t = re.sub(r"\s*\((?:predecessor )?GH-\d+\)$", "", t)
+    t = re.sub(r"\s*\(#\d+\)$", "", t)
+    return t.strip()
+
+def parse(path):
+    out = ra.parse_roadmap_ledger(str(path))
+    rows = out[0] if isinstance(out, tuple) else out
+    g = lambda e, k: e.get(k) if isinstance(e, dict) else getattr(e, k, None)
+    return [(g(e, "title") or "", g(e, "section") or "", g(e, "raw_text") or "") for e in rows]
+
+db = sqlite3.connect("file:%s?mode=ro" % (root / "releases.db"), uri=True)
+dbrows = db.execute("select title, section, rating_pri, rating_sev, rating_appeal, rating_effort from roadmap_items").fetchall()
+by = {}
+for t, sec, *r in dbrows:
+    by.setdefault(norm(t), []).append((t, sec, r))
+print("db rows:", len(dbrows))
+fail = 0
+for label, fname in (("base", "ROADMAP-base-44c318d.md.txt"), ("final-legacy", "ROADMAP-final-legacy-268f968.md.txt")):
+    entries = parse(here / fname)
+    n_match = n_miss = n_rmis = 0
+    print("\n## %s: %s — %d parser entries" % (label, fname, len(entries)))
+    for title, sec, raw in entries:
+        key = norm(title)
+        hits = by.get(key)
+        m = RAT.search(raw)
+        want = [int(x) for x in m.groups()] if m else None
+        if not hits:
+            n_miss += 1; print("MISSING          | %s | %s" % (sec, title)); continue
+        if want and not any(r == want for _, _, r in hits):
+            n_rmis += 1; print("RATING-MISMATCH  | %s | %s | want %s got %s" % (sec, title, want, [r for *_, r in hits])); continue
+        n_match += 1
+        print("MATCH            | %s -> %s | %s | rated %s" % (sec, hits[0][1], title, "/".join(map(str, want)) if want else "-"))
+    print("## %s totals: match=%d missing=%d rating_mismatch=%d" % (label, n_match, n_miss, n_rmis))
+    fail += n_miss + n_rmis
+print("\nRESULT:", "PASS" if fail == 0 else "FAIL (%d)" % fail)
+sys.exit(1 if fail else 0)

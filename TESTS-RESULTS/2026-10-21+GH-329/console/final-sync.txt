@@ -1,0 +1,2 @@
+releases: work connectors skipped (ModuleNotFoundError("No module named 'work_connectors'"))
+roadmap sync: 147 in ROADMAP.md -> +51 added, ~27 updated, -47 removed, 69 unchanged (txn 5a84b243c46b, generation 86)

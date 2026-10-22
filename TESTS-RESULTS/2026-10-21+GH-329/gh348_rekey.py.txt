@@ -1,0 +1,171 @@
+"""One-off GH-348 ROADMAP.md normaliser (plan step 5). Not committed as a tool (GH-241); its source
+and output are kept in TESTS-RESULTS/2026-10-21+GH-329/ as the receipt.
+
+Usage: python3 gh348_rekey.py ROADMAP.md [--write]
+
+1. Fold stray entries (under `## Ledger` before the first `###`, and under `## Entry format`)
+   into the first `### In progress`, and merge the second `### In progress` block into the first.
+2. De-key: a title starting `GH-N`/`#N` whose own first link is NOT a HiQS-Labs/rebalanceOS issue
+   URL for N loses the prefix; the number moves to the title tail, labelled with its org.
+3. Key: a title whose own first link is a HiQS-Labs/rebalanceOS issue URL for N gets `#N — `,
+   unless N is claimed by more than one eligible entry, or the title names several issues.
+URLs and prose are never rewritten. Prints a TSV receipt of every decision.
+"""
+import re
+import sys
+from collections import Counter
+
+LABS = re.compile(r"https://github\.com/HiQS-Labs/rebalanceOS/issues/(\d+)")
+ANY_ISSUE = re.compile(r"https://github\.com/([^/\s)]+)/([^/\s)]+)/issues/(\d+)")
+BOLD = re.compile(r"^- \*\*(.+?)\*\*")
+PREFIX = re.compile(r"^(?:GH-|#)(\d+)\b\s*(?:[—:·-]\s*)?")
+MULTI = re.compile(r"^(?:GH-|#)\d+\s*(?:[/,+&–]|\.\.\.?)\s*(?:GH-|#)?\d+")
+
+
+def doc_source(rest):
+    """HiQS-Labs issue number named by the `source:` frontmatter of the entry's linked PROJECT doc."""
+    m = re.search(r"\]\((PROJECT/[^)]+\.md)\)", rest)
+    if not m:
+        return None
+    try:
+        head = open(m.group(1)).read(2000)
+    except OSError:
+        return None
+    sm = re.search(r"^source:\s*(\S+)", head, re.M)
+    lm = LABS.fullmatch(sm.group(1)) if sm else None
+    return int(lm.group(1)) if lm else None
+
+
+def blocks(lines, start, end):
+    """(first, last) line index pairs of ledger entries in [start, end)."""
+    out, i = [], start
+    while i < end:
+        if lines[i].startswith("- **") or (lines[i].startswith("- [") and not re.match(r"^- \[[ xX]\]", lines[i])):
+            j = i + 1
+            while j < end and lines[j].startswith((" ", "\t")) and lines[j].strip():
+                j += 1
+            out.append((i, j))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def main():
+    path, write = sys.argv[1], "--write" in sys.argv
+    lines = open(path).read().split("\n")
+    heads = [i for i, ln in enumerate(lines) if ln.startswith("#")]
+
+    def next_head(i):
+        return min([h for h in heads if h > i] + [len(lines)])
+
+    ledger = lines.index("## Ledger")
+    ip = [i for i, ln in enumerate(lines) if ln == "### In progress"]
+    assert len(ip) == 2, ip
+    entry_fmt = lines.index("## Entry format")
+
+    moved = []
+    stray1 = blocks(lines, ledger + 1, ip[0])
+    second = blocks(lines, ip[1] + 1, next_head(ip[1]))
+    # the "Project / track name" bullet is the format example, not an entry
+    stray2 = [(a, b) for a, b in blocks(lines, entry_fmt + 1, len(lines))
+              if not lines[a].startswith("- **Project / track name**")]
+    for a, b in stray1 + second + stray2:
+        moved.append(lines[a:b])
+    drop = set()
+    for a, b in stray1 + second + stray2:
+        drop.update(range(a, b))
+    drop.add(ip[1])
+    first_end = next_head(ip[0])
+    # insert moved blocks at the end of the first In progress section (before trailing blanks)
+    ins = first_end
+    while ins - 1 > ip[0] and not lines[ins - 1].strip():
+        ins -= 1
+    new = []
+    for i, ln in enumerate(lines):
+        if i == ins:
+            for blk in moved:
+                new.extend(blk)
+        if i not in drop:
+            new.append(ln)
+    # collapse runs of >1 blank line created by removals
+    out = []
+    for ln in new:
+        if not ln.strip() and out and not out[-1].strip():
+            continue
+        out.append(ln)
+    lines = out
+
+    # pass 2/3: de-key and key
+    entries = [(a, b) for a, b in blocks(lines, 0, len(lines))]
+    eligible = {}
+    for a, _ in entries:
+        m = BOLD.match(lines[a])
+        if not m:
+            continue
+        title = m.group(1)
+        if MULTI.match(title):
+            continue
+        rest = lines[a][m.end():]
+        u = ANY_ISSUE.search(rest)
+        lm = LABS.match(u.group(0)) if u else None
+        if lm:
+            eligible[a] = int(lm.group(1))
+    counts = Counter(eligible.values())
+    receipt = []
+    for a, _ in entries:
+        m = BOLD.match(lines[a])
+        if not m:
+            receipt.append(("skip-nonbold", "", lines[a][:80]))
+            continue
+        title = m.group(1)
+        rest = lines[a][m.end():]
+        u = ANY_ISSUE.search(rest)
+        pm = PREFIX.match(title)
+        if MULTI.match(title):
+            receipt.append(("keep-multi", "", title))
+            continue
+        n = eligible.get(a)
+        if n is not None and counts[n] == 1:
+            base = PREFIX.sub("", title, count=1) if pm and int(pm.group(1)) == n else title
+            if pm and int(pm.group(1)) != n:
+                receipt.append(("CONFLICT-prefix-vs-url", n, title))
+                continue
+            newt = "#%d — %s" % (n, base)
+            lines[a] = "- **" + newt + "**" + rest
+            receipt.append(("keyed", n, newt))
+        elif n is not None:
+            if pm:
+                base = PREFIX.sub("", title, count=1)
+                newt = "%s (#%d)" % (base, n)
+                lines[a] = "- **" + newt + "**" + rest
+                receipt.append(("dekey-duplicate", n, newt))
+            else:
+                receipt.append(("unkeyed-duplicate", n, title))
+        elif pm and not u and counts[int(pm.group(1))] == 0 and doc_source(rest) == int(pm.group(1)):
+            # no issue link, but the entry's own plan doc declares `source:` = HiQS-Labs issue N
+            n = int(pm.group(1))
+            base = PREFIX.sub("", title, count=1)
+            newt = "#%d — %s" % (n, base)
+            lines[a] = "- **" + newt + "** ([#%d](https://github.com/HiQS-Labs/rebalanceOS/issues/%d))" % (n, n) + rest
+            receipt.append(("keyed-via-doc-source+link-added", n, newt))
+        elif pm:
+            org = ("%s/%s" % (u.group(1), u.group(2))) if u else "no-url"
+            base = PREFIX.sub("", title, count=1)
+            label = "predecessor " if u else ""
+            newt = "%s (%sGH-%s)" % (base, label, pm.group(1))
+            lines[a] = "- **" + newt + "**" + rest
+            receipt.append(("dekey-" + org, pm.group(1), newt))
+        else:
+            org = ("%s/%s#%s" % u.groups()) if u else "no-url"
+            receipt.append(("unkeyed-" + org.split("#")[0], "", title))
+    for r in receipt:
+        print("%s\t%s\t%s" % r)
+    print("# moved blocks: %d" % len(moved), file=sys.stderr)
+    print("# summary: %s" % dict(Counter(r[0] for r in receipt)), file=sys.stderr)
+    if write:
+        open(path, "w").write("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

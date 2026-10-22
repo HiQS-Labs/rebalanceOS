@@ -10,6 +10,18 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.103.0] - 2026-10-21
+
+### Changed
+
+- The work ledger now lives only in `releases.db`; `ROADMAP.md` is retired. Read it with `releases_app.py roadmap list`, and change rows with `roadmap add`, `update`, `move`, `rate` and `repoint`. Agents that followed ROUTER.md's "read ROADMAP.md" step now run `roadmap list` instead.
+- The release-ledger app was updated to the current XYZ Forge version, with one local dump-parsing fix kept. The ledger database was migrated to schema 9, which the governed landing and task workflows need.
+
+### Added
+
+- The doc-hygiene check now reports any closed GitHub issue whose roadmap row is still In progress or queued, so finished work can no longer sit in "In progress" unnoticed. 17 rows were flagged on the first run.
+- Roadmap rows are now tied to their GitHub issue wherever the entry links one in this repo (48 of 147), so they can be reconciled against GitHub. Rows that point at a predecessor repository stay as they were.
+
 ## [0.102.0] - 2026-10-20
 
 ### Added

@@ -323,15 +323,48 @@ EOF
 # ------------------------------------------------------------------------------------------------
 # E. roadmap-coverage (nothing active goes MISSING from ROADMAP.md)
 # ------------------------------------------------------------------------------------------------
+# GH-348: ported verbatim from XYZ Forge 1573dd4b7 utils/pdda/pdda.sh (GH-243/GH-269 DB branch).
 check_roadmap_coverage() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-roadmap-coverage" rc=0
   local PDDA_ROADMAP="${PDDA_ROADMAP:-$PDDA_REPO_ROOT/ROADMAP.md}"
-  local file rel
+  local file rel ledger_name="ROADMAP.md" ledger_hint="add a one-line ledger entry linking it" ledger_path
 
-  if [ ! -f "$PDDA_ROADMAP" ]; then
-    pdda_record_finding error "$CHECK_NAME" "$PDDA_ROADMAP" 0 \
-      "ROADMAP.md not found; cannot verify working-doc coverage" "add-roadmap"
+  # GH-243/GH-269: in a releases-mode repo the ledger lives in the DB — a doc parked via
+  # `releases roadmap add` has a doc_path/raw_text row and no ROADMAP.md line (that file is retired).
+  # Coverage passes when the pointer exists in EITHER surface; legacy repos are unaffected
+  # (db_doc_paths stays empty and only the ROADMAP.md grep decides).
+  local db_doc_paths=""
+  local db_raw_texts=""
+  local db_ledger_ready=0
+  local releases_mode=0
+  grep -Eq '^[[:space:]]*ROADMAP_SOURCE[[:space:]]*=[[:space:]]*releases([[:space:]]*(#.*)?)?$' \
+    "$PDDA_REPO_ROOT/.pdda-mode" 2>/dev/null && releases_mode=1
+  ledger_path="$PDDA_ROADMAP"
+  if [ "$releases_mode" -eq 1 ] || [ ! -f "$PDDA_ROADMAP" ]; then
+    ledger_name="releases.db"
+    ledger_hint="park it with releases roadmap add"
+    ledger_path="$PDDA_REPO_ROOT/releases.db"
+  fi
+  if ([ "$releases_mode" -eq 1 ] || [ ! -f "$PDDA_ROADMAP" ]) \
+     && [ -f "$PDDA_REPO_ROOT/releases.db" ] && command -v sqlite3 >/dev/null 2>&1; then
+    if db_doc_paths="$(sqlite3 "$PDDA_REPO_ROOT/releases.db" \
+        "SELECT doc_path FROM roadmap_items WHERE doc_path IS NOT NULL" 2>/dev/null)"; then
+      db_ledger_ready=1
+      db_raw_texts="$(sqlite3 "$PDDA_REPO_ROOT/releases.db" \
+        "SELECT raw_text FROM roadmap_items WHERE raw_text IS NOT NULL" 2>/dev/null)" || db_ledger_ready=0
+    fi
+  fi
+  pdda_roadmap_covers() {  # <relpath> -> 0 iff parked in the selected ledger
+    [ "$releases_mode" -eq 0 ] && [ -f "$PDDA_ROADMAP" ] && grep -Fq "$1" "$PDDA_ROADMAP" && return 0
+    [ -n "$db_doc_paths" ] && grep -Fq "$1" <<<"$db_doc_paths" && return 0
+    [ -n "$db_raw_texts" ] && grep -Fq "$1" <<<"$db_raw_texts" && return 0
+    return 1
+  }
+
+  if { [ "$releases_mode" -eq 1 ] || [ ! -f "$PDDA_ROADMAP" ]; } && [ "$db_ledger_ready" -eq 0 ]; then
+    pdda_record_finding error "$CHECK_NAME" "$ledger_path" 0 \
+      "no readable releases.db ledger present; cannot verify working-doc coverage" "add-roadmap"
     pdda_emit_summary "$CHECK_NAME" 1
     return "$(pdda_gated_exit 1)"
   fi
@@ -344,12 +377,12 @@ check_roadmap_coverage() {
     fi
 
     rel="$(pdda_relpath "$file")"
-    if grep -Fq "$rel" "$PDDA_ROADMAP"; then
+    if pdda_roadmap_covers "$rel"; then
       continue
     fi
 
     pdda_record_finding error "$CHECK_NAME" "$file" 1 \
-      "active working doc has no pointer in ROADMAP.md ($rel) — add a one-line ledger entry linking it, or set roadmap_exempt: true" \
+      "active working doc has no pointer in $ledger_name ($rel) — $ledger_hint, or set roadmap_exempt: true" \
       "add-roadmap-pointer"
     rc=1
   done < <(pdda_list_working_docs)
@@ -362,12 +395,12 @@ check_roadmap_coverage() {
     fi
 
     rel="$(pdda_relpath "$file")"
-    if grep -Fq "$rel" "$PDDA_ROADMAP"; then
+    if pdda_roadmap_covers "$rel"; then
       continue
     fi
 
     pdda_record_finding error "$CHECK_NAME" "$file" 1 \
-      "captured GH issue doc is not parked in ROADMAP.md ($rel) — add a one-line queue entry linking it, or set roadmap_exempt: true" \
+      "captured GH issue doc is not parked in $ledger_name ($rel) — $ledger_hint, or set roadmap_exempt: true" \
       "add-roadmap-queue"
     rc=1
   done < <(pdda_list_inbox_issue_docs)
@@ -644,6 +677,35 @@ check_issue_doc_sync() {
     fi
     # state=CLOSED in 3-COMPLETED is the fully reconciled end state: no finding.
   done < <(pdda_list_completed_docs)
+
+  # GH-348: block (3) ported verbatim from XYZ Forge 1573dd4b7 utils/pdda/pdda.sh.
+  # --- (3) roadmap section drift (GH-492), using the SAME offline/live state table --------------
+  # This cache has no closure reason. Report drift without guessing Completed vs Deferred;
+  # the explicit reconcile-state verb obtains stateReason before it writes anything.
+  if grep -q "ROADMAP_SOURCE=releases" "$PDDA_REPO_ROOT/.pdda-mode" 2>/dev/null && [ -f "$PDDA_REPO_ROOT/releases.db" ]; then
+    local roadmap_rows section
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+      pdda_record_finding warn "$CHECK_NAME" "$PDDA_REPO_ROOT/releases.db" 0 \
+        "sqlite3 unavailable — roadmap section sync NOT evaluated" "state-unavailable"
+    elif ! roadmap_rows="$(sqlite3 -readonly -separator $'\t' "$PDDA_REPO_ROOT/releases.db" \
+      "SELECT gh_number, section FROM roadmap_items WHERE gh_number IS NOT NULL AND section NOT IN ('Completed', 'Deferred · vision')" 2>/dev/null)"; then
+      pdda_record_finding warn "$CHECK_NAME" "$PDDA_REPO_ROOT/releases.db" 0 \
+        "roadmap rows unavailable — roadmap section sync NOT evaluated" "state-unavailable"
+    else
+      while IFS=$'\t' read -r num section; do
+        [ -n "$num" ] || continue
+        state="$(printf '%s\n' "$table" | awk -F'\t' -v n="$num" '$1 == n { print toupper($2); exit }')"
+        if [ "$state" = "CLOSED" ]; then
+          pdda_record_finding warn "$CHECK_NAME" "$PDDA_REPO_ROOT/releases.db" 0 \
+            "issue #$num is CLOSED but roadmap section is '$section' — review: releases roadmap reconcile-state --dry-run" \
+            "reconcile-roadmap-state"
+        elif [ "$state" != "OPEN" ]; then
+          pdda_record_finding warn "$CHECK_NAME" "$PDDA_REPO_ROOT/releases.db" 0 \
+            "issue #$num state unavailable — roadmap section sync NOT evaluated" "state-unavailable"
+        fi
+      done <<< "$roadmap_rows"
+    fi
+  fi
 
   pdda_emit_summary "$CHECK_NAME" "$rc"
   return "$(pdda_gated_exit "$rc")"

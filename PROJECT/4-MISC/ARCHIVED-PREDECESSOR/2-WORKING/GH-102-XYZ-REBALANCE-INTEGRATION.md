@@ -370,7 +370,7 @@ emitted file on the XYZ side. **Do not start until GH-101 has landed `recent_row
 
 The bidirectional close: Reb's ranked "what to do next" emits cross-repo tick lanes so Reb
 *priorities* seed XYZ marathon queues. **Medium cost — net-new `roadmap_signals` table** (ROADMAP
-Phase-5, [ROADMAP.md:34-35](../../../../ROADMAP.md#L34)). Only build if Phase 2 demonstrates the forward
+Phase-5, [ROADMAP.md:34-35](https://github.com/HiQS-Labs/rebalanceOS/blob/87d15c325d25cd410a04ddd9e851102c01226ca7/ROADMAP.md#L34)). Only build if Phase 2 demonstrates the forward
 telemetry earns its place in the ranking; otherwise stop — a one-way telemetry link is a complete,
 useful outcome on its own.
 
@@ -651,7 +651,7 @@ the emit does **not** demonstrably exist yet — today XYZ ships session-health 
   (supplies #1's freshness/degraded health fields — Phase 2 is sequenced after GH-101 Phase 1–2),
   the collector registry (`register_collector` at [index_ops.py:95](../../../../src/rebalance/ingest/index_ops.py#L95),
   dispatched by `refresh_index` at [index_ops.py:1095](../../../../src/rebalance/ingest/index_ops.py#L1095)),
-  and the ROADMAP Phase-5 `roadmap_signals` note ([ROADMAP.md:34-35](../../../../ROADMAP.md#L34), for #3).
+  and the ROADMAP Phase-5 `roadmap_signals` note ([ROADMAP.md:34-35](https://github.com/HiQS-Labs/rebalanceOS/blob/87d15c325d25cd410a04ddd9e851102c01226ca7/ROADMAP.md#L34), for #3).
 - **XYZ-side prerequisites:** the emitted state file + per-phase `updatedAt` heartbeat (GH-75), the
   `registry.tsv` `source_commit` + `tick_version` columns (#2), and the tick-lane consumer (#3).
   **Seam #4 adds one more:** a deterministic per-issue disposition export from `hq` / `rollup.sh`

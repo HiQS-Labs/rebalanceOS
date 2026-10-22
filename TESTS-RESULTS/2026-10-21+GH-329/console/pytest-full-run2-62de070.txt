@@ -1,0 +1,9 @@
+## HEAD 62de070
+## pytest tests/
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+2815 passed, 21 skipped, 10 xfailed, 1 warning, 171 subtests passed in 301.11s (0:05:01)
+## pytest HiQS/tests
+163 passed, 1 skipped, 1 xfailed in 5.71s
