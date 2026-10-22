@@ -1,1 +1,5 @@
 observe
+# GH-348: releases.db (via releases.sql) is the work-ledger source of truth. ROADMAP.md is retired;
+# write rows with `releases_app.py roadmap add|update|move|rate|repoint`. `roadmap sync` is a no-op
+# while this marker is present. Keep the mode on the first non-comment line (utils/pdda/pdda-lib.sh).
+ROADMAP_SOURCE=releases

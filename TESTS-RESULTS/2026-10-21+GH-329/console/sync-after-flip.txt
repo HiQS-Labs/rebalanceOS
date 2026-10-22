@@ -1,0 +1,1 @@
+roadmap sync: skipped — releases-mode repo (the DB is canonical; sync only mirrors ROADMAP.md in legacy mode, and would delete rows parked by `roadmap add`)

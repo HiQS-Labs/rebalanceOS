@@ -55,9 +55,21 @@ done
 echo
 
 # 2. Campaigns already under way.
-echo "-- ROADMAP.md In progress --"
+#    GH-348: the ledger is releases.db; ROADMAP.md is read only in a legacy checkout that still has it.
+section=""
 if [ -f "$REPO_ROOT/ROADMAP.md" ]; then
+  echo "-- ROADMAP.md In progress --"
   section="$(awk '/^### In progress/{f=1;next} /^###/{f=0} f' "$REPO_ROOT/ROADMAP.md")"
+elif [ -f "$REPO_ROOT/releases.db" ] && command -v sqlite3 >/dev/null 2>&1; then
+  echo "-- releases.db roadmap: In progress --"
+  section="$(sqlite3 -readonly "$REPO_ROOT/releases.db" \
+    "SELECT raw_text FROM roadmap_items WHERE section='In progress'" 2>/dev/null)" \
+    || echo "  WARNING: releases.db unreadable; in-progress check NOT run"
+else
+  echo "-- In progress --"
+  echo "  WARNING: no ROADMAP.md and no readable releases.db; in-progress check NOT run"
+fi
+if [ -n "$section" ]; then
   for term in "$@"; do
     if hits="$(printf '%s' "$section" | grep -i -- "$term" 2>/dev/null)" && [ -n "$hits" ]; then
       echo "  PRIOR ART: '$term' is already an in-progress campaign:"
