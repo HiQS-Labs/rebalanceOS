@@ -12,9 +12,10 @@ only. On DB<->dump divergence `releases check` fails and `releases check --rebui
 for MERGE RESOLUTION ONLY, never crash recovery — crash recovery is the per-boundary journal
 protocol in perform_write()/recover_from_journal().
 
-HARD BOUNDARY (Phase 0): this tool NEVER writes RELEASES.md. `gen` is side-by-side only — it
-writes RELEASES.generated.md plus a drift report. If a code path here can reach RELEASES.md for
-writing, that is a bug; the only permitted touch on that file is READING it (import, drift).
+HARD BOUNDARY (GH-568): RELEASES.md and RELEASES.generated.md are permanently retired.
+The SQLite DB (releases.db) is authoritative for reads and writes at runtime; releases.sql is
+authoritative at git merge boundaries. `releases gen` and drift reporting are retired and refuse.
+The only permitted touch on legacy ledger files is reading them during one-shot import.
 
 RELEASES-PREVIEW.md was removed 2026-08-19. It existed to give a human a readable view of the DB
 without SQL, and both of its jobs now have better homes: a desktop SQLite viewer for browsing, and
@@ -27,8 +28,6 @@ Artifacts (repo root unless noted):
   releases.db                    the SQLite DB (committed per-repo, PRD Decision 2)
   releases.sql                   canonical logical dump (committed, git-mergeable)
   releases.db.bak                backup of a DB displaced by `check --rebuild`
-  RELEASES.generated.md          side-by-side generated view (Phase 0; gen only)
-  RELEASES.generated.md.drift    drift report: generated view vs the real RELEASES.md (gen only)
 In the git common-dir (GH-448 idiom — never a literal .git/... path; in a linked worktree .git
 is a file):
   releases-app.lock              the repo-scoped writer lock
@@ -67,11 +66,23 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.parse
 import uuid
 
 # ── constants ───────────────────────────────────────────────────────────────────────────────────
 
 APP = "releases-app"
+
+# GH-491: one vocabulary for CLI writes and the dashboard's ledgerSections.
+# `roadmap sections --json` exposes it without opening a repository or database.
+ROADMAP_SECTIONS = (
+    "Queue / parked intake",
+    "Queue",  # Historical short heading (GH-243).
+    "In progress",
+    "Completed",
+    "Deferred · vision",
+)
+
 
 EXIT_OK = 0
 EXIT_CHECK_FAILED = 1
@@ -83,9 +94,7 @@ EXIT_CRASH_INJECTED = 70
 DB_NAME = "releases.db"
 DUMP_NAME = "releases.sql"
 DB_BAK_NAME = "releases.db.bak"
-GEN_NAME = "RELEASES.generated.md"
-DRIFT_NAME = "RELEASES.generated.md.drift"
-LEDGER_NAME = "RELEASES.md"          # READ-ONLY for this tool, forever in Phase 0
+LEDGER_NAME = "RELEASES.md"          # legacy import source (PRD Phase 0)
 LOCK_NAME = "releases-app.lock"
 AUDIT_NAME = "releases-app-lock-audit.log"
 JOURNAL_NAME = "releases-app-journal.json"
@@ -108,12 +117,22 @@ ITEM_STATES = ("open", "shipped", "cut")
 # dead end that only the schema knew about — `manifest ship` writes it. Both `shipped` and `cut` are
 # terminal FOR THAT ROW: re-admitting an item is a NEW dial-in row, which keeps the trail append-only
 # and readable rather than flipping one row back and forth.
-LEGAL_ITEM_TRANSITIONS = {("dialed_in", "shipped"), ("dialed_in", "cut")}
+# GH-351: `shipped` was a dead end. `manifest cut` refuses on a shipped row and re-dialing adds a
+# SECOND row beside it, so a manifest could permanently assert that one issue both shipped and is
+# pending. `manifest unship` retracts a false shipped item back to dialed_in instead.
+LEGAL_ITEM_TRANSITIONS = {("dialed_in", "shipped"), ("dialed_in", "cut"), ("shipped", "dialed_in")}
 GH_ISSUE_URL_RE = re.compile(r"^https://github\.com/[^/\s]+/[^/\s]+/issues/[0-9]+$")
 TMP_RE = re.compile(r"^TMP-[A-Z0-9]{6}$")
 MIG_RE = re.compile(r"^MIG-[A-Z0-9]{6}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# The legacy `GH_URL:` import field means a RELEASE pointer; it accepted issue URLs only before
+# GH-349 and still does. Widening it to PRs was an unrequested cross-caller change with no contract
+# test behind it — codex QA, 2026-08-31. The roadmap ledger keeps its own, wider matcher below.
 URL_EXTRACT_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/issues/[0-9]+")
+
+# The roadmap ledger has always accepted a `pull` URL in an entry (the pre-GH-349 regex did too),
+# so it matches both kinds — org-agnostic, which is the whole point of GH-349.
+ROADMAP_URL_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/(?:issues|pull|pulls)/[0-9]+")
 
 # Crockford base32 (PRD GID shape note): every global_id CHECK is the type prefix plus exactly
 # 26 characters of [0-9A-HJKMNP-TV-Z], written out in full in the migration so length AND
@@ -121,6 +140,25 @@ URL_EXTRACT_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/issues/[0-9]+"
 CROCKFORD_GLOB_CLASS = "[0-9A-HJKMNP-TV-Z]"
 
 GENERATION_KEY = "generation"
+
+# GH-525: some repos write a literal placeholder in RELEASES.md for a release that has not shipped
+# a version yet — AEGIS-Sleuth's convention is "versions are RECORDED, never RESERVED", so every
+# unshipped block reads `Release: TBD`. The schema already models "no version yet" as SQL NULL
+# (releases.version is nullable and UNIQUE(repo_id, version) permits any number of NULLs); the
+# importer just never mapped a placeholder onto it, so every unshipped block collided on the same
+# "version" string. Downstream's only recourse was to FORK this file for two lines, which is how it
+# drifted ~1700 lines behind and re-derived an INSERT_RE fix that already existed here.
+#
+# Comma-separated so a repo can carry more than one placeholder (TBD, N/A, -). Unset by default:
+# behaviour is byte-identical to before for every existing install.
+UNSHIPPED_VERSION_TOKENS_KEY = "unshipped_version_tokens"
+PROJECTIONS_KEY = "projections"
+
+# The settings keys an operator may write with `releases settings set`. Deliberately a
+# deny-by-default allowlist: `generation` belongs to the writer protocol and `repo_slug` is the
+# ledger's identity, so exposing either here would be handing out a supported way to corrupt the
+# ledger. A new configurable key is a deliberate addition to this tuple, never an accident.
+CONFIGURABLE_SETTINGS = (UNSHIPPED_VERSION_TOKENS_KEY, PROJECTIONS_KEY)
 
 CRASH_BOUNDARIES = ("pre-commit", "post-commit", "post-stage", "mid-rename", "post-rename")
 
@@ -315,9 +353,6 @@ def artifact_paths(root):
         "db": os.path.join(root, DB_NAME),
         "dump": os.path.join(root, DUMP_NAME),
         "bak": os.path.join(root, DB_BAK_NAME),
-        "gen": os.path.join(root, GEN_NAME),
-        "drift": os.path.join(root, DRIFT_NAME),
-        "ledger": os.path.join(root, LEDGER_NAME),
     }
 
 
@@ -394,14 +429,14 @@ class WriterLock:
 
 # ── DB connection (PRAGMA foreign_keys asserted per connection) ─────────────────────────────────
 
-def connect(db_path, must_exist=True):
+def connect(db_path, must_exist=True, readonly=False):
     if must_exist and not os.path.exists(db_path):
         refuse("not-initialized", "no %s here; run `releases init` first" % DB_NAME)
     # isolation_level=None: transactions are BEGIN/COMMIT'd explicitly by perform_write, so the
     # intent journal -> COMMIT -> stage -> rename ordering is the ONLY ordering that exists.
-    # Separate store (releases ledger) with its own fail-closed policy — autocommit plus an
-    # asserted foreign_keys check the rebalance gateway does not offer.
-    conn = sqlite3.connect(db_path, isolation_level=None)  # GATEWAY-OK: own store, own fail-closed policy (GH-136)
+    location = ("file:%s?mode=ro" % urllib.parse.quote(os.path.abspath(db_path), safe="/")
+                if readonly else db_path)
+    conn = sqlite3.connect(location, isolation_level=None, uri=readonly)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
@@ -414,6 +449,21 @@ def connect(db_path, must_exist=True):
 def get_setting(conn, key, default=None):
     row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else default
+
+
+def unshipped_version_tokens(conn):
+    """The configured placeholders that mean "no version yet" (GH-525).
+
+    Returns a set, empty when the setting is absent — and an empty set is what keeps this
+    inert for every install that never opts in. Entries are trimmed and compared
+    case-sensitively: `TBD` is a literal token in a hand-maintained ledger, not a word to be
+    normalised, and accepting `tbd` would quietly widen what counts as "unshipped". Blank
+    entries are dropped so a trailing comma cannot turn the empty string into a placeholder —
+    an empty `Release:` value stays a malformed ledger, refused as it always was."""
+    raw = get_setting(conn, UNSHIPPED_VERSION_TOKENS_KEY)
+    if not raw:
+        return set()
+    return {token.strip() for token in raw.split(",") if token.strip()}
 
 
 def get_generation(conn):
@@ -583,8 +633,8 @@ CREATE INDEX idx_gf_import ON grandfather_entries(import_run);
 
 
 MIGRATION_002_DDL = """
-CREATE TABLE IF NOT EXISTS roadmap_items (  -- GH-69 shadow: mirrors ROADMAP.md's ledger. During
-  id INTEGER PRIMARY KEY,                   -- the shadow phase ROADMAP.md is the ONLY thing humans
+CREATE TABLE IF NOT EXISTS roadmap_items (  -- GH-69/GH-269: roadmap ledger.
+  id INTEGER PRIMARY KEY,                   --
   global_id TEXT NOT NULL UNIQUE {rmi_gid}, -- edit; `releases roadmap sync` mirrors it here. Rows
   repo_id INTEGER NOT NULL REFERENCES repos(id),  -- follow the GH-32 grammar (GID-keyed, no
   gh_number INTEGER,                        -- integer ids as dump values), so merges and rebuilds
@@ -840,6 +890,122 @@ def _migration_005(conn):
                      % (name, column, column, column, column, column))
 
 
+MIGRATION_008_DDL = """
+CREATE TABLE IF NOT EXISTS work_events (
+  id INTEGER PRIMARY KEY,
+  global_id TEXT NOT NULL UNIQUE {wev_gid},
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  gh_number INTEGER,
+  txn_id TEXT NOT NULL,
+  event TEXT NOT NULL,
+  payload TEXT,
+  at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_work_events_gh ON work_events(gh_number);
+CREATE TABLE IF NOT EXISTS connector_cursors (
+  connector TEXT PRIMARY KEY,
+  last_event_id INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at TEXT,
+  last_error TEXT,
+  updated_at TEXT NOT NULL
+);
+"""
+
+
+def _migration_008(conn):
+    """GH-549: work_events (append-only projection provenance) + connector_cursors (device-local).
+
+    The two tables are deliberately asymmetric, and the asymmetry is the whole design:
+
+    * `work_events` is written INSIDE perform_write's transaction, so it is emitted in the
+      canonical dump under the include_receipts guard and is therefore visible to `check`'s
+      byte comparison at cmd_check (dump-divergence) but NOT to business_digest.
+    * `connector_cursors` is written AFTER the transaction commits, by the dispatcher, once
+      connectors finish. It is therefore excluded from dump_text entirely. Putting it in the
+      dump would make releases.sql disagree with the DB the moment any connector ran, and the
+      next `releases check` would fail dump-divergence on a healthy repo.
+
+    TRANSACTION-SAFE: the table/index DDL goes through _ddl_statements(), and the two
+    append-only triggers are issued as individual execute() calls because _ddl_statements
+    refuses trigger bodies (their BEGIN...END contains its own semicolons). Same shape as
+    migration 004/005.
+
+    Idempotent by IF NOT EXISTS on the tables and by _has_trigger on the triggers.
+    """
+    ddl = MIGRATION_008_DDL.format(wev_gid=_gid_check("global_id", "wev-"))
+    for statement in _ddl_statements(ddl):
+        conn.execute(statement)
+    # Append-only, mirroring op_receipts' pair. These govern ROW MUTATION only: DROP TABLE
+    # drops a table's triggers with it (see the manifest migration's own note).
+    if not _has_trigger(conn, "work_events_no_update"):
+        conn.execute("""CREATE TRIGGER work_events_no_update BEFORE UPDATE ON work_events
+                          BEGIN SELECT RAISE(ABORT, 'work_events is append-only'); END""")
+    if not _has_trigger(conn, "work_events_no_delete"):
+        conn.execute("""CREATE TRIGGER work_events_no_delete BEFORE DELETE ON work_events
+                          BEGIN SELECT RAISE(ABORT, 'work_events is append-only'); END""")
+
+
+MIGRATION_006_DDL = """
+CREATE TABLE IF NOT EXISTS jog_queue (
+  id INTEGER PRIMARY KEY,
+  global_id TEXT NOT NULL UNIQUE {jog_gid},
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  gh_number INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'parked', 'failed', 'dropped', 'archived')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  lease_pid INTEGER,
+  failure_reason TEXT,
+  UNIQUE (repo_id, gh_number)
+);
+CREATE INDEX IF NOT EXISTS idx_jog_queue_repo_pos ON jog_queue(repo_id, position);
+CREATE INDEX IF NOT EXISTS idx_jog_queue_status ON jog_queue(status);
+"""
+
+
+def _ensure_jog_schema(conn, stamp=True):
+    """Apply migration 006 idempotently."""
+    ddl = MIGRATION_006_DDL.format(jog_gid=_gid_check("global_id", "jog-"))
+    for statement in _ddl_statements(ddl):
+        conn.execute(statement)
+    if stamp and conn.execute("SELECT 1 FROM schema_migrations WHERE version = 6").fetchone() is None:
+        conn.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (6, ?)",
+                     (now_iso(),))
+
+
+def _migration_006(conn):
+    """GH-259: Add dedicated jog_queue table for serial execution."""
+    _ensure_jog_schema(conn, stamp=False)
+
+
+def _migration_007(conn):
+    """GH-355: Add updated_at modification timestamps to remaining tables.
+
+    Only roadmap_items and jog_queue previously carried updated_at; adding updated_at to
+    releases, manifest_items, marathons, repos, settings, issue_refs, doc_lines, legacy_lines,
+    and grandfather_entries allows consumers to detect changes and staleness across the ledger.
+    """
+    stamp = now_iso()
+    tables = ("releases", "manifest_items", "marathons", "repos", "settings", "issue_refs",
+              "doc_lines", "legacy_lines", "grandfather_entries")
+    for table in tables:
+        if _table_exists(conn, table) and not _has_column(conn, table, "updated_at"):
+            conn.execute("ALTER TABLE %s ADD COLUMN updated_at TEXT" % table)
+            if table == "issue_refs" and _has_column(conn, table, "created_at"):
+                conn.execute("UPDATE issue_refs SET updated_at = COALESCE(created_at, ?)", (stamp,))
+            elif table == "marathons" and _has_column(conn, table, "created_at"):
+                conn.execute("UPDATE marathons SET updated_at = COALESCE(created_at, ?)", (stamp,))
+            elif table == "releases":
+                conn.execute("UPDATE releases SET updated_at = COALESCE(shipped_date, baseline_at, ?)", (stamp,))
+            elif table == "manifest_items":
+                conn.execute("UPDATE manifest_items SET updated_at = COALESCE(dialed_in_at, ?)", (stamp,))
+            else:
+                conn.execute("UPDATE %s SET updated_at = ?" % table, (stamp,))
+
+
+
 # The migration REGISTRY is the truth (GH-111). apply/rebuild stamp exactly the versions
 # present here — never a hard-coded range — so a deliberate gap (e.g. GH-111's 004 landing
 # before GH-108's 003) yields a ledger of {1,2,4} rather than a false claim to 3. Pending
@@ -850,13 +1016,25 @@ def _migration_005(conn):
 # it must never use executescript() or any other implicit-commit API. 001 is exempt because
 # it is reachable only on a fresh database (cmd_init) or a rebuild, never alongside other
 # pending versions on a live ledger.
+def _migration_009(conn):
+    """GH-646: absence is not a historic start; migration deliberately leaves NULL."""
+    if not _has_column(conn, "roadmap_items", "status_label"):
+        conn.execute("ALTER TABLE roadmap_items ADD COLUMN status_label TEXT "
+                     "CHECK(status_label IS NULL OR status_label = 'in-progress')")
+
+
 MIGRATIONS = {
     1: {"apply": lambda conn: conn.executescript(MIGRATION_001), "txn_safe": False},
     2: {"apply": lambda conn: _ensure_roadmap_schema(conn, stamp=False), "txn_safe": True},
     3: {"apply": _migration_003, "txn_safe": True},
     4: {"apply": _migration_004, "txn_safe": True},
     5: {"apply": _migration_005, "txn_safe": True},
+    6: {"apply": _migration_006, "txn_safe": True},
+    7: {"apply": _migration_007, "txn_safe": True},
+    8: {"apply": _migration_008, "txn_safe": True},
+    9: {"apply": _migration_009, "txn_safe": True},
 }
+
 
 
 def registry_versions():
@@ -932,22 +1110,43 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
     _emit(w, "schema_migrations", ["version", "applied_at"],
           _rows(conn, "SELECT version, applied_at FROM schema_migrations ORDER BY version"))
 
-    settings_sql = "SELECT key, value FROM settings"
+    settings_cols = ["key", "value"]
+    settings_select = "SELECT key, value{extra} FROM settings"
+    if _has_column(conn, "settings", "updated_at"):
+        settings_cols.append("updated_at")
+        settings_extra = ", updated_at"
+    else:
+        settings_extra = ""
     if not include_generation:
-        settings_sql += " WHERE key != '%s'" % GENERATION_KEY
-    _emit(w, "settings", ["key", "value"], _rows(conn, settings_sql + " ORDER BY key"))
+        settings_select += " WHERE key != '%s'" % GENERATION_KEY
+    _emit(w, "settings", settings_cols, _rows(conn, settings_select.format(extra=settings_extra) + " ORDER BY key"))
 
-    _emit(w, "repos", ["global_id", "slug"],
-          _rows(conn, "SELECT global_id, slug FROM repos ORDER BY id"))
+    repo_cols = ["global_id", "slug"]
+    repo_extra = ""
+    if _has_column(conn, "repos", "updated_at"):
+        repo_cols.append("updated_at")
+        repo_extra = ", updated_at"
+    _emit(w, "repos", repo_cols,
+          _rows(conn, "SELECT global_id, slug%s FROM repos ORDER BY id" % repo_extra))
 
-    _emit(w, "issue_refs", ["global_id", "url", "temp_id", "created_at"],
-          _rows(conn, "SELECT global_id, url, temp_id, created_at FROM issue_refs ORDER BY id"))
+    ref_cols = ["global_id", "url", "temp_id", "created_at"]
+    ref_extra = ""
+    if _has_column(conn, "issue_refs", "updated_at"):
+        ref_cols.append("updated_at")
+        ref_extra = ", updated_at"
+    _emit(w, "issue_refs", ref_cols,
+          _rows(conn, "SELECT global_id, url, temp_id, created_at%s FROM issue_refs ORDER BY id" % ref_extra))
 
-    _emit(w, "marathons", ["global_id", "repo_gid", "tracking_ref_gid", "status", "created_at"],
+    mar_cols = ["global_id", "repo_gid", "tracking_ref_gid", "status", "created_at"]
+    mar_extra = ""
+    if _has_column(conn, "marathons", "updated_at"):
+        mar_cols.append("updated_at")
+        mar_extra = ", m.updated_at"
+    _emit(w, "marathons", mar_cols,
           _rows(conn, """SELECT m.global_id, r.global_id AS repo_gid, t.global_id AS tracking_ref_gid,
-                         m.status, m.created_at
+                         m.status, m.created_at%s
                          FROM marathons m JOIN repos r ON r.id = m.repo_id
-                         JOIN issue_refs t ON t.id = m.tracking_ref_id ORDER BY m.id"""))
+                         JOIN issue_refs t ON t.id = m.tracking_ref_id ORDER BY m.id""" % mar_extra))
 
     # GH-111 appends three baseline fields to the RELEASE record and three membership fields to
     # the MANIFEST ITEM record, both in fixed trailing order. They are emitted only when the
@@ -965,11 +1164,13 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
                     FROM releases rel JOIN repos r ON r.id = rel.repo_id
                     JOIN issue_refs t ON t.id = rel.tracking_ref_id
                     LEFT JOIN marathons mar ON mar.id = rel.marathon_id ORDER BY rel.id"""
+    rel_extra = ""
     if _has_column(conn, "releases", "baseline_count"):
         rel_cols += ["baseline_count", "baseline_at", "baseline_source"]
-        rel_extra = ", rel.baseline_count, rel.baseline_at, rel.baseline_source"
-    else:
-        rel_extra = ""
+        rel_extra += ", rel.baseline_count, rel.baseline_at, rel.baseline_source"
+    if _has_column(conn, "releases", "updated_at"):
+        rel_cols.append("updated_at")
+        rel_extra += ", rel.updated_at"
     _emit(w, "releases", rel_cols, _rows(conn, rel_select.format(extra=rel_extra)))
 
     mfi_cols = ["global_id", "release_gid", "issue_ref_gid", "state"]
@@ -977,14 +1178,16 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
                     t.global_id AS issue_ref_gid, mi.state{extra}
                     FROM manifest_items mi JOIN releases rel ON rel.id = mi.release_id
                     JOIN issue_refs t ON t.id = mi.issue_ref_id{join} ORDER BY mi.id"""
+    mfi_extra, mfi_join = "", ""
     if _has_column(conn, "manifest_items", "dialed_in_at"):
         # marathon_id is an integer FK, and integer FKs never appear as dump VALUES — the row
         # carries its marathon's GID, exactly as the release record does.
         mfi_cols += ["dialed_in_at", "dial_reason", "marathon_gid"]
-        mfi_extra = ", mi.dialed_in_at, mi.dial_reason, mar.global_id AS marathon_gid"
+        mfi_extra += ", mi.dialed_in_at, mi.dial_reason, mar.global_id AS marathon_gid"
         mfi_join = " LEFT JOIN marathons mar ON mar.id = mi.marathon_id"
-    else:
-        mfi_extra, mfi_join = "", ""
+    if _has_column(conn, "manifest_items", "updated_at"):
+        mfi_cols.append("updated_at")
+        mfi_extra += ", mi.updated_at"
     _emit(w, "manifest_items", mfi_cols,
           _rows(conn, mfi_select.format(extra=mfi_extra, join=mfi_join)))
 
@@ -993,20 +1196,33 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
                          FROM manifest_state_events e JOIN manifest_items mi ON mi.id = e.item_id
                          ORDER BY e.id"""))
 
-    _emit(w, "doc_lines", ["repo_gid", "position", "content"],
-          _rows(conn, """SELECT r.global_id AS repo_gid, d.position, d.content
+    doc_cols = ["repo_gid", "position", "content"]
+    doc_extra = ""
+    if _has_column(conn, "doc_lines", "updated_at"):
+        doc_cols.append("updated_at")
+        doc_extra = ", d.updated_at"
+    _emit(w, "doc_lines", doc_cols,
+          _rows(conn, """SELECT r.global_id AS repo_gid, d.position, d.content%s
                          FROM doc_lines d JOIN repos r ON r.id = d.repo_id
-                         ORDER BY d.repo_id, d.position"""))
+                         ORDER BY d.repo_id, d.position""" % doc_extra))
 
-    _emit(w, "legacy_lines", ["release_gid", "position", "content"],
-          _rows(conn, """SELECT rel.global_id AS release_gid, l.position, l.content
+    leg_cols = ["release_gid", "position", "content"]
+    leg_extra = ""
+    if _has_column(conn, "legacy_lines", "updated_at"):
+        leg_cols.append("updated_at")
+        leg_extra = ", l.updated_at"
+    _emit(w, "legacy_lines", leg_cols,
+          _rows(conn, """SELECT rel.global_id AS release_gid, l.position, l.content%s
                          FROM legacy_lines l JOIN releases rel ON rel.id = l.release_id
-                         ORDER BY l.release_id, l.position"""))
+                         ORDER BY l.release_id, l.position""" % leg_extra))
 
+    gf_extra = ""
+    if _has_column(conn, "grandfather_entries", "updated_at"):
+        gf_extra = ", g.updated_at"
     gf_rows = _rows(conn, """SELECT g.import_run, COALESCE(g.release_gid, '(document)') AS rgid,
-                             g.rule, g.source_value, g.supplied_value, g.disposition, g.id AS _id
+                             g.rule, g.source_value, g.supplied_value, g.disposition, g.id AS _id%s
                              FROM grandfather_entries g
-                             ORDER BY g.import_run, COALESCE(g.release_gid, ''), g.rule, g.id""")
+                             ORDER BY g.import_run, COALESCE(g.release_gid, ''), g.rule, g.id""" % gf_extra)
     if gf_rows:
         w("-- table: grandfather_entries (natural key per PRD grammar: import_run + "
           "release_gid-or-(document) + rule + source ordinal)")
@@ -1014,13 +1230,16 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
         for row in gf_rows:
             key = (row["import_run"], row["rgid"], row["rule"])
             ordinal[key] = ordinal.get(key, 0) + 1
-            values = ", ".join(_sql_str(row[c]) for c in
-                               ("import_run", "rgid", "rule", "source_value",
-                                "supplied_value", "disposition"))
+            cols = ["import_run", "rgid", "rule", "source_value", "supplied_value", "disposition"]
+            if _has_column(conn, "grandfather_entries", "updated_at"):
+                cols.append("updated_at")
+            values = ", ".join(_sql_str(row.get(c)) for c in cols)
             w("-- gf-key: %s/%s/%s/%d" % (row["import_run"], row["rgid"], row["rule"],
                                            ordinal[key]))
-            w("INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value, "
-              "supplied_value, disposition) VALUES(%s);" % values)
+            ins_cols = ["import_run", "release_gid", "rule", "source_value", "supplied_value", "disposition"]
+            if _has_column(conn, "grandfather_entries", "updated_at"):
+                ins_cols.append("updated_at")
+            w("INSERT INTO grandfather_entries(%s) VALUES(%s);" % (", ".join(ins_cols), values))
 
     if _table_exists(conn, "roadmap_items"):
         # GH-108's five rating columns are appended in fixed trailing order, emitted only when the
@@ -1041,14 +1260,45 @@ def dump_text(conn, generation, include_receipts=True, include_generation=True):
             rmi_extra = "".join(", ri.%s" % c for c in RATING_COLUMNS)
         else:
             rmi_extra = ""
+        if _has_column(conn, "roadmap_items", "status_label"):
+            rmi_cols.append("status_label")
+            rmi_extra += ", ri.status_label"
         _emit(w, "roadmap_items", rmi_cols, _rows(conn, rmi_select.format(extra=rmi_extra)))
 
+    if _table_exists(conn, "jog_queue"):
+        jq_cols = ["global_id", "repo_gid", "gh_number", "position", "status",
+                   "created_at", "updated_at", "attempt_count", "lease_pid", "failure_reason"]
+        jq_select = """SELECT jq.global_id, r.global_id AS repo_gid, jq.gh_number,
+                       jq.position, jq.status, jq.created_at, jq.updated_at,
+                       jq.attempt_count, NULL AS lease_pid, jq.failure_reason
+                       FROM jog_queue jq JOIN repos r ON r.id = jq.repo_id
+                       ORDER BY jq.position, jq.id"""
+        _emit(w, "jog_queue", jq_cols, _rows(conn, jq_select))
+
+
     if include_receipts:
+
         _emit(w, "op_receipts",
               ["op", "target_gid", "at", "txn_id", "session_id",
                "state_digest_before", "state_digest_after"],
               _rows(conn, "SELECT op, target_gid, at, txn_id, session_id, state_digest_before, "
                           "state_digest_after FROM op_receipts ORDER BY id"))
+        # GH-549: work_events rides with op_receipts, INSIDE this guard, and for the same reason.
+        # It is written in perform_write's transaction (so the dump and the DB always agree, and
+        # cmd_check's byte comparison stays clean) but it is provenance, not business state, so
+        # business_digest — which calls this with include_receipts=False — must not see it.
+        #
+        # connector_cursors is deliberately absent from this function entirely. It is written
+        # AFTER the transaction commits, once connectors finish, so a row here would put
+        # releases.sql out of sync with the DB the moment any connector ran and fail
+        # dump-divergence on a healthy repo.
+        if _table_exists(conn, "work_events"):
+            _emit(w, "work_events",
+                  ["global_id", "repo_gid", "gh_number", "txn_id", "event", "payload", "at"],
+                  _rows(conn, """SELECT we.global_id, r.global_id AS repo_gid, we.gh_number,
+                                 we.txn_id, we.event, we.payload, we.at
+                                 FROM work_events we JOIN repos r ON r.id = we.repo_id
+                                 ORDER BY we.id"""))
     return "\n".join(out) + "\n"
 
 
@@ -1065,16 +1315,6 @@ def dump_generation_from_text(text):
     return None
 
 
-# ── generation marker in the generated file ─────────────────────────────────────────────────────
-# The side-by-side generated file carries the marker as an HTML comment on line 1 (the trio
-# contract needs it there). The real RELEASES.md never carries one — this tool never writes that
-# file, and no header is added during Phase 0 (the header arrives with the Phase 2 flip).
-
-GEN_MARKER_RE = re.compile(r"^<!-- releases-app generation: (\d+) -->$")
-
-
-def gen_marker(generation):
-    return "<!-- releases-app generation: %d -->" % generation
 
 
 # ── staged writes + crash injection ─────────────────────────────────────────────────────────────
@@ -1103,15 +1343,34 @@ def _atomic_write(final_path, content):
 
 # ── the writer protocol (PRD Git story 2-3): journal -> txn -> stage -> rename -> clear ─────────
 
+def projections_enabled(root):
+    """An explicit off setting overrides the older per-file adoption signal."""
+    db = os.path.join(root, DB_NAME)
+    if not os.path.isfile(db):
+        return True
+    try:
+        conn = connect(db)
+        try:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (PROJECTIONS_KEY,)).fetchone()
+        finally:
+            conn.close()
+        return row is None or row[0] != "off"
+    except sqlite3.Error:
+        return True
+
+
 def refresh_preview(root):
     """GH-106: after a successful write, refresh the baked viewer artifacts — but only the ones
-    the repo has ADOPTED (the file already exists at root; presence is the opt-in signal, so
+    the repo has ADOPTED (the file already exists at root and `projections` is not `off`; presence
+    remains the default opt-in signal, so
     fixtures and non-adopting repos are silent no-ops). Best-effort by design: the write is
     already durable with its receipt when this runs, so a refresh failure WARNS on stderr and
     never fails the operation. Success is silent (the exporter's stdout is captured).
 
     GH-108 adds LEADERBOARD.html on the same terms — one template, two baked artifacts, both
     regenerated by the same hook so a ranking can never lag the ledger it ranks."""
+    if not projections_enabled(root):
+        return
     exporter = os.path.join(root, "utils", "timeline", "export_timeline.py")
     if not os.path.exists(exporter):
         return
@@ -1130,33 +1389,290 @@ def refresh_preview(root):
         except Exception as exc:  # never let a rendered artifact break a committed write
             print("warning: %s refresh failed (the write itself is committed): %s"
                   % (name, exc), file=sys.stderr)
-    # LEADERBOARD.md rides the same adoption signal — generated, never hand-edited.
-    board = os.path.join(root, "LEADERBOARD.md")
-    script = os.path.join(root, "utils", "leaderboard.sh")
-    if os.path.exists(board) and os.path.exists(script):
+
+
+# ── GH-549: work-state events ───────────────────────────────────────────────────────────────────
+#
+# perform_write() is handed only (op, target_gid, mutate). It does NOT receive the issue number,
+# and it cannot see the marker a roadmap-update just wrote — so a plain op->event table is not
+# implementable. Each mapped op instead names an EXTRACTOR: run after mutate(), inside the same
+# transaction, given (conn, op, target_gid), returning (event, gh_number, payload_dict) or None.
+#
+# Returning None means "no row from me". For `work-emit` that is deliberate and load-bearing: its
+# own mutate already inserted the row, and the seam inserts only for a tuple, so None there means
+# "already written", never "no event". One `work emit` therefore yields exactly one row.
+#
+# The registry is TOTAL. Every op reachable from a perform_write caller is either mapped here or
+# named in NON_EVENT_OPS with a reason. test/gh549-work-events.sh derives the op inventory from
+# this source file and fails when one is neither — so a new verb cannot silently drop a state.
+
+NON_EVENT_OPS = {
+    "import":                  "legacy RELEASES.md import; historical rows, not live work",
+    "add":                     "release object, not an issue's work state",
+    "update":                  "release field edit",
+    "baseline":                "release provenance capture",
+    "ship":                    "release shipped; issue-level state comes from its manifest items",
+    "manifest-add":            "manifest bookkeeping, not an issue state change",
+    "manifest-ship":           "covered by the issue's own roadmap transition",
+    "manifest-marathon":       "attaches a marathon; no work-state change",
+    "manifest-cut":            "manifest bookkeeping",
+    "manifest-unship":         "manifest bookkeeping",
+    "marathon-add":            "creates a marathon container, not issue work",
+    "settings-set":            "ledger configuration",
+    "roadmap-repoint":         "moves a doc path; the work state is unchanged",
+    "roadmap-sync":            "no-op in releases-mode repos",
+    "roadmap-reconcile-state": "sweeps markers; the per-row updates emit on their own",
+    "reconcile":               "wave bookkeeping; a merge is proven by the merge emitter, not here",
+    "jog-add":                 "emits an explicit pending transition for the changed queue row",
+    "jog-bump":                "reprioritisation within the queue",
+    "jog-clear":               "emits its changed rows explicitly as one atomic batch",
+    "jog-reconcile":           "emits its changed orphan rows explicitly as one atomic batch",
+    "migrate":                 "schema change",
+    "merge-rebuild":           "rebuild receipt",
+    "work-emit":               "carries its own event explicitly (perform_write's work_event arg)",
+}
+
+
+def _repo_id_for_event(conn):
+    row = conn.execute("SELECT id FROM repos ORDER BY id LIMIT 1").fetchone()
+    return row["id"] if row else None
+
+
+def _roadmap_row(conn, gid):
+    return conn.execute("SELECT repo_id, gh_number, status_marker, section, rating_pri, rating_sev, "
+                        "rating_appeal, rating_effort FROM roadmap_items WHERE global_id = ?",
+                        (gid,)).fetchone()
+
+
+def _extract_roadmap_add(conn, op, gid):
+    row = _roadmap_row(conn, gid)
+    if row is None:
+        return None
+    return ("parked", row["gh_number"], {"section": row["section"]}, row["repo_id"])
+
+
+def _extract_roadmap_rate(conn, op, gid):
+    row = _roadmap_row(conn, gid)
+    if row is None:
+        return None
+    return ("rated", row["gh_number"],
+            {"rated": "%s/%s/%s/%s" % (row["rating_pri"], row["rating_sev"],
+                                       row["rating_appeal"], row["rating_effort"])},
+            row["repo_id"])
+
+
+def _live_roadmap_event(section, marker, rated):
+    """Classify a live roadmap transition. Terminal sections outrank stale markers."""
+    sec = (section or "").strip().lower()
+    if sec.startswith("deferred"):
+        return "deferred"
+    if sec.startswith("completed"):
+        return "completed"
+    if marker == "\U0001F6A7" or sec.startswith("in progress"):
+        return "in_flight"
+    return "rated" if rated else "parked"
+
+
+def _extract_roadmap_update(conn, op, gid, previous=None):
+    """Classify only an actual lifecycle transition; metadata edits remain informational."""
+    row = _roadmap_row(conn, gid)
+    if row is None:
+        return None
+    marker = row["status_marker"] or ""
+    accepted = bool(previous and previous.get("accepted_start")) if isinstance(previous, dict) else False
+    # Appearance is not new authority: an active section/marker may change while
+    # the lifecycle stays active. Only a classified transition or explicit
+    # accepted-start witness may replace the original lifecycle id/time.
+    changed = accepted or previous is not None and (
+        _live_roadmap_event(previous["section"], previous["status_marker"], False)
+        != _live_roadmap_event(row["section"], marker, False)
+    )
+    if not changed:
+        return ("updated", row["gh_number"], {
+            "source": "roadmap-update", "transition": False,
+            "marker": marker, "section": row["section"],
+        }, row["repo_id"])
+    event = _live_roadmap_event(row["section"], marker,
+                                row["rating_pri"] is not None)
+    payload = {
+        "source": "roadmap-update", "transition": True,
+        "marker": marker, "section": row["section"],
+    }
+    if accepted:
+        payload["accepted_start"] = True
+    return (event, row["gh_number"], payload, row["repo_id"])
+
+
+def _jog_work_event(row, status, event=None):
+    return (event or "jog_%s" % status, row["gh_number"],
+            {"source": "jog", "transition": True, "status": status,
+             "jog_global_id": row["global_id"]}, row["repo_id"])
+
+
+def _extract_jog(conn, op, gid):
+    if isinstance(gid, str) and gid.startswith("GH-"):
         try:
-            r = subprocess.run(["bash", script], cwd=root, capture_output=True, text=True,
-                               timeout=60)
-            if r.returncode != 0:
-                print("warning: LEADERBOARD.md refresh failed (the write itself is committed): %s"
-                      % (r.stderr.strip() or "exit %d" % r.returncode), file=sys.stderr)
-        except Exception as exc:
-            print("warning: LEADERBOARD.md refresh failed (the write itself is committed): %s"
-                  % exc, file=sys.stderr)
+            gh_number = int(gid[3:])
+        except ValueError:
+            refuse("jog-event-identity", "invalid jog receipt target %r" % gid)
+        rows = conn.execute(
+            "SELECT global_id, repo_id, gh_number, status FROM jog_queue "
+            "WHERE gh_number = ? LIMIT 2", (gh_number,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT global_id, repo_id, gh_number, status FROM jog_queue "
+            "WHERE global_id = ? LIMIT 2", (gid,)).fetchall()
+    if not rows:
+        return None
+    if len(rows) != 1:
+        refuse("jog-event-identity",
+               "jog target %r matches multiple repositories; refusing event ownership guess"
+               % gid)
+    row = rows[0]
+    event = "in_flight" if op == "jog-lease" else None
+    return _jog_work_event(row, row["status"], event=event)
 
 
-def perform_write(root, conn, op, target_gid, mutate):
+WORK_EVENT_EXTRACTORS = {
+    "roadmap-add":    _extract_roadmap_add,
+    "roadmap-rate":   _extract_roadmap_rate,
+    "roadmap-update": _extract_roadmap_update,
+    "jog-lease":      _extract_jog,
+    "jog-drop":       _extract_jog,
+    "jog-retry":      _extract_jog,
+    "jog-skip":       _extract_jog,
+}
+
+JOG_STATUS_PREFIX = "jog-"
+
+
+def extractor_for(op):
+    """Resolve an op to its extractor, or None when the op is allowlisted as non-eventful.
+
+    Raises KeyError for an op that is neither — the coverage test relies on that being loud."""
+    if op in WORK_EVENT_EXTRACTORS:
+        return WORK_EVENT_EXTRACTORS[op]
+    if op in NON_EVENT_OPS:
+        return None
+    if op.startswith(JOG_STATUS_PREFIX):
+        # jog_set_status computes f"jog-{status}"; the family is mapped as a whole.
+        return _extract_jog
+    raise KeyError("op %r is neither mapped to a work-event extractor nor in NON_EVENT_OPS" % op)
+
+
+def _record_work_event(conn, op, target_gid, txn_id, at, explicit=None, previous=None):
+    """Insert at most one work_events row, inside perform_write's open transaction.
+
+    `explicit` is an (event, gh_number, payload[, repo_id]) tuple supplied by a caller that already
+    knows its event — `work emit`, which reports something no extractor could derive, such as a
+    merge it witnessed. The optional repo_id keeps multi-repo batch events on their source row.
+    It takes precedence over the registry and is why `work-emit` needs no
+    extractor of its own. Writing the row HERE rather than in the caller's mutate is what gets
+    it the real txn_id: the id is minted inside this transaction, and work_events is append-only,
+    so a caller cannot stamp it afterwards.
+    """
+    # Order matters for the WRITER LOCK, not just for tidiness. This runs inside
+    # perform_write's transaction, so every query here lengthens the critical section that
+    # concurrent-writer suites (gh57-releases-fuzz, jog-queue) race against. Resolve the op
+    # from the in-memory registry FIRST — a dict lookup — and only touch sqlite_master for the
+    # writes that will actually emit. 22 of the 27 ops are non-eventful, so the common path now
+    # costs one dict lookup instead of a schema query.
+    if explicit is None:
+        try:
+            if extractor_for(op) is None:
+                return None
+        except KeyError:
+            # An unclassified op must not break a ledger write in production; the coverage test
+            # is where this fails, loudly, before it ships.
+            return None
+    if not _table_exists(conn, "work_events"):
+        return None
+    if explicit is not None:
+        if len(explicit) == 4:
+            event, gh_number, payload, repo_id = explicit
+        else:
+            event, gh_number, payload = explicit
+            repo_id = _repo_id_for_event(conn)
+        if repo_id is None:
+            return None
+        conn.execute("""INSERT INTO work_events(global_id, repo_id, gh_number, txn_id, event,
+                        payload, at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                     (new_gid("wev-"), repo_id, gh_number, txn_id, event,
+                      json.dumps(payload, sort_keys=True) if payload is not None else None, at))
+        return event
+    extractor = extractor_for(op)   # already validated above; cannot raise here
+    result = (extractor(conn, op, target_gid, previous)
+              if op == "roadmap-update" else extractor(conn, op, target_gid))
+    if result is None:
+        return None
+    if len(result) == 4:
+        event, gh_number, payload, repo_id = result
+    else:
+        event, gh_number, payload = result
+        repo_id = _repo_id_for_event(conn)
+    if repo_id is None:
+        return None
+    conn.execute("""INSERT INTO work_events(global_id, repo_id, gh_number, txn_id, event,
+                    payload, at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                 (new_gid("wev-"), repo_id, gh_number, txn_id, event,
+                  json.dumps(payload, sort_keys=True) if payload is not None else None, at))
+    return event
+
+
+def _dispatch_work_connectors(db_path, at):
+    """Post-lock, post-commit connector dispatch. Swallows everything by design (GH-549).
+
+    The ledger row is already durable before this runs. A connector that raises, hangs, or
+    cannot even be imported must not change the host verb's exit code — so the import itself
+    is inside the try, and BaseException is caught rather than Exception.
+    """
+    if os.environ.get("XYZ_WORK_CONNECTORS") == "0":
+        return {}
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import work_connectors
+        return work_connectors.dispatch(db_path, at)
+    except BaseException as exc:        # noqa: BLE001 - deliberate; see the docstring
+        try:
+            print("releases: work connectors skipped (%r)" % (exc,), file=sys.stderr)
+        except Exception:
+            pass
+        return {}
+
+
+def _sync_status_labels(conn, before, op, target_gid, accepted_start=False):
+    """One field-maintenance seam, including multi-row sweep/sync mutations."""
+    for row in conn.execute("SELECT * FROM roadmap_items").fetchall():
+        old = before.get(row["global_id"])
+        state = _live_roadmap_event(row["section"], row["status_marker"], False)
+        label = old["status_label"] if old else None
+        if state != "in_flight":
+            label = None
+        elif (op == "roadmap-update" and row["global_id"] == target_gid
+              and accepted_start):
+            label = "in-progress"
+        if label != row["status_label"]:
+            conn.execute("UPDATE roadmap_items SET status_label = ? WHERE global_id = ?",
+                         (label, row["global_id"]))
+
+
+def perform_write(root, conn, op, target_gid, mutate, work_event=None, work_events=None,
+                  accepted_start=False):
     """Run one CLI transaction under the full multi-artifact protocol:
 
       write intent journal (txn_id, NEXT generation, planned outputs)   [BEFORE the DB commit]
       -> BEGIN IMMEDIATE -> mutate -> stamp generation into settings -> COMMIT
-      -> stage dump (+ generated view when one exists), each carrying that generation
+      -> stage dump carrying that generation
       -> atomic renames -> clear journal.
 
     `mutate(conn)` does the business writes; the op_receipt (before/after business-state digests)
     is appended HERE so no writer can forget it. Recovery per boundary is `check`'s job
     (recover_from_journal); RELEASES_APP_CRASH_AT lands on the five named boundaries. The caller
     must NOT hold the writer lock (this function takes it)."""
+    if op.startswith("jog-"):
+        _require_jog_primary(root)
+    if work_event is not None and work_events is not None:
+        raise ValueError("work_event and work_events are mutually exclusive")
     paths = artifact_paths(root)
     lock = WriterLock(root)
     lock.acquire()
@@ -1169,8 +1685,6 @@ def perform_write(root, conn, op, target_gid, mutate):
         generation = get_generation(conn) + 1
         txn_id = new_txn_id()
         planned = [paths["dump"]]
-        if os.path.exists(paths["gen"]):
-            planned.append(paths["gen"])
 
         journal = {
             "app": APP, "txn_id": txn_id, "session_id": session_id(), "op": op,
@@ -1182,7 +1696,43 @@ def perform_write(root, conn, op, target_gid, mutate):
         digest_before = business_digest(conn)
         conn.execute("BEGIN IMMEDIATE")
         try:
+            previous = (_roadmap_row(conn, target_gid)
+                        if op == "roadmap-update" and target_gid is not None else None)
+            labels_ready = _has_column(conn, "roadmap_items", "status_label")
+            before_rows = ({r["global_id"]: dict(r) for r in conn.execute(
+                "SELECT * FROM roadmap_items")} if labels_ready else {})
             mutate(conn)
+            if labels_ready:
+                _sync_status_labels(conn, before_rows, op, target_gid, accepted_start)
+            if accepted_start and previous is not None:
+                previous = dict(previous, accepted_start=True)
+            now = now_iso()
+            if _has_column(conn, "settings", "updated_at"):
+                cur = conn.execute("UPDATE settings SET value = ?, updated_at = ? WHERE key = ?",
+                                   (str(generation), now, GENERATION_KEY))
+                if cur.rowcount == 0:
+                    conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)",
+                                 (GENERATION_KEY, str(generation), now))
+            else:
+                cur = conn.execute("UPDATE settings SET value = ? WHERE key = ?",
+                                   (str(generation), GENERATION_KEY))
+                if cur.rowcount == 0:
+                    conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
+                                 (GENERATION_KEY, str(generation)))
+            digest_after = business_digest(conn)
+            conn.execute("""INSERT INTO op_receipts(op, target_gid, at, txn_id, session_id,
+                             state_digest_before, state_digest_after)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                         (op, target_gid, now, txn_id, session_id(),
+                          digest_before, digest_after))
+            if work_events is not None:
+                for explicit in work_events:
+                    _record_work_event(conn, op, target_gid, txn_id, now, explicit=explicit)
+            else:
+                _record_work_event(conn, op, target_gid, txn_id, now,
+                                   explicit=work_event, previous=previous)
+            _crash("pre-commit")
+            conn.commit()
         except BaseException:
             # a refused/mutating error never leaves a live journal behind: the DB rolled back,
             # so there is nothing to recover — clear the journal and re-raise. (An injected
@@ -1196,36 +1746,30 @@ def perform_write(root, conn, op, target_gid, mutate):
             except OSError:
                 pass
             raise
-        cur = conn.execute("UPDATE settings SET value = ? WHERE key = ?",
-                           (str(generation), GENERATION_KEY))
-        if cur.rowcount == 0:
-            conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
-                         (GENERATION_KEY, str(generation)))
-        digest_after = business_digest(conn)
-        conn.execute("""INSERT INTO op_receipts(op, target_gid, at, txn_id, session_id,
-                         state_digest_before, state_digest_after)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                     (op, target_gid, now_iso(), txn_id, session_id(),
-                      digest_before, digest_after))
-        _crash("pre-commit")
-        conn.commit()
         _crash("post-commit")
 
         staged = [(_stage_write(paths["dump"], dump_text(conn, generation)), paths["dump"])]
-        if os.path.exists(paths["gen"]):
-            staged.append((_stage_write(paths["gen"],
-                                        gen_marker(generation) + "\n" + render_ledger(conn)),
-                           paths["gen"]))
         _crash("post-stage")
 
-        for i, (tmp, final) in enumerate(staged):
+        for tmp, final in staged:
             os.replace(tmp, final)
-            if i == 0 and len(staged) > 1:
-                _crash("mid-rename")
+            _crash("mid-rename")
         _crash("post-rename")
 
         os.unlink(lock.journal_path)
         refresh_preview(root)  # GH-106: adoption-gated, best-effort — after full durability
+
+        # ── GH-549: the one dispatch seam ───────────────────────────────────────────────────
+        # Release the writer lock EXPLICITLY here, before dispatching. A governance writer must
+        # never hold the lock across connector network time. WriterLock.release() is idempotent
+        # (it acts only while self.fh is not None), so the `finally` below stays correct as the
+        # failure path and becomes a no-op on this success path.
+        #
+        # Dispatch lives HERE, inside perform_write, rather than in each cmd_* caller. Moving it
+        # to the callers would trade one audited seam for 29 independently correct call sites,
+        # and nothing would catch a caller that simply never dispatched.
+        lock.release()
+        _dispatch_work_connectors(paths["db"], now)
         return txn_id
     finally:
         lock.release()
@@ -1282,8 +1826,6 @@ def perform_migration(root, conn):
         generation = get_generation(conn) + 1
         txn_id = new_txn_id()
         planned = [paths["dump"]]
-        if os.path.exists(paths["gen"]):
-            planned.append(paths["gen"])
         journal = {
             "app": APP, "txn_id": txn_id, "session_id": session_id(), "op": "migrate",
             "generation": generation, "planned_outputs": planned, "db": paths["db"],
@@ -1302,11 +1844,19 @@ def perform_migration(root, conn):
                        "the migrated schema has %d foreign-key violation(s) (first: %s); the "
                        "migration is rolled back and the ledger is untouched"
                        % (len(violations), tuple(violations[0])))
-            cur = conn.execute("UPDATE settings SET value = ? WHERE key = ?",
-                               (str(generation), GENERATION_KEY))
-            if cur.rowcount == 0:
-                conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
-                             (GENERATION_KEY, str(generation)))
+            now = now_iso()
+            if _has_column(conn, "settings", "updated_at"):
+                cur = conn.execute("UPDATE settings SET value = ?, updated_at = ? WHERE key = ?",
+                                   (str(generation), now, GENERATION_KEY))
+                if cur.rowcount == 0:
+                    conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)",
+                                 (GENERATION_KEY, str(generation), now))
+            else:
+                cur = conn.execute("UPDATE settings SET value = ? WHERE key = ?",
+                                   (str(generation), GENERATION_KEY))
+                if cur.rowcount == 0:
+                    conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
+                                 (GENERATION_KEY, str(generation)))
             digest_after = business_digest(conn)
             conn.execute("""INSERT INTO op_receipts(op, target_gid, at, txn_id, session_id,
                              state_digest_before, state_digest_after)
@@ -1326,15 +1876,10 @@ def perform_migration(root, conn):
         _crash("post-commit")
 
         staged = [(_stage_write(paths["dump"], dump_text(conn, generation)), paths["dump"])]
-        if os.path.exists(paths["gen"]):
-            staged.append((_stage_write(paths["gen"],
-                                        gen_marker(generation) + "\n" + render_ledger(conn)),
-                           paths["gen"]))
         _crash("post-stage")
-        for i, (tmp, final) in enumerate(staged):
+        for tmp, final in staged:
             os.replace(tmp, final)
-            if i == 0 and len(staged) > 1:
-                _crash("mid-rename")
+            _crash("mid-rename")
         _crash("post-rename")
         os.unlink(lock.journal_path)
         refresh_preview(root)
@@ -1358,8 +1903,8 @@ def recover_from_journal(root, conn):
     """Per-boundary crash recovery (PRD Git story 3), run by `check` (which holds the writer
     lock — this function must not take it again). pre-COMMIT (DB generation < journal's):
     discard stage remnants, clear the journal — the DB never changed. post-COMMIT, any later
-    boundary (DB generation == journal's): the DB is truth; REGENERATE the dump and generated
-    view from the DB state (staged files, present or missing, are disposable — they are
+    boundary (DB generation == journal's): the DB is truth; REGENERATE the dump from the
+    DB state (staged files, present or missing, are disposable — they are
     derivable), complete the renames, clear the journal — the committed operation is never
     discarded."""
     paths = artifact_paths(root)
@@ -1410,8 +1955,6 @@ def recover_from_journal(root, conn):
         return ("discarded", txn_id)
     if db_gen == jgen:
         _atomic_write(paths["dump"], dump_text(conn, db_gen))
-        if os.path.exists(paths["gen"]):
-            _atomic_write(paths["gen"], gen_marker(db_gen) + "\n" + render_ledger(conn))
         os.unlink(journal_path)
         audit_log(root, "recovered",
                   "post-COMMIT crash completed (txn %s, gen %d); committed operation preserved"
@@ -1487,129 +2030,9 @@ def _normalize_status(raw):
     return "active", True
 
 
-# ── generator: the pinned normalized rendering (PRD Generator contract) ─────────────────────────
-# Canonical field order and spellings are defined HERE, once. Consumers parse fields, not bytes;
-# lossless preservation lives in doc_lines/legacy_lines, both re-rendered verbatim in order until
-# dispositioned. `Manifest-Members:` is generated from manifest_items when they exist (imported
-# bare numbers stay in legacy_lines verbatim instead). `Status: Shipped` normalizes to the enum;
-# the generator renders the canonical capitalized spelling.
-
-def render_ledger(conn):
-    out = []
-
-    def w(s=""):
-        out.append(s)
-
-    for row in conn.execute("""SELECT d.content FROM doc_lines d JOIN repos r ON r.id = d.repo_id
-                               ORDER BY d.repo_id, d.position"""):
-        w(row["content"])
-
-    first = True
-    for rel in conn.execute("""SELECT rel.*, t.url AS tracking_url, t.temp_id AS tracking_temp
-                               FROM releases rel JOIN issue_refs t ON t.id = rel.tracking_ref_id
-                               ORDER BY rel.id""").fetchall():
-        if not first:
-            w()
-        first = False
-        w("Release: %s" % (rel["version"] if rel["version"] else "(unversioned)"))
-        w("Status: %s" % STATUS_RENDER[rel["status"]])
-        if rel["shipped_date"]:
-            w("Shipped: %s" % rel["shipped_date"])
-        if rel["target_date"]:
-            w("Target Date: %s" % rel["target_date"])
-        if rel["codename"]:
-            w("Codename: %s" % rel["codename"])
-        if rel["description"]:
-            w("Description: %s" % rel["description"])
-        if rel["exit_criterion"]:
-            w("Exit criterion: %s" % rel["exit_criterion"])
-        members = conn.execute("""SELECT t.url, t.temp_id FROM manifest_items mi
-                                  JOIN issue_refs t ON t.id = mi.issue_ref_id
-                                  WHERE mi.release_id = ? ORDER BY mi.id""",
-                               (rel["id"],)).fetchall()
-        if members:
-            nums = [ (m["url"] or "").rsplit("/", 1)[-1] or (m["temp_id"] or "?") for m in members ]
-            w("Manifest-Members: %s" % " ".join(nums))
-        if rel["gh_release_url"]:
-            w("GH_URL: %s" % rel["gh_release_url"])
-        if rel["tracking_url"]:
-            w("Tracking Issue: %s" % rel["tracking_url"])
-        elif rel["tracking_temp"]:
-            w("Tracking Issue: %s" % rel["tracking_temp"])
-        if rel["milestone"]:
-            w("Milestone: %s" % rel["milestone"])
-        if rel["front_door_reviewed"]:
-            w("Front-door reviewed: %s" % rel["front_door_reviewed"])
-        if rel["shakedown_reviewed"]:
-            w("Shakedown reviewed: %s" % rel["shakedown_reviewed"])
-        if rel["license_file"]:
-            w("License file: %s" % rel["license_file"])
-        for ll in conn.execute("""SELECT content FROM legacy_lines l
-                                  WHERE l.release_id = ? ORDER BY l.position""",
-                               (rel["id"],)).fetchall():
-            w(ll["content"])
-    return "\n".join(out) + "\n"
-
-
-def write_drift_report(root, conn):
-    """Side-by-side drift report (Phase 0 sole-writer evidence): compares the DB-backed view
-    against the real RELEASES.md. A hand-edit during the measured window is visible here, and
-    each one resets the sole-writer clock (PRD Phase 0). A stale real file after CLI writes is
-    EXPECTED in Phase 0 — the flip is Phase 2 — so direction matters and is labeled."""
-    paths = artifact_paths(root)
-    lines = ["releases-app drift report (GH-32 Phase 0, side-by-side)",
-             "generated: %s" % now_iso(),
-             "real ledger: %s (READ-ONLY — never written by this tool)" % paths["ledger"],
-             ""]
-    if not os.path.exists(paths["ledger"]):
-        lines.append("no real RELEASES.md present — nothing to drift against")
-        _atomic_write(paths["drift"], "\n".join(lines) + "\n")
-        return
-    doc, blocks = parse_legacy_ledger(paths["ledger"])
-    db_rows = {r["version"]: r for r in conn.execute("SELECT * FROM releases ORDER BY id")}
-    db_versions = set(db_rows)
-    file_versions = {b["fields"]["Release"][0] for b in blocks if b["fields"].get("Release")}
-
-    hand_edits = 0
-    only_db = sorted(v for v in (db_versions - file_versions) if v)
-    only_file = sorted(v for v in (file_versions - db_versions) if v)
-    if only_db:
-        lines.append("[stale-file] in the DB but not in RELEASES.md (expected after CLI writes; "
-                     "the real file is refreshed only at the Phase 2 flip): %s"
-                     % ", ".join(only_db))
-    if only_file:
-        hand_edits += len(only_file)
-        lines.append("[hand-edit] blocks in RELEASES.md with no DB counterpart: %s"
-                     % ", ".join(only_file))
-    for b in blocks:
-        version = b["fields"].get("Release", [None])[0]
-        if version not in db_rows:
-            continue
-        row = db_rows[version]
-        f = b["fields"]
-
-        def fv(label):
-            vals = f.get(label, [])
-            return vals[-1] if vals else None
-
-        status, _ = _normalize_status(fv("Status") or "")
-        for label, file_val, db_val in (
-                ("Status", status, row["status"]),
-                ("Codename", fv("Codename"), row["codename"]),
-                ("Target Date", fv("Target Date"), row["target_date"]),
-                ("Description", fv("Description"), row["description"]),
-                ("Milestone", fv("Milestone"), row["milestone"])):
-            if (file_val or "") != (db_val or ""):
-                hand_edits += 1
-                lines.append("[drift] Release %s: %s is %r in the file, %r in the DB "
-                             "(file edited by hand, or stale after a CLI write)"
-                             % (version, label, file_val, db_val))
-    lines.append("")
-    lines.append("summary: %d file-only block(s), %d field-level difference(s). File-only blocks "
-                 "and unexpected field drift are hand-edits — each resets the Phase 0 "
-                 "sole-writer clock. Stale-after-CLI directions do not." % (len(only_file),
-                                                                            hand_edits))
-    _atomic_write(paths["drift"], "\n".join(lines) + "\n")
+# ── retired generator and drift report (GH-568) ──────────────────────────────────
+# RELEASES.generated.md and drift reporting have been retired end-to-end.
+# Releases are inspected via `releases list` or `releases show`.
 
 
 # ── structural validation (refused in BOTH modes — lenient tolerates imported legacy debt,
@@ -1646,11 +2069,57 @@ def issue_ref_for_token(conn, token, allow_mig=False):
     if row:
         return row
     gid = new_gid("ref-")
-    conn.execute("INSERT INTO issue_refs(global_id, url, temp_id, created_at) "
-                 "VALUES (?, ?, ?, ?)",
-                 (gid, value if kind == "url" else None,
-                  value if kind == "temp" else None, now_iso()))
+    now = now_iso()
+    if _has_column(conn, "issue_refs", "updated_at"):
+        conn.execute("INSERT INTO issue_refs(global_id, url, temp_id, created_at, updated_at) "
+                     "VALUES (?, ?, ?, ?, ?)",
+                     (gid, value if kind == "url" else None,
+                      value if kind == "temp" else None, now, now))
+    else:
+        conn.execute("INSERT INTO issue_refs(global_id, url, temp_id, created_at) "
+                     "VALUES (?, ?, ?, ?)",
+                     (gid, value if kind == "url" else None,
+                      value if kind == "temp" else None, now))
     return conn.execute("SELECT * FROM issue_refs WHERE global_id = ?", (gid,)).fetchone()
+
+
+def _github_slug_from_origin(root):
+    """Best-effort '<org>/<repo>' from a github.com origin remote; None when unresolved."""
+    try:
+        out = subprocess.check_output(["git", "-C", root, "remote", "get-url", "origin"],
+                                      stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return None
+    m = re.search(r"github\.com[/:]([\w.\-]+/[\w.\-]+?)(?:\.git)?$", out)
+    return m.group(1) if m else None
+
+
+def tracking_token_to_url(conn, root, token):
+    """GH-222: canonicalize `releases update --tracking-issue <N|URL>` to a real issue URL.
+    A bare issue number expands against the tracked repo slug (when org/repo shaped) or the
+    github.com origin remote; a full URL passes the shared shape check. Placeholders are
+    refused: a re-point supersedes a real issue with a real issue (the TMP-/MIG- lifecycle
+    belongs to `add` and `reconcile --map`). GitHub issue state is never consulted — the
+    legitimate case is re-pointing to an already-closed superseding umbrella."""
+    token = (token or "").strip()
+    if re.fullmatch(r"[0-9]+", token):
+        row = conn.execute("SELECT slug FROM repos ORDER BY id LIMIT 1").fetchone()
+        slug = row["slug"] if row else ""
+        if not re.fullmatch(r"[\w.\-]+/[\w.\-]+", slug):
+            slug = _github_slug_from_origin(root) or ""
+        if not slug:
+            refuse("tracking-issue-slug",
+                   "cannot expand bare issue number %r: the repo slug is not org/repo shaped "
+                   "and no github.com origin remote resolves; pass the full "
+                   "https://github.com/<org>/<repo>/issues/<n> URL" % token)
+        return "https://github.com/%s/issues/%s" % (slug, token)
+    kind, value = check_tracking_token(token)
+    if kind != "url":
+        refuse("tracking-repoint-shape",
+               "re-pointing to placeholder %r is refused: a re-point supersedes a real issue "
+               "with a real issue (the TMP-/MIG- lifecycle belongs to `add` and "
+               "`reconcile --map`)" % value)
+    return value
 
 
 def validate_release_fields(conn, mode, *, version=None, status=None, target_date=None,
@@ -1708,18 +2177,30 @@ def cmd_init(args):
     paths = artifact_paths(root)
     if os.path.exists(paths["db"]):
         refuse("already-initialized", "%s already exists here" % DB_NAME)
-    slug = args.slug or os.path.basename(os.path.normpath(root))
+    # GH-1016: prefer the GitHub owner/name so roadmap identity matches issue URLs; the folder
+    # basename is only the fallback for a repo without a github.com origin.
+    slug = args.slug or _github_slug_from_origin(root) or os.path.basename(os.path.normpath(root))
     lock = WriterLock(root)
     lock.acquire()
     try:
         conn = connect(paths["db"], must_exist=False)
         try:
             apply_migrations(conn)
-            conn.execute("INSERT INTO repos(global_id, slug) VALUES (?, ?)",
-                         (new_gid("repo-"), slug))
-            conn.execute("INSERT INTO settings(key, value) VALUES ('enforcement', 'lenient')")
-            conn.execute("INSERT INTO settings(key, value) VALUES ('repo_slug', ?)", (slug,))
-            conn.execute("INSERT INTO settings(key, value) VALUES (?, '1')", (GENERATION_KEY,))
+            now = now_iso()
+            if _has_column(conn, "repos", "updated_at"):
+                conn.execute("INSERT INTO repos(global_id, slug, updated_at) VALUES (?, ?, ?)",
+                             (new_gid("repo-"), slug, now))
+            else:
+                conn.execute("INSERT INTO repos(global_id, slug) VALUES (?, ?)",
+                             (new_gid("repo-"), slug))
+            if _has_column(conn, "settings", "updated_at"):
+                conn.execute("INSERT INTO settings(key, value, updated_at) VALUES ('enforcement', 'lenient', ?)", (now,))
+                conn.execute("INSERT INTO settings(key, value, updated_at) VALUES ('repo_slug', ?, ?)", (slug, now))
+                conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, '1', ?)", (GENERATION_KEY, now))
+            else:
+                conn.execute("INSERT INTO settings(key, value) VALUES ('enforcement', 'lenient')")
+                conn.execute("INSERT INTO settings(key, value) VALUES ('repo_slug', ?)", (slug,))
+                conn.execute("INSERT INTO settings(key, value) VALUES (?, '1')", (GENERATION_KEY,))
             generation = get_generation(conn)
             _atomic_write(paths["dump"], dump_text(conn, generation))
         finally:
@@ -1731,9 +2212,14 @@ def cmd_init(args):
 
 
 def _grandfather(conn, import_run, release_gid, rule, source_value, supplied_value):
-    conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
-                     supplied_value, disposition) VALUES (?, ?, ?, ?, ?, NULL)""",
-                 (import_run, release_gid, rule, source_value, supplied_value))
+    if _has_column(conn, "grandfather_entries", "updated_at"):
+        conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
+                         supplied_value, disposition, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?)""",
+                     (import_run, release_gid, rule, source_value, supplied_value, now_iso()))
+    else:
+        conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
+                         supplied_value, disposition) VALUES (?, ?, ?, ?, ?, NULL)""",
+                     (import_run, release_gid, rule, source_value, supplied_value))
 
 
 def cmd_import(args):
@@ -1745,7 +2231,7 @@ def cmd_import(args):
             refuse("import-once",
                    "this DB already holds releases; the legacy import is ONE-SHOT (PRD Phase 0) "
                    "— diverge via the dump merge procedure, not re-import")
-        ledger = args.file or paths["ledger"]
+        ledger = args.file or os.path.join(root, LEDGER_NAME)
         if not os.path.exists(ledger):
             refuse("import-source-missing", "no ledger file at %s" % ledger)
         doc_lines, blocks = parse_legacy_ledger(ledger)
@@ -1754,9 +2240,15 @@ def cmd_import(args):
                                     uuid.uuid4().hex[:6])
 
         def mutate(conn):
+            now = now_iso()
             for pos, content in enumerate(doc_lines):
-                conn.execute("INSERT INTO doc_lines(repo_id, position, content) VALUES (?, ?, ?)",
-                             (repo["id"], pos, content))
+                if _has_column(conn, "doc_lines", "updated_at"):
+                    conn.execute("INSERT INTO doc_lines(repo_id, position, content, updated_at) VALUES (?, ?, ?, ?)",
+                                 (repo["id"], pos, content, now))
+                else:
+                    conn.execute("INSERT INTO doc_lines(repo_id, position, content) VALUES (?, ?, ?)",
+                                 (repo["id"], pos, content))
+            placeholder_versions = unshipped_version_tokens(conn)
             for block in blocks:
                 f = block["fields"]
 
@@ -1767,6 +2259,10 @@ def cmd_import(args):
                 version = (fv("Release") or "").strip()
                 if not version:
                     refuse("release-value", "a block's Release: value is empty (malformed ledger)")
+                # GH-525: a configured placeholder means "not shipped yet" -> SQL NULL, so any
+                # number of unshipped blocks coexist. Read once per import, above the loop.
+                if version in placeholder_versions:
+                    version = None
                 gid = new_gid("rel-")
 
                 status_raw = fv("Status")
@@ -1854,24 +2350,36 @@ def cmd_import(args):
                 if exit_criterion and len(exit_criterion) > 1000:
                     _grandfather(conn, import_run, gid, "exit-criterion-length",
                                  "%d chars" % len(exit_criterion), None)
-                if conn.execute("SELECT 1 FROM releases WHERE version = ?", (version,)).fetchone():
-                    refuse("version-uniqueness",
-                           "duplicate Release: %r in the legacy ledger (structural)" % version)
-
-                conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
-                             target_date, shipped_date, description, exit_criterion,
-                             tracking_ref_id, marathon_id, gh_release_url, milestone,
-                             front_door_reviewed, shakedown_reviewed, license_file)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)""",
-                             (gid, repo["id"], version, codename, status, target_date,
-                              shipped_date, description, exit_criterion, ref["id"],
-                              gh_release_url, milestone, qa.get("front_door_reviewed"),
-                              qa.get("shakedown_reviewed"), qa.get("license_file")))
+                if _has_column(conn, "releases", "updated_at"):
+                    conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                                 target_date, shipped_date, description, exit_criterion,
+                                 tracking_ref_id, marathon_id, gh_release_url, milestone,
+                                 front_door_reviewed, shakedown_reviewed, license_file, updated_at)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)""",
+                                 (gid, repo["id"], version, codename, status, target_date,
+                                  shipped_date, description, exit_criterion, ref["id"],
+                                  gh_release_url, milestone, qa.get("front_door_reviewed"),
+                                  qa.get("shakedown_reviewed"), qa.get("license_file"), now))
+                else:
+                    conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                                 target_date, shipped_date, description, exit_criterion,
+                                 tracking_ref_id, marathon_id, gh_release_url, milestone,
+                                 front_door_reviewed, shakedown_reviewed, license_file)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)""",
+                                 (gid, repo["id"], version, codename, status, target_date,
+                                  shipped_date, description, exit_criterion, ref["id"],
+                                  gh_release_url, milestone, qa.get("front_door_reviewed"),
+                                  qa.get("shakedown_reviewed"), qa.get("license_file")))
                 rel_id = conn.execute("SELECT id FROM releases WHERE global_id = ?",
                                       (gid,)).fetchone()["id"]
                 for ln, text in sorted(block["extras"], key=lambda e: e[0]):
-                    conn.execute("""INSERT INTO legacy_lines(release_id, position, content,
-                                 disposition) VALUES (?, ?, ?, NULL)""", (rel_id, ln, text))
+                    if _has_column(conn, "legacy_lines", "updated_at"):
+                        conn.execute("""INSERT INTO legacy_lines(release_id, position, content,
+                                     disposition, updated_at) VALUES (?, ?, ?, NULL, ?)""",
+                                     (rel_id, ln, text, now))
+                    else:
+                        conn.execute("""INSERT INTO legacy_lines(release_id, position, content,
+                                     disposition) VALUES (?, ?, ?, NULL)""", (rel_id, ln, text))
 
         txn = perform_write(root, conn, "import", None, mutate)
         gf = conn.execute("SELECT COUNT(*) c FROM grandfather_entries").fetchone()["c"]
@@ -1904,16 +2412,28 @@ def cmd_add(args):
                 if not row:
                     refuse("unknown-gid", "no marathon with global id %r" % args.marathon)
                 marathon_id = row["id"]
-            conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
-                         target_date, shipped_date, description, exit_criterion, tracking_ref_id,
-                         marathon_id, gh_release_url, milestone, front_door_reviewed,
-                         shakedown_reviewed, license_file)
-                         VALUES (?, (SELECT id FROM repos ORDER BY id LIMIT 1), ?, ?, ?, ?, ?, ?, ?,
-                                 ?, ?, ?, ?, ?, ?, ?)""",
-                         (gid, args.version, args.codename, args.status, args.target_date,
-                          args.shipped_date, args.description, args.exit_criterion, ref["id"],
-                          marathon_id, args.gh_release_url, args.milestone,
-                          _qa(args.front_door), _qa(args.shakedown), _qa(args.license)))
+            if _has_column(conn, "releases", "updated_at"):
+                conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                             target_date, shipped_date, description, exit_criterion, tracking_ref_id,
+                             marathon_id, gh_release_url, milestone, front_door_reviewed,
+                             shakedown_reviewed, license_file, updated_at)
+                             VALUES (?, (SELECT id FROM repos ORDER BY id LIMIT 1), ?, ?, ?, ?, ?, ?, ?,
+                                     ?, ?, ?, ?, ?, ?, ?, ?)""",
+                             (gid, args.version, args.codename, args.status, args.target_date,
+                              args.shipped_date, args.description, args.exit_criterion, ref["id"],
+                              marathon_id, args.gh_release_url, args.milestone,
+                              _qa(args.front_door), _qa(args.shakedown), _qa(args.license), now_iso()))
+            else:
+                conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                             target_date, shipped_date, description, exit_criterion, tracking_ref_id,
+                             marathon_id, gh_release_url, milestone, front_door_reviewed,
+                             shakedown_reviewed, license_file)
+                             VALUES (?, (SELECT id FROM repos ORDER BY id LIMIT 1), ?, ?, ?, ?, ?, ?, ?,
+                                     ?, ?, ?, ?, ?, ?, ?)""",
+                             (gid, args.version, args.codename, args.status, args.target_date,
+                              args.shipped_date, args.description, args.exit_criterion, ref["id"],
+                              marathon_id, args.gh_release_url, args.milestone,
+                              _qa(args.front_door), _qa(args.shakedown), _qa(args.license)))
             print("added release %s (version %s, status %s)" % (gid, args.version, args.status))
 
         perform_write(root, conn, "add", gid, mutate)
@@ -1928,10 +2448,11 @@ def cmd_update(args):
     try:
         row = find_release(conn, args.gid)
         mode = enforcement_mode(conn)
+        # GH-222: `--tracking-issue <N|URL>` re-points the tracking ref (validated pre-write,
+        # applied inside the perform_write transaction so the dump/receipt chain stays atomic).
+        new_tracking_url = None
         if args.tracking_issue is not None:
-            refuse("tracking-ref-immutable",
-                   "a release's tracking reference keeps its identity; fill the real URL with "
-                   "`releases reconcile --map` (the TMP-/MIG- lifecycle), never by replacing it")
+            new_tracking_url = tracking_token_to_url(conn, root, args.tracking_issue)
         eff_version = args.version if args.version is not None else row["version"]
         validate_release_fields(conn, mode, version=eff_version,
                                 status=args.status, target_date=args.target_date,
@@ -1939,10 +2460,19 @@ def cmd_update(args):
                                 exit_criterion=args.exit_criterion, editing_gid=args.gid)
 
         def mutate(conn):
+            tracking_ref_id = row["tracking_ref_id"]
+            if new_tracking_url is not None:
+                ref = issue_ref_for_token(conn, new_tracking_url)
+                tracking_ref_id = ref["id"]
+            upd_clause = ""
+            extra_params = ()
+            if _has_column(conn, "releases", "updated_at"):
+                upd_clause = ", updated_at=?"
+                extra_params = (now_iso(),)
             conn.execute("""UPDATE releases SET version=?, codename=?, status=?, target_date=?,
-                         shipped_date=?, description=?, exit_criterion=?, gh_release_url=?,
-                         milestone=?, front_door_reviewed=?, shakedown_reviewed=?, license_file=?
-                         WHERE global_id=?""",
+                         shipped_date=?, description=?, exit_criterion=?, tracking_ref_id=?,
+                         gh_release_url=?, milestone=?, front_door_reviewed=?, shakedown_reviewed=?,
+                         license_file=?""" + upd_clause + " WHERE global_id=?",
                          (eff_version,
                           args.codename if args.codename is not None else row["codename"],
                           args.status if args.status is not None else row["status"],
@@ -1951,6 +2481,7 @@ def cmd_update(args):
                           args.description if args.description is not None else row["description"],
                           args.exit_criterion if args.exit_criterion is not None
                           else row["exit_criterion"],
+                          tracking_ref_id,
                           args.gh_release_url if args.gh_release_url is not None
                           else row["gh_release_url"],
                           args.milestone if args.milestone is not None else row["milestone"],
@@ -1959,8 +2490,7 @@ def cmd_update(args):
                           _qa(args.shakedown) if args.shakedown is not None
                           else row["shakedown_reviewed"],
                           _qa(args.license) if args.license is not None
-                          else row["license_file"],
-                          args.gid))
+                          else row["license_file"]) + extra_params + (args.gid,))
             # GH-111 baseline auto-capture, in the SAME writer-locked transaction as the status
             # flip — a dial-in landing between the two would pin a manifest state that never
             # existed. Only on draft -> active, only when nothing is captured yet: an
@@ -1974,6 +2504,9 @@ def cmd_update(args):
                 count = _capture_baseline(conn, row["id"], "observed")
                 if count:
                     print("baseline for %s captured at %d (observed)" % (args.gid, count))
+            if new_tracking_url is not None:
+                print("re-pointed tracking issue -> %s (old ref row kept its identity)"
+                      % new_tracking_url)
             print("updated release %s" % args.gid)
 
         perform_write(root, conn, "update", args.gid, mutate)
@@ -2000,8 +2533,13 @@ def _capture_baseline(conn, release_id, source):
     count = _live_manifest_count(conn, release_id)
     if not count:
         return 0
-    conn.execute("""UPDATE releases SET baseline_count = ?, baseline_at = ?, baseline_source = ?
-                     WHERE id = ?""", (count, now_iso(), source, release_id))
+    now = now_iso()
+    if _has_column(conn, "releases", "updated_at"):
+        conn.execute("""UPDATE releases SET baseline_count = ?, baseline_at = ?, baseline_source = ?,
+                        updated_at = ? WHERE id = ?""", (count, now, source, now, release_id))
+    else:
+        conn.execute("""UPDATE releases SET baseline_count = ?, baseline_at = ?, baseline_source = ?
+                        WHERE id = ?""", (count, now, source, release_id))
     return count
 
 
@@ -2055,8 +2593,13 @@ def cmd_ship(args):
             refuse("date-shape", "--date %r must be a valid YYYY-MM-DD calendar date" % when)
 
         def mutate(conn):
-            conn.execute("UPDATE releases SET status='shipped', shipped_date=? WHERE global_id=?",
-                         (when, args.gid))
+            if _has_column(conn, "releases", "updated_at"):
+                conn.execute("""UPDATE releases SET status='shipped', shipped_date=?, updated_at=?
+                                WHERE global_id=?""",
+                             (when, now_iso(), args.gid))
+            else:
+                conn.execute("UPDATE releases SET status='shipped', shipped_date=? WHERE global_id=?",
+                             (when, args.gid))
             # The evidence citation rides in the append-only audit trail (the schema has no
             # evidence column by design): a ship-evidence receipt in the SAME transaction as the
             # status flip. check()'s chain rule skips op='ship-evidence' rows.
@@ -2083,7 +2626,7 @@ def cmd_manifest_add(args):
         def mutate(conn):
             ref = issue_ref_for_token(conn, args.issue)
             if conn.execute("""SELECT 1 FROM manifest_items
-                               WHERE release_id=? AND issue_ref_id=? AND state='dialed_in'""",
+                              WHERE release_id=? AND issue_ref_id=? AND state='dialed_in'""",
                             (rel["id"], ref["id"])).fetchone():
                 refuse("manifest-duplicate",
                        "issue is already dialed into this release (refused in both modes). A cut "
@@ -2120,11 +2663,18 @@ def cmd_manifest_add(args):
                            "marathon %s does not belong to release %s; an item's marathon must be "
                            "its own release's marathon" % (args.marathon, args.gid))
                 marathon_id = mar["id"]
-            conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
-                                                       dialed_in_at, dial_reason, marathon_id)
-                         VALUES (?, ?, ?, 'dialed_in', ?, ?, ?)""",
-                         (gid, rel["id"], ref["id"], now_iso(),
-                          getattr(args, "reason", None), marathon_id))
+            if _has_column(conn, "manifest_items", "updated_at"):
+                conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
+                                                           dialed_in_at, dial_reason, marathon_id, updated_at)
+                             VALUES (?, ?, ?, 'dialed_in', ?, ?, ?, ?)""",
+                             (gid, rel["id"], ref["id"], now_iso(),
+                              getattr(args, "reason", None), marathon_id, now_iso()))
+            else:
+                conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
+                                                           dialed_in_at, dial_reason, marathon_id)
+                             VALUES (?, ?, ?, 'dialed_in', ?, ?, ?)""",
+                             (gid, rel["id"], ref["id"], now_iso(),
+                              getattr(args, "reason", None), marathon_id))
             print("manifest item %s dialed into %s (state=dialed_in)" % (gid, args.gid))
 
         perform_write(root, conn, "manifest-add", gid, mutate)
@@ -2159,7 +2709,11 @@ def cmd_manifest_ship(args):
             if not ref:
                 refuse("unknown-issue", "no issue_refs row for %r" % value)
             item = _live_manifest_item(conn, rel, ref, value, args.gid, "shipped")
-            conn.execute("UPDATE manifest_items SET state='shipped' WHERE id=?", (item["id"],))
+            if _has_column(conn, "manifest_items", "updated_at"):
+                conn.execute("UPDATE manifest_items SET state='shipped', updated_at=? WHERE id=?",
+                             (now_iso(), item["id"]))
+            else:
+                conn.execute("UPDATE manifest_items SET state='shipped' WHERE id=?", (item["id"],))
             # State and event land in ONE transaction — the coupling the digest chain checks.
             conn.execute("""INSERT INTO manifest_state_events(item_id, from_state, to_state, at,
                          reason) VALUES (?, ?, 'shipped', ?, ?)""",
@@ -2194,7 +2748,7 @@ def cmd_manifest_marathon(args):
             if not ref:
                 refuse("unknown-issue", "no issue_refs row for %r" % value)
             item = conn.execute("""SELECT * FROM manifest_items
-                                   WHERE release_id=? AND issue_ref_id=? AND state='dialed_in'""",
+                                  WHERE release_id=? AND issue_ref_id=? AND state='dialed_in'""",
                                 (rel["id"], ref["id"])).fetchone()
             if not item:
                 refuse("unknown-issue",
@@ -2211,8 +2765,12 @@ def cmd_manifest_marathon(args):
                 refuse("marathon-link-permanent",
                        "manifest item %s already belongs to another marathon; marathon links are "
                        "historical and permanent" % item["global_id"])
-            conn.execute("UPDATE manifest_items SET marathon_id=? WHERE id=?",
-                         (mar["id"], item["id"]))
+            if _has_column(conn, "manifest_items", "updated_at"):
+                conn.execute("UPDATE manifest_items SET marathon_id=?, updated_at=? WHERE id=?",
+                             (mar["id"], now_iso(), item["id"]))
+            else:
+                conn.execute("UPDATE manifest_items SET marathon_id=? WHERE id=?",
+                             (mar["id"], item["id"]))
             print("manifest item %s linked to marathon %s" % (item["global_id"], args.marathon))
 
         perform_write(root, conn, "manifest-marathon", args.gid, mutate)
@@ -2272,7 +2830,11 @@ def cmd_manifest_cut(args):
             if not ref:
                 refuse("unknown-issue", "no issue_refs row for %r" % value)
             item = _live_manifest_item(conn, rel, ref, value, args.gid, "cut")
-            conn.execute("UPDATE manifest_items SET state='cut' WHERE id=?", (item["id"],))
+            if _has_column(conn, "manifest_items", "updated_at"):
+                conn.execute("UPDATE manifest_items SET state='cut', updated_at=? WHERE id=?",
+                             (now_iso(), item["id"]))
+            else:
+                conn.execute("UPDATE manifest_items SET state='cut' WHERE id=?", (item["id"],))
             # item state and its event land in ONE transaction (PRD: the coupling is
             # CLI-enforced; a direct writer that skips the event is caught by the digest chain)
             conn.execute("""INSERT INTO manifest_state_events(item_id, from_state, to_state, at,
@@ -2286,6 +2848,100 @@ def cmd_manifest_cut(args):
         conn.close()
 
 
+
+def cmd_manifest_unship(args):
+    """GH-351: retract a shipped manifest item back to dialed_in.
+
+    `shipped` used to be terminal with no way out. `manifest cut` refuses on a shipped row, and the
+    refusal pointed at re-dialing — which retracts nothing and adds a SECOND row, leaving the
+    manifest asserting that one issue both shipped and is pending. AGENTS.md forbids hand-editing
+    releases.db, so an operator had no supported way to correct a false ship at all.
+
+    The correction is a real state transition with an auditable event, not a silent UPDATE: the
+    retraction lands in manifest_state_events beside the ship it reverses, so the ledger records
+    that the claim was withdrawn rather than pretending it was never made.
+    """
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        rel = find_release(conn, args.gid)
+        reason = (args.reason or "").strip()
+        if not reason:
+            refuse("unship-needs-reason",
+                   "retracting a shipped manifest item without a reason is refused (structural, "
+                   "both modes)")
+        kind, value = check_tracking_token(args.issue)
+
+        def mutate(conn):
+            column = "url" if kind == "url" else "temp_id"
+            ref = conn.execute("SELECT * FROM issue_refs WHERE %s = ?" % column,
+                               (value,)).fetchone()
+            if not ref:
+                refuse("unknown-issue", "no issue_refs row for %r" % value)
+
+            item = conn.execute("""SELECT * FROM manifest_items
+                                   WHERE release_id=? AND issue_ref_id=? AND state='shipped'
+                                   ORDER BY id DESC LIMIT 1""",
+                                (rel["id"], ref["id"])).fetchone()
+            if not item:
+                prior = conn.execute("""SELECT state FROM manifest_items
+                                        WHERE release_id=? AND issue_ref_id=?
+                                        ORDER BY id DESC LIMIT 1""",
+                                     (rel["id"], ref["id"])).fetchone()
+                if prior:
+                    refuse("transition",
+                           "issue %r is in release %s at state %r, not shipped"
+                           % (value, args.gid, prior["state"]))
+                refuse("unknown-issue",
+                       "issue %r is not in release %s's manifest" % (value, args.gid))
+
+            # Un-shipping must not manufacture the very contradiction it exists to remove: if a live
+            # row already sits beside the shipped one (GH-111 dropped UNIQUE(release_id,
+            # issue_ref_id), so it can), retracting would leave TWO dialed_in rows.
+            existing = conn.execute("""SELECT 1 FROM manifest_items
+                                       WHERE release_id=? AND issue_ref_id=? AND state='dialed_in'
+                                         AND id != ?""",
+                                    (rel["id"], ref["id"], item["id"])).fetchone()
+            if existing:
+                refuse("manifest-duplicate",
+                       "issue is already dialed into this release as dialed_in; unship would "
+                       "create a duplicate live row")
+
+            held = conn.execute("""SELECT r.global_id, r.codename FROM manifest_items mi
+                                   JOIN releases r ON r.id = mi.release_id
+                                   WHERE mi.issue_ref_id = ? AND mi.release_id != ?
+                                     AND mi.state = 'dialed_in'""",
+                                (ref["id"], rel["id"])).fetchall()
+            if held:
+                refuse("dialed-in-elsewhere",
+                       "issue is already dialed into %s — a task belongs to ONE release at a time."
+                       % (", ".join("%s (%s)" % (h["global_id"], h["codename"] or "?")
+                                    for h in held)))
+
+            if (item["state"], "dialed_in") not in LEGAL_ITEM_TRANSITIONS:
+                refuse("transition",
+                       "cannot move an item from %r to 'dialed_in' (legality is CLI-enforced)"
+                       % item["state"])
+
+            if _has_column(conn, "manifest_items", "updated_at"):
+                conn.execute("UPDATE manifest_items SET state='dialed_in', updated_at=? WHERE id=?",
+                             (now_iso(), item["id"]))
+            else:
+                conn.execute("UPDATE manifest_items SET state='dialed_in' WHERE id=?",
+                             (item["id"],))
+            # item state and its event land in ONE transaction, matching ship/cut: a direct writer
+            # that skips the event is caught by the digest chain.
+            conn.execute("""INSERT INTO manifest_state_events(item_id, from_state, to_state, at,
+                            reason) VALUES (?, 'shipped', 'dialed_in', ?, ?)""",
+                         (item["id"], now_iso(), reason))
+            print("manifest item %s un-shipped (shipped -> dialed_in); retraction event appended"
+                  % item["global_id"])
+
+        perform_write(root, conn, "manifest-unship", args.gid, mutate)
+    finally:
+        conn.close()
+
 def cmd_marathon_add(args):
     root = resolve_root(args.root)
     paths = artifact_paths(root)
@@ -2296,9 +2952,14 @@ def cmd_marathon_add(args):
         def mutate(conn):
             ref = issue_ref_for_token(conn, args.tracking_issue)
             repo_id = conn.execute("SELECT id FROM repos ORDER BY id LIMIT 1").fetchone()["id"]
-            conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
-                         created_at) VALUES (?, ?, ?, ?, ?)""",
-                         (gid, repo_id, ref["id"], args.status, now_iso()))
+            if _has_column(conn, "marathons", "updated_at"):
+                conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
+                             created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)""",
+                             (gid, repo_id, ref["id"], args.status, now_iso(), now_iso()))
+            else:
+                conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
+                             created_at) VALUES (?, ?, ?, ?, ?)""",
+                             (gid, repo_id, ref["id"], args.status, now_iso()))
             print("marathon %s added (status %s)" % (gid, args.status))
 
         perform_write(root, conn, "marathon-add", gid, mutate)
@@ -2603,8 +3264,8 @@ def cmd_project_sync(args):
         conn.close()
 
 
-# ── GH-69: ROADMAP.md shadow (`releases roadmap sync` / `list`) ────────────────────────────────
-# Shadow phase contract, mirroring GH-32 Phase 0 exactly: ROADMAP.md is the ONLY thing humans and
+# ── GH-269: roadmap ledger (`releases roadmap sync` / `list`) ────────────────────────────────
+# Ledger contract: the database is the ONLY thing humans and
 # agents edit; this code only READS it and mirrors the ledger into roadmap_items. The parser is a
 # twin of the marathon planner's (utils/py/_marathon_plan.py) with one deliberate difference: the
 # planner recognises only its four SECTIONS and skips the rest silently, while the shadow captures
@@ -2620,9 +3281,9 @@ _ROADMAP_STATUS_MARKERS = ["\U0001F195", "\U0001F6A7", "\u2705", "\u23F8\uFE0F",
 # ── GH-108: the one canonical rating grammar ────────────────────────────────────────────────────
 # `rated N/N/N/N` — exactly four slash-separated integers 1-100, axis order fixed as
 # pri/sev/appeal/effort — optionally followed by ` ovr N` (an integer 4-400 on calc's own scale).
-# There is no labeled long form: the axis NAMES live in PROJECT/3-COMPLETED/GH-108-RATING-SYSTEM.md,
-# not in the entry line. Higher is better on every axis, effort included (it scores CHEAPNESS), so
-# the four combine without sign-flipping.
+# There is no labeled long form: the axis NAMES live in RELEASES-DB-FAQS.md (and
+# PROJECT/3-COMPLETED/GH-108-RATING-SYSTEM.md), not in the entry line. Higher is better on every axis,
+# effort included (it scores CHEAPNESS), so the four combine without sign-flipping.
 #
 # The refusal contract matters as much as the grammar: the PRESENCE of a `rated` or `ovr` token
 # either parses as the full form or refuses with a named rule. A malformed shape must never read
@@ -2710,10 +3371,117 @@ def parse_rating(raw, title):
     return out
 
 
+def _without_rating(raw, title):
+    """Remove the one rating accepted by parse_rating, including its optional override."""
+    parse_rating(raw, title)  # refuse malformed/duplicate stored tokens before rewriting them
+    spans = []
+    rated = _RATED_RE.search(raw)
+    if rated:
+        spans.append(rated.span())
+    override = _OVR_RE.search(raw)
+    if override:
+        spans.append(override.span())
+    for start, end in sorted(spans, reverse=True):
+        raw = raw[:start] + raw[end:]
+    raw = re.sub(r"\(\s*\)", "", raw)
+    return re.sub(r"[ \t]{2,}", " ", raw).strip()
+
+
+# GH-349 review (LTVera-Pandas #322): a ledger entry's GH number is a KEY, not a mention. It is
+# only read from the HEAD of the title. An unanchored search harvested 111 out of "Execution
+# checklist for GH-111 + GH-108", which collided with the real GH-111 entry and made
+# `roadmap sync` refuse outright on this repo's own ROADMAP.md. A title that names several issues
+# (`#129/#130/#131 · Wave 1 …`) is an umbrella heading, not a key, and must stay unnumbered.
+_ROADMAP_KEY_RE = re.compile(r"^(?:GH-|#)(\d+)\b")
+# The separator set distinguishes a RANGE from prose. `..`/`...` and U+2013 EN DASH are the
+# conventional numeric-range delimiters (`GH-135..140`, `GH-135–140` — six issues, not issue 135).
+# U+2014 EM DASH is deliberately EXCLUDED: `GH-100 — 2026 planning` is a single-issue title whose
+# key would otherwise be silently dropped. The ASCII hyphen is excluded for the same reason.
+# The first pass conflated the two dashes; codex QA separated them, 2026-08-31.
+_ROADMAP_MULTI_KEY_RE = re.compile(
+    r"^(?:GH-|#)\d+\s*(?:[/,+&\u2013]|\.\.\.?)\s*(?:GH-|#)?\d+")
+
+# Markdown task-list items (`- [ ]`, `- [x]`) share the `- [` prefix with a link bullet but are
+# not ledger entries; without this they parsed as rows with an empty or "x" title.
+_ROADMAP_TASKBOX_RE = re.compile(r"^- \[[ xX]\]")
+
+
+def _is_ledger_bullet(line):
+    """A ledger entry opener: a bold bullet or a link bullet, never a task-list checkbox."""
+    if line.startswith("- **"):
+        return True
+    return line.startswith("- [") and not _ROADMAP_TASKBOX_RE.match(line)
+
+
+def _roadmap_gh_number(title):
+    """The GH number a ledger entry is keyed by, or None. Anchored at the head of the title."""
+    if _ROADMAP_MULTI_KEY_RE.match(title):
+        return None
+    m = _ROADMAP_KEY_RE.match(title)
+    return int(m.group(1)) if m else None
+
+
+# A scheme in a markdown link target: `https:`, `mailto:`, or a Windows drive prefix `C:`. Any of
+# these means the target is not a repo-relative path, whatever it ends with.
+_DOC_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+
+
+def _doc_pointer(target):
+    """The repo-relative document path a link target names, or None.
+
+    The `doc_path` column is a path a consumer resolves against the filesystem, so an absolute
+    URL, a mail address or a drive-lettered path in it yields a miss indistinguishable from a
+    dead pointer. codex QA found the first cut let all three through, because the extraction
+    regexes accepted any `.md`-suffixed target and this check was only consulted on the fallback
+    branch. It is now the SINGLE validator every candidate passes through, whichever regex found
+    it — a scheme-bearing `https://github.com/acme/specs/blob/main/DESIGN.md` is rejected here
+    even though it ends `.md`."""
+    if not target:
+        return None
+    target = target.strip()
+    if not target:
+        return None
+    if _DOC_SCHEME_RE.match(target) or target.startswith("/") or "\\" in target:
+        return None
+    path = target.split("#", 1)[0].split("?", 1)[0]
+    return path if path.endswith(".md") else None
+
+
+def _roadmap_issue_url(raw, link_target, gh_number):
+    """The URL a ledger entry is keyed to, or None.
+
+    Exactly two things count as evidence of identity: the bullet's OWN link target, and a URL in
+    the block whose number corroborates the title's GH key. Nothing else — an unanchored search
+    keyed GH-94 to a DIFFERENT repo's issue #2 and GH-68 to a PR, because both hooks cite other
+    work in passing.
+
+    An earlier cut kept a third branch for UNKEYED entries: the first URL on the bullet's first
+    line. codex QA showed that branch is wrong on the reporting repo's live data, where it stored
+    a BLOCKER as the row's identity — `Grow Willies …` took #42 (a blocker that has its own ledger
+    row) and `Marathon Plan 2026-07-07 …` took #47 (merely its only fireable lane). Being first is
+    not evidence. An unkeyed entry whose own link is a document now stores nothing.
+
+    Position never implies identity here: no URL beats a wrong URL."""
+    if link_target:
+        target = link_target.strip()
+        m = ROADMAP_URL_RE.fullmatch(target)
+        if m:
+            num = int(target.rsplit("/", 1)[1])
+            if gh_number is None or num == gh_number:
+                return m.group(0)
+    if gh_number is None:
+        return None
+    for cand in ROADMAP_URL_RE.findall(raw):
+        if int(cand.rsplit("/", 1)[1]) == gh_number:
+            return cand
+    return None
+
+
 def parse_roadmap_ledger(path):
     """ROADMAP.md -> [entry dict], file order. Same block boundaries as the planner: an entry runs
-    from its `- **` line to the next `- **`, `###`, or `##`."""
-    lines = open(path, encoding="utf-8").read().splitlines()
+    from its bullet line (`- **` or `- [`) to the next bullet, `###`, or `##`."""
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().splitlines()
     entries = []
     sec = None
     inledger = False
@@ -2731,36 +3499,46 @@ def parse_roadmap_ledger(path):
             sec = line[4:].strip()
             i += 1
             continue
-        if inledger and sec and line.startswith("- **"):
+        if inledger and sec and _is_ledger_bullet(line):
             j = i + 1
-            while j < n and not (lines[j].startswith("- **") or lines[j].startswith("### ")
+            while j < n and not (_is_ledger_bullet(lines[j]) or lines[j].startswith("### ")
                                  or re.match(r"^##\s+", lines[j])):
                 j += 1
             raw = "\n".join(lines[i:j]).rstrip()
-            m = re.match(r"^- \*\*(.+?)\*\*", raw)
-            title = m.group(1).strip() if m else raw[4:80]
-            gh = re.match(r"^GH-(\d+)\b", title)
+            m_bold = re.match(r"^- \*\*(.+?)\*\*", raw)
+            m_link = re.match(r"^- \[(.+?)\](?:\((.*?)\))?", raw)
+            if m_bold:
+                title = m_bold.group(1).strip()
+            elif m_link:
+                title = m_link.group(1).strip()
+            else:
+                title = raw[2:].strip()[:80]
+            gh_number = _roadmap_gh_number(title)
             marker = None
             for cand in _ROADMAP_STATUS_MARKERS:
                 if cand in raw:
                     marker = cand
                     break
             cre = re.search(r"cx/risk/eff (\d+)/(\d+)/(\d+)", raw)
-            doc = re.search(r"\]\((PROJECT/[^)]+\.md)", raw)
-            # Org-agnostic on purpose (not pinned to a specific owner): this parses
-            # XYZ-forge's own ROADMAP.md format, whose issue/PR links predate and will
-            # outlive any one org name (rots on org rename otherwise — see GH-123).
-            issue = re.search(r"https://github\.com/[^/\s]+/XYZ-forge/(?:issues|pull)/\d+", raw)
+            link_target = m_link.group(2) if m_link else None
+            doc = (re.search(r"\]\((PROJECT/[^)#]+\.md)(?:#[^)]*)?\)", raw)
+                   or re.search(r"\]\(([^)#\s]+\.md)(?:#[^)]*)?\)", raw))
+            # Every candidate goes through the one validator — the extraction regexes only find
+            # a shape, they do not decide whether it is a document pointer.
+            doc_path = _doc_pointer(doc.group(1)) if doc else None
+            if doc_path is None:
+                doc_path = _doc_pointer(link_target)
+            issue_url = _roadmap_issue_url(raw, link_target, gh_number)
             pos[sec] = pos.get(sec, 0) + 1
             entry = {
-                "gh_number": int(gh.group(1)) if gh else None,
+                "gh_number": gh_number,
                 "title": title, "section": sec, "position": pos[sec],
                 "status_marker": marker,
                 "complexity": int(cre.group(1)) if cre else None,
                 "risk": int(cre.group(2)) if cre else None,
                 "effort": int(cre.group(3)) if cre else None,
-                "doc_path": doc.group(1) if doc else None,
-                "issue_url": issue.group(0) if issue else None,
+                "doc_path": doc_path,
+                "issue_url": issue_url,
                 "raw_text": raw,
             }
             entry.update(parse_rating(raw, title))
@@ -2776,14 +3554,673 @@ _ROADMAP_FIELDS = ("gh_number", "title", "section", "position", "status_marker",
                   + RATING_COLUMNS
 
 
+
+def validate_raw_text(raw_text, issue_num=None):
+    """GH-257: validate that raw_text matches the markdown shape the renderer requires.
+
+    The renderer (`roadmap render`) parses bullets starting with an exact `- **<title>**`
+    prefix. An unparseable line (e.g. `- [ ] #255 ...`, `-   **`, or unclosed bold) is dropped by
+    the markdown renderer. Validating at write time catches malformed input immediately.
+    """
+    if not isinstance(raw_text, str):
+        refuse("invalid-raw-text", "raw_text must be a string")
+    if "\r" in raw_text or "\n" in raw_text:
+        refuse("invalid-raw-text",
+               "malformed --raw-text: raw_text must be a single line (no newlines permitted)")
+    stripped = raw_text.strip()
+    if not re.match(r'^- \*\*[^\r\n*]+?\*\*', stripped):
+        refuse("invalid-raw-text",
+               "malformed --raw-text %r: expected markdown bullet starting with '- **<title>**' "
+               "(e.g. '- **GH-%s · <title>** ...')" % (raw_text, str(issue_num) if issue_num else "<num>"))
+    if issue_num is not None:
+        gh_patterns = [r'\bGH-%d\b' % issue_num, r'#%d\b' % issue_num]
+        if not any(re.search(p, raw_text) for p in gh_patterns):
+            refuse("invalid-raw-text",
+                   "malformed --raw-text: does not reference issue GH-%d / #%d" % (issue_num, issue_num))
+    return stripped
+
+
+
+def validate_issue_identity(issue_url, gh_number, require_github=False):
+    """GH-527: a GitHub issue_url must name the same issue as the row's gh_number.
+
+    `reconcile-state` reads issue identity from this pair, so a row where they disagree can never
+    be reconciled — it cannot ask GitHub about the right issue. GH-61 was imported that way: the
+    legacy ROADMAP.md importer took the FIRST issue link in a line that named four child issues
+    before its own `→ [#61]` pointer. That importer is retired, but intake accepted the same
+    mismatch with no complaint, so the defect stayed creatable. Checked at BOTH writers now.
+
+    The shape check is deliberately NOT enforced at intake. Rows legitimately carry URLs this
+    regex does not match — imported cross-repo references, and fixtures that use short stand-in
+    hosts — and refusing those would reject shapes intake has always accepted. Identity is what
+    matters: if the URL IS a GitHub issue URL, its number must agree. `require_github` is for the
+    repair verb, whose entire purpose is to make a row resolvable, so a malformed URL there is a
+    failed repair rather than a pre-existing shape to tolerate.
+    """
+    url = issue_url or ""
+    if not GH_ISSUE_URL_RE.fullmatch(url):
+        if require_github:
+            refuse("roadmap-issue-url", "%s is not a GitHub issue URL" % issue_url)
+        return
+    if gh_number is not None and url.rsplit("/", 1)[-1] != str(gh_number):
+        refuse("roadmap-issue-url", "%s does not name issue #%s; a row's issue_url and gh_number "
+               "must agree, or reconcile-state can never resolve the row"
+               % (issue_url, gh_number))
+
+
+def cmd_roadmap_add(args):
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        validate_issue_identity(args.issue_url, args.issue_num)
+        basename = os.path.basename(args.doc_path)
+        # hq park passes the hq_roadmap_line rendering via --raw-text so preview and stored row
+        # share ONE template; the inline fallback exists only for direct CLI use.
+        if args.raw_text:
+            raw_text = validate_raw_text(args.raw_text, args.issue_num)
+        else:
+            raw_text = "- **GH-%d · %s** 🆕 **captured %s via HQ** — [%s](%s) · [#%d](%s)" % (
+                args.issue_num, args.title, args.created, basename, args.doc_path,
+                args.issue_num, args.issue_url
+            )
+            # GH-703: direct CLI intake must pass through the same grammar as an explicit
+            # --raw-text value. Titles containing a lone asterisk otherwise create a row that
+            # roadmap_render() silently drops because it cannot replay the bold bullet.
+            raw_text = validate_raw_text(raw_text, args.issue_num)
+        # GH-249: the rating rides in the ledger line, parsed by the SAME parse_rating() the
+        # markdown sync uses — one grammar, one parser, never a second scorer. Before this, ratings
+        # could only enter through `roadmap sync`, which GH-169 turned into a no-op in releases-mode
+        # repos, so every row parked after the flip was silently unrated.
+        rating = parse_rating(raw_text, args.title)
+
+        if args.dry_run:
+            print("ROADMAP line: %s" % raw_text)
+            if rating["rating_pri"] is not None:
+                print("rating: %s" % "/".join(str(rating[c]) for c in RATING_COLUMNS[:4]))
+                if rating["rating_ovr"] is not None:
+                    print("ovr: %d" % rating["rating_ovr"])
+            return
+
+        # Dup guard — only when the shadow table exists; a pre-migration ledger gets the schema
+        # installed inside mutate (mirrors cmd_roadmap_sync) instead of a raw OperationalError.
+        if _table_exists(conn, "roadmap_items"):
+            row = conn.execute("SELECT id FROM roadmap_items WHERE issue_url = ?", (args.issue_url,)).fetchone()
+            if row:
+                refuse("roadmap-duplicate", "issue %s is already parked in the roadmap" % args.issue_url)
+
+            row2 = conn.execute("SELECT id FROM roadmap_items WHERE gh_number = ?", (args.issue_num,)).fetchone()
+            if row2:
+                refuse("roadmap-duplicate", "issue GH-%d is already parked in the roadmap" % args.issue_num)
+
+        gid = new_gid("rmi-")
+
+        def mutate(conn):
+            _ensure_roadmap_schema(conn)
+            ts = now_iso()
+            section = "Queue / parked intake"   # the canonical ledger queue heading (GH-243)
+            max_pos = conn.execute("SELECT MAX(position) FROM roadmap_items WHERE section = ?", (section,)).fetchone()
+            pos = (max_pos[0] or 0) + 1 if max_pos else 1
+            
+            repo = conn.execute("SELECT id FROM repos ORDER BY id LIMIT 1").fetchone()
+            if not repo:
+                refuse("no-repo", "the DB has no repos row; run `releases init` first")
+            
+            # Mirrors cmd_roadmap_sync: feature commands never self-migrate. A rated line meeting
+            # a ledger with no rating columns is refused BY NAME rather than written with its
+            # scores silently dropped — an unrated row is indistinguishable from "never scored".
+            rating_ok = _has_column(conn, "roadmap_items", "rating_pri")
+            if not rating_ok and rating["rating_pri"] is not None:
+                refuse("schema-behind",
+                       "GH-%d carries `rated` scores but this ledger has no rating columns. Run "
+                       "`releases migrate` first — intake stores scores, it never installs schema."
+                       % args.issue_num)
+
+            cols = ["global_id", "repo_id", "gh_number", "title", "section", "position",
+                    "status_marker", "doc_path", "issue_url", "raw_text", "first_seen", "updated_at"]
+            vals = [gid, repo["id"], args.issue_num, args.title, section, pos,
+                    "🆕", args.doc_path, args.issue_url, raw_text, ts, ts]
+            if rating_ok:
+                cols += list(RATING_COLUMNS)
+                vals += [rating[c] for c in RATING_COLUMNS]
+            conn.execute("INSERT INTO roadmap_items(%s) VALUES (%s)"
+                         % (", ".join(cols), ", ".join("?" * len(cols))), vals)
+                          
+        perform_write(root, conn, "roadmap-add", gid, mutate)
+        print("added roadmap entry %s for GH-%d" % (gid, args.issue_num))
+    finally:
+        conn.close()
+
+def cmd_roadmap_rate(args):
+    """GH-253: score a roadmap row that is already parked.
+
+    GH-249 taught intake to STORE a rating, but rows parked between the GH-169 flip and that fix
+    were written unrated and had no path back — `roadmap add` only inserts, `roadmap sync` is a
+    no-op in releases-mode, and nothing else writes the columns. That made "unrated" permanent for
+    exactly the rows the bug created. This is the way back.
+
+    The rating is rendered into the SAME `rated N/N/N/N [ovr N]` token the ledger line carries and
+    handed to the SAME parse_rating() — the token in raw_text and the five columns are written in
+    one transaction so the lossless shadow can never disagree with the scores derived from it.
+    """
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "roadmap_items"):
+            refuse("no-ledger", "this DB has no roadmap_items table; run `releases migrate` first")
+        # A row imported from a multi-issue ROADMAP bullet ("#129/#130/#131 · Wave 1 …") carries NO
+        # gh_number, so --issue-num cannot address it and it would be unscorable forever — the same
+        # permanence bug this command exists to end. --gid is the escape hatch for those rows.
+        if (args.issue_num is None) == (args.gid is None):
+            refuse("selector", "pass exactly one of --issue-num or --gid")
+        if args.issue_num is not None:
+            where, param, label = "gh_number = ?", args.issue_num, "GH-%d" % args.issue_num
+        else:
+            where, param, label = "global_id = ?", args.gid, args.gid
+        rows = conn.execute(
+            "SELECT global_id, title, raw_text, rating_pri, complexity, risk, effort "
+            "FROM roadmap_items WHERE " + where + " LIMIT 2", (param,)).fetchall()
+        if not rows:
+            refuse("no-such-row", "no roadmap row for %s; park it with `roadmap add` first" % label)
+        if len(rows) != 1:
+            refuse("selector", "%s matches multiple repositories; pass --gid" % label)
+        row = rows[0]
+        where, param = "global_id = ?", row["global_id"]
+        if not _has_column(conn, "roadmap_items", "rating_pri"):
+            refuse("schema-behind",
+                   "this ledger has no rating columns. Run `releases migrate` first — rating "
+                   "stores scores, it never installs schema.")
+        if row["rating_pri"] is not None and not args.force:
+            refuse("already-rated",
+                   "%s is already rated. Re-scoring is a deliberate act, not a retry: pass "
+                   "--force if you mean to replace the existing scores." % label)
+        if any(_col(row, c) is not None for c in ("complexity", "risk", "effort")):
+            refuse("rating-vocabulary-clash",
+                   "%s carries legacy `cx/risk/eff`. The two vocabularies measure different "
+                   "things and never share a row; convert the entry deliberately rather than "
+                   "stacking a `rated` score on top of it." % label)
+
+        token = "(rated %s%s)" % (args.rated, "" if args.ovr is None else " ovr %d" % args.ovr)
+        # parse_rating is the ONE parser and the ONE validator: a malformed --rated is refused by
+        # name here, exactly as it is on the intake path, rather than reaching the columns.
+        rating = parse_rating(token, row["title"])
+        raw_text = _without_rating(row["raw_text"], row["title"])
+        raw_text = "%s %s" % (raw_text, token)
+
+        if args.dry_run:
+            print("ROADMAP line: %s" % raw_text)
+            print("rating: %s" % "/".join(str(rating[c]) for c in RATING_COLUMNS[:4]))
+            if rating["rating_ovr"] is not None:
+                print("ovr: %d" % rating["rating_ovr"])
+            return
+
+        def mutate(conn):
+            conn.execute(
+                "UPDATE roadmap_items SET raw_text = ?, updated_at = ?, %s WHERE %s"
+                % (", ".join("%s = ?" % c for c in RATING_COLUMNS), where),
+                [raw_text, now_iso()] + [rating[c] for c in RATING_COLUMNS] + [param])
+
+        perform_write(root, conn, "roadmap-rate", row["global_id"], mutate)
+        print("rated %s %s" % (label, args.rated))
+    finally:
+        conn.close()
+
+
+def cmd_roadmap_repoint(args):
+    """Re-point a parked row's capture doc after the doc moves between PROJECT stages.
+
+    `roadmap add` records doc_path once and refuses duplicates, and nothing else rewrites it — so
+    promoting a doc 1-INBOX -> 2-WORKING left the row pointing at a path that no longer exists, and
+    pdda-check-roadmap-coverage fails on it with no supported way to fix it.
+
+    The move itself stays a `git mv` by the operator: this verb only rewrites the row in
+    `releases.db`.
+    """
+    root = resolve_root(args.root)
+    conn = connect(artifact_paths(root)["db"])
+    try:
+        gid = getattr(args, "gid", None)
+        if (args.issue_num is None) == (gid is None):
+            refuse("selector", "pass exactly one of --issue-num or --gid")
+        where, param, label = (("gh_number = ?", args.issue_num, "GH-%d" % args.issue_num)
+                               if args.issue_num is not None else ("global_id = ?", gid, gid))
+        rows = conn.execute("SELECT global_id, gh_number, doc_path, raw_text FROM roadmap_items "
+                            "WHERE %s LIMIT 2" % where, (param,)).fetchall()
+        if not rows:
+            refuse("no-such-row", "no roadmap row for %s" % label)
+        if len(rows) != 1:
+            refuse("selector", "%s matches multiple repositories; pass --gid" % label)
+        row = rows[0]
+        new = args.doc_path
+        if not os.path.isfile(os.path.join(root, new)):
+            refuse("no-such-doc", "%s does not exist under %s — re-point to a real doc, never a "
+                                  "path that merely looks right" % (new, root))
+        old = row["doc_path"]
+        # The ledger line embeds the path too; rewriting one without the other just moves the drift.
+        raw_text = row["raw_text"].replace(old, new) if old else row["raw_text"]
+        if args.dry_run:
+            print("doc_path: %s -> %s" % (old, new))
+            print("ROADMAP line: %s" % raw_text)
+            return
+
+        def mutate(conn):
+            conn.execute("UPDATE roadmap_items SET doc_path = ?, raw_text = ?, updated_at = ? "
+                         "WHERE global_id = ?", (new, raw_text, now_iso(), row["global_id"]))
+
+        perform_write(root, conn, "roadmap-repoint", row["global_id"], mutate)
+        # An unnumbered row is selectable only by --gid; name it by GID rather than crash after the write.
+        print("repointed %s -> %s" % ("GH-%d" % row["gh_number"] if row["gh_number"] is not None
+                                      else row["global_id"], new))
+    finally:
+        conn.close()
+
+
+def cmd_settings_set(args):
+    """`releases settings set <key> <value>` — write a settings row THROUGH the writer protocol.
+
+    GH-525: without this there is no supported way to configure the ledger at all. A settings row
+    is part of the business-state digest, so a direct `sqlite3 INSERT` — the only alternative —
+    leaves the latest receipt's after-digest disagreeing with the state and `check` fails with
+    `receipt-chain: ... a receipt-less mutation`. Measured, not assumed: setting
+    `unshipped_version_tokens` by hand took a clean ledger to `check: 2 failure(s)`.
+
+    So a configurable ledger needs a configuring verb. Only keys in CONFIGURABLE_SETTINGS are
+    writable: `generation` is owned by the writer protocol and `repo_slug` is identity, and letting
+    either be set here would hand an operator a supported way to corrupt the ledger."""
+    root = resolve_root(args.root)
+    conn = connect(artifact_paths(root)["db"])
+    try:
+        if args.key not in CONFIGURABLE_SETTINGS:
+            refuse("setting-not-configurable",
+                   "%s is not an operator-configurable setting; configurable keys are: %s"
+                   % (args.key, ", ".join(sorted(CONFIGURABLE_SETTINGS))))
+        if args.key == PROJECTIONS_KEY and args.value not in ("on", "off"):
+            refuse("invalid-projections-setting", "projections must be on or off")
+        old = get_setting(conn, args.key)
+        if args.dry_run:
+            print("%s: %s -> %s" % (args.key, old if old is not None else "(unset)", args.value))
+            return
+
+        def mutate(conn):
+            if _has_column(conn, "settings", "updated_at"):
+                conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?) "
+                             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+                             "updated_at = excluded.updated_at",
+                             (args.key, args.value, now_iso()))
+            else:
+                conn.execute("INSERT INTO settings(key, value) VALUES (?, ?) "
+                             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                             (args.key, args.value))
+
+        perform_write(root, conn, "settings-set", None, mutate)
+        print("%s = %s" % (args.key, args.value))
+    finally:
+        conn.close()
+
+
+def cmd_settings_list(args):
+    """Print every settings row, so "what is this ledger configured to do" is one command."""
+    root = resolve_root(args.root)
+    conn = connect(artifact_paths(root)["db"])
+    try:
+        for row in conn.execute("SELECT key, value FROM settings ORDER BY key"):
+            mark = " (configurable)" if row["key"] in CONFIGURABLE_SETTINGS else ""
+            print("%-28s %s%s" % (row["key"], row["value"], mark))
+    finally:
+        conn.close()
+
+
+def cmd_settings_get(args):
+    """Print one setting value."""
+    root = resolve_root(args.root)
+    conn = connect(artifact_paths(root)["db"])
+    try:
+        val = get_setting(conn, args.key, None)
+        if val is None:
+            sys.exit(1)
+        print(val)
+    finally:
+        conn.close()
+
+
+def validate_roadmap_section(section):
+    """Refuse headings the dashboard cannot render; never silently rename input."""
+    if section not in ROADMAP_SECTIONS:
+        hint = (" 'Deferred / cancelled' is a legacy markdown heading; use 'Deferred · vision'."
+                if section == "Deferred / cancelled" else "")
+        refuse("invalid-section", "unknown roadmap section %r.%s Valid sections: %s"
+               % (section, hint, ", ".join(repr(s) for s in ROADMAP_SECTIONS)))
+    return section
+
+
+def cmd_roadmap_sections(args):
+    print(json.dumps(ROADMAP_SECTIONS, ensure_ascii=False) if args.as_json
+          else "\n".join(ROADMAP_SECTIONS))
+
+
+def cmd_roadmap_update(args):
+    """Update a parked row's explicit fields through the receipt-backed writer.
+
+    GH-257 adds raw_text/section updates; GH-424 adds an explicit status marker.
+    Marker-only updates preserve raw_text, ratings, section and doc_path.
+    """
+    marker = getattr(args, "status_marker", None)  # `move` shares this handler.
+    accepted = getattr(args, "accepted_start", False)
+    if accepted and (args.gid is None or args.issue_num is not None or any(
+            getattr(args, k, None) is not None for k in
+            ("raw_text", "section", "status_marker", "issue_url"))):
+        refuse("accepted-start-fields", "--accepted-start requires only --gid (and optional --dry-run)")
+    if marker is not None and marker not in _ROADMAP_STATUS_MARKERS:
+        refuse("invalid-status-marker", "--status-marker must be one of %s"
+               % ", ".join(_ROADMAP_STATUS_MARKERS))
+    if args.section is not None:
+        validate_roadmap_section(args.section)
+    # `roadmap move` delegates here with its OWN namespace, which has no --issue-url. Read it
+    # defensively rather than adding the flag to a verb that has no business setting it.
+    issue_url = getattr(args, "issue_url", None)
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "roadmap_items"):
+            refuse("no-ledger", "this DB has no roadmap_items table; run `releases migrate` first")
+        if (args.issue_num is None) == (args.gid is None):
+            refuse("selector", "pass exactly one of --issue-num or --gid")
+        if args.issue_num is not None:
+            where, param, label = "gh_number = ?", args.issue_num, "GH-%d" % args.issue_num
+        else:
+            where, param, label = "global_id = ?", args.gid, args.gid
+
+        has_rating_cols = _has_column(conn, "roadmap_items", "rating_pri")
+        select_cols = ["*"]
+        rows = conn.execute(
+            "SELECT %s FROM roadmap_items WHERE %s LIMIT 2" % (", ".join(select_cols), where),
+            (param,)).fetchall()
+        if not rows:
+            refuse("no-such-row", "no roadmap row for %s; park it with `roadmap add` first" % label)
+        if len(rows) != 1:
+            refuse("selector", "%s matches multiple repositories; pass --gid" % label)
+        row = rows[0]
+        # Once identity is resolved, mutate exactly that row. A number-only UPDATE can otherwise
+        # cross repository ownership when two configured repositories both have issue #N.
+        where, param = "global_id = ?", row["global_id"]
+
+        if accepted:
+            if not _has_column(conn, "roadmap_items", "status_label") or 9 in pending_versions(conn):
+                refuse("status-label-unsupported", "schema009 required; migrate deliberately first")
+            repos = {r["id"]: r["slug"] for r in conn.execute("SELECT id,slug FROM repos")}
+            identity = resolve_roadmap_identity(row, repos, _origin_repo_identity(root))
+            if not identity["identity_valid"]:
+                refuse("accepted-start-identity", "roadmap row does not have qualified owned issue identity")
+            try:
+                native = read_native_issue(identity["repo"], row["gh_number"], row["issue_url"])
+            except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
+                refuse("accepted-start-native", str(exc))
+            if native["state"] != "open":
+                refuse("accepted-start-native", "accepted start requires an open native issue")
+
+        if not accepted and args.raw_text is None and args.section is None and marker is None and issue_url is None:
+            refuse("no-update", "pass at least one of --raw-text, --section, --status-marker or --issue-url")
+
+        new_raw_text = None
+        rating = None
+        if args.raw_text is not None:
+            new_raw_text = validate_raw_text(args.raw_text, row["gh_number"])
+            old_raw_text = row["raw_text"] or ""
+            if (new_raw_text == old_raw_text.strip()
+                    and args.section is None and marker is None and issue_url is None):
+                print("roadmap update: %s raw_text unchanged; nothing written" % label)
+                return
+            rating = parse_rating(new_raw_text, row["title"])
+            if not has_rating_cols and rating["rating_pri"] is not None:
+                refuse("schema-behind",
+                       "this ledger has no rating columns. Run `releases migrate` first — rating "
+                       "stores scores, it never installs schema.")
+
+        if issue_url is not None:
+            # The repair must not be able to re-create the defect it exists to fix.
+            validate_issue_identity(issue_url, row["gh_number"], require_github=True)
+
+        if args.dry_run:
+            if accepted:
+                print("accepted-start: %s -> In progress / 🚧 / in-progress (preview only)" % label)
+            if args.raw_text is not None:
+                print("raw_text: %s -> %s" % (old_raw_text, new_raw_text))
+                if rating["rating_pri"] is not None:
+                    print("rating: %s" % "/".join(str(rating[c]) for c in RATING_COLUMNS[:4]))
+                    if rating["rating_ovr"] is not None:
+                        print("ovr: %d" % rating["rating_ovr"])
+            if args.section:
+                print("section: -> %s" % args.section)
+            if marker is not None:
+                print("status_marker: -> %s" % marker)
+            if issue_url:
+                print("issue_url: %s -> %s" % (row["issue_url"], issue_url))
+            return
+
+        def mutate(conn):
+            if accepted:
+                current = conn.execute("SELECT * FROM roadmap_items WHERE global_id = ?",
+                                       (row["global_id"],)).fetchone()
+                if current is None or any(current[k] != row[k] for k in ("repo_id", "gh_number", "issue_url")):
+                    refuse("accepted-start-stale", "row changed during native lookup; retry admission")
+                latest = latest_owned_lifecycle(conn, current["repo_id"], current["gh_number"])
+                if (current["status_label"] == "in-progress" and latest
+                        and latest["event"] in _START_EVENTS
+                        and _live_roadmap_event(current["section"], current["status_marker"], False) == "in_flight"):
+                    raise _AlreadyRecorded("in_flight")
+                if dict(current) != dict(row):
+                    refuse("accepted-start-stale", "row changed during native lookup; retry admission")
+            ts = now_iso()
+            updates = ["updated_at = ?"]
+            params = [ts]
+            if accepted:
+                updates.extend(["section = ?", "status_marker = ?"])
+                params.extend(["In progress", "🚧"])
+            if args.raw_text is not None:
+                updates.append("raw_text = ?")
+                params.append(new_raw_text)
+                if has_rating_cols:
+                    for c in RATING_COLUMNS:
+                        updates.append("%s = ?" % c)
+                        params.append(rating[c])
+            if args.section is not None:
+                updates.append("section = ?")
+                params.append(args.section)
+            if marker is not None:
+                updates.append("status_marker = ?")
+                params.append(marker)
+            if issue_url is not None:
+                updates.append("issue_url = ?")
+                params.append(issue_url)
+
+            params.append(param)
+            conn.execute("UPDATE roadmap_items SET %s WHERE %s" % (", ".join(updates), where), params)
+
+        try:
+            perform_write(root, conn, "roadmap-update", row["global_id"], mutate,
+                          accepted_start=accepted)
+        except _AlreadyRecorded:
+            print("accepted-start: %s already active; original start preserved" % label)
+            return
+        print("updated %s" % label)
+    finally:
+        conn.close()
+
+
+def cmd_roadmap_move(args):
+    """GH-269: move a roadmap row to a new section (e.g. 'Completed', 'Deferred · vision')."""
+    return cmd_roadmap_update(args)
+
+
+def cmd_roadmap_reconcile_state(args):
+    """GH-492: preview by default; apply only positively verified terminal issue states.
+
+    Read every candidate before taking the writer lock, so one failed lookup cannot leave a
+    partially swept ledger. Local updated_at is a concurrency fence, not a GitHub freshness
+    watermark: an issue can close without any local row changing.
+    """
+    root = resolve_root(args.root)
+    conn = connect(artifact_paths(root)["db"])
+    try:
+        if not _table_exists(conn, "roadmap_items"):
+            refuse("no-ledger", "this DB has no roadmap_items table; run `releases migrate` first")
+        terminal = tuple(validate_roadmap_section(s) for s in ("Completed", "Deferred · vision"))
+        rows = conn.execute(
+            "SELECT * FROM roadmap_items WHERE section NOT IN (?, ?) AND gh_number IS NOT NULL "
+            "ORDER BY gh_number, global_id", terminal).fetchall()
+        changes = []
+        unresolvable = []
+        owned_repos = {r["id"]: r["slug"] for r in conn.execute("SELECT id,slug FROM repos")}
+        origin = _origin_repo_identity(root)
+        for row in rows:
+            # A URL cannot override the row's independently owned repository.
+            url = row["issue_url"] or ""
+            identity = resolve_roadmap_identity(row, owned_repos, origin)
+            if (not GH_ISSUE_URL_RE.fullmatch(url)
+                    or url.rsplit("/", 1)[-1] != str(row["gh_number"])
+                    or not identity["identity_valid"]):
+                # Per-row, not per-command: one row whose issue_url disagrees with its gh_number
+                # is a local data defect, and refusing the whole sweep over it strands every other
+                # row (#527). Still never guess this row's state — skip it and name it.
+                unresolvable.append(row["gh_number"])
+                continue
+            try:
+                native = read_native_issue(identity["repo"], row["gh_number"], url)
+            except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
+                refuse("roadmap-issue-state", "%s native identity/state unavailable (%s); refusing to guess "
+                       "issue state" % (url, exc))
+            try:
+                result = subprocess.run(
+                    [os.environ.get("RELEASES_GH_BIN", "gh"), "issue", "view", url,
+                     "--json", "state,stateReason"], cwd=root,
+                    capture_output=True, text=True, check=False, timeout=30)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                refuse("roadmap-issue-state", "%s could not be read (%s); refusing to guess issue state"
+                       % (url, exc))
+            if result.returncode:
+                refuse("roadmap-issue-state", "%s failed (exit %d): %s; refusing to guess issue state"
+                       % (url, result.returncode, result.stderr.strip()))
+            try:
+                issue = json.loads(result.stdout)
+            except ValueError:
+                issue = None
+            if not isinstance(issue, dict) or issue.get("state") not in ("OPEN", "CLOSED"):
+                refuse("roadmap-issue-state", "%s returned invalid state; refusing to guess issue state" % url)
+            if issue["state"] == "OPEN":
+                if native["state"] != "open":
+                    refuse("roadmap-issue-state", "%s changed from native closed to open during lookup; retry "
+                           "the sweep" % url)
+                continue
+            if native["state"] != "closed":
+                refuse("roadmap-issue-state", "%s changed from native open to closed during lookup; retry "
+                       "the sweep" % url)
+            reason = issue.get("stateReason")
+            if reason not in ("COMPLETED", "NOT_PLANNED"):
+                refuse("roadmap-issue-state", "%s returned unknown closure reason; refusing to guess "
+                       "issue state" % url)
+            target = terminal[0] if reason == "COMPLETED" else terminal[1]
+            changes.append((row, target))
+
+        for gh in unresolvable:
+            print("warn: rule=roadmap-issue-identity: GH-%s has no matching owned issue URL; skipped "
+                  "(fix with `releases roadmap update --issue-num %s --issue-url <url>`)"
+                  % (gh, gh))
+        if not changes:
+            print("roadmap reconcile-state: no changes; nothing written")
+            return
+        if not args.apply:
+            for row, target in changes:
+                print("would move GH-%d: %s -> %s" % (row["gh_number"], row["section"], target))
+            print("roadmap reconcile-state: dry-run; nothing written (pass --apply to write)")
+            return
+
+        def mutate(conn):
+            # Recheck the observed rows inside BEGIN IMMEDIATE; never overwrite a concurrent edit.
+            for row, target in changes:
+                current = conn.execute("SELECT * FROM roadmap_items WHERE global_id = ?",
+                                       (row["global_id"],)).fetchone()
+                if current is None or dict(current) != dict(row):
+                    refuse("roadmap-state-stale", "GH-%d changed during lookup; rerun the sweep"
+                           % row["gh_number"])
+            ts = now_iso()
+            for row, target in changes:
+                conn.execute("UPDATE roadmap_items SET section = ?, updated_at = ? WHERE global_id = ?",
+                             (target, ts, row["global_id"]))
+
+        batch = []
+        for row, target in changes:
+            event = "completed" if target == terminal[0] else "deferred"
+            batch.append((event, row["gh_number"], {
+                "source": "roadmap-reconcile-state", "transition": True,
+                "section": target, "previous_section": row["section"],
+            }, row["repo_id"]))
+        perform_write(root, conn, "roadmap-reconcile-state", None, mutate,
+                      work_events=batch)
+        for row, target in changes:
+            print("moved GH-%d: %s -> %s" % (row["gh_number"], row["section"], target))
+    finally:
+        conn.close()
+
+
 def cmd_roadmap_sync(args):
     root = resolve_root(args.root)
+    # PR #240 review: sync mirrors ROADMAP.md and DELETES rows absent from it — in a releases-mode
+    # repo the DB is canonical and rows arrive via `roadmap add` with no markdown source line, so
+    # mirroring would destroy parked intake. Skip cleanly (exit 0): wave_reconcile.py calls sync
+    # unconditionally post-merge and must stay green in both modes.
+    try:
+        with open(os.path.join(root, ".pdda-mode")) as f:
+            if "ROADMAP_SOURCE=releases" in f.read():
+                print("roadmap sync: skipped — releases-mode repo (the DB is canonical; sync only "
+                      "mirrors ROADMAP.md in legacy mode, and would delete rows parked by `roadmap add`)")
+                return
+    except OSError:
+        pass
     conn = connect(artifact_paths(root)["db"])
     try:
         md_path = os.path.join(root, ROADMAP_NAME)
         if not os.path.exists(md_path):
             refuse("roadmap-missing", "no %s at %s — nothing to shadow" % (ROADMAP_NAME, root))
         parsed = parse_roadmap_ledger(md_path)
+        if len(parsed) == 0:
+            ledger_has_content = False
+            in_ledger_check = False
+            with open(md_path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+            for line in lines:
+                if re.match(r"^##\s+Ledger\s*$", line.strip()):
+                    in_ledger_check = True
+                    continue
+                if in_ledger_check and re.match(r"^##\s+", line):
+                    break
+                # A `###` section heading is ledger STRUCTURE, not content: a ledger with its
+                # sections and no bullets is genuinely empty. Format drift, by contrast, is
+                # bullets in a shape the parser missed — still non-heading lines, still caught.
+                if (in_ledger_check and line.strip()
+                        and not line.strip().startswith("<!--")
+                        and not line.startswith("###")):
+                    ledger_has_content = True
+                    break
+            has_rows = bool(_table_exists(conn, "roadmap_items")
+                            and conn.execute("SELECT 1 FROM roadmap_items LIMIT 1").fetchone())
+            if ledger_has_content or has_rows:
+                # --allow-empty is the ONE sanctioned way to clear the mirror. It is deliberately
+                # narrow: it never excuses a ledger that still has content, so it cannot be used to
+                # paper over the format drift this guard exists to catch. Without it, an
+                # intentionally emptied ledger was a dead end, and AGENTS.md forbids the hand-edit
+                # of releases.db that agy suggested as the workaround. codex QA, 2026-08-31.
+                if ledger_has_content or not getattr(args, "allow_empty", False):
+                    refuse("roadmap-empty-parse",
+                           "parsed 0 entries from %s (%s); refusing to delete roadmap_items%s"
+                           % (ROADMAP_NAME,
+                              "ledger is non-empty" if ledger_has_content else "table has existing rows",
+                              "" if ledger_has_content else " — pass --allow-empty if the ledger is "
+                              "meant to be empty and you intend to clear the mirror"))
+                n_rows = conn.execute("SELECT COUNT(*) FROM roadmap_items").fetchone()[0]
+                print("roadmap sync: --allow-empty — %s ledger is empty, clearing %d mirrored row(s)"
+                      % (ROADMAP_NAME, n_rows))
         # duplicate GH keys in the markdown would make the mirror ambiguous — name it, do not pick
         seen = {}
         for e in parsed:
@@ -2795,6 +4232,21 @@ def cmd_roadmap_sync(args):
                            % (e["gh_number"], ROADMAP_NAME, seen[e["gh_number"]][:60],
                               e["title"][:60]))
                 seen[e["gh_number"]] = e["title"]
+
+        # An unkeyed row is keyed by its TITLE instead (see the `have`/`parsed` key below), so two
+        # identical unkeyed titles are the same ambiguity as a duplicate GH number — and more
+        # reachable since GH-349 made umbrella and range headings deliberately unkeyed. Left
+        # unguarded, both enter `adds` on the first sync and collapse to one key on the next,
+        # leaving an orphan row behind. codex QA, 2026-08-31.
+        seen_titles = set()
+        for e in parsed:
+            if e["gh_number"] is None:
+                if e["title"] in seen_titles:
+                    refuse("roadmap-duplicate-title",
+                           "the unkeyed entry %r appears twice in %s. Entries without a GH number "
+                           "are mirrored by title, so two identical ones are ambiguous; give one a "
+                           "GH key or retitle it, then re-run." % (e["title"][:80], ROADMAP_NAME))
+                seen_titles.add(e["title"])
 
         repo = conn.execute("SELECT id, global_id FROM repos ORDER BY id LIMIT 1").fetchone()
         if repo is None:
@@ -2880,10 +4332,130 @@ def cmd_roadmap_sync(args):
         conn.close()
 
 
+def roadmap_render(conn):
+    """Replay the ledger, preserving section names and each stored entry block (GH-423).
+
+    Positions are section-local. The GID breaks position ties deterministically without
+    depending on SQLite's row order. Unknown sections are retained, just as sync retains them;
+    consumers still decide which sections they accept.
+    """
+    parts = ["## Ledger\n"]
+    if not _table_exists(conn, "roadmap_items"):
+        return parts[0]
+    section = None
+    unparseable = []
+    for row in conn.execute("SELECT * FROM roadmap_items ORDER BY section, position, global_id"):
+        raw = row["raw_text"]
+        gh = row["gh_number"]
+        gh_label = "#%d" % gh if gh is not None else (row["global_id"] or "unknown")
+        if raw and raw.strip():
+            stripped = raw.strip()
+            first_line = stripped.splitlines()[0]
+            if first_line.startswith("- **"):
+                if not re.match(r'^- \*\*[^\r\n*]+?\*\*', first_line):
+                    unparseable.append(gh_label)
+                    continue
+            elif first_line.startswith("- ["):
+                if _ROADMAP_TASKBOX_RE.match(first_line) or not re.match(r'^- \[[^\r\n\]]+?\]', first_line):
+                    unparseable.append(gh_label)
+                    continue
+            else:
+                unparseable.append(gh_label)
+                continue
+        else:
+            title = row["title"]
+            if not title or not title.strip():
+                unparseable.append(gh_label)
+                continue
+            if gh is not None and _roadmap_gh_number(title) != gh:
+                title = "GH-%d · %s" % (gh, title)
+            raw = "- **%s**" % title
+            if row["status_marker"]:
+                raw += " " + row["status_marker"]
+            if all(_col(row, c) is not None for c in RATING_COLUMNS[:4]):
+                raw += " rated " + "/".join(str(row[c]) for c in RATING_COLUMNS[:4])
+                if _col(row, "rating_ovr") is not None:
+                    raw += " ovr %s" % row["rating_ovr"]
+            elif all(_col(row, c) is not None for c in ("complexity", "risk", "effort")):
+                raw += " cx/risk/eff %s/%s/%s" % (row["complexity"], row["risk"], row["effort"])
+            if row["doc_path"]:
+                raw += " → [doc](%s)" % row["doc_path"]
+            if row["issue_url"]:
+                raw += " · [issue](%s)" % row["issue_url"]
+
+        if row["section"] != section:
+            section = row["section"]
+            parts.append("\n### %s\n\n" % section)
+        parts.append(raw)
+        parts.append("\n\n")
+
+    if unparseable:
+        print("roadmap: warning: dropped %d unparseable row(s): %s" % (
+            len(unparseable), ", ".join(unparseable)), file=sys.stderr)
+
+    return "".join(parts)
+
+
+def cmd_roadmap_render(args):
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    out = os.path.realpath(args.out) if args.out else None
+    if out:
+        if out in {os.path.realpath(p) for p in paths.values()}:
+            refuse("roadmap-render-output", "--out must not overwrite a releases ledger artifact")
+        # Check the destination's repository, including foreign repos and symlink targets.
+        # Fail closed when git cannot establish whether ROADMAP.md is tracked.
+        for candidate in dict.fromkeys((out, os.path.abspath(args.out))):
+            if os.path.basename(candidate) != ROADMAP_NAME:
+                continue
+            try:
+                tracked = subprocess.run(
+                    ["git", "-C", os.path.dirname(candidate), "ls-files", "--error-unmatch", "--", ROADMAP_NAME],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError as exc:
+                refuse("roadmap-render-output", "cannot check tracked ROADMAP.md: %s" % exc)
+            if tracked.returncode != 1:
+                refuse("roadmap-render-output", "--out refuses tracked ROADMAP.md (or unverifiable tracking)")
+    conn = connect(paths["db"])
+    try:
+        rendered = roadmap_render(conn)
+    finally:
+        conn.close()
+    if out:
+        try:
+            _atomic_write(out, rendered)
+        except OSError as exc:
+            refuse("roadmap-render-output", "cannot write --out: %s" % exc)
+    else:
+        sys.stdout.write(rendered)
+
+
 def cmd_roadmap_list(args):
     root = resolve_root(args.root)
     conn = connect(artifact_paths(root)["db"])
     try:
+        if getattr(args, "as_json", False):
+            # Machine-readable contract for consumers (hq rollup): the human rendering below is
+            # a display, not an API — its column offsets shift whenever a field widens.
+            rows = []
+            if _table_exists(conn, "roadmap_items"):
+                selected_slug = get_setting(conn, "repo_slug")
+                for r in conn.execute("""SELECT roadmap_items.*, repos.slug AS repo_slug
+                                         FROM roadmap_items LEFT JOIN repos ON repos.id = roadmap_items.repo_id
+                                         ORDER BY section, position"""):
+                    rows.append({"global_id": r["global_id"], "gh_number": r["gh_number"],
+                                 "repo_slug": r["repo_slug"],
+                                 "is_selected_repo": r["repo_slug"] is not None and r["repo_slug"] == selected_slug,
+                                 "title": r["title"], "section": r["section"],
+                                 "position": r["position"], "status_marker": r["status_marker"],
+                                 "doc_path": _col(r, "doc_path"), "issue_url": _col(r, "issue_url"),
+                                 "raw_text": _col(r, "raw_text")})
+                    rows[-1]["status_label_supported"] = _has_column(conn, "roadmap_items", "status_label")
+                    rows[-1]["status_label"] = _col(r, "status_label")
+                    for key in (*RATING_COLUMNS, "risk"):
+                        rows[-1][key] = _col(r, key)
+            print(json.dumps(rows, ensure_ascii=False))
+            return
         if not _table_exists(conn, "roadmap_items"):
             print("(no roadmap shadow yet — run `releases roadmap sync`)")
             return
@@ -2906,28 +4478,1235 @@ def cmd_roadmap_list(args):
         conn.close()
 
 
-def cmd_gen(args):
+def resolve_issue_number(target):
+    """Resolve a target string or int into a GitHub issue number (int)."""
+    if isinstance(target, int):
+        return target
+    s = str(target).strip()
+    if s.isdigit():
+        return int(s)
+    m = re.search(r"(?:GH-|gh-|#|issues/)(\d+)", s)
+    if m:
+        return int(m.group(1))
+    refuse("invalid-issue-target", "cannot resolve GitHub issue number from %r" % target)
+
+
+def _require_jog_primary(root):
+    from harness_paths import require_primary
+    try:
+        require_primary(root)
+    except (ValueError, subprocess.CalledProcessError, OSError) as exc:
+        refuse("jog-primary", str(exc))
+
+
+def cmd_jog_add(args):
     root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
     paths = artifact_paths(root)
     conn = connect(paths["db"])
-    lock = WriterLock(root)
-    lock.acquire()
     try:
-        if os.path.exists(lock.journal_path):
-            refuse("journal-live", "run `releases check` to recover the interrupted write first")
-        generation = get_generation(conn)
-        _atomic_write(paths["gen"], gen_marker(generation) + "\n" + render_ledger(conn))
-        write_drift_report(root, conn)
-        print("generated %s (side-by-side, generation %d) + drift report %s"
-              % (paths["gen"], generation, paths["drift"]))
-        print("NOTE: Phase 0 is side-by-side ONLY — %s is never written by this tool"
-              % LEDGER_NAME)
+        gh_num = resolve_issue_number(args.target)
+
+        if args.dry_run:
+            print("jog add: would enqueue GH-%d at position %s" % (gh_num, args.pos or "end"))
+            return
+
+        gid = new_gid("jog-")
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            repo = conn.execute("SELECT id FROM repos ORDER BY id LIMIT 1").fetchone()
+            if not repo:
+                refuse("no-repo", "the DB has no repos row; run `releases init` first")
+
+            matches = conn.execute(
+                """SELECT id,global_id,repo_id,gh_number,status,position FROM jog_queue
+                   WHERE gh_number = ? LIMIT 2""", (gh_num,)).fetchall()
+            if len(matches) > 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            existing = matches[0] if matches else None
+            repo_id = existing["repo_id"] if existing else repo["id"]
+            ts = now_iso()
+            if existing:
+                if existing["status"] in ("pending", "running"):
+                    refuse("jog-duplicate",
+                           "GH-%d is already in jog queue (%s at position %d)"
+                           % (gh_num, existing["status"], existing["position"]))
+                if args.pos is not None:
+                    new_pos = max(1, args.pos)
+                    conn.execute("UPDATE jog_queue SET position = position + 1 WHERE repo_id = ? AND status IN ('pending', 'running') AND position >= ?",
+                                 (repo_id, new_pos))
+                else:
+                    max_pos = conn.execute("SELECT MAX(position) FROM jog_queue WHERE repo_id = ? AND status IN ('pending', 'running')",
+                                           (repo_id,)).fetchone()[0]
+                    new_pos = (max_pos or 0) + 1
+                conn.execute("""UPDATE jog_queue SET status = 'pending', position = ?, updated_at = ?,
+                                attempt_count = 0, lease_pid = NULL, failure_reason = NULL
+                                WHERE id = ?""", (new_pos, ts, existing["id"]))
+                work_events.append(_jog_work_event(existing, "pending"))
+                return
+
+            if args.pos is not None:
+                new_pos = max(1, args.pos)
+                conn.execute("UPDATE jog_queue SET position = position + 1 WHERE repo_id = ? AND status IN ('pending', 'running') AND position >= ?",
+                             (repo_id, new_pos))
+            else:
+                max_pos = conn.execute("SELECT MAX(position) FROM jog_queue WHERE repo_id = ? AND status IN ('pending', 'running')",
+                                       (repo_id,)).fetchone()[0]
+                new_pos = (max_pos or 0) + 1
+
+            conn.execute("""INSERT INTO jog_queue(global_id, repo_id, gh_number, position, status,
+                            created_at, updated_at, attempt_count, lease_pid, failure_reason)
+                            VALUES (?, ?, ?, ?, 'pending', ?, ?, 0, NULL, NULL)""",
+                         (gid, repo_id, gh_num, new_pos, ts, ts))
+            work_events.append(_jog_work_event(
+                {"global_id": gid, "repo_id": repo_id, "gh_number": gh_num}, "pending"))
+
+        perform_write(root, conn, "jog-add", gid, mutate, work_events=work_events)
+        print("jog: enqueued GH-%d" % gh_num)
     finally:
-        lock.release()
         conn.close()
 
 
+def cmd_jog_list(args):
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "jog_queue"):
+            if args.as_json:
+                print("[]")
+            else:
+                print("Jog queue is empty (table not initialized).")
+            return
+
+        where_clause = "" if args.show_all else "WHERE jq.status IN ('pending', 'running')"
+        has_rm = _table_exists(conn, "roadmap_items")
+        if has_rm:
+            query = """
+                SELECT jq.id, jq.global_id, jq.gh_number, jq.position, jq.status,
+                       jq.attempt_count, jq.lease_pid, jq.failure_reason, jq.created_at, jq.updated_at,
+                       ri.title, ri.doc_path, ri.issue_url
+                FROM jog_queue jq
+                LEFT JOIN roadmap_items ri ON ri.gh_number = jq.gh_number
+                %s
+                ORDER BY CASE WHEN jq.status IN ('running', 'pending') THEN 0 ELSE 1 END, jq.position ASC, jq.id ASC
+            """ % where_clause
+        else:
+            query = """
+                SELECT jq.id, jq.global_id, jq.gh_number, jq.position, jq.status,
+                       jq.attempt_count, jq.lease_pid, jq.failure_reason, jq.created_at, jq.updated_at,
+                       NULL AS title, NULL AS doc_path, NULL AS issue_url
+                FROM jog_queue jq
+                %s
+                ORDER BY CASE WHEN jq.status IN ('running', 'pending') THEN 0 ELSE 1 END, jq.position ASC, jq.id ASC
+            """ % where_clause
+
+        rows = [dict(r) for r in conn.execute(query).fetchall()]
+        if args.as_json:
+            print(json.dumps(rows, indent=2))
+            return
+
+        if not rows:
+            print("Jog queue is empty.")
+            return
+
+        print("%-4s %-8s %-10s %-4s %-8s %s" % ("Pos", "Issue", "Status", "Att", "PID", "Title / Doc"))
+        print("-" * 75)
+        for r in rows:
+            pos_str = str(r["position"]) if r["status"] in ("pending", "running") else "-"
+            issue_str = "GH-%d" % r["gh_number"]
+            status_str = r["status"]
+            att_str = str(r["attempt_count"])
+            pid_str = str(r["lease_pid"] or "-")
+            title_str = r["title"] or r["doc_path"] or "(no title)"
+            if len(title_str) > 38:
+                title_str = title_str[:35] + "..."
+            print("%-4s %-8s %-10s %-4s %-8s %s" % (pos_str, issue_str, status_str, att_str, pid_str, title_str))
+    finally:
+        conn.close()
+
+
+def cmd_jog_bump(args):
+    root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        gh_num = resolve_issue_number(args.target)
+
+        if args.dry_run:
+            print("jog bump: would move GH-%d to position 1" % gh_num)
+            return
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            repo = conn.execute("SELECT id FROM repos ORDER BY id LIMIT 1").fetchone()
+            if not repo:
+                refuse("no-repo", "the DB has no repos row; run `releases init` first")
+            row = conn.execute("SELECT id, global_id, position, status FROM jog_queue WHERE repo_id = ? AND gh_number = ?",
+                               (repo["id"], gh_num)).fetchone()
+            if not row:
+                refuse("jog-not-found", "GH-%d is not in jog queue" % gh_num)
+            if row["status"] not in ("pending", "running"):
+                refuse("jog-terminal", "GH-%d is %s; retry or re-add it first" % (gh_num, row["status"]))
+            cur_pos = row["position"]
+            if cur_pos == 1:
+                return
+            conn.execute("UPDATE jog_queue SET position = position + 1 WHERE repo_id = ? AND status IN ('pending', 'running') AND position < ?",
+                         (repo["id"], cur_pos))
+            conn.execute("UPDATE jog_queue SET position = 1, updated_at = ? WHERE id = ?", (now_iso(), row["id"]))
+
+        perform_write(root, conn, "jog-bump", "GH-%d" % gh_num, mutate)
+        print("jog: bumped GH-%d to position 1" % gh_num)
+    finally:
+        conn.close()
+
+
+def cmd_jog_drop(args):
+    root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        gh_num = resolve_issue_number(args.target)
+
+        if args.dry_run:
+            print("jog drop: would drop GH-%d with reason: %s" % (gh_num, args.reason))
+            return
+
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute("""SELECT id,global_id,repo_id,gh_number,position,status
+                                   FROM jog_queue WHERE gh_number = ? LIMIT 2""",
+                                (gh_num,)).fetchall()
+            if not rows:
+                refuse("jog-not-found", "GH-%d is not in jog queue" % gh_num)
+            if len(rows) != 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            row = rows[0]
+            if row["status"] == "completed" and not getattr(args, "force", False):
+                refuse("jog-already-completed", "GH-%d is already completed (pass --force to drop anyway)" % gh_num)
+            cur_pos = row["position"]
+            conn.execute("""UPDATE jog_queue SET status = 'dropped', failure_reason = ?, lease_pid = NULL,
+                            updated_at = ? WHERE id = ?""", (args.reason, now_iso(), row["id"]))
+            if row["status"] in ("pending", "running"):
+                conn.execute("UPDATE jog_queue SET position = position - 1 WHERE repo_id = ? AND status IN ('pending', 'running') AND position > ?",
+                             (row["repo_id"], cur_pos))
+            if row["status"] != "dropped":
+                work_events.append(_jog_work_event(row, "dropped"))
+
+        perform_write(root, conn, "jog-drop", "GH-%d" % gh_num, mutate,
+                      work_events=work_events)
+        print("jog: dropped GH-%d (reason: %s)" % (gh_num, args.reason))
+    finally:
+        conn.close()
+
+
+def cmd_jog_retry(args):
+    root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        gh_num = resolve_issue_number(args.target)
+
+        if args.dry_run:
+            print("jog retry: would reset GH-%d to pending" % gh_num)
+            return
+
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute("""SELECT id,global_id,repo_id,gh_number,status
+                                   FROM jog_queue WHERE gh_number = ? LIMIT 2""",
+                                (gh_num,)).fetchall()
+            if not rows:
+                refuse("jog-not-found", "GH-%d is not in jog queue" % gh_num)
+            if len(rows) != 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            row = rows[0]
+            max_pos = conn.execute("SELECT MAX(position) FROM jog_queue WHERE repo_id = ? AND status IN ('pending', 'running')",
+                                   (row["repo_id"],)).fetchone()[0]
+            new_pos = (max_pos or 0) + 1
+            conn.execute("""UPDATE jog_queue SET status = 'pending', position = ?, lease_pid = NULL,
+                            failure_reason = NULL, updated_at = ? WHERE id = ?""",
+                         (new_pos, now_iso(), row["id"]))
+            if row["status"] != "pending":
+                work_events.append(_jog_work_event(row, "pending"))
+
+        perform_write(root, conn, "jog-retry", "GH-%d" % gh_num, mutate,
+                      work_events=work_events)
+        print("jog: reset GH-%d to pending" % gh_num)
+    finally:
+        conn.close()
+
+
+def cmd_jog_skip(args):
+    root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        gh_num = resolve_issue_number(args.target)
+
+        if args.dry_run:
+            print("jog skip: would park GH-%d with reason: %s" % (gh_num, args.reason))
+            return
+
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute("""SELECT id,global_id,repo_id,gh_number,position,status
+                                   FROM jog_queue WHERE gh_number = ? LIMIT 2""",
+                                (gh_num,)).fetchall()
+            if not rows:
+                refuse("jog-not-found", "GH-%d is not in jog queue" % gh_num)
+            if len(rows) != 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            row = rows[0]
+            cur_pos = row["position"]
+            conn.execute("""UPDATE jog_queue SET status = 'parked', failure_reason = ?, lease_pid = NULL,
+                            updated_at = ? WHERE id = ?""", (args.reason, now_iso(), row["id"]))
+            if row["status"] in ("pending", "running"):
+                conn.execute("UPDATE jog_queue SET position = position - 1 WHERE repo_id = ? AND status IN ('pending', 'running') AND position > ?",
+                             (row["repo_id"], cur_pos))
+            if row["status"] != "parked":
+                work_events.append(_jog_work_event(row, "parked"))
+
+        perform_write(root, conn, "jog-skip", "GH-%d" % gh_num, mutate,
+                      work_events=work_events)
+        print("jog: skipped GH-%d (status: parked)" % gh_num)
+    finally:
+        conn.close()
+
+
+def cmd_jog_clear(args):
+    root = resolve_root(args.root)
+    if not args.dry_run:
+        _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if args.dry_run:
+            print("jog clear: would archive terminal items in jog queue")
+            return
+
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute("""SELECT global_id,repo_id,gh_number FROM jog_queue
+                                   WHERE status IN ('completed','dropped','parked','failed')
+                                   ORDER BY id""").fetchall()
+            conn.execute("""UPDATE jog_queue SET status = 'archived', updated_at = ?
+                            WHERE status IN ('completed', 'dropped', 'parked', 'failed')""", (now_iso(),))
+            for row in rows:
+                work_events.append((
+                    "jog_archived", row["gh_number"],
+                    {"source": "jog", "transition": True, "status": "archived",
+                     "jog_global_id": row["global_id"]}, row["repo_id"]))
+
+        perform_write(root, conn, "jog-clear", "jog_queue", mutate,
+                      work_events=work_events)
+        print("jog: archived terminal queue items")
+    finally:
+        conn.close()
+
+
+def cmd_jog_to_marathon(args):
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "jog_queue"):
+            print("No active jog items.")
+            return
+        rows = conn.execute("SELECT gh_number FROM jog_queue WHERE status IN ('pending', 'running') ORDER BY position").fetchall()
+        issues = ["GH-%d" % r["gh_number"] for r in rows]
+        if issues:
+            print(" ".join(issues))
+        else:
+            print("No active jog items.")
+    finally:
+        conn.close()
+
+
+def jog_acquire_lease(root, gh_num, pid):
+    """Acquire a lease on an enqueued item via perform_write (receipt-backed)."""
+    _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute(
+                "SELECT id,global_id,repo_id,gh_number,status,attempt_count "
+                "FROM jog_queue WHERE gh_number = ? LIMIT 2", (gh_num,)).fetchall()
+            if not rows:
+                if conn.execute("SELECT 1 FROM repos LIMIT 1").fetchone() is None:
+                    refuse("no-repo", "no repos row")
+                refuse("jog-not-found", "GH-%d not in jog queue" % gh_num)
+            if len(rows) != 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            row = rows[0]
+            ts = now_iso()
+            att = row["attempt_count"] + 1
+            conn.execute("""UPDATE jog_queue SET status = 'running', lease_pid = ?, attempt_count = ?, updated_at = ?
+                            WHERE id = ?""", (pid, att, ts, row["id"]))
+
+        perform_write(root, conn, "jog-lease", "GH-%d" % gh_num, mutate)
+    finally:
+        conn.close()
+
+
+def jog_set_status(root, gh_num, status, failure_reason=None, clear_lease=True):
+    """Transition a jog queue item to a new status via perform_write (receipt-backed)."""
+    _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        work_events = []
+
+        def mutate(conn):
+            _ensure_jog_schema(conn)
+            rows = conn.execute("""SELECT id,global_id,repo_id,gh_number,position,status
+                                   FROM jog_queue WHERE gh_number = ? LIMIT 2""",
+                                (gh_num,)).fetchall()
+            if not rows:
+                refuse("jog-not-found", "GH-%d not in jog queue" % gh_num)
+            if len(rows) != 1:
+                refuse("jog-event-identity",
+                       "GH-%d matches multiple repositories; refusing queue mutation" % gh_num)
+            row = rows[0]
+            ts = now_iso()
+            pid_clause = ", lease_pid = NULL" if clear_lease else ""
+            conn.execute(f"""UPDATE jog_queue SET status = ?, failure_reason = ?, updated_at = ?{pid_clause}
+                            WHERE id = ?""", (status, failure_reason, ts, row["id"]))
+            if (row["status"] in ("pending", "running")
+                    and status in ("completed", "dropped", "archived", "parked", "failed")):
+                conn.execute("""UPDATE jog_queue SET position = position - 1
+                                WHERE repo_id = ? AND status IN ('pending', 'running') AND position > ?""",
+                             (row["repo_id"], row["position"]))
+            if row["status"] != status:
+                work_events.append(_jog_work_event(row, status))
+
+        perform_write(root, conn, f"jog-{status}", "GH-%d" % gh_num, mutate,
+                      work_events=work_events)
+    finally:
+        conn.close()
+
+
+def jog_reconcile_orphan_leases(root):
+    """Inspect and reconcile orphan running rows whose lease_pid is dead via perform_write."""
+    _require_jog_primary(root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "jog_queue"):
+            return []
+        rows = conn.execute("""SELECT id,global_id,repo_id,gh_number,attempt_count,lease_pid
+                               FROM jog_queue WHERE status = 'running'""").fetchall()
+        orphans = []
+        for r in rows:
+            pid = r["lease_pid"]
+            alive = False
+            if pid and isinstance(pid, int):
+                try:
+                    os.kill(pid, 0)
+                    alive = True
+                except OSError:
+                    pass
+            if not alive:
+                orphans.append(r)
+
+        if not orphans:
+            return []
+
+        work_events = []
+        reconciled = []
+
+        def mutate(conn):
+            ts = now_iso()
+            for candidate in orphans:
+                # Re-resolve under BEGIN IMMEDIATE: the liveness probe happens before the writer
+                # transaction, so a concurrently recovered row must not be rewritten or emitted.
+                row = conn.execute("""SELECT id,global_id,repo_id,gh_number,attempt_count
+                                      FROM jog_queue WHERE id = ? AND status = 'running'""",
+                                   (candidate["id"],)).fetchone()
+                if row is None:
+                    continue
+                if row["attempt_count"] >= 3:
+                    status = "parked"
+                    conn.execute("""UPDATE jog_queue SET status = 'parked', failure_reason = 'orphan lease: max attempts exceeded',
+                                    lease_pid = NULL, updated_at = ? WHERE id = ?""", (ts, row["id"]))
+                else:
+                    status = "pending"
+                    conn.execute("""UPDATE jog_queue SET status = 'pending', lease_pid = NULL, updated_at = ?
+                                    WHERE id = ?""", (ts, row["id"]))
+                work_events.append((
+                    "jog_%s" % status, row["gh_number"],
+                    {"source": "jog", "transition": True, "status": status,
+                     "jog_global_id": row["global_id"]}, row["repo_id"]))
+                reconciled.append(row["gh_number"])
+
+        perform_write(root, conn, "jog-reconcile", "jog_queue", mutate,
+                      work_events=work_events)
+        return reconciled
+    finally:
+        conn.close()
+
+
+def cmd_jog_run(args):
+    """Execute the serial jog queue supervisor."""
+    try:
+        from jog_run import jog_run_main
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from jog_run import jog_run_main
+    jog_run_main(args)
+
+
+def _jog_verb_dispatch(fn_name):
+    """GH-280 Phase 3 verb dispatch: shared root/target resolution, then delegate to jog_run."""
+    def handler(args):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import jog_run
+        root = resolve_root(getattr(args, "root", None))
+        gh_num = resolve_issue_number(args.target)
+        try:
+            result = getattr(jog_run, fn_name)(root, gh_num, args)
+        except jog_run.ContractError as exc:
+            print(f"jog: {exc}", file=sys.stderr)
+            sys.exit(2)
+        sys.exit(result)
+    return handler
+
+
+def cmd_jog_resume(args):
+    _jog_verb_dispatch("jog_resume")(args)
+
+
+def cmd_jog_retry_gate(args):
+    _jog_verb_dispatch("jog_retry_gate")(args)
+
+
+def cmd_jog_retry_build(args):
+    _jog_verb_dispatch("jog_retry_build")(args)
+
+
+def cmd_jog_land(args):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import jog_run
+    root = resolve_root(getattr(args, "root", None))
+    gh_num = resolve_issue_number(args.target)
+    sys.exit(jog_run.jog_land(root, gh_num, getattr(args, "pr", None)))
+
+
+
+
+def cmd_gen(args):
+    refuse("retired",
+           "releases gen is retired — RELEASES.generated.md and drift reporting have been removed (GH-568); use releases list or releases show instead")
+
+
 # ── check ───────────────────────────────────────────────────────────────────────────────────────
+
+def _parse_reanchor_breaks(target_gid):
+    """Extract re-anchored break count from a merge-rebuild receipt's target_gid (GH-360).
+    Returns int count for canonical 'reanchor:N', None if target_gid is NULL (legacy un-scoped rebuild),
+    or -1 for any non-NULL malformed/non-canonical target_gid.
+    """
+    if target_gid is None:
+        return None
+    if not isinstance(target_gid, str):
+        return -1
+    m = re.fullmatch(r"reanchor:(\d+)", target_gid)
+    if m:
+        return int(m.group(1))
+    return -1
+
+
+class _AlreadyRecorded(Exception):
+    """Raised INSIDE perform_write's mutate when the event to emit is already the row's latest
+    (GH-564). perform_write's own abort path rolls back, clears the journal and re-raises
+    before any receipt or generation bump, so a skip leaves nothing on the chain. The decision
+    is made under WriterLock and inside BEGIN IMMEDIATE, which is what makes it safe against
+    two producers racing (Codex plan QA r1): a read before perform_write could let both see the
+    same stale latest event and each emit a duplicate."""
+
+
+def _latest_event(conn, gh_number, only_source=None, exclude_source=None):
+    """The most recent work_events.event for this issue, filtered by producer.
+
+    `only_source="backfill"` sees only backfill's own rows; `exclude_source="backfill"` sees
+    everything BUT them. Each producer compares against a view that ignores the other (Codex
+    plan QA r3): with one global latest, a backfill `rated` after a `review_ready` lets the
+    next reconcile re-emit `review_ready`, whose presence lets the next backfill re-emit
+    `rated` — two honest observers ping-ponging forever. Backfill events are snapshots of the
+    ledger's claim, not state transitions, so they must not reset what reconcile has already
+    announced; and reconcile's events must not make backfill think its projection changed."""
+    # No LIMIT (impl QA r1): the producer filter runs in Python, so a cap applied before it
+    # would hide a producer's last row behind enough newer rows from the other producer, and
+    # the "already recorded" check would answer None — a duplicate. A per-issue event list is
+    # small; correctness is not worth a cap here. The cursor iterates lazily either way.
+    rows = conn.execute("""SELECT event, payload FROM work_events WHERE gh_number = ?
+                           ORDER BY id DESC""", (gh_number,))
+    for event, payload in rows:
+        if only_source is None and exclude_source is None:
+            return event
+        # `work emit --payload-json` accepts ANY JSON value, so a prior `[]`, `null` or string
+        # payload is a legitimate row (impl QA r2). Only an object can carry a source; anything
+        # else — including unparseable text — is "no producer named".
+        try:
+            decoded = json.loads(payload) if payload else None
+        except ValueError:
+            decoded = None
+        src = decoded.get("source") if isinstance(decoded, dict) else None
+        if only_source is not None and src != only_source:
+            continue
+        if exclude_source is not None and src == exclude_source:
+            continue
+        return event
+    return None
+
+
+def _emit_work_event(root, conn, event, gh_number, payload, unless_latest_in=(), only_source=None,
+                     exclude_source=None, terminal=()):
+    """Record one work event through perform_write — the ONE seam (GH-549), reused by `work
+    emit`, `work backfill` and the review-ready scan (GH-564).
+
+    Returns the txn_id, or raises _AlreadyRecorded when the issue's latest event (scoped by
+    `only_source` / `exclude_source`) is any name in `unless_latest_in`, OR when its latest
+    event from ANY producer is in `terminal` — a terminal claim (`completed`, `pr_merged`)
+    suppresses whoever made it, since a backfill `completed` is the only producer of that name
+    and reconcile must still honour it. An empty `unless_latest_in` means unconditional —
+    `work emit`'s contract. The check runs inside `mutate`, i.e. inside the transaction — see
+    _AlreadyRecorded.
+    """
+    if not _table_exists(conn, "work_events"):
+        refuse("schema-old", "this ledger predates work_events — run `releases migrate` first")
+    if _repo_id_for_event(conn) is None:
+        refuse("no-repo", "the ledger has no repo row to attribute this event to")
+    suppress = set(unless_latest_in)
+    terminal_set = set(terminal)
+
+    def mutate(c):
+        """Changes no domain row. The only thing it does is decide, atomically with the write,
+        whether the write should happen at all."""
+        if terminal_set:
+            anyone = _latest_event(c, gh_number)
+            if anyone in terminal_set:
+                raise _AlreadyRecorded(anyone)
+        if not suppress:
+            return
+        latest = _latest_event(c, gh_number, only_source=only_source, exclude_source=exclude_source)
+        if latest in suppress:
+            raise _AlreadyRecorded(latest)
+
+    return perform_write(root, conn, "work-emit", None, mutate,
+                         work_event=(event, gh_number, payload))
+
+
+def cmd_work_emit(args):
+    """`work emit` — record one work event from OUTSIDE a domain verb (GH-549).
+
+    This is how merge-cleanup reports a merge it actually witnessed. It is an ORDINARY
+    perform_write caller — the 29th — not a second write protocol. Codex's plan review was
+    right that a standalone verb re-implementing the lock, journal, receipt, generation stamp,
+    staged dump and atomic rename would be a fork of the one path everything else uses; here
+    perform_write does all of that and this only supplies the `mutate`.
+
+    Its extractor is registered as _extract_none and returns None, so the generic seam does not
+    insert a second row: `None` from a registered extractor means "my mutate already wrote it",
+    never "no event". One `work emit` therefore produces exactly one work_events row.
+    """
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        payload = None
+        if args.payload_json:
+            try:
+                payload = json.loads(args.payload_json)
+            except ValueError as exc:
+                refuse("bad-payload", "--payload-json is not valid JSON (%s)" % exc)
+        gid = getattr(args, "roadmap_gid", None)
+        if gid:
+            if (args.event != "label_repair" or not _has_column(conn, "roadmap_items", "status_label")
+                    or 9 in pending_versions(conn)):
+                refuse("label-repair-selector", "--roadmap-gid requires label_repair and schema009")
+            row = conn.execute("SELECT * FROM roadmap_items WHERE global_id = ?", (gid,)).fetchone()
+            repos = {r["id"]: r["slug"] for r in conn.execute("SELECT id,slug FROM repos")}
+            if row is None:
+                refuse("label-repair-identity", "no such roadmap row")
+            identity = resolve_roadmap_identity(row, repos, _origin_repo_identity(root))
+            if not identity["identity_valid"]:
+                refuse("label-repair-identity", "unqualified owned issue identity")
+            def repair(c):
+                current = c.execute("SELECT * FROM roadmap_items WHERE global_id = ?", (gid,)).fetchone()
+                if current is None or dict(current) != dict(row):
+                    refuse("label-repair-stale", "row changed; retry repair")
+                if (current["status_label"] is not None or _live_roadmap_event(
+                        current["section"], current["status_marker"], False) not in ("completed", "deferred")):
+                    refuse("label-repair-active", "repair requires a NULL terminal row")
+            perform_write(root, conn, "work-emit", gid, repair, work_event=(
+                "label_repair", row["gh_number"], {"source": "label-repair", "roadmap_gid": gid}, row["repo_id"]))
+            print("emitted label_repair for %s" % gid)
+            return
+        if args.event == "label_repair":
+            refuse("label-repair-selector", "label_repair requires qualified --roadmap-gid")
+        # `work emit` is unconditional by contract: merge-cleanup calls it to report a merge it
+        # witnessed, and a witnessed event is recorded whatever came before it.
+        txn_id = _emit_work_event(root, conn, args.event, args.gh_number, payload)
+        print("emitted %s for GH-%s (txn %s)" % (args.event, args.gh_number, txn_id))
+    finally:
+        conn.close()
+
+
+def _backfill_event_for(section, marker, rated):
+    """Which event a roadmap row's CURRENT state projects to (GH-564). Ordered; first match wins
+    (Codex plan QA r3 asked for the order to be total):
+
+      1. a Deferred section is skipped whatever the marker — a deferred 🚧 is still deferred
+      2. a Completed section is `completed`, whatever the marker — closeout writes the section,
+         and 40 live rows carry a stale 🆕 from the #424 marker bug. NOT `pr_merged`: that name
+         asserts a merge the snapshot did not witness (plan QA r1, and the same reasoning that
+         kept marker→merged out of the live stream in #549).
+      3. 🚧, or an In-progress section, is `in_flight`
+      4. otherwise rated → `rated`, unrated → `parked`
+    """
+    sec = (section or "").strip()
+    if sec.lower().startswith("deferred"):
+        return None
+    if sec.lower().startswith("completed"):
+        return "completed"
+    if marker == "\U0001F6A7" or sec.lower().startswith("in progress"):
+        return "in_flight"
+    return "rated" if rated else "parked"
+
+
+def cmd_work_backfill(args):
+    """`work backfill` — project the roadmap's EXISTING state onto the event stream (GH-564).
+
+    work_events begins at migration 008, so `reconcile --reset` can only replay what was emitted
+    after #549 landed; every issue that was parked, rated, started or completed before that has
+    no event and sits off the board. This walks roadmap_items and emits one event per row from
+    its current section/marker, each through _emit_work_event → perform_write, so every synthetic
+    event carries a real receipt and txn_id. Never a direct INSERT.
+
+    Idempotent: a row is skipped when its latest BACKFILL event already names the same state —
+    decided inside the transaction. A second run emits zero. A row whose state changed since
+    the last backfill emits again. --dry-run prints the whole table and touches nothing.
+    """
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    conn = connect(paths["db"])
+    try:
+        if not _table_exists(conn, "work_events"):
+            refuse("schema-old", "this ledger predates work_events — run `releases migrate` first")
+        rows = conn.execute("""SELECT gh_number, section, status_marker,
+                                      (rating_pri IS NOT NULL) AS rated
+                               FROM roadmap_items
+                               WHERE gh_number IS NOT NULL AND gh_number != ''
+                               ORDER BY CAST(gh_number AS INTEGER)""").fetchall()
+        plan = []
+        for gh, section, marker, rated in rows:
+            try:
+                gh_int = int(gh)
+            except (TypeError, ValueError):
+                continue
+            event = _backfill_event_for(section, marker, bool(rated))
+            if event is None:
+                plan.append((gh_int, section, marker, None, "skip: deferred"))
+                continue
+            # Read-only preview of the decision the transaction will make for real below. The
+            # authoritative check is inside mutate; this only makes --dry-run and the summary
+            # line honest about what a real run would do.
+            latest = _latest_event(conn, gh_int, only_source="backfill")
+            note = "skip: already %s" % latest if latest == event else "emit"
+            plan.append((gh_int, section, marker, event, note))
+        for gh, section, marker, event, note in plan:
+            print("GH-%-5s %-24s %-2s -> %-10s %s" % (gh, (section or "")[:24], marker or "",
+                                                     event or "-", note))
+        if args.dry_run:
+            print("dry-run: %d row(s), %d would emit, 0 written"
+                  % (len(plan), sum(1 for p in plan if p[4] == "emit")))
+            return
+        emitted = skipped = failed = 0
+        for gh, section, marker, event, note in plan:
+            if event is None:
+                skipped += 1
+                continue
+            payload = {"source": "backfill", "section": section, "marker": marker}
+            try:
+                _emit_work_event(root, conn, event, gh, payload,
+                                 unless_latest_in=(event,), only_source="backfill")
+                emitted += 1
+            except _AlreadyRecorded:
+                skipped += 1
+            except SystemExit:
+                raise
+            except Exception as exc:              # noqa: BLE001 — one bad row must not stop the rest
+                failed += 1
+                print("GH-%s: FAILED — %r" % (gh, exc), file=sys.stderr)
+        print("backfill: %d emitted, %d skipped, %d failed" % (emitted, skipped, failed))
+        if emitted:
+            _dispatch_work_connectors(paths["db"], now_iso())
+    finally:
+        conn.close()
+
+
+def _repo_identity_for_scan(root):
+    """`owner/name` for `gh pr list --repo` (GH-564, Codex plan QA r3). `work reconcile --root X`
+    can run from any CWD, so the repository must be resolved from the ledger's own identity —
+    never from the caller's checkout. First enabled connector's repos[0], else the root's
+    origin remote, else None (the scan is skipped with a printed reason)."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import work_connectors
+        for name, cfg in sorted(work_connectors.load_connectors(warn=False).items()):
+            repos = cfg.get("repos") or []
+            if repos and isinstance(repos[0], str) and "/" in repos[0]:
+                return repos[0]
+    except Exception:                                # noqa: BLE001 — identity lookup is best-effort
+        pass
+    try:
+        r = subprocess.run(["git", "-C", root, "remote", "get-url", "origin"],
+                           capture_output=True, text=True, timeout=10)
+        url = (r.stdout or "").strip()
+        m = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/?$", url)
+        if r.returncode == 0 and m:
+            return m.group(1)
+    except Exception:                                # noqa: BLE001
+        pass
+    return None
+
+
+def _linked_issues(pr):
+    """Issue numbers a PR closes, from its title and body — the same regex merge_cleanup uses
+    (skills/2-daily/merge-cleanup/scripts/merge_cleanup.py:CLOSES_RE), inlined rather than imported
+    because that is a skill script off sys.path and a ledger verb must not grow a dependency
+    on a skill's file layout."""
+    text = "%s\n%s" % (pr.get("title") or "", pr.get("body") or "")
+    seen, out = set(), []
+    for m in re.finditer(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)", text, re.I):
+        n = int(m.group(1))
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
+
+
+def _scan_review_ready(root, conn):
+    """Emit `review_ready` for every issue an OPEN, NON-DRAFT PR closes (GH-564). Runs before
+    dispatch and outside the connector lock. Fail-soft at every layer: no repo identity, no gh,
+    a failing gh, bad JSON, or one emission raising — each is printed and the verb continues.
+    Returns (emitted, skipped, failed)."""
+    if os.environ.get("XYZ_WORK_CONNECTORS") == "0":
+        return (0, 0, 0)
+    # The two conditions _emit_work_event REFUSES on (SystemExit), checked once here so the scan
+    # skips with a reason instead of taking the verb down before dispatch (impl QA r3). A
+    # refusal is right for `work emit`, whose caller wants to know; it is wrong for a
+    # best-effort scan inside a verb that promised never to fail.
+    if not _table_exists(conn, "work_events"):
+        print("review-ready scan skipped: this ledger predates work_events (run `releases migrate`)")
+        return (0, 0, 0)
+    if _repo_id_for_event(conn) is None:
+        print("review-ready scan skipped: the ledger has no repo row to attribute events to")
+        return (0, 0, 0)
+    repo = _repo_identity_for_scan(root)
+    if not repo:
+        print("review-ready scan skipped: no repository identity (set work_connectors.<name>.repos)")
+        return (0, 0, 0)
+    gh_bin = os.environ.get("XYZ_BOARD_SYNC_GH_BIN", "gh")
+    try:
+        r = subprocess.run([gh_bin, "pr", "list", "--repo", repo, "--state", "open",
+                            "--json", "number,isDraft,title,body", "--limit", "200"],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            print("review-ready scan skipped: %s pr list exited %s: %s"
+                  % (gh_bin, r.returncode, (r.stderr or "").strip()[:200]))
+            return (0, 0, 0)
+        prs = json.loads(r.stdout or "[]")
+        if not isinstance(prs, list):
+            raise ValueError("not a list")
+    except Exception as exc:                          # noqa: BLE001 — never fails the verb
+        print("review-ready scan skipped: %r" % (exc,))
+        return (0, 0, 0)
+    emitted = skipped = failed = 0
+    for pr in prs:
+        if not isinstance(pr, dict) or pr.get("isDraft"):
+            continue
+        for n in _linked_issues(pr):
+            try:
+                _emit_work_event(root, conn, "review_ready", n, {"pr": pr.get("number")},
+                                 unless_latest_in=("review_ready", "pr_merged"),
+                                 exclude_source="backfill",
+                                 terminal=("completed", "pr_merged"))
+                emitted += 1
+            except _AlreadyRecorded:
+                skipped += 1
+            except KeyboardInterrupt:
+                raise
+            except (SystemExit, Exception) as exc:    # noqa: BLE001 — one issue must not stop the scan
+                # SystemExit included (impl QA r3): a refusal from the writer for ONE issue is a
+                # failed scan item, not a reason to abandon dispatch for every other issue.
+                failed += 1
+                print("review-ready GH-%s: FAILED — %r (continuing)" % (n, exc), file=sys.stderr)
+    if emitted or failed:
+        print("review-ready: %d emitted, %d already current, %d failed" % (emitted, skipped, failed))
+    return (emitted, skipped, failed)
+
+
+_START_EVENTS = {"in_flight", "jog_running", "jog_leased"}
+_STOP_EVENTS = {"parked", "rated", "completed", "deferred", "pr_merged",
+                "jog_pending", "jog_completed", "jog_parked", "jog_failed",
+                "jog_dropped", "jog_archived", "jog_stopped", "jog_stop",
+                "jog_deferred"}
+
+
+def _is_lifecycle_event(ev):
+    """Return whether an event genuinely supersedes earlier lifecycle evidence."""
+    event = ev.get("event")
+    payload = ev.get("payload") if isinstance(ev.get("payload"), dict) else {}
+    if payload.get("source") == "backfill":
+        return False
+    if event in _START_EVENTS:
+        return (event in ("jog_running", "jog_leased")
+                or (event == "in_flight" and payload.get("source") in ("roadmap-update", "jog")
+                    and payload.get("transition") is True))
+    if event in ("rated", "parked"):
+        return (payload.get("source") == "roadmap-update"
+                and payload.get("transition") is True)
+    return event in _STOP_EVENTS
+
+
+def _sqlite_header_uses_wal(db_path):
+    """Inspect SQLite's header without opening it; read/write version 2 denotes WAL."""
+    try:
+        with open(db_path, "rb") as handle:
+            header = handle.read(20)
+    except OSError:
+        return False
+    return (len(header) >= 20 and header.startswith(b"SQLite format 3\x00")
+            and (header[18] == 2 or header[19] == 2))
+
+
+def _utc_datetime(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = _dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(_dt.timezone.utc)
+
+
+def _repo_from_issue_url(value):
+    m = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/issues/(\d+)", value or "")
+    return (m.group(1), int(m.group(2))) if m else (None, None)
+
+
+def _origin_repo_identity(root):
+    try:
+        proc = subprocess.run(["git", "-C", root, "remote", "get-url", "origin"],
+                              capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode:
+        return None
+    match = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/?$", (proc.stdout or "").strip())
+    return match.group(1) if match else None
+
+
+def resolve_roadmap_identity(row, repo_rows, origin_repo=None):
+    """Qualify the row's OWN repo, never a same-number or URL-selected neighbour."""
+    url_repo, number = _repo_from_issue_url(row["issue_url"])
+    slug = repo_rows.get(row["repo_id"])
+    source = slug if slug and "/" in slug else None
+    name = origin_repo.rsplit("/", 1)[-1] if origin_repo else None
+    # GH-1016: a legacy bare slug is the checkout folder name, which may differ from the GitHub
+    # name by case or -/_ ("aegis-sleuth-slack-bot" vs "AEGIS-Sleuth-Slackbot"). Tolerate that only
+    # for a single-repo ledger; validity below still needs the URL to name origin exactly.
+    key = lambda s: s.casefold().replace("-", "").replace("_", "")
+    if slug and name and (slug == name or ("/" not in slug and len(repo_rows) == 1
+                                           and key(slug) == key(name))):
+        source = origin_repo
+    valid = bool(source and url_repo == source and number == row["gh_number"])
+    return {"repo": source, "number": row["gh_number"], "identity_valid": valid,
+            "issue_url": row["issue_url"], "repo_id": row["repo_id"]}
+
+
+def latest_owned_lifecycle(conn, repo_id, number):
+    for row in conn.execute("SELECT id,event,payload,at FROM work_events "
+                            "WHERE repo_id = ? AND gh_number = ? ORDER BY id DESC",
+                            (repo_id, number)):
+        ev = dict(row)
+        try:
+            ev["payload"] = json.loads(ev["payload"]) if ev["payload"] else None
+        except ValueError:
+            continue
+        if _is_lifecycle_event(ev):
+            return ev
+    return None
+
+
+def read_native_issue(repo, number, issue_url, timeout=10):
+    """REST issues expose pull_request explicitly; `gh issue view` alone is not proof."""
+    proc = subprocess.run([os.environ.get("XYZ_LABELS_GH_BIN", os.environ.get("RELEASES_GH_BIN", "gh")),
+                           "api", "repos/%s/issues/%d" % (repo, number)],
+                          capture_output=True, text=True, timeout=timeout)
+    if proc.returncode:
+        raise ValueError("native issue read failed: %s" % proc.stderr.strip())
+    issue = json.loads(proc.stdout)
+    if (not isinstance(issue, dict) or "pull_request" in issue
+            or issue.get("number") != number or issue.get("html_url") != issue_url
+            or issue.get("state") not in ("open", "closed")
+            or not isinstance(issue.get("labels"), list)):
+        raise ValueError("native issue identity/state unavailable or pull request")
+    return issue
+
+
+def load_work_evidence(db_path, stale_days=3, as_of=None):
+    """Read schema-8 work evidence without migration, side effects, config, or network."""
+    db_path = os.path.abspath(os.fspath(db_path))
+    root = os.path.dirname(db_path)
+    result = {"schema_ready": False, "schema_version": None, "generation": None,
+              "status_label_supported": False,
+              "as_of": as_of or now_iso(), "stale_days": stale_days,
+              "issues": [], "cursors": [], "warnings": []}
+    if not os.path.isfile(db_path):
+        result["error"] = "missing releases.db; initialize or select the correct --root"
+        return result
+    sidecars = [p for p in (db_path + "-wal", db_path + "-shm", db_path + "-journal")
+                if os.path.exists(p)]
+    if _sqlite_header_uses_wal(db_path):
+        result["error"] = ("ambiguous live SQLite state; database header uses WAL mode; "
+                           "checkpoint it and run `releases check` before diagnostics")
+        return result
+    common = git_common_dir(root)
+    if common is None:
+        result["error"] = ("unsupported ledger root for read-only diagnostics: "
+                           "cannot resolve the git common-dir")
+        return result
+    intent = os.path.join(common, JOURNAL_NAME)
+    if sidecars or (intent and os.path.exists(intent)):
+        result["error"] = ("ambiguous live SQLite state; run `releases check` before diagnostics: "
+                           + ", ".join(os.path.basename(p) for p in sidecars
+                                       + ([intent] if intent and os.path.exists(intent) else [])))
+        return result
+    try:
+        # Quote the path as a URI component: raw # and ? in a filesystem path would otherwise
+        # become a fragment/query and silently open a different file.
+        db_uri = "file:%s?mode=ro" % urllib.parse.quote(db_path, safe="/")
+        conn = sqlite3.connect(db_uri, uri=True, timeout=10)
+        conn.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        result["error"] = "read-only open failed: %s" % exc
+        return result
+    try:
+        if not _table_exists(conn, "schema_migrations"):
+            result["error"] = "schema tracker missing; run `releases check`, then migrate deliberately"
+            return result
+        versions = [int(r[0]) for r in conn.execute(
+            "SELECT version FROM schema_migrations ORDER BY version")]
+        result["schema_version"] = max(versions) if versions else 0
+        if result["schema_version"] < 8 or not _table_exists(conn, "work_events"):
+            result["error"] = "schema 8 work events unavailable; run `releases migrate` deliberately"
+            return result
+        result["schema_ready"] = True
+        result["generation"] = get_generation(conn)
+        now_dt = _utc_datetime(result["as_of"])
+        if now_dt is None:
+            result["error"] = "--as-of must be a timezone-qualified ISO timestamp"
+            result["schema_ready"] = False
+            return result
+        repo_rows = {r["id"]: r["slug"] for r in conn.execute("SELECT id, slug FROM repos")}
+        origin_repo = _origin_repo_identity(root)
+        events_by_issue = {}
+        for ev in conn.execute("SELECT id,repo_id,gh_number,event,payload,at FROM work_events "
+                               "WHERE gh_number IS NOT NULL ORDER BY id"):
+            payload = None
+            try:
+                payload = json.loads(ev["payload"]) if ev["payload"] else None
+            except ValueError:
+                pass
+            item = {"id": ev["id"], "repo": repo_rows.get(ev["repo_id"]),
+                    "number": ev["gh_number"], "event": ev["event"],
+                    "payload": payload, "at": ev["at"]}
+            events_by_issue.setdefault((ev["repo_id"], ev["gh_number"]), []).append(item)
+        jog_state = {}
+        if _table_exists(conn, "jog_queue"):
+            for jog in conn.execute("SELECT id,repo_id,gh_number,status FROM jog_queue ORDER BY id"):
+                jog_state.setdefault((jog["repo_id"], jog["gh_number"]), []).append(jog["status"])
+        label_ready = result["schema_version"] >= 9 and _has_column(conn, "roadmap_items", "status_label")
+        result["status_label_supported"] = label_ready
+        rows = conn.execute("SELECT global_id,repo_id,gh_number,issue_url,section,status_marker,"
+                            "rating_pri,rating_sev,rating_appeal,rating_effort,rating_ovr "
+                            + (",status_label " if label_ready else "") +
+                            "FROM roadmap_items WHERE gh_number IS NOT NULL ORDER BY gh_number,global_id")
+        for row in rows:
+            # The roadmap row owns its repo_id. Never borrow another repo row merely because
+            # its slug matches the URL; same-basename cross-owner ledgers make that unsafe.
+            # A legacy basename slug is accepted only when origin proves the full owner/name.
+            repo_id = row["repo_id"]
+            # The repos row is the independently owned identity. A malformed or foreign URL
+            # must make the evidence invalid without erasing which configured repository owns
+            # it. Legacy basename-only rows are qualified only when the local origin proves the
+            # full slug; otherwise there is no safe identity to project.
+            identity = resolve_roadmap_identity(row, repo_rows, origin_repo)
+            source_repo, repo_matches = identity["repo"], identity["identity_valid"]
+            evs = events_by_issue.get((repo_id, row["gh_number"]), []) if repo_matches else []
+            latest = evs[-1] if evs else None
+            latest_lifecycle = None
+            for ev in reversed(evs):
+                if _is_lifecycle_event(ev):
+                    latest_lifecycle = ev
+                    break
+            start = None
+            if latest_lifecycle and latest_lifecycle["event"] in _START_EVENTS:
+                payload = latest_lifecycle.get("payload")
+                source = payload.get("source") if isinstance(payload, dict) else None
+                explicit_transition = (
+                    source != "backfill" and
+                    (latest_lifecycle["event"] in ("jog_running", "jog_leased")
+                     or latest_lifecycle["event"] == "in_flight" and
+                     source in ("roadmap-update", "jog") and
+                     payload.get("transition") is True)
+                )
+                observed = _utc_datetime(latest_lifecycle["at"])
+                sec = (row["section"] or "").strip().lower()
+                ledger_consistent = (row["status_marker"] == "\U0001F6A7"
+                                     or sec.startswith("in progress"))
+                is_jog = latest_lifecycle["event"].startswith("jog_") or source == "jog"
+                jog_rows = jog_state.get((repo_id, row["gh_number"]), [])
+                jog_consistent = not is_jog or (len(jog_rows) == 1 and
+                                                 jog_rows[0] in ("running", "leased"))
+                if is_jog and len(jog_rows) > 1:
+                    result["warnings"].append(
+                        "%s#%s has ambiguous multiple jog rows; activity preserved as unknown"
+                        % (source_repo or "unknown", row["gh_number"]))
+                if explicit_transition and ledger_consistent and jog_consistent and observed and observed <= now_dt:
+                    age = (now_dt - observed).total_seconds() / 86400.0
+                    start = dict(latest_lifecycle, age_days=age,
+                                 freshness="recent" if age <= stale_days else "stale")
+            result["issues"].append({
+                "global_id": row["global_id"], "repo": source_repo,
+                "number": int(row["gh_number"]),
+                "identity_valid": repo_matches,
+                "section": row["section"], "marker": row["status_marker"],
+                "status_label_supported": label_ready,
+                "status_label": row["status_label"] if label_ready else None,
+                "ratings": {k.replace("rating_", ""): row[k] for k in RATING_COLUMNS},
+                "latest_event": latest, "latest_lifecycle": latest_lifecycle,
+                "recent_start": start,
+                "activity": start["freshness"] if start else "unknown",
+            })
+        max_event_id = conn.execute("SELECT COALESCE(MAX(id),0) FROM work_events").fetchone()[0]
+        result["cursors"] = []
+        for row in conn.execute("SELECT connector,last_event_id,last_attempt_at,last_error,updated_at "
+                                "FROM connector_cursors ORDER BY connector"):
+            cursor = dict(row)
+            cursor["lag"] = max(0, int(max_event_id) - int(cursor["last_event_id"]))
+            result["cursors"].append(cursor)
+        return result
+    except sqlite3.Error as exc:
+        result["schema_ready"] = False
+        result["error"] = "diagnostic query failed: %s" % exc
+        return result
+    finally:
+        conn.close()
+
+
+def cmd_work_status(args):
+    if args.stale_days < 0:
+        refuse("bad-stale-days", "--stale-days must be zero or greater")
+    root = resolve_root(args.root)
+    report = load_work_evidence(artifact_paths(root)["db"], args.stale_days)
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import work_connectors
+        report["enabled_connectors"] = sorted(work_connectors.load_connectors(warn=False))
+    except Exception as exc:
+        report["enabled_connectors"] = []
+        report["warnings"].append("connector config unreadable: %s" % exc)
+    if args.as_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print("work status: schema=%s generation=%s connectors=%s" % (
+            report.get("schema_version"), report.get("generation"),
+            ",".join(report["enabled_connectors"]) or "disabled"))
+        if report.get("error"):
+            print("UNREADY: %s" % report["error"])
+        for item in report.get("issues", []):
+            print("%s#%s %-22s lifecycle=%s activity=%s" % (
+                (item.get("repo") or "unknown") + ":", item["number"], item["section"],
+                (item.get("latest_lifecycle") or {}).get("event", "unknown"), item["activity"]))
+    if not report.get("schema_ready"):
+        raise SystemExit(EXIT_REFUSED)
+
+
+def cmd_work_reconcile(args):
+    """`work reconcile` — replay every event after a connector's cursor (GH-549).
+
+    This is the repair path for everything the event stream cannot witness: a merge performed
+    in the GitHub UI, a push made with --no-verify, a connector that was down, a board someone
+    edited by hand, and the review-ready transition, which is derived here rather than guessed
+    at push time. Idempotent because every connector write is set-to-value, never an increment.
+    """
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import work_connectors
+    conns = work_connectors.load_connectors()
+    if args.connector:
+        conns = {k: v for k, v in conns.items() if k == args.connector}
+        if not conns:
+            refuse("no-such-connector",
+                   "connector %r is not enabled in work_connectors" % args.connector)
+    if not conns:
+        print("no connectors enabled — nothing to reconcile")
+        return
+    # GH-564: derive "ready for review" from actually-open, non-draft PRs — before dispatch,
+    # outside the connector lock, and unable to fail the verb.
+    sc = connect(paths["db"])
+    try:
+        _scan_review_ready(root, sc)
+    finally:
+        sc.close()
+    # --reset is handled INSIDE dispatch's connector lock (impl QA r4). Deleting the cursors out
+    # here first let an in-flight dispatch re-persist its advance afterwards, so "replay from
+    # zero" could quietly find nothing to replay.
+    results = work_connectors.dispatch(paths["db"], now_iso(), connectors=conns,
+                                       reset=bool(args.reset))
+    if not results:
+        print("nothing to replay (every cursor is current)")
+        return
+    for name in sorted(results):
+        advanced, error = results[name]
+        if error:
+            print("%s: FAILED — %s (cursor unchanged)" % (name, error))
+        else:
+            print("%s: replayed through event %s" % (name, advanced))
+
 
 def cmd_check(args):
     root = resolve_root(args.root)
@@ -2982,7 +5761,8 @@ def cmd_check(args):
 
             dump_ok = False
             if os.path.exists(paths["dump"]):
-                dump_content = open(paths["dump"], encoding="utf-8").read()
+                with open(paths["dump"], encoding="utf-8") as fh:
+                    dump_content = fh.read()
                 dump_gen = dump_generation_from_text(dump_content)
                 if dump_gen != db_gen:
                     fail("generation-mismatch",
@@ -3001,46 +5781,52 @@ def cmd_check(args):
             if dump_ok:
                 print("OK: generation trio consistent at %d (DB <-> dump)" % db_gen)
 
-            if os.path.exists(paths["gen"]):
-                first = open(paths["gen"], encoding="utf-8").readline().strip()
-                m = GEN_MARKER_RE.match(first)
-                gen_file_gen = int(m.group(1)) if m else None
-                if gen_file_gen != db_gen:
-                    fail("generation-mismatch",
-                         "%s carries generation %s but the DB is at %d — regenerate with "
-                         "`releases gen`" % (GEN_NAME, gen_file_gen, db_gen))
-                else:
-                    print("OK: %s generation marker matches (%d)" % (GEN_NAME, db_gen))
 
-            # receipt chain (r3): before == previous after. The ONE legal fork is a history that
-            # went through the divergent-dump merge procedure: the union of two branches' dumps
-            # necessarily breaks the chain where the branches diverged, and the merge-rebuild
-            # receipt the rebuild appends records that fork. So: a break with a merge-rebuild
-            # receipt later in the history is the documented merge; a break with none is a
-            # spliced or forged audit trail. The latest after must equal the current
-            # business-state digest regardless — that is what catches a receipt-less direct
-            # write (detected, not prevented). HONEST LIMIT (stated, per r3's "narrow the claim
-            # to what can be proven"): a writer who edits the DUMP and launders it through
-            # --rebuild can always forge the receipt history too — provenance against a
-            # committer with dump-write access is git's job (the dump is a committed file), not
-            # the chain's; the chain catches direct DB writes and splices in rebuild-free
-            # histories.
-            receipts = conn.execute("""SELECT op, txn_id, state_digest_before,
+            # receipt chain (r3): before == previous after. A git branch switch, rebase, or divergent-dump
+            # merge legitimately forks the receipt chain between operations. The merge-rebuild receipt
+            # records that re-anchored fork point and scopes it to the specific breaks present at rebuild
+            # time (GH-360). A break with no matching merge-rebuild receipt is caught here and can be
+            # re-anchored via `releases check --rebuild`. The latest after must equal the current
+            # business-state digest regardless — that is what catches a receipt-less direct write
+            # (detected, not prevented).
+            receipts = conn.execute("""SELECT op, txn_id, target_gid, state_digest_before,
                                               state_digest_after
                                        FROM op_receipts WHERE op != 'ship-evidence'
                                        ORDER BY id""").fetchall()
             chain_ok = True
             breaks = 0
+            tolerated_breaks = 0
             prev_after = None
             for r in receipts:
                 if prev_after is not None and r["state_digest_before"] != prev_after:
                     breaks += 1
+                if r["op"] == "merge-rebuild":
+                    scoped = _parse_reanchor_breaks(r["target_gid"])
+                    if scoped == -1:
+                        fail("malformed-reanchor-receipt",
+                             "merge-rebuild receipt carries unparseable target_gid %r — "
+                             "expected 'reanchor:N' or NULL" % r["target_gid"])
+                        chain_ok = False
+                    elif scoped is not None:
+                        tolerated_breaks = scoped
+                    else:
+                        # Legacy merge-rebuild receipt with NULL target_gid tolerates breaks up to this point
+                        tolerated_breaks = breaks
                 prev_after = r["state_digest_after"]
-            has_merge_rebuild = any(r["op"] == "merge-rebuild" for r in receipts)
-            if breaks and not has_merge_rebuild:
-                fail("receipt-chain",
-                     "%d receipt(s) break the chain (before != previous after) with no "
-                     "merge-rebuild receipt — spliced or forged audit trail" % breaks)
+
+            if breaks > tolerated_breaks:
+                unreanchored = breaks - tolerated_breaks
+                if tolerated_breaks == 0:
+                    fail("receipt-chain",
+                         "%d receipt(s) break the chain (before != previous after) with no "
+                         "merge-rebuild receipt — likely caused by git branch switching or "
+                         "rebasing; run `releases check --rebuild` to re-anchor" % breaks)
+                else:
+                    fail("receipt-chain",
+                         "%d new receipt(s) break the chain (%d total break(s), %d re-anchored) — "
+                         "likely caused by git branch switching or rebasing; run "
+                         "`releases check --rebuild` to re-anchor"
+                         % (unreanchored, breaks, tolerated_breaks))
                 chain_ok = False
             digest = business_digest(conn)
             if receipts and receipts[-1]["state_digest_after"] != digest:
@@ -3159,34 +5945,10 @@ def cmd_check(args):
 # inserts, resolving parent GIDs to fresh integer ids in dump order — the "deterministic
 # renumbering on rebuild" the grammar promises.
 
-# DOTALL: _sql_str() writes string values verbatim, so a value holding a newline (a roadmap row's
-# raw_text, for one) spans several dump lines. Without DOTALL `.` stops at the first newline and
-# the dump the tool itself wrote fails to parse on `check --rebuild`. _is_single_values_tuple()
-# keeps the greedy (.*) from swallowing a statement boundary.
-INSERT_RE = re.compile(r"^INSERT INTO ([a-z_]+)\(([^)]*)\) VALUES\((.*)\);$", re.DOTALL)
-
-
-def _is_single_values_tuple(blob):
-    """True when a VALUES(...) blob is exactly one row: every '...' string is closed and nothing
-    outside a string is a paren, semicolon or newline. Values are only NULL, numbers or quoted
-    strings, so any of those outside quotes means the match ran past one statement's end (or
-    stopped on a `);` that sits inside a multi-line string)."""
-    in_str = False
-    i = 0
-    while i < len(blob):
-        ch = blob[i]
-        if in_str:
-            if ch == "'":
-                if i + 1 < len(blob) and blob[i + 1] == "'":
-                    i += 1
-                else:
-                    in_str = False
-        elif ch == "'":
-            in_str = True
-        elif ch in "();\n":
-            return False
-        i += 1
-    return not in_str
+# re.S: a dumped value may contain newlines (a roadmap_items raw_text, say). parse_dump
+# already buffers multi-line statements; without DOTALL the regex could never match one,
+# so the buffer swallowed the rest of the file and --rebuild refused with dump-parse.
+INSERT_RE = re.compile(r"^INSERT INTO ([a-z_]+)\(([^)]*)\) VALUES\((.*)\);$", re.S)
 
 
 def _split_values(blob):
@@ -3225,6 +5987,34 @@ def _value(p):
     return p
 
 
+# rebalanceOS local delta (#322) — not in XYZ Forge 1573dd4b7. Re-apply on every re-vendor until upstreamed.
+# A multi-line VALUES string containing `);` at a line end let INSERT_RE stop early or swallow the next row,
+# so the dump the tool itself wrote failed to parse on `check --rebuild`. The guard below rejects any match
+# that is not exactly one well-formed row, so parse_dump keeps buffering instead.
+def _is_single_values_tuple(blob):
+    """True when a VALUES(...) blob is exactly one row: every '...' string is closed and nothing
+    outside a string is a paren, semicolon or newline. Values are only NULL, numbers or quoted
+    strings, so any of those outside quotes means the match ran past one statement's end (or
+    stopped on a `);` that sits inside a multi-line string)."""
+    in_str = False
+    i = 0
+    while i < len(blob):
+        ch = blob[i]
+        if in_str:
+            if ch == "'":
+                if i + 1 < len(blob) and blob[i + 1] == "'":
+                    i += 1
+                else:
+                    in_str = False
+        elif ch == "'":
+            in_str = True
+        elif ch in "();\n":
+            return False
+        i += 1
+    return not in_str
+# end rebalanceOS local delta (#322)
+
+
 def parse_dump(text):
     """Parse canonical-dump text into {table: [rowdict,...]} in file order."""
     tables = {}
@@ -3235,7 +6025,7 @@ def parse_dump(text):
         if not m:
             return False
         table, cols_blob, vals_blob = m.groups()
-        if not _is_single_values_tuple(vals_blob):
+        if not _is_single_values_tuple(vals_blob):  # rebalanceOS local delta (#322)
             return False
         cols = [c.strip() for c in cols_blob.split(",")]
         vals = _split_values(vals_blob)
@@ -3335,46 +6125,88 @@ def load_dump(conn, tables, skip_schema_migrations=False):
         for row in tables.get("schema_migrations", []):
             conn.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                          (int(row["version"]), row["applied_at"]))
+    now = now_iso()
     for row in tables.get("settings", []):
-        conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)", (row["key"], row["value"]))
+        if _has_column(conn, "settings", "updated_at"):
+            conn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)",
+                         (row["key"], row["value"], row.get("updated_at") or now))
+        else:
+            conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)", (row["key"], row["value"]))
     repo_ids = {}
     for row in tables.get("repos", []):
-        cur = conn.execute("INSERT INTO repos(global_id, slug) VALUES (?, ?)",
-                           (row["global_id"], row["slug"]))
+        if _has_column(conn, "repos", "updated_at"):
+            cur = conn.execute("INSERT INTO repos(global_id, slug, updated_at) VALUES (?, ?, ?)",
+                               (row["global_id"], row["slug"], row.get("updated_at") or now))
+        else:
+            cur = conn.execute("INSERT INTO repos(global_id, slug) VALUES (?, ?)",
+                               (row["global_id"], row["slug"]))
         repo_ids[row["global_id"]] = cur.lastrowid
     ref_ids = {}
     for row in tables.get("issue_refs", []):
-        cur = conn.execute("""INSERT INTO issue_refs(global_id, url, temp_id, created_at)
-                              VALUES (?, ?, ?, ?)""",
-                           (row["global_id"], row.get("url"), row.get("temp_id"),
-                            row["created_at"]))
+        if _has_column(conn, "issue_refs", "updated_at"):
+            ref_updated = row.get("updated_at") or row.get("created_at") or now
+            cur = conn.execute("""INSERT INTO issue_refs(global_id, url, temp_id, created_at, updated_at)
+                                  VALUES (?, ?, ?, ?, ?)""",
+                               (row["global_id"], row.get("url"), row.get("temp_id"),
+                                row["created_at"], ref_updated))
+        else:
+            cur = conn.execute("""INSERT INTO issue_refs(global_id, url, temp_id, created_at)
+                                  VALUES (?, ?, ?, ?)""",
+                               (row["global_id"], row.get("url"), row.get("temp_id"),
+                                row["created_at"]))
         ref_ids[row["global_id"]] = cur.lastrowid
     mar_ids = {}
     for row in tables.get("marathons", []):
-        cur = conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
-                              created_at) VALUES (?, ?, ?, ?, ?)""",
-                           (row["global_id"], repo_ids[row["repo_gid"]],
-                            ref_ids[row["tracking_ref_gid"]], row["status"], row["created_at"]))
+        if _has_column(conn, "marathons", "updated_at"):
+            mar_updated = row.get("updated_at") or row.get("created_at") or now
+            cur = conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
+                                  created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)""",
+                               (row["global_id"], repo_ids[row["repo_gid"]],
+                                ref_ids[row["tracking_ref_gid"]], row["status"], row["created_at"],
+                                mar_updated))
+        else:
+            cur = conn.execute("""INSERT INTO marathons(global_id, repo_id, tracking_ref_id, status,
+                                  created_at) VALUES (?, ?, ?, ?, ?)""",
+                               (row["global_id"], repo_ids[row["repo_gid"]],
+                                ref_ids[row["tracking_ref_gid"]], row["status"], row["created_at"]))
         mar_ids[row["global_id"]] = cur.lastrowid
     rel_ids = {}
     for row in tables.get("releases", []):
-        cur = conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
-                              target_date, shipped_date, description, exit_criterion,
-                              tracking_ref_id, marathon_id, gh_release_url, milestone,
-                              front_door_reviewed, shakedown_reviewed, license_file,
-                              baseline_count, baseline_at, baseline_source)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                           (row["global_id"], repo_ids[row["repo_gid"]], row.get("version"),
-                            row.get("codename"), row["status"], row.get("target_date"),
-                            row.get("shipped_date"), row["description"], row.get("exit_criterion"),
-                            ref_ids[row["tracking_ref_gid"]],
-                            mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None,
-                            row.get("gh_release_url"), row.get("milestone"),
-                            row.get("front_door_reviewed"), row.get("shakedown_reviewed"),
-                            row.get("license_file"),
-                            # absent trailing fields read as NULL — a pre-004 dump is still loadable
-                            _int_or_none(row.get("baseline_count")), row.get("baseline_at"),
-                            row.get("baseline_source")))
+        if _has_column(conn, "releases", "updated_at"):
+            rel_updated = row.get("updated_at") or row.get("shipped_date") or row.get("baseline_at") or now
+            cur = conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                                  target_date, shipped_date, description, exit_criterion,
+                                  tracking_ref_id, marathon_id, gh_release_url, milestone,
+                                  front_door_reviewed, shakedown_reviewed, license_file,
+                                  baseline_count, baseline_at, baseline_source, updated_at)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               (row["global_id"], repo_ids[row["repo_gid"]], row.get("version"),
+                                row.get("codename"), row["status"], row.get("target_date"),
+                                row.get("shipped_date"), row["description"], row.get("exit_criterion"),
+                                ref_ids[row["tracking_ref_gid"]],
+                                mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None,
+                                row.get("gh_release_url"), row.get("milestone"),
+                                row.get("front_door_reviewed"), row.get("shakedown_reviewed"),
+                                row.get("license_file"),
+                                _int_or_none(row.get("baseline_count")), row.get("baseline_at"),
+                                row.get("baseline_source"), rel_updated))
+        else:
+            cur = conn.execute("""INSERT INTO releases(global_id, repo_id, version, codename, status,
+                                  target_date, shipped_date, description, exit_criterion,
+                                  tracking_ref_id, marathon_id, gh_release_url, milestone,
+                                  front_door_reviewed, shakedown_reviewed, license_file,
+                                  baseline_count, baseline_at, baseline_source)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               (row["global_id"], repo_ids[row["repo_gid"]], row.get("version"),
+                                row.get("codename"), row["status"], row.get("target_date"),
+                                row.get("shipped_date"), row["description"], row.get("exit_criterion"),
+                                ref_ids[row["tracking_ref_gid"]],
+                                mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None,
+                                row.get("gh_release_url"), row.get("milestone"),
+                                row.get("front_door_reviewed"), row.get("shakedown_reviewed"),
+                                row.get("license_file"),
+                                _int_or_none(row.get("baseline_count")), row.get("baseline_at"),
+                                row.get("baseline_source")))
         rel_ids[row["global_id"]] = cur.lastrowid
     item_ids = {}
     for row in tables.get("manifest_items", []):
@@ -3382,13 +6214,24 @@ def load_dump(conn, tables, skip_schema_migrations=False):
         # git-merge surface, and a colleague's branch may carry one for weeks — but only the new
         # vocabulary is ever emitted.
         state = "dialed_in" if row["state"] == "open" else row["state"]
-        cur = conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
-                              dialed_in_at, dial_reason, marathon_id)
-                              VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                           (row["global_id"], rel_ids[row["release_gid"]],
-                            ref_ids[row["issue_ref_gid"]], state,
-                            row.get("dialed_in_at"), row.get("dial_reason"),
-                            mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None))
+        if _has_column(conn, "manifest_items", "updated_at"):
+            item_updated = row.get("updated_at") or row.get("dialed_in_at") or now
+            cur = conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
+                                  dialed_in_at, dial_reason, marathon_id, updated_at)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                               (row["global_id"], rel_ids[row["release_gid"]],
+                                ref_ids[row["issue_ref_gid"]], state,
+                                row.get("dialed_in_at"), row.get("dial_reason"),
+                                mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None,
+                                item_updated))
+        else:
+            cur = conn.execute("""INSERT INTO manifest_items(global_id, release_id, issue_ref_id, state,
+                                  dialed_in_at, dial_reason, marathon_id)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                               (row["global_id"], rel_ids[row["release_gid"]],
+                                ref_ids[row["issue_ref_gid"]], state,
+                                row.get("dialed_in_at"), row.get("dial_reason"),
+                                mar_ids.get(row["marathon_gid"]) if row.get("marathon_gid") else None))
         item_ids[row["global_id"]] = cur.lastrowid
     for row in tables.get("manifest_state_events", []):
         conn.execute("""INSERT INTO manifest_state_events(item_id, from_state, to_state, at, reason)
@@ -3396,41 +6239,82 @@ def load_dump(conn, tables, skip_schema_migrations=False):
                      (item_ids[row["item_gid"]], row["from_state"], row["to_state"], row["at"],
                       row["reason"]))
     for row in tables.get("doc_lines", []):
-        conn.execute("""INSERT INTO doc_lines(repo_id, position, content) VALUES (?, ?, ?)""",
-                     (repo_ids[row["repo_gid"]], int(row["position"]), row["content"]))
+        if _has_column(conn, "doc_lines", "updated_at"):
+            conn.execute("""INSERT INTO doc_lines(repo_id, position, content, updated_at) VALUES (?, ?, ?, ?)""",
+                         (repo_ids[row["repo_gid"]], int(row["position"]), row["content"], row.get("updated_at") or now))
+        else:
+            conn.execute("""INSERT INTO doc_lines(repo_id, position, content) VALUES (?, ?, ?)""",
+                         (repo_ids[row["repo_gid"]], int(row["position"]), row["content"]))
     for row in tables.get("legacy_lines", []):
-        conn.execute("""INSERT INTO legacy_lines(release_id, position, content, disposition)
-                        VALUES (?, ?, ?, ?)""",
-                     (rel_ids[row["release_gid"]], int(row["position"]), row["content"],
-                      row.get("disposition")))
+        if _has_column(conn, "legacy_lines", "updated_at"):
+            conn.execute("""INSERT INTO legacy_lines(release_id, position, content, disposition, updated_at)
+                            VALUES (?, ?, ?, ?, ?)""",
+                         (rel_ids[row["release_gid"]], int(row["position"]), row["content"],
+                          row.get("disposition"), row.get("updated_at") or now))
+        else:
+            conn.execute("""INSERT INTO legacy_lines(release_id, position, content, disposition)
+                            VALUES (?, ?, ?, ?)""",
+                         (rel_ids[row["release_gid"]], int(row["position"]), row["content"],
+                          row.get("disposition")))
     for row in tables.get("grandfather_entries", []):
         rgid = row.get("release_gid")
         if rgid in ("(document)", ""):
             rgid = None
         elif rgid is not None and not rgid.startswith("rel-"):
             rgid = None   # tolerate older shapes; the (document) marker is the contract
-        conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
-                        supplied_value, disposition) VALUES (?, ?, ?, ?, ?, ?)""",
-                     (row["import_run"], rgid, row["rule"], row.get("source_value"),
-                      row.get("supplied_value"), row.get("disposition")))
+        if _has_column(conn, "grandfather_entries", "updated_at"):
+            conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
+                            supplied_value, disposition, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                         (row["import_run"], rgid, row["rule"], row.get("source_value"),
+                          row.get("supplied_value"), row.get("disposition"), row.get("updated_at") or now))
+        else:
+            conn.execute("""INSERT INTO grandfather_entries(import_run, release_gid, rule, source_value,
+                            supplied_value, disposition) VALUES (?, ?, ?, ?, ?, ?)""",
+                         (row["import_run"], rgid, row["rule"], row.get("source_value"),
+                          row.get("supplied_value"), row.get("disposition")))
     for row in tables.get("roadmap_items", []):
+        label_ready = _has_column(conn, "roadmap_items", "status_label")
+        if not label_ready and row.get("status_label") is not None:
+            refuse("status-label-unsupported", "cannot restore an established label into a pre-schema009 ledger")
+        label_cols = ", status_label" if label_ready else ""
+        placeholders = ", ".join("?" for _ in range(21 if label_ready else 20))
         conn.execute("""INSERT INTO roadmap_items(global_id, repo_id, gh_number, title, section,
                         position, status_marker, complexity, risk, effort, doc_path, issue_url,
                         raw_text, first_seen, updated_at,
-                        rating_pri, rating_sev, rating_appeal, rating_effort, rating_ovr)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        rating_pri, rating_sev, rating_appeal, rating_effort, rating_ovr%s)
+                        VALUES (%s)""" % (label_cols, placeholders),
                      (row["global_id"], repo_ids[row["repo_gid"]], _int_or_none(row.get("gh_number")),
                       row["title"], row["section"], int(row["position"]),
                       row.get("status_marker"), _int_or_none(row.get("complexity")),
                       _int_or_none(row.get("risk")), _int_or_none(row.get("effort")),
                       row.get("doc_path"), row.get("issue_url"), row["raw_text"],
                       row["first_seen"], row["updated_at"],
-                      *[_int_or_none(row.get(c)) for c in RATING_COLUMNS]))
+                      *[_int_or_none(row.get(c)) for c in RATING_COLUMNS])
+                     + ((row.get("status_label"),) if label_ready else ()))
+    for row in tables.get("jog_queue", []):
+        conn.execute("""INSERT INTO jog_queue(global_id, repo_id, gh_number, position, status,
+                        created_at, updated_at, attempt_count, lease_pid, failure_reason)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                     (row["global_id"], repo_ids[row["repo_gid"]], int(row["gh_number"]),
+                      int(row["position"]), row["status"], row["created_at"], row["updated_at"],
+                      int(row.get("attempt_count") or 0),
+                      _int_or_none(row.get("lease_pid")), row.get("failure_reason")))
     for row in tables.get("op_receipts", []):
+
         conn.execute("""INSERT INTO op_receipts(op, target_gid, at, txn_id, session_id,
                         state_digest_before, state_digest_after) VALUES (?, ?, ?, ?, ?, ?, ?)""",
                      (row["op"], row.get("target_gid"), row["at"], row["txn_id"],
                       row["session_id"], row["state_digest_before"], row["state_digest_after"]))
+    # GH-549: work_events restores with the receipts. connector_cursors deliberately has no
+    # loader — it is device-local, was never in the dump, and a rebuild resets it. `work
+    # reconcile` replays from zero, which is idempotent because every connector write is
+    # set-to-value rather than an increment.
+    for row in tables.get("work_events", []):
+        conn.execute("""INSERT INTO work_events(global_id, repo_id, gh_number, txn_id, event,
+                        payload, at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                     (row["global_id"], repo_ids[row["repo_gid"]],
+                      _int_or_none(row.get("gh_number")), row["txn_id"], row["event"],
+                      row.get("payload"), row["at"]))
 
 
 def _rebuild(root, conn):
@@ -3446,7 +6330,8 @@ def _rebuild(root, conn):
                "for git-merge resolution only, never crash recovery")
     if not os.path.exists(paths["dump"]):
         refuse("dump-missing", "nothing to rebuild from")
-    dump_content = open(paths["dump"], encoding="utf-8").read()
+    with open(paths["dump"], encoding="utf-8") as fh:
+        dump_content = fh.read()
     dump_gen = dump_generation_from_text(dump_content)
     if dump_gen is None:
         refuse("dump-generation", "%s carries no generation header — not a canonical dump"
@@ -3458,9 +6343,7 @@ def _rebuild(root, conn):
 
     tmp_db = "%s.rebuild-%s" % (paths["db"], new_txn_id()[:12])
     try:
-        # Staging copy of the separate releases ledger, rebuilt under the same app-local
-        # autocommit + foreign_keys policy as connect() above.
-        tconn = sqlite3.connect(tmp_db, isolation_level=None)  # GATEWAY-OK: staging copy, same policy (GH-136)
+        tconn = sqlite3.connect(tmp_db, isolation_level=None)
         try:
             tconn.row_factory = sqlite3.Row
             tconn.execute("PRAGMA foreign_keys = ON")
@@ -3497,17 +6380,38 @@ def _rebuild(root, conn):
             for version in registry_versions():
                 tconn.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                               (version, dump_applied.get(version, stamped_at)))
-            tconn.execute("UPDATE settings SET value = ? WHERE key = ?",
-                          (str(new_gen), GENERATION_KEY))
-            if tconn.execute("SELECT 1 FROM settings WHERE key = ?",
-                             (GENERATION_KEY,)).fetchone() is None:
-                tconn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
-                              (GENERATION_KEY, str(new_gen)))
+            if _has_column(tconn, "settings", "updated_at"):
+                tconn.execute("UPDATE settings SET value = ?, updated_at = ? WHERE key = ?",
+                              (str(new_gen), stamped_at, GENERATION_KEY))
+                if tconn.execute("SELECT 1 FROM settings WHERE key = ?",
+                                 (GENERATION_KEY,)).fetchone() is None:
+                    tconn.execute("INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)",
+                                  (GENERATION_KEY, str(new_gen), stamped_at))
+            else:
+                tconn.execute("UPDATE settings SET value = ? WHERE key = ?",
+                              (str(new_gen), GENERATION_KEY))
+                if tconn.execute("SELECT 1 FROM settings WHERE key = ?",
+                                 (GENERATION_KEY,)).fetchone() is None:
+                    tconn.execute("INSERT INTO settings(key, value) VALUES (?, ?)",
+                                  (GENERATION_KEY, str(new_gen)))
+            new_receipts = tconn.execute("""SELECT op, state_digest_before, state_digest_after
+                                           FROM op_receipts WHERE op != 'ship-evidence'
+                                           ORDER BY id""").fetchall()
+            reanchored_breaks = 0
+            prev_after = None
+            for r in new_receipts:
+                if prev_after is not None and r["state_digest_before"] != prev_after:
+                    reanchored_breaks += 1
+                prev_after = r["state_digest_after"]
+            if prev_after is not None and old_digest != prev_after:
+                reanchored_breaks += 1
+
             new_digest = business_digest(tconn)
+            reanchor_gid = "reanchor:%d" % reanchored_breaks
             tconn.execute("""INSERT INTO op_receipts(op, target_gid, at, txn_id, session_id,
                              state_digest_before, state_digest_after)
-                             VALUES ('merge-rebuild', NULL, ?, ?, ?, ?, ?)""",
-                          (now_iso(), new_txn_id(), session_id(), old_digest, new_digest))
+                             VALUES ('merge-rebuild', ?, ?, ?, ?, ?, ?)""",
+                          (reanchor_gid, now_iso(), new_txn_id(), session_id(), old_digest, new_digest))
         finally:
             tconn.close()
         probe = connect(tmp_db)   # FK pragma + openability of the rebuilt DB, before it goes live
@@ -3525,12 +6429,109 @@ def _rebuild(root, conn):
     fresh = connect(paths["db"])
     try:
         _atomic_write(paths["dump"], dump_text(fresh, new_gen))
-        if os.path.exists(paths["gen"]):
-            _atomic_write(paths["gen"], gen_marker(new_gen) + "\n" + render_ledger(fresh))
     finally:
         fresh.close()
     print("rebuilt %s from %s (generation %d -> %d); displaced DB backed up at %s"
           % (DB_NAME, DUMP_NAME, old_gen, new_gen, paths["bak"]))
+
+def cmd_dashboard(args):
+    root = resolve_root(args.root)
+    paths = artifact_paths(root)
+    db_path = paths["db"]
+    
+    if not os.path.exists(db_path):
+        refuse("not-initialized", "no %s here" % DB_NAME)
+
+    # read-only connection
+    conn = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        # Trust header info
+        db_gen = get_generation(conn)
+        receipts = conn.execute("SELECT COUNT(*) FROM op_receipts").fetchone()[0]
+        
+        # Staleness: dump vs DB
+        dump_path = paths["dump"]
+        dump_gen = -1
+        if os.path.exists(dump_path):
+            with open(dump_path, "r", encoding="utf-8") as f:
+                dump_gen = dump_generation_from_text(f.read())
+        
+        staleness_banner = ""
+        if dump_gen != db_gen:
+            staleness_banner = "<div style='background: red; color: white; padding: 10px; font-weight: bold;'>STALE SYNC: DB generation (%d) != Dump generation (%d)</div>" % (db_gen, dump_gen)
+            
+        # Releases panel
+        releases = conn.execute("""
+            SELECT version, codename, status, target_date, shipped_date, description, exit_criterion, id
+            FROM releases ORDER BY target_date IS NULL, target_date, version
+        """).fetchall()
+
+        releases_html = "<h2>Releases</h2><div style='display: flex; gap: 1rem; overflow-x: auto;'>"
+        for r in releases:
+            open_items = conn.execute("SELECT COUNT(*) FROM manifest_items WHERE release_id = ? AND state != 'cut' AND state != 'shipped'", (r["id"],)).fetchone()[0]
+            closed_items = conn.execute("SELECT COUNT(*) FROM manifest_items WHERE release_id = ? AND state = 'shipped'", (r["id"],)).fetchone()[0]
+            
+            # calculate days to target
+            target = r["target_date"]
+            days_str = ""
+            if target:
+                try:
+                    today = _dt.date.today()
+                    t_date = _dt.date.fromisoformat(target)
+                    delta = (t_date - today).days
+                    days_str = " | %d days %s" % (abs(delta), 'overdue' if delta < 0 else 'to target')
+                except ValueError:
+                    pass
+            
+            releases_html += f"""
+            <div style='border: 1px solid #ccc; padding: 1rem; min-width: 250px;'>
+                <h3>{r['version'] or ''} {r['codename'] or ''}</h3>
+                <p>Status: {r['status']}{days_str}</p>
+                <p>Manifest: {open_items} open / {closed_items} closed</p>
+                <p>Exit: {r['exit_criterion'] or 'None'}</p>
+            </div>
+            """
+        releases_html += "</div>"
+
+        # Roadmap panel
+        roadmap_items = conn.execute("""
+            SELECT section, gh_number, title, status_marker 
+            FROM roadmap_items 
+            ORDER BY position
+        """).fetchall()
+        
+        roadmap_by_section = {}
+        for item in roadmap_items:
+            roadmap_by_section.setdefault(item["section"], []).append(item)
+            
+        roadmap_html = "<h2>Roadmap</h2>"
+        for section, items in roadmap_by_section.items():
+            roadmap_html += f"<h3>{section}</h3><ul>"
+            for i in items:
+                gh = f"GH-{i['gh_number']} " if i['gh_number'] else ""
+                roadmap_html += f"<li>{i['status_marker'] or ''} {gh}{i['title']}</li>"
+            roadmap_html += "</ul>"
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Releases Dashboard</title></head>
+<body style="font-family: sans-serif; padding: 2rem;">
+    <h1>Releases Dashboard</h1>
+    <div style='background: #eee; padding: 10px; margin-bottom: 20px;'>
+        <strong>Trust Header</strong> | Generation: {db_gen} | Receipts: {receipts}
+    </div>
+    {staleness_banner}
+    {releases_html}
+    <hr>
+    {roadmap_html}
+</body>
+</html>
+"""
+        print(html)
+    finally:
+        conn.close()
 
 
 def cmd_reconcile(args):
@@ -3557,13 +6558,24 @@ def cmd_reconcile(args):
                                    (temp,)).fetchone()
                 if not row:
                     refuse("unknown-temp-ref", "no issue_refs row carries temp id %r" % temp)
-                conn.execute("UPDATE issue_refs SET url = ?, temp_id = NULL WHERE id = ?",
-                             (url, row["id"]))
+                now = now_iso()
+                if _has_column(conn, "issue_refs", "updated_at"):
+                    conn.execute("UPDATE issue_refs SET url = ?, temp_id = NULL, updated_at = ? WHERE id = ?",
+                                 (url, now, row["id"]))
+                else:
+                    conn.execute("UPDATE issue_refs SET url = ?, temp_id = NULL WHERE id = ?",
+                                 (url, row["id"]))
                 if temp.startswith("MIG-"):
-                    conn.execute("""UPDATE grandfather_entries SET disposition = ?
-                                 WHERE rule = 'tracking-issue-missing' AND supplied_value = ?
-                                   AND disposition IS NULL""",
-                                 ("reconciled:%s" % now_iso(), temp))
+                    if _has_column(conn, "grandfather_entries", "updated_at"):
+                        conn.execute("""UPDATE grandfather_entries SET disposition = ?, updated_at = ?
+                                     WHERE rule = 'tracking-issue-missing' AND supplied_value = ?
+                                       AND disposition IS NULL""",
+                                     ("reconciled:%s" % now, now, temp))
+                    else:
+                        conn.execute("""UPDATE grandfather_entries SET disposition = ?
+                                     WHERE rule = 'tracking-issue-missing' AND supplied_value = ?
+                                       AND disposition IS NULL""",
+                                     ("reconciled:%s" % now, temp))
                 print("reconciled %s -> %s (row %s kept its identity)"
                       % (temp, url, row["global_id"]))
 
@@ -3576,13 +6588,12 @@ def cmd_reconcile(args):
 
 def build_parser():
     p = argparse.ArgumentParser(prog="releases",
-                                 description="GH-32 SQLite-backed RELEASES ledger CLI "
-                                             "(Phase 0+1: side-by-side generation only)")
+                                 description="SQLite-backed releases and roadmap ledger CLI")
     p.add_argument("--root", help="repo root (default: git toplevel of the CWD)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("init", help="create the DB + dump; settings default lenient")
-    sp.add_argument("--slug", help="repo slug (default: root directory basename)")
+    sp.add_argument("--slug", help="repo slug (default: github.com origin owner/name, else root directory basename)")
 
     sp = sub.add_parser("import", help="ONE-SHOT legacy ledger import (Phase 0)")
     sp.add_argument("file", nargs="?",
@@ -3605,7 +6616,10 @@ def build_parser():
         sp.add_argument(flag)
     for flag in ("--front-door", "--shakedown", "--license"):
         sp.add_argument(flag, choices=["Yes", "No"])
-    sp.add_argument("--tracking-issue", help=argparse.SUPPRESS)
+    sp.add_argument("--tracking-issue", metavar="N|URL",
+                    help="GH-222: re-point the tracking issue (bare number expands against the "
+                         "org/repo slug or the github origin remote; the new URL is stored "
+                         "canonically like `add`)")
 
     sp = sub.add_parser("migrate",
                         help="upgrade a LIVE ledger to the registry's schema version "
@@ -3650,6 +6664,12 @@ def build_parser():
     sp_cut.add_argument("--gid", required=True)
     sp_cut.add_argument("issue", help="issue URL or TMP-XXXXXX")
     sp_cut.add_argument("--reason", default="")
+    sp_unship = msub.add_parser("unship",
+                                help="retract a falsely shipped manifest item back to dialed_in "
+                                     "(REQUIRES --reason)")
+    sp_unship.add_argument("--gid", required=True)
+    sp_unship.add_argument("issue", help="issue URL or TMP-XXXXXX")
+    sp_unship.add_argument("--reason", default="")
 
     sp = sub.add_parser("marathon", help="marathon CRUD (v1: add/list)")
     msub = sp.add_subparsers(dest="marathon_cmd", required=True)
@@ -3673,12 +6693,12 @@ def build_parser():
     sp = sub.add_parser("next", help="the next unshipped release, by target date")
     sp.add_argument("--verbose", action="store_true", help="also print its full record")
 
-    sp = sub.add_parser("gen", help="side-by-side generation (Phase 0: NEVER writes RELEASES.md)")
+    sp = sub.add_parser("gen", help="retired: RELEASES.generated.md removed (GH-568); refuses")
     sp.add_argument("--side-by-side", action="store_true", default=True,
                     help="the only mode in Phase 0 (accepted for CLI-shape compatibility)")
 
     sp = sub.add_parser("check",
-                        help="DB<->dump<->generated consistency; FK pragma; stale WAL; "
+                        help="DB<->dump consistency; FK pragma; stale WAL; "
                              "receipt-vs-change bypass detection; temp-ref staleness; "
                              "duplication warnings; per-boundary crash recovery")
     sp.add_argument("--rebuild", action="store_true",
@@ -3688,12 +6708,118 @@ def build_parser():
     sp.add_argument("--map", action="append", metavar="TMP-X=URL",
                     help="placeholder -> real issue URL (repeatable)")
 
-    sp = sub.add_parser("roadmap", help="ROADMAP.md shadow (GH-69): sync/list the ledger mirror")
+    sp = sub.add_parser("dashboard", help="render the releases and roadmap dashboard HTML")
+
+    # GH-525: a ledger with configurable behaviour needs a configuring verb. A settings row is part
+    # of the business-state digest, so writing one by hand breaks the receipt chain and `check`
+    # fails — this is the only supported way to set one.
+    sp_set = sub.add_parser("settings", help="read/write operator-configurable ledger settings")
+    ssub = sp_set.add_subparsers(dest="settings_cmd", required=True)
+    sp_sl = ssub.add_parser("list", help="print every settings row")
+    sp_sg = ssub.add_parser("get", help="print one setting value")
+    sp_sg.add_argument("key", help="setting key name")
+    sp_ss = ssub.add_parser("set", help="write one operator-configurable setting (receipted)")
+    sp_ss.add_argument("key", help="setting key; only configurable keys are accepted")
+    sp_ss.add_argument("value", help="new value")
+    sp_ss.add_argument("--dry-run", action="store_true", help="print the change, write nothing")
+
+    sp_work = sub.add_parser("work", help="GH-549 work-state event stream and its connectors")
+    wsub = sp_work.add_subparsers(dest="work_cmd", required=True)
+    sp_we = wsub.add_parser("emit", help="record one work event (used by merge-cleanup)")
+    sp_we.add_argument("--event", required=True, help="domain event name, e.g. pr_merged")
+    we_selector = sp_we.add_mutually_exclusive_group(required=True)
+    we_selector.add_argument("--gh-number", type=int, help="the issue this is about")
+    we_selector.add_argument("--roadmap-gid", help="owned terminal row for labels-only repair")
+    sp_we.add_argument("--payload-json", help="optional JSON object of extra detail")
+    sp_wb = wsub.add_parser("backfill", help="project the roadmap's existing state onto the "
+                                             "event stream (GH-564); idempotent")
+    sp_wb.add_argument("--dry-run", action="store_true", help="print the plan, write nothing")
+    sp_wr = wsub.add_parser("reconcile", help="replay events a connector has not seen")
+    sp_wr.add_argument("--connector", help="only this connector (default: every enabled one)")
+    sp_wr.add_argument("--reset", action="store_true",
+                       help="replay from the beginning, not from the cursor")
+    sp_ws = wsub.add_parser("status", help="read-only work lifecycle and observation diagnostics")
+    sp_ws.add_argument("--json", dest="as_json", action="store_true")
+    sp_ws.add_argument("--stale-days", type=int, default=3,
+                       help="age after which a valid start observation is stale (default: 3)")
+
+    sp = sub.add_parser("roadmap", help="Roadmap ledger: sync/list/render the ledger items")
     rsub = sp.add_subparsers(dest="roadmap_cmd", required=True)
-    sp_rs = rsub.add_parser("sync", help="mirror ROADMAP.md's ledger into roadmap_items (one-way; "
-                                         "ROADMAP.md stays the source of truth)")
+    sp_sections = rsub.add_parser("sections", help="list accepted roadmap section names (no DB required)")
+    sp_sections.add_argument("--json", dest="as_json", action="store_true",
+                             help="emit the dashboard's section vocabulary as a JSON array")
+    sp_rs = rsub.add_parser("sync", help="mirror legacy ROADMAP.md's ledger into roadmap_items (one-way)")
     sp_rs.add_argument("--dry-run", action="store_true", help="report the diff, write nothing")
-    rsub.add_parser("list", help="print the shadow rows")
+    sp_rs.add_argument("--allow-empty", action="store_true",
+                       help="permit clearing roadmap_items when the ledger is genuinely empty. "
+                            "Without it a 0-entry parse REFUSES (rule=roadmap-empty-parse) so "
+                            "format drift can never silently delete the mirror; this flag never "
+                            "excuses a ledger that still has content")
+    sp_rs = rsub.add_parser("reconcile-state", help="reconcile nonterminal rows against GitHub issue state")
+    rs_mode = sp_rs.add_mutually_exclusive_group()
+    rs_mode.add_argument("--dry-run", action="store_true", help="preview only (the default)")
+    rs_mode.add_argument("--apply", action="store_true", help="apply verified changes in one transaction")
+    sp_rl = rsub.add_parser("list", help="print the shadow rows")
+    sp_rl.add_argument("--json", dest="as_json", action="store_true",
+                       help="emit rows as a JSON array (machine-readable; the default rendering "
+                            "is a display, not an API)")
+    sp_render = rsub.add_parser("render", help="replay DB rows as ledger markdown (stdout by default)")
+    sp_render.add_argument("--out", help="output file (relative to cwd); refuses tracked ROADMAP.md")
+
+    sp_ra = rsub.add_parser("add", help="intake a single issue into the roadmap ledger directly")
+    sp_ra.add_argument("--issue-num", required=True, type=int, help="GH issue number")
+    sp_ra.add_argument("--issue-url", required=True, help="GH issue URL")
+    sp_ra.add_argument("--title", required=True, help="Issue title")
+    sp_ra.add_argument("--created", required=True, help="Created date YYYY-MM-DD")
+    sp_ra.add_argument("--doc-path", required=True, help="Capture doc relpath")
+    sp_ra.add_argument("--raw-text", default=None,
+                       help="pre-rendered ROADMAP line (hq park passes hq_roadmap_line output so "
+                            "preview and stored row share one template). GH-249: a `rated "
+                            "N/N/N/N [ovr N]` token in this line is parsed and stored — in a "
+                            "releases-mode repo this is the ONLY way to score an entry, since "
+                            "`roadmap sync` is a no-op there")
+    sp_ra.add_argument("--dry-run", action="store_true", help="print what would be written and write nothing")
+
+    sp_rr = rsub.add_parser("rate", help="score a roadmap row that is already parked (GH-253)")
+    sp_rr.add_argument("--issue-num", type=int, help="GH issue number of the parked row")
+    sp_rr.add_argument("--gid", help="the row's rmi- global id — for a multi-issue row that has no "
+                                     "gh_number and cannot be addressed any other way")
+    sp_rr.add_argument("--rated", required=True,
+                       help="the four axes as N/N/N/N (pri/sev/appeal/effort, 1-100, higher is "
+                            "better on every axis — effort scores CHEAPNESS)")
+    sp_rr.add_argument("--ovr", type=int, default=None,
+                       help="operator override (4-400) replacing the derived calc for ranking; "
+                            "the four axes keep their honest values underneath")
+    sp_rr.add_argument("--force", action="store_true",
+                       help="replace an existing rating (refused by default)")
+    sp_rr.add_argument("--dry-run", action="store_true", help="print what would be written and write nothing")
+
+    sp_rp = rsub.add_parser("repoint", help="re-point a parked row's capture doc after the doc moves")
+    sp_rp.add_argument("--issue-num", type=int, help="GH issue number of the parked row (unique match required)")
+    sp_rp.add_argument("--gid", help="exact roadmap row global ID; pass exactly one selector")
+    sp_rp.add_argument("--doc-path", required=True, help="the doc's NEW repo-relative path")
+    sp_rp.add_argument("--dry-run", action="store_true", help="print what would be written and write nothing")
+
+    sp_ru = rsub.add_parser("update", help="update a roadmap row's text, section or status marker")
+    sp_ru.add_argument("--issue-num", type=int, help="GH issue number of the parked row")
+    sp_ru.add_argument("--gid", help="the row's rmi- global id")
+    sp_ru.add_argument("--accepted-start", action="store_true", help="explicit qualified open-issue admission; schema009 required")
+    sp_ru.add_argument("--raw-text", help="new raw_text for the row")
+    sp_ru.add_argument("--status-marker", choices=_ROADMAP_STATUS_MARKERS,
+                       help="explicit lifecycle marker; never inferred from raw_text")
+    sp_ru.add_argument("--section", help="new section; accepted names: " + ", ".join(ROADMAP_SECTIONS))
+    sp_ru.add_argument("--issue-url", help="corrected GitHub issue URL for the row (GH-527). Must "
+                       "name the same issue as the row's gh_number — this is the only verb that "
+                       "can repair an issue_url written wrong at intake")
+    sp_ru.add_argument("--dry-run", action="store_true", help="print what would be written and write nothing")
+
+    sp_rm = rsub.add_parser("move", help="move an existing roadmap row to a new section (GH-269)")
+    sp_rm.add_argument("--issue-num", type=int, help="GH issue number of the parked row")
+    sp_rm.add_argument("--gid", help="the row's rmi- global id")
+    sp_rm.add_argument("--section", required=True,
+                       help="new section; accepted names: " + ", ".join(ROADMAP_SECTIONS))
+    sp_rm.add_argument("--raw-text", default=None, help="optional updated raw_text for the row")
+    sp_rm.add_argument("--dry-run", action="store_true", help="print what would be written and write nothing")
 
     sp = sub.add_parser("project", help="GitHub Project release-card projection")
     psub = sp.add_subparsers(dest="project_cmd", required=True)
@@ -3702,6 +6828,87 @@ def build_parser():
     sp_sync.add_argument("--number", required=True, type=int, help="GitHub Project number")
     sp_sync.add_argument("--apply", action="store_true",
                          help="perform GitHub writes (default is an auditable dry run)")
+
+    sp = sub.add_parser("jog", help="Jog serial immediate-queue execution engine (GH-259)")
+    jsub = sp.add_subparsers(dest="jog_cmd", required=True)
+    sp_ja = jsub.add_parser("add", help="enqueue an issue into the jog queue")
+    sp_ja.add_argument("target", help="issue number (e.g. 123 or GH-123) or doc path")
+    sp_ja.add_argument("--pos", type=int, default=None, help="queue position (default: append to end)")
+    sp_ja.add_argument("--dry-run", action="store_true", help="report what would be queued, write nothing")
+
+    sp_jl = jsub.add_parser("list", help="list active jog queue items")
+    sp_jl.add_argument("--all", dest="show_all", action="store_true", help="include completed/dropped/archived items")
+    sp_jl.add_argument("--json", dest="as_json", action="store_true", help="output as JSON array")
+
+    sp_jb = jsub.add_parser("bump", help="bump an issue to the head of the jog queue (position 1)")
+    sp_jb.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jb.add_argument("--dry-run", action="store_true", help="report what would be bumped, write nothing")
+
+    sp_jd = jsub.add_parser("drop", help="mark a jog queue item as dropped with a reason")
+    sp_jd.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jd.add_argument("--reason", required=True, help="reason for dropping from the queue")
+    sp_jd.add_argument("--force", action="store_true", help="force dropping an already completed item")
+    sp_jd.add_argument("--dry-run", action="store_true", help="report what would be dropped, write nothing")
+
+    sp_jr = jsub.add_parser("retry", help="retry a parked or failed jog item (resets to pending)")
+    sp_jr.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jr.add_argument("--dry-run", action="store_true", help="report what would be retried, write nothing")
+
+    sp_js = jsub.add_parser("skip", help="park/skip an item at the head of the queue")
+    sp_js.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_js.add_argument("--reason", default="skipped by operator", help="reason for skipping")
+    sp_js.add_argument("--dry-run", action="store_true", help="report what would be skipped, write nothing")
+
+    sp_jc = jsub.add_parser("clear", help="archive terminal items (completed, dropped, parked, failed) in jog queue")
+    sp_jc.add_argument("--dry-run", action="store_true", help="report what would be archived, write nothing")
+
+    sp_jtm = jsub.add_parser("to-marathon", help="export active jog items to marathon format")
+
+    sp_jres = jsub.add_parser("resume", help="reconcile durable Marathon state for an item (spends no token)")
+    sp_jres.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jres.add_argument("--root", default=argparse.SUPPRESS, help="repository root path")
+
+    sp_jrg = jsub.add_parser("retry-gate", help="re-run ONLY the gate against the same head SHA (no builder turn)")
+    sp_jrg.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jrg.add_argument("--builder", default="agy", help="builder identity recorded for the retry")
+    sp_jrg.add_argument("--reviewer", default=None, help="reviewer agent (required; must differ from --builder)")
+    sp_jrg.add_argument("--auto-merge", action="store_true", help="merge the PR if the gate retry approves")
+    sp_jrg.add_argument("--root", default=argparse.SUPPRESS, help="repository root path")
+
+    sp_jrb = jsub.add_parser("retry-build", help="fresh Marathon attempt on a fresh execution id (history preserved)")
+    sp_jrb.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jrb.add_argument("--target-root", help="disposable full execution clone")
+    sp_jrb.add_argument("--builder", default="agy", help="builder turn-taker (default: agy; or codex, aider)")
+    sp_jrb.add_argument("--reviewer", default=None, help="reviewer agent (required; must differ from --builder)")
+    sp_jrb.add_argument("--auto-merge", action="store_true", help="opt-in to auto-merge an approved PR")
+    sp_jrb.add_argument("--root", default=argparse.SUPPRESS, help="repository root path")
+
+    sp_jl = jsub.add_parser("land", help="verify committed delivery after hosted reconciliation, complete the primary queue row")
+    sp_jl.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jl.add_argument("--pr", default=None, help="PR number or URL (required when the receipt has no PR identity)")
+    sp_jl.add_argument("--root", default=argparse.SUPPRESS, help="repository root path")
+
+    sp_jrec = jsub.add_parser("reconcile", help="idempotent replay entry for jog land (same verification and steps)")
+    sp_jrec.add_argument("target", help="issue number (e.g. 123 or GH-123)")
+    sp_jrec.add_argument("--pr", default=None, help="PR number or URL (required when the receipt has no PR identity)")
+    sp_jrec.add_argument("--root", default=argparse.SUPPRESS, help="repository root path")
+
+    sp_jrun = jsub.add_parser("run", help="execute the serial jog queue loop")
+    sp_jrun.add_argument("--target-root", required=False, help="disposable full execution clone (required for dispatch)")
+    sp_jrun.add_argument("--auto-merge", action="store_true", help="opt-in to auto-merge passing PRs on same-seam tasks")
+    sp_jrun.add_argument("--builder", default="agy", help="builder turn-taker (default: agy; or codex, aider)")
+    sp_jrun.add_argument("--reviewer", default=None,
+                         help="reviewer agent — REQUIRED with --executor marathon, the default "
+                              "executor (GH-280 Phase 5); no default is selected")
+    sp_jrun.add_argument("--executor", choices=["relay", "marathon"], default="marathon",
+                         help="per-task executor (GH-280 Phase 5): 'marathon' is the default — the "
+                              "reviewed one-phase driver via the structured contracts, requires "
+                              "--reviewer; 'relay' is the legacy rollback path kept for a "
+                              "documented compatibility window")
+    sp_jrun.add_argument("--max-tasks", type=int, default=None, help="maximum tasks to process in this run")
+    sp_jrun.add_argument("--simulate", action="store_true", help="simulate drive execution in test environments")
+    sp_jrun.add_argument("--dry-run", action="store_true", help="simulate queue run without mutations")
+
     return p
 
 
@@ -3713,16 +6920,38 @@ def main(argv=None):
         "manifest": lambda a: cmd_manifest_add(a) if a.manifest_cmd in ("dial-in", "add")
         else (cmd_manifest_ship(a) if a.manifest_cmd == "ship"
               else (cmd_manifest_marathon(a) if a.manifest_cmd == "marathon"
-                    else cmd_manifest_cut(a))),
+    else (cmd_manifest_unship(a) if a.manifest_cmd == "unship"
+                    else cmd_manifest_cut(a)))),
         "marathon": lambda a: cmd_marathon_add(a) if a.marathon_cmd == "add"
         else cmd_marathon_list(a),
         "list": cmd_list, "show": cmd_show, "next": cmd_next, "gen": cmd_gen,
         "check": cmd_check, "reconcile": cmd_reconcile,
         "project": lambda a: cmd_project_sync(a) if a.project_cmd == "sync" else None,
-        "roadmap": lambda a: cmd_roadmap_sync(a) if a.roadmap_cmd == "sync"
-        else cmd_roadmap_list(a),
+        # A lookup, not a ternary chain: `rate` (GH-253) was the fourth branch, and the nested
+        # form was already one subcommand past readable.
+        "roadmap": lambda a: {"add": cmd_roadmap_add, "sync": cmd_roadmap_sync,
+                              "rate": cmd_roadmap_rate, "list": cmd_roadmap_list,
+                              "render": cmd_roadmap_render,
+                              "repoint": cmd_roadmap_repoint, "update": cmd_roadmap_update,
+                              "move": cmd_roadmap_move, "sections": cmd_roadmap_sections,
+                              "reconcile-state": cmd_roadmap_reconcile_state}[a.roadmap_cmd](a),
+        "settings": lambda a: {"set": cmd_settings_set,
+                               "list": cmd_settings_list,
+                               "get": cmd_settings_get}[a.settings_cmd](a),
+        "work": lambda a: {"emit": cmd_work_emit, "backfill": cmd_work_backfill,
+                           "reconcile": cmd_work_reconcile,
+                           "status": cmd_work_status}[a.work_cmd](a),
+        "dashboard": cmd_dashboard,
+        "jog": lambda a: {"add": cmd_jog_add, "list": cmd_jog_list,
+                          "bump": cmd_jog_bump, "drop": cmd_jog_drop,
+                          "retry": cmd_jog_retry, "skip": cmd_jog_skip,
+                          "clear": cmd_jog_clear, "to-marathon": cmd_jog_to_marathon,
+                          "run": cmd_jog_run, "resume": cmd_jog_resume,
+                          "retry-gate": cmd_jog_retry_gate, "retry-build": cmd_jog_retry_build,
+                          "land": cmd_jog_land, "reconcile": cmd_jog_land}[a.jog_cmd](a),
     }
     handlers[args.cmd](args)
+
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 gh_issue: 348
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/348
 title: "Retire ROADMAP.md: make the RELEASES SQLite ledger the only work ledger (with #329 as phase 1)"
-status: "Active — plan drafted; awaiting Codex plan QA"
+status: "Active — plan QA Approved (codex r2); Phase 1 (#329) committed; Phase 2 next"
 created: 2026-10-21
 updated: 2026-10-21
 owner: noel
@@ -19,7 +19,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Recon done (RECON.md); plan drafted; task clone renamed to the gh329 group formula. | Codex plan QA via relay-xyz, then Phase 1 (#329). |
+| Plan QA Approved (codex r2, attested). Phase 1: Forge 1573dd4b7 app + #322 delta, schema v5→v9, check warning set unchanged, reconcile-state dry-run exit 0. | Phase 2 (#348): de-key/key, final import, flip. |
 
 ## Tracked issues
 
@@ -66,7 +66,7 @@ after merge), and this repo's old `releases_app.py` lacks the verbs the governed
 - Four entries sit outside any `###` section and never reach the DB (lines 35-38: #300, #232, #230; line 230: GH-23).
   There are two `### In progress` headings.
 - Readers that break when the file disappears: `pdda.sh roadmap-coverage` (hard ERROR), `prior-art-check.sh` (silent
-  skip), `scripts/check_doc_links.py` (8 broken links, CI red). Forge `pdda.sh:326-372` already has the DB branch for
+  skip), `scripts/check_doc_links.py` (8 broken links, CI red). Forge `pdda.sh:326-409` already has the DB branch for
   coverage. `src/rebalance/ingest/releases_scan.py` reads `releases.db` directly and is unaffected.
 - `wave_reconcile.py` is a 2.5K-line harness tool that imports `harness_paths` and calls `ci-route.sh`, the marathon
   planner, timeline and leaderboard through `harness_tool()`. It belongs in the machine-local `.xyz/` harness, not in

@@ -12,6 +12,6 @@
 # Update via PR only.
 #
 # Simple key=value lines; `#` comments and blanks ignored.
-commit=c829000bad5e196392e5ffbff5838cc558877f67
-pinned_at=2026-07-03
-note=GH-102 Phase 0 discovery ran against this XYZ commit (GH-75 shipped).
+commit=1573dd4b71198ffa50813d0905a211676194263a
+pinned_at=2026-10-21
+note=GH-329: tracked utils/py/releases_app.py re-vendored from this XYZ Forge commit (plus the marked #322 local delta); releases.db migrated to schema 9. Previous pin c829000 (2026-07-03, GH-102 Phase 0).

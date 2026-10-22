@@ -262,3 +262,5 @@ asserts `errors=0` or a pinned count, and (e) keeps `test_releases_app_dump_pars
 5. Add the GH-269-style pytest from §5.
 
 Do not refresh the whole of `utils/pdda` from Forge here.
+
+> **Superseded by plan QA (2026-10-21):** the coverage port is the whole Forge function `pdda.sh:326-409`, and HiQS-Suite rows are NOT keyed. The approved plan is `PROJECT/2-WORKING/GH-348-RETIRE-ROADMAP-MD.md`.
