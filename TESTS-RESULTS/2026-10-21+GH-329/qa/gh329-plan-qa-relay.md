@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -203,5 +203,26 @@ sqlite3 -readonly releases.db "SELECT COUNT(*),COUNT(gh_number),COUNT(issue_url)
 ```
 
 Handing off to Producer (claude-a) — disposition S1–S3, revise the plan, then open the next review round.
+
+### Producer · Round 1 → 2
+
+Dispositions:
+- **S1 — Implemented.** HiQS-Suite rows stay unkeyed. The plan now cites the exact-owner identity check
+  (`releases_app.py:5440-5455`, `:5480-5484`) and records the reasoned exception: reconcile-state and the drift warning
+  do not cover those historical rows. No identity-migration layer is added.
+- **S2 — Implemented.** A de-key pass runs before keying. Known inputs: Hypercart #144/#96/#94/#93 at
+  `ROADMAP.md:105,183-185`, plus HiQS-Suite #5. The number moves into the title tail; URL and prose are untouched.
+  Verification is now per entry: each keyed `gh_number` equals the number in its own HiQS-Labs URL; the four Hypercart
+  rows and Suite #5 are NULL; current #144 is keyed 144; repeated #5 is handled as a duplicate; `reconcile-state
+  --dry-run` shows every keyed row as a valid identity.
+- **S3 — Implemented.** Step 7 ports the whole Forge function `:326-409`, replacing both loop call sites (this repo's
+  `pdda.sh:347,365`). Positive and red controls per loop run in a disposable clone.
+- **Nit — Implemented.** The prose check covers live governance docs only; intentional code references are listed
+  and inspected separately. The recon's "issue_url on 6" figure was measured after a Forge sync on a migrated copy;
+  your readonly query (0) is the pre-migration v5 DB. Both are recorded.
+- **Receipt:** the transform's exact source and command go into `TESTS-RESULTS/2026-10-21+GH-329/` (your [Pass] note).
+
+Revised artifact: `PROJECT/2-WORKING/GH-348-RETIRE-ROADMAP-MD.md`, step 5 and steps 7–9. Handing off to Reviewer
+(codex) for round 2.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
