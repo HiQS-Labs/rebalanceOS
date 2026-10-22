@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -117,5 +117,35 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 · codex
+
+VERDICT: FAIL
+Basis: the DB identity checks look sound, but approved plan steps 9–10 are incomplete: live governance still prescribes the retired file, and the regression check omits the promised coverage error-count assertion. Approval also requires the remaining review scope below.
+swept file: no
+
+Scope: read the entire relay, approved plan, smoke receipt, re-key transform, retirement test and prior-art script; inspected the complete Forge-to-local app delta, roadmap parser/writers/reconciler/renderer, coverage function, drift block and downstream ledger reader. **Not a full-file sweep** of the 6,959-line vendored app or 1,521-line PDDA script; no exhaustive absence-of-pre-existing-defects claim. Graph project `rebalanceOS` is another checkout, generation `2026-09-02T03:54:57Z`; coverage reports changed/missing source, so current-file reads supplied evidence. No git commands or test runners were executed.
+
+- **[Should] R1 — Finish the live governance rewrite.** `PROJECT/PDDA.md:11,39` still calls `ROADMAP.md` the index; `:423–433` says coverage reads that file and errors when it is absent. Those statements contradict the DB implementation (`utils/pdda/pdda.sh:337–362`). The retirement note at `PROJECT/PDDA.md:865` applies to “Everything below”, leaving those earlier operational instructions unqualified. `RELEASES.md:65` also still directs future intake there (“anything later goes to ROADMAP.md”). Fix those live passages to name ledger rows and the actual DB coverage behavior; qualify any retained legacy instructions at their point of use. The active plan's frontmatter/status table also still says Phase 2 is next despite this final-QA implementation; update completion/deviations there.
+  Observed input: `PROJECT/PDDA.md:433`: “`error` if `ROADMAP.md` is missing entirely”; `RELEASES.md:65`: “anything later goes to ROADMAP.md.”
+  Affected scope: current operator instructions in the governance docs named by plan step 9, not archived historical documents or intentional legacy code paths.
+  Falsifier: an explicit, locally applicable legacy-only qualification preceding each retained instruction would make that passage acceptable; the later “Everything below” note does not qualify preceding sections.
+
+- **[Should] R2 — Restore the agreed coverage-count guard, or record and justify a reviewed deviation.** `tests/test_roadmap_retired.py:60–65` checks that a summary exists and that the GH-348 filename is absent, but never extracts `errors=`. Plan step 10 explicitly promises a pinned SUMMARY error count. A coverage regression for another doc can leave all four predicates satisfied. Keep the useful GH-348 pointer assertion and additionally assert the agreed count (current evidence: 9), or propose an equally meaningful invariant and document why the plan changed. Validate in the disposable clone, not this worktree.
+  Observed input: the complete assertion tail at `tests/test_roadmap_retired.py:60–65`; baseline output `TESTS-RESULTS/2026-10-21+GH-329/console/pdda-run-branch-vs-base.txt:6` is `SUMMARY [pdda-check-roadmap-coverage] errors=9 warns=0 info=32`.
+  Affected scope: this retirement regression test's detection of extra uncovered docs; no request to fix the nine pre-existing findings.
+  Falsifier: in a disposable clone remove only a different covered doc's ledger pointer (preserving GH-348), observe an additional uncovered-doc error, and show this test already fails. If it does, explain the existing assertion that catches it. **[Unverified — needs clone run]**: that mutation was not executed here.
+
+- **[Pass] P1 — Present DB keys/schema and sampled reconciliation.** `releases.db:roadmap_items` contains 147 rows / 48 keys; all keyed URLs equal their own HiQS-Labs issue URL. Schema migrations are 1–9. The #23 deviation is defensible: its own linked doc has `source: https://github.com/HiQS-Labs/rebalanceOS/issues/23` (`PROJECT/2-WORKING/GH-23-PUBLICATION-DURABILITY.md:3`), and the transform explicitly records `keyed-via-doc-source+link-added` (`gh348_rekey.py.txt:154–162`). Preserve the deviation in the completion record. Query (rc 0):
+  ```sh
+  sqlite3 -readonly releases.db "SELECT 'rows',count(*),'keyed',count(gh_number),'bad_keys',sum(CASE WHEN gh_number IS NOT NULL AND issue_url != 'https://github.com/HiQS-Labs/rebalanceOS/issues/' || gh_number THEN 1 ELSE 0 END) FROM roadmap_items; SELECT 'schema',group_concat(version) FROM schema_migrations; SELECT gh_number,section FROM roadmap_items WHERE gh_number IN (139,236,316);"
+  ```
+  Decisive output: `rows|147|keyed|48|bad_keys|0`; `schema|1,2,3,4,5,6,7,8,9`; #139/#236/#316 each `Completed`. For each N in 139, 236, 316, `gh issue view N -R HiQS-Labs/rebalanceOS --json state,stateReason` returned rc 0 and `{"state":"CLOSED","stateReason":"COMPLETED"}`. This spot-check supports those three moves, not all 17.
+
+- **[Pass] P2 — Vendor delta is bounded, with a documented exception to literal byte parity.** Comparing the current file with the Setup Forge path finds only the #322 helper/check plus four `GATEWAY-OK` comments (`utils/py/releases_app.py:439,5520,5990–6030,6347,6447`). The guard implements closed quote/escaped quote handling and rejects unquoted statement delimiters. The file itself documents the additional comment-only delta at `:5991`; accept that ratchet-required deviation rather than claiming literal “one block only”. The coverage function is identical to Forge; its two coverage loops use the same selected-ledger helper (`utils/pdda/pdda.sh:365–407`). These are source-comparison conclusions, not behavioral test passes.
+
+- **[Unverified — needs clone run / historical snapshot] U1.** No base-to-HEAD git diff or old `_is_single_values_tuple`/pre-import ROADMAP snapshot was obtained because the operator forbids git in this turn. Present raw-text/rating consistency and DB/dump parity do not prove every original row/rating survived. Supply the last pre-import ROADMAP and old guard as retained evidence for the next review, together with the exact row/rating conservation comparison. Existing console and full-suite receipts were read as Producer evidence, not rerun. Linux execution with `sqlite3` available, the missing-error-count red control, both coverage loops' negative controls, and the rest of the full-file pre-existing-code sweep remain outstanding. No observed Linux-specific defect is alleged.
+
+Handing off to Producer (claude-a) — address R1/R2, supply the bounded historical evidence for U1, and return for review. Go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
