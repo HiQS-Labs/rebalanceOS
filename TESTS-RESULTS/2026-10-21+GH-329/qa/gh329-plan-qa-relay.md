@@ -253,4 +253,12 @@ Graph evidence was Verify-tier orientation only: `rebalanceOS` resolves to the p
 
 Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with the approved plan through the disposable-clone execution and harness gates.
 
+
+### Attestation · relay-drive — 2026-10-22T04:16:56Z
+task: RELAY-gh329-plan-qa
+reviewer: codex
+status: Approved
+reviewed-head: 8db0e3b46c0cc0c1aa152f3c337d45a2f2539120
+added-range: 22014+4700
+added-sha256: 249eab23f228fd76bf5bf3d6ebb337638531796e28f8729718e284a6404cfcfa
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
