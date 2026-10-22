@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -224,5 +224,51 @@ Dispositions:
     rating_mismatch=0`, `final-legacy match=147 missing=0 rating_mismatch=0`, `RESULT: PASS`.
 
 Handing off to Reviewer (codex) for round 3 (cap).
+
+### Reviewer · Round 3 · codex
+
+VERDICT: PASS
+Basis: Ship. U1 now has the requested historical inputs, comparison source and per-entry clone receipt. R1/R2 remain resolved; no actionable finding remains. Approval accepts the retained clone evidence and recorded deviations, with the harness gate still to run.
+swept file: yes
+
+Scope: carried forward the round-2 whole-file source sweep (including pre-existing code), re-read the current retirement test, prior-art script and owning plan, and reviewed the new conservation evidence. No additional actionable pre-existing defect was established. The graph inventory has no project for this worktree; `rebalanceOS` points at another checkout, so no graph completeness claim is made. No git commands, test runners or executable evidence fixtures were run. Historical snapshot provenance is accepted from the retained Producer receipt; it was not independently re-extracted with git. Linux execution remains **[Unverified — needs clone run]**, owned by the subsequent harness gate.
+
+- **[Pass] U1 resolved — reproducible conservation evidence retained.** `conservation/compare.py.txt:3–12,23–60` identifies both snapshots, defines title normalisation, opens the ledger read-only and compares each entry's explicit rating token. `conservation/receipt.txt:1` records the isolated-clone command; its final lines state `final-legacy totals: match=147 missing=0 rating_mismatch=0`, `RESULT: PASS`, `exit=0` (`:296–299`). The base section reports `base totals: match=141 missing=0 rating_mismatch=0`. The final snapshot is explicitly the normalised import input at `268f968`, rather than its parent (`compare.py.txt:5–6`); that resolves the Setup revision ambiguity. No runtime code change is needed.
+- **[Pass] Receipt identity and ratings cross-check.** A narrow data-only probe found 147 distinct normalised DB titles, 141 distinct base receipt matches and 147 distinct final receipt matches, with no DB title left unmatched. All 31 base and 33 final explicit rating tokens occur in the receipt with the same multiplicities and match the current DB columns. This closes the potential ambiguity in `compare.py.txt:48–54`, where multiple hits could otherwise hide a many-to-one match. Exact command below, exit **0**; it reads inert evidence and SQLite only, without executing `compare.py.txt` or importing the app:
+
+  ```sh
+  export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+  mkdir -p "$TMPDIR"
+  python3 - <<'PY'
+  import collections,pathlib,re,sqlite3
+  p=pathlib.Path('TESTS-RESULTS/2026-10-21+GH-329/conservation')
+  def norm(t):
+   t=re.sub(r'^(?:GH-|#)\d+\s*(?:[—:·-]\s*)?', '', t)
+   return re.sub(r'\s*\((?:(?:predecessor )?GH-|#)\d+\)$', '', t).strip()
+  c=sqlite3.connect('file:releases.db?mode=ro',uri=True)
+  db={norm(t):r for t,*r in c.execute('select title,rating_pri,rating_sev,rating_appeal,rating_effort from roadmap_items')}
+  print('db_unique_normalized_titles',len(db))
+  receipt=p.joinpath('receipt.txt').read_text()
+  for label,filename,expected in [('base','ROADMAP-base-44c318d.md.txt',141),('final-legacy','ROADMAP-final-legacy-268f968.md.txt',147)]:
+   block=receipt.split('## '+label+':',1)[1].split('## '+label+' totals:',1)[0]
+   matches=[s.split(' | ') for s in block.splitlines() if s.startswith('MATCH ')]
+   titles=[norm(s[2]) for s in matches]
+   assert len(titles)==expected and len(set(titles))==expected
+   assert all(t in db for t in titles)
+   for s,t in zip(matches,titles):
+    if s[3]!='rated -': assert db[t]==list(map(int,s[3][6:].split('/')))
+   raw=p.joinpath(filename).read_text()
+   rated=re.findall(r'rated\s+(\d+/\d+/\d+/\d+)',raw)
+   rr=[s[3][6:] for s in matches if s[3]!='rated -']
+   assert collections.Counter(rated)==collections.Counter(rr)
+   print(label,'receipt_unique',len(set(titles)),'rated_tokens',len(rated),'db_missing',len(set(titles)-db.keys()))
+   if label=='final-legacy': print('db_unmatched',len(db.keys()-set(titles)))
+  print('receipt_totals',*[s for s in receipt.splitlines() if s.startswith('## ') and 'totals:' in s])
+  PY
+  ```
+
+  Decisive output: `db_unique_normalized_titles 147`; `base receipt_unique 141 rated_tokens 31 db_missing 0`; `final-legacy receipt_unique 147 rated_tokens 33 db_missing 0`; `db_unmatched 0`; both receipt totals show `missing=0 rating_mismatch=0`.
+
+Relay closed (Approved), no further turn needed. Handing the token to Producer (claude-a) with done; the harness owns the file-scoped commit and subsequent gate.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
