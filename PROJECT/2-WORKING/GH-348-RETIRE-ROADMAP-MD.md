@@ -2,7 +2,7 @@
 gh_issue: 348
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/348
 title: "Retire ROADMAP.md: make the RELEASES SQLite ledger the only work ledger (with #329 as phase 1)"
-status: "Active — plan QA Approved (codex r2); Phase 1 (#329) committed; Phase 2 next"
+status: "Active — implemented; final Codex QA in progress (r2)"
 created: 2026-10-21
 updated: 2026-10-21
 owner: noel
@@ -19,7 +19,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA Approved (codex r2, attested). Phase 1: Forge 1573dd4b7 app + #322 delta, schema v5→v9, check warning set unchanged, reconcile-state dry-run exit 0. | Phase 2 (#348): de-key/key, final import, flip. |
+| Phases 1-2 implemented and verified: full suite green at 62de070 (tests/ 2815, HiQS/tests 163), smoke + red controls, 0 closed-issue drift after reconcile-state. Final QA r1 findings fixed (75f869f). | Final Codex QA r2, then PR. |
 
 ## Tracked issues
 
@@ -172,6 +172,20 @@ after merge), and this repo's old `releases_app.py` lacks the verbs the governed
   - Adjacent path: re-run `roadmap sync` (skip, no change), and run `reconcile-state --dry-run` with a seeded
     closed-but-in-progress row.
   - Receipt goes to `TESTS-RESULTS/2026-10-21+GH-329/`.
+
+## Completion record and deviations (2026-10-21)
+
+- **#23 keyed via its doc's `source:`** (the plan said "the entry's own first link"): the entry had no link.
+  Its plan doc declares `source: https://github.com/HiQS-Labs/rebalanceOS/issues/23`, so the transform added that link
+  and keyed it (`rekey-receipt.tsv`: `keyed-via-doc-source+link-added`). Final QA r1 P1 accepted this.
+- **Two marked local deltas, not one:** the #322 guard, plus four `# GATEWAY-OK` comments on `sqlite3.connect` lines
+  that this repo's GH-136 ratchet requires (full-suite run 1 caught them).
+- **Applied `reconcile-state --apply` in this PR:** 17 CLOSED issues moved to Completed, to meet #348's "no closed
+  issue still marked in progress" acceptance.
+- **Final legacy import churned gids:** re-keyed rows were re-created under new `global_id`s (+51/−47). Conservation
+  is proven by title and rating instead (`console/conservation.txt`: 141/141 base entries present, 0 rating mismatches).
+- **Pre-existing, filed separately:** #349 (`pytest tests/ HiQS/tests` in one invocation fails 4 conftest-quarantine
+  tests on base too).
 
 ## Non-goals and operator steps outside this PR
 

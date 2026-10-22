@@ -65,3 +65,10 @@ ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-348-RETIRE-ROADMAP-MD.m
 SUMMARY [pdda-check-roadmap-coverage] errors=10 warns=0 info=32
 ## red control: recreating ROADMAP.md fails the retirement test
 3 failed, 1 passed in 5.97s
+
+## Final-QA r1 red controls (gate clone at 75f869f)
+
+- Working-doc loop: delete the GH-310 plan's only ledger row → `tests/test_roadmap_retired.py` fails with
+  `AssertionError: roadmap-coverage errors rose to 10 (baseline 9 at GH-348)`. The row-count test also fails (146 < 147).
+- Inbox loop: delete the row for `PROJECT/1-INBOX/GH-1-SUSTAINED-ACTIVITY-AUTO-PROMOTE.md` →
+  `ERROR … captured GH issue doc is not parked in releases.db (PROJECT/1-INBOX/GH-1-…)`, `SUMMARY … errors=11`.

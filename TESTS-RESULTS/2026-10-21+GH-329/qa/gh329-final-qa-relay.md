@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -147,5 +147,33 @@ Scope: read the entire relay, approved plan, smoke receipt, re-key transform, re
 - **[Unverified — needs clone run / historical snapshot] U1.** No base-to-HEAD git diff or old `_is_single_values_tuple`/pre-import ROADMAP snapshot was obtained because the operator forbids git in this turn. Present raw-text/rating consistency and DB/dump parity do not prove every original row/rating survived. Supply the last pre-import ROADMAP and old guard as retained evidence for the next review, together with the exact row/rating conservation comparison. Existing console and full-suite receipts were read as Producer evidence, not rerun. Linux execution with `sqlite3` available, the missing-error-count red control, both coverage loops' negative controls, and the rest of the full-file pre-existing-code sweep remain outstanding. No observed Linux-specific defect is alleged.
 
 Handing off to Producer (claude-a) — address R1/R2, supply the bounded historical evidence for U1, and return for review. Go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1 → 2
+
+Dispositions:
+- **R1 — Implemented.**
+  - `PROJECT/PDDA.md:11,39` now name the ledger rows.
+  - §G coverage (`:425-437`) now describes the DB behaviour and its legacy-mode branch, including the actual error
+    condition (unreadable `releases.db` / no `sqlite3`).
+  - §E `pdda.sh roadmap` and the LLM rubric line are qualified "legacy mode only" at the point of use, and the
+    remaining design-note lines name the ledger.
+  - `RELEASES.md:65` now says "parked as a roadmap ledger row (`releases_app.py roadmap add`…)".
+  - The plan's frontmatter and status table are updated, and a "Completion record and deviations" section was added
+    (#23 doc-source keying, two marked deltas, reconcile-state applied, gid churn, #349).
+- **R2 — Implemented.** `tests/test_roadmap_retired.py` now parses `errors=` and asserts `<= 9` (the baseline at the
+  flip). Red controls ran in a disposable clone at `75f869f` (`SMOKE.md` → "Final-QA r1 red controls"):
+  - Dropping GH-310's row → `errors rose to 10` → FAIL.
+  - Dropping an inbox capture's row → `captured GH issue doc is not parked in releases.db`, `errors=11`.
+  Both coverage loops' negative controls are now evidenced.
+- **U1 — Evidence supplied** (`TESTS-RESULTS/2026-10-21+GH-329/`):
+  - `old-322-guard-44c318d.py.txt` is the old `_is_single_values_tuple`, byte-for-byte from `44c318d`.
+  - `console/conservation.txt`: the Forge parser on base `44c318d` ROADMAP.md gives 141 entries. All 141 are present
+    in the HEAD DB by normalised title, with **0 rating mismatches**. The DB-only extras are exactly the 4 folded strays
+    and the 2 rows parked by this task (#348, #329).
+- **P2 note accepted:** two marked deltas (the #322 block and the GATEWAY-OK comments), recorded in the plan.
+- **Since run 2 (`62de070`):** docs changed, plus `tests/test_roadmap_retired.py` (4 passed at `75f869f`). No code path
+  in `utils/` or `src/` changed.
+
+Handing off to Reviewer (codex) for round 2.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
