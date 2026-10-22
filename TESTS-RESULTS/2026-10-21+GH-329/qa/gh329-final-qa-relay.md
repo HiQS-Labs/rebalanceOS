@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 2 / 3
 
@@ -175,5 +175,36 @@ Dispositions:
   in `utils/` or `src/` changed.
 
 Handing off to Reviewer (codex) for round 2.
+
+### Reviewer · Round 2 · codex
+
+VERDICT: FAIL
+Basis: R1 and R2 are resolved. U1 is only partially supplied: the old guard is reviewable, but historical row/rating conservation still has only an aggregate assertion, without the requested historical input or comparison procedure. No additional source-code change is requested.
+swept file: yes
+
+Scope: swept the complete current `utils/py/releases_app.py`, `utils/pdda/pdda.sh`, `utils/pdda/prior-art-check.sh` and `tests/test_roadmap_retired.py`, including their pre-existing code; inspected the plan, relevant live governance passages and retained campaign receipts. No further actionable pre-existing defect was established in that source sweep. This is not an exhaustive audit of every historical PROJECT document. Graph tools are absent from this turn's callable tool inventory; current source reads supplied evidence. No git commands, test runners or executable fixtures were run. Supplied clone-run results remain Producer evidence; Linux execution remains **[Unverified — needs clone run]** for the harness gate.
+
+- **[Pass] R1 resolved.** `PROJECT/PDDA.md:11,39,388–398,425–439` now names the DB index, qualifies the legacy check locally and describes the actual coverage branch; `RELEASES.md:65` directs future intake into a ledger row. The owning plan's status table now says “Phases 1-2 implemented” and its completion record explicitly records the #23, gateway-comment and gid-churn deviations. No further rewrite is required for the retirement contract.
+- **[Pass] R2 resolved.** `tests/test_roadmap_retired.py:68–69` extracts the SUMMARY count and asserts `errors <= 9`, matching plan step 7's allowed upper bound while permitting old debt to decrease. `SMOKE.md:69–74` records the working-loop red control's exact `errors rose to 10` failure and the inbox-loop uncovered-doc finding. These are accepted retained clone receipts, not reruns here. No new test machinery is needed.
+- **[Pass] Guard, vendor boundary and current ledger.** The retained old guard has the same AST as `_is_single_values_tuple` at `utils/py/releases_app.py:5995–6015`; direct source comparison with Setup's Forge file shows only that marked helper/check and the four gateway comments (`:439,5520,6347,6447`). The complete `check_roadmap_coverage` function (`utils/pdda/pdda.sh:327–410`) matches Forge, and the GH-492 block remains inside `check_issue_doc_sync` before its summary (`:681–711`). The current DB has 147 rows, 48 keys and no keyed URL disagreement; its canonical dump matches `releases.sql`. Exact narrow read-only probe, exit **0**:
+  ```sh
+  export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+  python3 - <<'PY'
+  import ast,pathlib,runpy,sqlite3
+  p=pathlib.Path('utils/py/releases_app.py')
+  m=runpy.run_path(str(p))
+  old=ast.parse(pathlib.Path('TESTS-RESULTS/2026-10-21+GH-329/old-322-guard-44c318d.py.txt').read_text()).body[0]
+  cur=next(n for n in ast.parse(p.read_text()).body if isinstance(n,ast.FunctionDef) and n.name==old.name)
+  print('guard_AST_equal',ast.dump(old)==ast.dump(cur))
+  c=sqlite3.connect('file:releases.db?mode=ro',uri=True); c.row_factory=sqlite3.Row
+  print('rows_keyed_bad',tuple(c.execute("SELECT count(*),count(gh_number),sum(gh_number IS NOT NULL AND issue_url IS NOT 'https://github.com/HiQS-Labs/rebalanceOS/issues/' || gh_number) FROM roadmap_items").fetchone()))
+  print('canonical_dump_equal',m['dump_text'](c,m['get_generation'](c))==pathlib.Path('releases.sql').read_text())
+  c.close()
+  PY
+  ```
+  Decisive output: `guard_AST_equal True`; `rows_keyed_bad (147, 48, 0)`; `canonical_dump_equal True`. This proves present consistency, not historical conservation.
+- **[Should] U1 remains open — retain reproducible conservation evidence.** `console/conservation.txt:1–12` supplies totals (`141/141`, `MISSING: 0`, `RATING MISMATCH: 0`) and six extra titles, but no command/comparison source, historical ROADMAP text, normalisation definition or per-entry matches. Round 1 explicitly requested the historical snapshot and exact comparison; the newly supplied old guard meets only the guard half. The stronger migration claim therefore remains **[Unverified — historical input/comparison missing]**. Cheapest fix: retain the base and final-legacy ROADMAP snapshots as inert evidence and the exact comparison source/command, exit status and per-entry title/rating matches (including all 147 final-legacy entries, not just the 141 base entries). Have the disposable clone perform that comparison and return its receipt. This asks for evidence only, not a behavior change or a new runtime subsystem. It should also disambiguate the source revision: Setup asks for `268f968^:ROADMAP.md`, while `conservation.txt:1` labels final legacy as `268f968`.
+
+Handing off to Producer (claude-a) — retain the missing U1 inputs and reproducible comparison, then return for round 3. Go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
