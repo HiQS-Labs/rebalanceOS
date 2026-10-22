@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -224,5 +224,33 @@ Dispositions:
 
 Revised artifact: `PROJECT/2-WORKING/GH-348-RETIRE-ROADMAP-MD.md`, step 5 and steps 7–9. Handing off to Reviewer
 (codex) for round 2.
+
+### Reviewer · Round 2
+
+VERDICT: PASS
+Basis: S1–S3 are resolved in the revised plan. The complete plan meets the planning Definition of Done, including explicit acceptance deviations and falsifiable clone checks. This approves the plan, not implementation or unexecuted runtime claims.
+swept file: yes
+
+Read the entire revised artifact (lines 1–193), recon and prior relay turns; revisited the material source paths. No additional blocking or Should-level defects found, including in the plan's pre-existing rationale, ordering, risks, rollback and non-goals. No artifact/source edits, git commands, suites or executable fixtures were run.
+
+- **[Pass] S1 and S2 resolved.** Plan:111–129 now de-keys predecessor prefixes before assigning current-repo keys, explicitly excludes Suite rows, preserves URLs, and requires per-entry assertions (including foreign NULL keys and current #144). This matches Forge `utils/py/releases_app.py:3416–3421` (prefix key), `:3450–3476` (URL qualification), `:5440–5455` and `:5480–5484` (owned/native identity checks). The exception at Plan:120–121 clearly limits reconciliation coverage. No redirect-based identity assumption remains in the operative steps.
+- **[Pass] S3 resolved.** Plan:133–142 now specifies the whole Forge coverage function and both loop replacements, plus a nonempty positive and one-pointer-removal red control for each loop. Forge `utils/pdda/pdda.sh:326–409` defines its DB text/helper locally; existing `utils/pdda/pdda.sh:564–569` supplies the state table and locals used by the separate GH-492 block at Forge `:673–700`. No broader runtime refresh is required by these cited blocks.
+- **[Pass] Scope and ordering remain appropriate.** Plan:92–102 pairs app/schema/dump, retaining the #322 guard (`utils/py/releases_app.py:3169–3189,3238–3239`, missing at Forge `:5995–6005`). Plan:130–132 pairs marker/deletion; append the marker after the mode, since `utils/pdda/pdda-lib.sh:34–42` reads the first non-comment line. Plan:178–182 records the hosted/harness acceptance exception and per-Mac update explicitly. Forge `relay-automation/xyz-vendor.sh:74–75,437–445,502–503` still targets `.xyz/`, supporting the pinned tracked-root replacement. The schema-tolerant read contract is at `src/rebalance/ingest/releases_scan.py:130–143`.
+- **[Pass] Verification is meaningful at plan time.** Plan:139–142 specifies coverage and drift red controls; :153–155 distinguishes live prose from intentional code literals; :156–174 specifies retirement invariants, final checks and a disposable-clone smoke receipt. Keep the exact transform source/command in the receipt as specified at :109–110. Ratings remain grounded as in :37–45. Rollback at :85–86 is adequate before subsequent ledger writes; retain the Round 1 caution to preserve any later writes during operational rollback.
+- **[Nit] Historical summary wording still trails the operative corrections.** Plan:69 and recon §3/recommended approach still cite the partial coverage interval `326–372`; recon also retains the earlier Suite-keying recommendation. Plan:111–142 is now authoritative and correct. When touching these summaries next, mark those older recommendations superseded so implementers do not follow them instead of the approved steps. This is not a condition of plan approval.
+- **[Unverified — needs clone run]** Migration success/warning equality, Forge's claimed 2/6 regression, the final 147 rows, coverage controls, reconciliation and final suites remain implementation checks. No runtime result is inferred from this source review. GitHub requirements were read from the seeded plan as permitted by Setup: both commands below exited 1 with the same decisive output:
+
+  ```sh
+  gh issue view 329 --repo HiQS-Labs/rebalanceOS --json body,title
+  gh issue view 348 --repo HiQS-Labs/rebalanceOS --json body,title
+  ```
+  ```text
+  error connecting to api.github.com
+  check your internet connection or https://githubstatus.com
+  ```
+
+Graph evidence was Verify-tier orientation only: `rebalanceOS` resolves to the primary checkout, coverage generation `2026-09-02T03:54:57Z`; search returned two old root-app symbols, with no further page. Coverage marked material files changed, excluded, untracked or missing relative to that index. Current worktree and pinned external source reads, rather than graph freshness, support the citations above. `Forge/` means the pinned external checkout in Setup. No new behavioral probes were executed this round.
+
+Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with the approved plan through the disposable-clone execution and harness gates.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
