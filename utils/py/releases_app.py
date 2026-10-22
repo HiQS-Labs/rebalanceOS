@@ -436,7 +436,7 @@ def connect(db_path, must_exist=True, readonly=False):
     # intent journal -> COMMIT -> stage -> rename ordering is the ONLY ordering that exists.
     location = ("file:%s?mode=ro" % urllib.parse.quote(os.path.abspath(db_path), safe="/")
                 if readonly else db_path)
-    conn = sqlite3.connect(location, isolation_level=None, uri=readonly)
+    conn = sqlite3.connect(location, isolation_level=None, uri=readonly)  # GATEWAY-OK: own store, own fail-closed policy (GH-136; rebalanceOS local delta)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
@@ -5517,7 +5517,7 @@ def load_work_evidence(db_path, stale_days=3, as_of=None):
         # Quote the path as a URI component: raw # and ? in a filesystem path would otherwise
         # become a fragment/query and silently open a different file.
         db_uri = "file:%s?mode=ro" % urllib.parse.quote(db_path, safe="/")
-        conn = sqlite3.connect(db_uri, uri=True, timeout=10)
+        conn = sqlite3.connect(db_uri, uri=True, timeout=10)  # GATEWAY-OK: own store, read path (GH-136; rebalanceOS local delta)
         conn.row_factory = sqlite3.Row
     except sqlite3.Error as exc:
         result["error"] = "read-only open failed: %s" % exc
@@ -5988,6 +5988,7 @@ def _value(p):
 
 
 # rebalanceOS local delta (#322) — not in XYZ Forge 1573dd4b7. Re-apply on every re-vendor until upstreamed.
+# (The other local delta is the four `# GATEWAY-OK` markers on sqlite3.connect lines, for this repo's GH-136 ratchet.)
 # A multi-line VALUES string containing `);` at a line end let INSERT_RE stop early or swallow the next row,
 # so the dump the tool itself wrote failed to parse on `check --rebuild`. The guard below rejects any match
 # that is not exactly one well-formed row, so parse_dump keeps buffering instead.
@@ -6343,7 +6344,7 @@ def _rebuild(root, conn):
 
     tmp_db = "%s.rebuild-%s" % (paths["db"], new_txn_id()[:12])
     try:
-        tconn = sqlite3.connect(tmp_db, isolation_level=None)
+        tconn = sqlite3.connect(tmp_db, isolation_level=None)  # GATEWAY-OK: staging copy, same policy (GH-136; rebalanceOS local delta)
         try:
             tconn.row_factory = sqlite3.Row
             tconn.execute("PRAGMA foreign_keys = ON")
@@ -6443,7 +6444,7 @@ def cmd_dashboard(args):
         refuse("not-initialized", "no %s here" % DB_NAME)
 
     # read-only connection
-    conn = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True)
+    conn = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True)  # GATEWAY-OK: read-only own store (GH-136; rebalanceOS local delta)
     conn.row_factory = sqlite3.Row
 
     try:
