@@ -1,0 +1,21 @@
+def _is_single_values_tuple(blob):
+    """True when a VALUES(...) blob is exactly one row: every '...' string is closed and nothing
+    outside a string is a paren, semicolon or newline. Values are only NULL, numbers or quoted
+    strings, so any of those outside quotes means the match ran past one statement's end (or
+    stopped on a `);` that sits inside a multi-line string)."""
+    in_str = False
+    i = 0
+    while i < len(blob):
+        ch = blob[i]
+        if in_str:
+            if ch == "'":
+                if i + 1 < len(blob) and blob[i + 1] == "'":
+                    i += 1
+                else:
+                    in_str = False
+        elif ch == "'":
+            in_str = True
+        elif ch in "();\n":
+            return False
+        i += 1
+    return not in_str

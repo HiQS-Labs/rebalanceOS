@@ -63,3 +63,7 @@ def test_roadmap_coverage_reads_the_db_not_the_file():
     assert "ROADMAP.md not found" not in out
     # A doc parked only in the DB must count as covered (red control: drop its row and this fails).
     assert "GH-348-RETIRE-ROADMAP-MD.md" not in out
+    # Baseline at the GH-348 flip: 9 pre-existing uncovered docs. Losing any other doc's ledger pointer
+    # raises the count, so this fails; lower it here as the pre-existing ones are fixed.
+    errors = int(re.search(r"SUMMARY \[pdda-check-roadmap-coverage\] errors=(\d+)", out).group(1))
+    assert errors <= 9, f"roadmap-coverage errors rose to {errors} (baseline 9 at GH-348)"

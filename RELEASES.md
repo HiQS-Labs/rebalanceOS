@@ -62,7 +62,7 @@ Target Date: 2026-11-15
 Codename: Daily Driver
 Milestone:
 Description: Proves the product survives a week of real daily use on one machine without intervention; no new features, only evidence. Proof, not new work — consolidates the former 0.71.0 Daily Driver and 0.72.0 Punch List into one milestone. Prerequisites: #216 MLX instrumentation, #217 MLX memory cap. Regression gates only: #209, #210, #213, #215, #222 (closed).
-Exit: one 7-day daily-driver window on the 64 GB Mac Studio — MLX allocation under the #217 cap (0.35 x RAM, ~22 GB) read from #216 instrumentation; no rebalance process over 32 GB phys_footprint; zero `database is locked`; doctor OK daily. In-scope defects reset the clock, environmental flakes do not. Defects the window finds are fixed here, scope frozen the day it closes; anything later goes to ROADMAP.md.
+Exit: one 7-day daily-driver window on the 64 GB Mac Studio — MLX allocation under the #217 cap (0.35 x RAM, ~22 GB) read from #216 instrumentation; no rebalance process over 32 GB phys_footprint; zero `database is locked`; doctor OK daily. In-scope defects reset the clock, environmental flakes do not. Defects the window finds are fixed here, scope frozen the day it closes; anything later is parked as a roadmap ledger row (`releases_app.py roadmap add`; ROADMAP.md was retired in GH-348).
 GH_URL: https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/266
 Front-door reviewed:
 Shakedown reviewed:

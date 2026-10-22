@@ -1,0 +1,12 @@
+parser entries: base(44c318d)=141  final-legacy(268f968)=147
+db rows (HEAD): 147
+base entries found in DB by normalised title: 141/141
+MISSING: 0
+RATING MISMATCH: 0
+DB rows not in base parse (expected: the 4 folded strays + rows added since): 6
+  + GPT 6 Luna High held-out storyline trial
+  + CLIO journey follow-up
+  + CLIO journey replay
+  + publication durability
+  + Retire ROADMAP.md: RELEASES SQLite ledger becomes the only work ledger
+  + Install XYZ Forge RELEASES overlay properly + migrate releases.db
