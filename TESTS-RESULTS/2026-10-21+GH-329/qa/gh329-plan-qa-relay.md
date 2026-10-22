@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -116,5 +116,92 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+VERDICT: FAIL
+Basis: The reuse/migration approach is sound, but step 5 does not deliver the promised issue identities, and step 7 cites an incomplete transplant. Resolve S1–S3 in the plan before implementation.
+swept file: yes
+
+Reviewed the entire plan, including existing rationale, risks, non-goals and verification. Findings include pre-existing defects in those sections; no other plan defects found in this bounded review. `Forge/` citations mean the pinned external checkout in Setup. No artifact/source edits, git commands, suites or executable fixtures were run.
+
+- **[Should] S1 — Decide explicitly how renamed-org rows remain reconcilable.** Plan:109–114 keys HiQS-Suite URLs while preserving them, but Forge does not follow redirects during identity qualification. `Forge/utils/py/releases_app.py:5440–5455` compares URL owner/name to the owned repository exactly; `:4080–4088` skips invalid identities before network lookup. For HiQS-Suite issue #81 (`ROADMAP.md:61`), adding a prefix produces a keyed but unreconcilable row. Bypassing that check alone would not suffice: `:5480–5484` also requires the native API's html_url to equal the stored URL.
+  Observed input: `issue_url=https://github.com/HiQS-Suite/rebalanceOS/issues/81`, `gh_number=81`, repo row `1|rebalanceOS`, origin identity `HiQS-Labs/rebalanceOS`; the source-function probe below returns False.
+  Affected scope: rows whose own issue URL uses HiQS-Suite while the owned repository is HiQS-Labs; not Hypercart rows.
+  Falsifier: the same resolver with the HiQS-Labs URL returns True; the Suite URL must also return True before claiming redirect-based reconciliation works.
+  Fix: state a bounded migration policy and acceptance check. Within the current no-URL-rewrite/no-new-identity-layer scope, leave these rows explicitly unkeyed and list the reconciliation limitation as a reasoned exception. If full reconciliation is required instead, specify an independently verified canonical-identity migration preserving historical URL text. Do not assume GitHub redirects solve local validation.
+
+- **[Should] S2 — Remove existing foreign keys before assigning current-repo keys.** Step 5 specifies adding prefixes and says foreign entries “stay unkeyed”; four already start with GH-N. `ROADMAP.md:105,183–185` carry Hypercart #144/#96/#94/#93. Forge's `_roadmap_gh_number` (`:3416–3421`) keys these irrespective of org. Current-repo #144 is also present at `ROADMAP.md:57`. Merely skipping foreign entries retains their keys; that either blocks current #144 as a duplicate candidate or collides during sync (`Forge/utils/py/releases_app.py:4217–4230`). The number-only drift block would also read foreign keys against this repo's state table.
+  Observed input: `**GH-144 one-shot sentinel prompt**` with a Hypercart URL at line 105 and distinct HiQS-Labs #144 at line 57; existing foreign keys 93/94/96/144 also appear in the readonly DB query below.
+  Affected scope: existing prefix-keyed entries whose own URL belongs to the predecessor; duplicate detection must operate on eligible current-repo identities after cleanup.
+  Falsifier: after the transform/parser pass, all four predecessor entries have NULL gh_number and retain original URL/prose, current #144 is eligible for key 144, and repeated-current-issue entries such as #5 remain explicitly handled as duplicates.
+  Fix: explicitly de-key existing foreign prefixes, preserving their references in non-prefix title/raw text, then assign current keys. Require per-entry identity assertions, not just total keyed count and successful sync.
+
+- **[Should] S3 — Port the complete coverage function, including both loop call sites.** Plan:120–121 names Forge `:326–372` and says to port only those hunks. That interval stops inside the first loop. Necessary replacements of legacy file-only greps are at Forge `:378–379` and `:396–397`; this repo still uses `grep -Fq "$rel" "$PDDA_ROADMAP"` at `utils/pdda/pdda.sh:347,365`. Copying only the specified range leaves DB-covered docs failing after deletion.
+  Observed input: absent ROADMAP.md, readable releases.db containing a working doc's doc_path, and the legacy grep call sites cited above.
+  Affected scope: working-doc and inbox-doc loops in check_roadmap_coverage.
+  Falsifier: in a disposable clone, a nonempty DB-only pointer passes each loop; removing that pointer adds exactly the corresponding uncovered-doc finding.
+  Fix: specify the whole Forge function (`:326–409`), preserving unrelated local functions, and name those positive/red controls. Its dependencies are local to the function or already present here; no broader PDDA refresh is needed. Runtime result: [Unverified — needs clone run].
+
+- **[Pass] Reuse, ordering and marker layout are appropriate.** Forge's vendor destination/staging are `Forge/relay-automation/xyz-vendor.sh:74–75,441–445,502–503`; they do not update the tracked root app. A pinned root re-vendor with one documented #322 delta is a reasonable scoped exception to the supported vendor path. The local guard is at `utils/py/releases_app.py:3169–3189,3238–3239`, absent from Forge's `:5995–6005`; retaining it pending upstream follow-up is justified. Plan:92–102 bundles app/DB/dump; :117–118 bundles marker/deletion. Append the marker after “observe”: `utils/pdda/pdda-lib.sh:34–42` selects the first non-comment line. Reader PRAGMA/optional-column tolerance is visible at `src/rebalance/ingest/releases_scan.py:130–143`; migration runtime compatibility still needs clone checks.
+
+- **[Pass] Scratch transform, historical permalinks and harness non-goals are proportionate.** Plan:109–116 requires a keyed/skipped receipt without script sprawl; retain the exact transform command/content in that receipt for reproduction after scratch deletion. Plan:128–130 preserves historical meaning through a permalink. Keeping wave reconciliation in the harness is defensible: `Forge/utils/py/wave_reconcile.py:26,1837–1842` depends on harness_paths and multiple harness tools. Plan:161–165 explicitly records the #329 acceptance deviation and per-Mac operator step. This reviews that reasoned exception, not a claim that the original hosted-workflow acceptance was implemented.
+
+- **[Pass] Ratings and bounded rollback are adequate for planning.** Plan:38–46 grounds #348 in planning drift, scope and neutral appeal, and labels #329 provisional. Plan:85–87 gives a matching app/schema/file revert. Operational rollback after cutover must preserve any subsequent ledger writes rather than blindly revert their data.
+
+- **[Nit] Make verification instructions attainable.** Plan:137–138 expects remaining ROADMAP.md references outside history to be “only retirement notes,” although intentional compatibility branches/parser constants retain that literal (`utils/pdda/pdda.sh:269`, Forge app `:4183`). Limit this assertion to live governance prose and separately inspect intentional code references. Recon's “issue_url on 6” baseline also differs from the seeded DB (below: zero); label whether that count was measured after Forge sync.
+
+- **[Unverified — needs clone run]** The claimed Forge 2/6 regression, v5→v9 migration, unchanged warning set, 147-row final import, and final suites were not independently executed here. Retain disposable-clone checks and published receipts. Both `gh issue view 329 --repo HiQS-Labs/rebalanceOS --json body,title` and the corresponding 348 command exited 1 with “error connecting to api.github.com”; requirements were reviewed from the plan/non-goals as permitted by Setup. Graph project rebalanceOS points at the primary checkout, generation 2026-09-02; coverage reported changed/untracked/excluded paths, so material claims use direct source reads.
+
+Probe evidence: non-mutating source-only extraction, exit 0. Environment: `PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"`. Exact command (no module initialization, git or network):
+
+```sh
+python3 - <<'PY'
+import ast, re
+from pathlib import Path
+forge = Path("/private/tmp/claude-501/-Users-noelsaw-Documents-GH-Repos-rebalanceOS/fd0b2af5-dab6-48a5-bdad-092951e3fb8a/scratchpad/forge-dev")
+tree = ast.parse((forge / "utils/py/releases_app.py").read_text())
+names = {"_repo_from_issue_url", "resolve_roadmap_identity"}
+parts = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+scope = {"re": re}
+exec(compile(ast.Module(body=parts, type_ignores=[]), "<source-functions>", "exec"), scope)
+for owner in ("HiQS-Suite", "HiQS-Labs", "Hypercart-Dev-Tools"):
+    repo_name = "rebalance-OS" if owner == "Hypercart-Dev-Tools" else "rebalanceOS"
+    row = {"repo_id": 1, "gh_number": 81, "issue_url": f"https://github.com/{owner}/{repo_name}/issues/81"}
+    print(owner, scope["resolve_roadmap_identity"](row, {1: "rebalanceOS"}, "HiQS-Labs/rebalanceOS")["identity_valid"])
+for n, line in enumerate(Path("ROADMAP.md").read_text().splitlines(), 1):
+    m = re.match(r"^- \*\*((?:#|GH-)(\d+)\b.*?)\*\*", line)
+    if m and "Hypercart-Dev-Tools" in line:
+        print(f"ROADMAP.md:{n}: existing foreign key={m.group(2)} title={m.group(1)}")
+PY
+```
+
+Decisive output:
+```text
+HiQS-Suite False
+HiQS-Labs True
+Hypercart-Dev-Tools False
+ROADMAP.md:105: existing foreign key=144 title=GH-144 one-shot sentinel prompt
+ROADMAP.md:183: existing foreign key=96 title=GH-96 git-pulse stages PDDA registry projection
+ROADMAP.md:184: existing foreign key=94 title=GH-94 priority_tier soft down-weight
+ROADMAP.md:185: existing foreign key=93 title=GH-93 MCP probe tools
+```
+
+Exact readonly query, exit 0:
+```sh
+sqlite3 -readonly releases.db "SELECT COUNT(*),COUNT(gh_number),COUNT(issue_url) FROM roadmap_items; SELECT group_concat(version) FROM schema_migrations; SELECT gh_number,title FROM roadmap_items WHERE gh_number IS NOT NULL ORDER BY gh_number;"
+```
+```text
+143|6|0
+1,2,3,4,5
+5|GH-5 PR2 — one status vocabulary across every user-facing surface
+93|GH-93 MCP probe tools
+94|GH-94 priority_tier soft down-weight
+96|GH-96 git-pulse stages PDDA registry projection
+144|GH-144 one-shot sentinel prompt
+330|GH-330 Fleet safety follow-up
+```
+
+Handing off to Producer (claude-a) — disposition S1–S3, revise the plan, then open the next review round.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
