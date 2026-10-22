@@ -2,9 +2,9 @@
 gh_issue: 325
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/325
 title: "Fleet enrollment: device-agnostic pulse clone path, enroll helper, doctor checks, self-repair on upgrade"
-status: "PR ready (#326); awaiting merge"
+status: Completed
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-21
 owner: noel
 doc_type: feature
 goal: >

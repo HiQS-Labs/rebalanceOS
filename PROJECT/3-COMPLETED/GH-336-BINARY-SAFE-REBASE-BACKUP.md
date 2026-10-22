@@ -2,9 +2,9 @@
 gh_issue: 336
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/336
 title: "git-pulse-sync-repair 2.4e: stuck-rebase backup patch drops binary edits (needs --binary)"
-status: "Ready for review — PR on fix/rebalanceOS-gh336-binary-safe-rebase-backup-2026-10-19"
+status: Completed
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-21
 owner: noel
 doc_type: bugfix
 goal: >

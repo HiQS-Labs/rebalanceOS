@@ -2,9 +2,9 @@
 gh_issue: 338
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/338
 title: "doctor: a device silent for 72h is an error on every other Mac (fleet pulse freshness)"
-status: "Ready for review — PR on feat/rebalanceOS-gh338-doctor-pulse-delivery-rows-2026-10-19"
+status: Completed
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-21
 owner: noel
 doc_type: bugfix
 goal: >
