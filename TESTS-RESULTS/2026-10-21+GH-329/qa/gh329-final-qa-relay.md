@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-21.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 3
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -206,5 +206,23 @@ Scope: swept the complete current `utils/py/releases_app.py`, `utils/pdda/pdda.s
 - **[Should] U1 remains open — retain reproducible conservation evidence.** `console/conservation.txt:1–12` supplies totals (`141/141`, `MISSING: 0`, `RATING MISMATCH: 0`) and six extra titles, but no command/comparison source, historical ROADMAP text, normalisation definition or per-entry matches. Round 1 explicitly requested the historical snapshot and exact comparison; the newly supplied old guard meets only the guard half. The stronger migration claim therefore remains **[Unverified — historical input/comparison missing]**. Cheapest fix: retain the base and final-legacy ROADMAP snapshots as inert evidence and the exact comparison source/command, exit status and per-entry title/rating matches (including all 147 final-legacy entries, not just the 141 base entries). Have the disposable clone perform that comparison and return its receipt. This asks for evidence only, not a behavior change or a new runtime subsystem. It should also disambiguate the source revision: Setup asks for `268f968^:ROADMAP.md`, while `conservation.txt:1` labels final legacy as `268f968`.
 
 Handing off to Producer (claude-a) — retain the missing U1 inputs and reproducible comparison, then return for round 3. Go to the Producer window and say 'take your turn'.
+
+### Producer · Round 2 → 3
+
+Dispositions:
+- **U1 — Implemented (evidence only, no code change).** `TESTS-RESULTS/2026-10-21+GH-329/conservation/` now retains:
+  - `ROADMAP-base-44c318d.md.txt`: ROADMAP.md at task start (origin/development `44c318d`).
+  - `ROADMAP-final-legacy-268f968.md.txt`: ROADMAP.md exactly as committed in `268f968`, i.e. the normalised file the
+    final legacy `roadmap sync` imported. It is the last ROADMAP.md before deletion in `74b999e`. This resolves the
+    `268f968^` wording: `268f968^` is the pre-normalisation file, and the reviewed import input is `268f968` itself.
+  - `compare.py.txt`: the exact comparison. It uses the repo's own `parse_roadmap_ledger`. The normalisation definition
+    is in its docstring and covers only the prefix/suffix the re-key transform changed. It matches each entry's
+    `rated P/S/A/E` token against the DB `rating_*` columns.
+  - `receipt.txt`: the command, the per-entry MATCH lines for **all 141 base and all 147 final-legacy entries**, the
+    totals and `exit=0`. It was run with `python3 -I` in a fresh disposable `--no-local` clone at `fa77a5c` (one commit
+    before this block; the snapshots and script are unchanged since). Result: `base match=141 missing=0
+    rating_mismatch=0`, `final-legacy match=147 missing=0 rating_mismatch=0`, `RESULT: PASS`.
+
+Handing off to Reviewer (codex) for round 3 (cap).
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

@@ -1,0 +1,299 @@
+# command: cd <disposable clone at fa77a5c> && python3 -I TESTS-RESULTS/2026-10-21+GH-329/conservation/compare.py.txt .
+db rows: 147
+
+## base: ROADMAP-base-44c318d.md.txt — 141 parser entries
+MATCH            | In progress -> In progress | Opt-in RELEASES ledger scan + /daily close-loop inputs | rated 55/30/50/55
+MATCH            | In progress -> Completed | HiQS work activity naming with a backwards-compatibility adapter | rated 55/15/50/55
+MATCH            | In progress -> Completed | CLIO history and HiQS activity lookup skill | rated 55/30/50/90
+MATCH            | In progress -> In progress | CI/CD posture audit ladder — quarantine expiry + static pre-push gate (Rung 1 + Stage 1) | rated 70/55/50/75
+MATCH            | In progress -> Completed | Close-the-loop flags from the local GitHub corpus | rated 65/35/50/75
+MATCH            | In progress -> Completed | job_guard refuses healthy runs on small-swap Macs — scale swap corroboration, fix the inner embedding guard | rated 85/70/50/55
+MATCH            | In progress -> In progress | Fleet Pulse delivery | rated -
+MATCH            | In progress -> In progress | One install path — per-job installers folded into `stack.sh` | rated 70/65/55/60
+MATCH            | In progress -> Completed | Broken runtime virtualenv strands scheduler fleet at EX_CONFIG | rated 90/90/50/80
+MATCH            | In progress -> In progress | Daily established-work status reader | rated 70/45/50/45
+MATCH            | In progress -> Completed | CLIO first-prompt capture | rated 85/80/50/70
+MATCH            | In progress -> Completed | Guarded jobs that self-report lifecycle events log a second start/terminal pair | rated 50/40/50/85
+MATCH            | In progress -> In progress | Terra Low evidence-bound actual-work synthesis | rated -
+MATCH            | In progress -> Completed | Mac Studio bounded runtime recovery before Terra work synthesis | rated 95/90/50/30
+MATCH            | In progress -> Completed | Focus 5 full clone detection & parent grouping | rated 75/65/50/60
+MATCH            | In progress -> Completed | Shutdown — end-of-day triage and next-session continuity | rated 70/55/50/55
+MATCH            | In progress -> In progress | CI critical path halving — embeddings seam lane split | rated 45/35/50/35
+MATCH            | In progress -> Completed | CLIO prompt logs ingestion into RebalanceOS semantic index | rated -
+MATCH            | In progress -> Completed | CLIO multi-agent capture — ZCode, Codex, Agy alongside Claude Code | rated -
+MATCH            | In progress -> In progress | Focus 5 umbrella — horizontal layout mode + CLIO writer fix | rated -
+MATCH            | In progress -> In progress | Refactor & Rename 'vault-sync' to 'obsidian-vault-embeddings' + Lightweight Embedding Engine | rated -
+MATCH            | In progress -> In progress | Subsystem consolidation — too many subsystems reinventing the same concept | rated -
+MATCH            | In progress -> In progress | GH-5 PR2 — one status vocabulary across every user-facing surface | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Claude session identity/status snapshot | rated -
+MATCH            | Queue / parked intake -> Completed | daily: machine CPU-health scanner — surface runaway CPU-bound processes in the /daily cycle | rated 70/60/50/70
+MATCH            | Queue / parked intake -> Completed | Monitored-repo rules: how repos are selected, added, and managed (and which rules to tweak) | rated 45/40/60/55
+MATCH            | Queue / parked intake -> Queue / parked intake | Test-suite directory-independence check: decide the cheap version before paying for the full differential | rated 55/45/65/90
+MATCH            | Queue / parked intake -> Queue / parked intake | CI ratchet: make canonical-path rules block new subsystem duplication | rated 60/55/65/45
+MATCH            | Queue / parked intake -> Completed | github-sync burns the GitHub API budget: 5–7k calls/hour, runs overrun the hourly tick, 403s leave repos stale | rated 90/90/85/30
+MATCH            | Queue / parked intake -> Queue / parked intake | doctor warns daily when the runtime trails origin/development | rated 75/70/80/60
+MATCH            | Queue / parked intake -> Completed | project_registry contested claims — 7 repos claimed by two projects each | rated 55/40/45/65
+MATCH            | Queue / parked intake -> Completed | Activity-signal read-layer consolidation | rated 70/65/75/25
+MATCH            | Queue / parked intake -> Queue / parked intake | Build 0.74.0 Hardened Core | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Build 0.75.0 Fleet Engine | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Sustained-activity auto-promotion | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | `three_eyes pause` does not stop launchd firing the job | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | launchd fleet: keep/merge/retire decision for all 14 jobs | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | /10days marathon-2026-07-25 | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | health_issue_reporter dedupes on title | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | doctor: crash-looping KeepAlive daemon reports OK | rated 50/55/60/55
+MATCH            | Queue / parked intake -> Queue / parked intake | Vault ingest lag and stuck pending-embed chunks unmonitored | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | 302 GitHub documents fetched but never projected into the semantic index | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Tests in a git worktree silently import the main checkout | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | github_sync holds the SQLite write lock across network I/O | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Scheduler jobs crash on a rare CPython EINTR at bootstrap | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard: 2 residual presentation gaps from the consistency pass (issue #135) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Explicit --database at a nonexistent path silently falls back | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO projection: no malformed-source-row test | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Simplify intake, definition, and exclusion of repos | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Local Qwen embedding proof on this Mac | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | 3-Eyes — unified local job supervisor | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | [CRITICAL] HiQS loses direct GitHub commits and file-level change signals | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Skill: rebalance live-signal-active-git (morning brief) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Focus 5 Float: Dock reopen + panel resize | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Ingest Claude Code Cloud jobs (web sessions) + status | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard redesign — master (one module per day) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Web app theme color picker | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard consistency refactor | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Collector health signal reports a working system as broken | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | GH-144 one-shot sentinel prompt | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Collector sentinel — scheduled detect → triage → repair → PR loop | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | ROADMAP→dashboard collector | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO — durable, idempotent writes to the shared Obsidian note | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO prompt projection silently loses historical entries | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | rebalance-embed reaches 46.9 GB phys_footprint — MLX Metal buffer cache never released | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Instrument MLX memory per batch — the dominant consumer is unobserved | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Hard MLX memory limit — fail the job, not the machine | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | doctor reads an empty launchctl list as "no jobs loaded" | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Rebalance memory — unified project (8 lanes) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Skill: rebalance — optional PDDA lifecycle signal (third axis) | rated -
+MATCH            | In progress -> In progress | Architectural Audit: Complexity, DRY, and System Stability | rated -
+MATCH            | In progress -> In progress | HiQS build — marathon decomposition | rated -
+MATCH            | In progress -> In progress | HiQS — clean-room rebuild of the signal pipeline | rated -
+MATCH            | In progress -> In progress | Commit history coverage — backfill direct + merge commits | rated -
+MATCH            | In progress -> In progress | Cognee integration path for long-term memory | rated -
+MATCH            | In progress -> In progress | Signal-health nuance — collector panel over-states urgency | rated -
+MATCH            | In progress -> In progress | Git Pulse Daily Summary false "No git activity found today" | rated 65/45/55/60
+MATCH            | In progress -> In progress | VS Code extension: native Tree View pane for git-pulse/rebalance device data | rated -
+MATCH            | In progress -> In progress | Source health measures row COUNT, not row QUALITY | rated 75/70/75/85
+MATCH            | In progress -> In progress | Collector health bundle | rated -
+MATCH            | In progress -> In progress | HiQS — unify all six signals into one ranked pipeline | rated -
+MATCH            | In progress -> In progress | Auto-promote watched repos to active projects | rated -
+MATCH            | In progress -> In progress | Focus 5 off-roster reason badge | rated -
+MATCH            | In progress -> In progress | Adopt gsd-core patterns: hook guard + PDDA conventions + skills inventory + capabilities manifest | rated -
+MATCH            | In progress -> In progress | XYZ ⇄ Rebalance integration | rated -
+MATCH            | In progress -> In progress | Project health axes — concrete spec | rated -
+MATCH            | In progress -> In progress | Collector Path and Portability Audit — Phase 6 | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — reminders drawer (Apple + Obsidian) | rated -
+MATCH            | In progress -> In progress | Repo links open VS Code with "focus-if-open" | rated -
+MATCH            | In progress -> In progress | Unified UI refresh + restart (system-wide) | rated -
+MATCH            | In progress -> In progress | Focus 5 Native (standalone Mac App Store track) | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — reference-design UI refresh | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — same-session resolution-change resilience | rated -
+MATCH            | In progress -> In progress | MARATHON-2026-07-21 bundle | rated -
+MATCH            | Completed -> Completed | doctor: surface a Mac silent >72h on every other Mac | rated -
+MATCH            | Completed -> Completed | git-pulse-sync-repair: binary-safe stuck-rebase backup | rated -
+MATCH            | Completed -> Completed | git-pulse-sync-repair skill | rated -
+MATCH            | Completed -> Completed | Fleet enrollment: device-agnostic pulse clone path, enroll helper, doctor checks, self-repair on upgrade | rated -
+MATCH            | Completed -> Completed | GH-330 Fleet safety follow-up | rated 88/88/50/65
+MATCH            | Completed -> Completed | Fix CI development red failure: Python interpreter seam for scheduler tests | rated 90/85/50/85
+MATCH            | Completed -> Completed | Audit and consolidate reader scripts and add mechanical script-inventory CI ratchet gate | rated 85/80/50/85
+MATCH            | Completed -> Completed | Executive portfolio planning matrix view & local API | rated 70/50/75/50
+MATCH            | Completed -> Completed | The embeddings job is gated on machine-wide compressor pressure it does not cause | rated -
+MATCH            | Completed -> Completed | Test suite gaps & Hypothesis adoption | rated -
+MATCH            | Completed -> Completed | `_read_config()` returns a non-dict for valid JSON of the wrong shape | rated -
+MATCH            | Completed -> Completed | hiqs_digest: the watched-set filter guards one section; every headline collector filters on date only | rated -
+MATCH            | Completed -> Completed | SQLite gateway routing — nine direct-connect bypasses retired behind a CI ratchet | rated -
+MATCH            | Completed -> Completed | Build 0.73.0 Subsystem Unification | rated -
+MATCH            | Completed -> Completed | github_embeddings vector bloat — reclaim, backfill, re-embed | rated -
+MATCH            | Completed -> Completed | Hard kernel panic — unbounded concurrent embedding runs | rated -
+MATCH            | Completed -> Completed | Audit: no launchd job declares a memory limit, nice value, or single-instance lock | rated -
+MATCH            | Completed -> Completed | Focus5Float telemetry viewer: .md support | rated -
+MATCH            | Completed -> Completed | Architecture diagram: show incoming (not-yet-active) XYZ HQ data | rated -
+MATCH            | Completed -> Completed | daily-sync fails daily — "database is locked" from collision with hourly github-sync | rated -
+MATCH            | Completed -> Completed | Centralize UTC→local time display | rated 40/30/50/30
+MATCH            | Completed -> Completed | Obsidian Vault Daily Activity Sync | rated -
+MATCH            | Completed -> Completed | Multi-device Git Pulse daily synthesis → Obsidian vault | rated -
+MATCH            | Completed -> Completed | focus5 refresh worktree-drop + repo-name font shrink | rated -
+MATCH            | Completed -> Completed | GSD Core pattern review | rated -
+MATCH            | Completed -> Completed | Focus 5 newest-dirty-repo banner | rated -
+MATCH            | Completed -> Completed | Client auto-discovery | rated -
+MATCH            | Completed -> Completed | Watch-list coverage guard | rated -
+MATCH            | Completed -> Completed | GH-96 git-pulse stages PDDA registry projection | rated -
+MATCH            | Completed -> Completed | GH-94 priority_tier soft down-weight | rated -
+MATCH            | Completed -> Completed | GH-93 MCP probe tools | rated -
+MATCH            | Completed -> Completed | Gemini "What to do next" → fixed vault file | rated -
+MATCH            | Completed -> Completed | Apple Reminders unified integration | rated -
+MATCH            | Completed -> Completed | Focus 5 Float (floating macOS card stack) | rated -
+MATCH            | Completed -> Completed | Focus 5 Float — Telemetry tab | rated -
+MATCH            | Completed -> Completed | CLIO migration + Focus 5 Float — Prompt Log tab | rated -
+MATCH            | Completed -> Completed | Focus 5 Float — offline cache & manual server start | rated -
+MATCH            | Completed -> Completed | Focus 5 — identity-agnostic ranking vector | rated -
+MATCH            | Completed -> Completed | Focus 5 active repos bug remediation | rated -
+MATCH            | Completed -> Completed | Team Calendar as a Signal (HiQS) | rated -
+MATCH            | Completed -> Completed | Unified front-door, portability & auth hardening | rated -
+MATCH            | Completed -> Completed | AI-agent front door (ROUTER.md) | rated -
+MATCH            | Deferred · vision -> Deferred · vision | Fused retrieval measurement — PAUSED by operator decision 2026-08-20, do not restart unasked | rated -
+MATCH            | Superseded -> Superseded | Signal-quality contract (observe-first source health) | rated -
+MATCH            | Superseded -> Superseded | Zapier ingest: alternative email & calendar streams | rated -
+MATCH            | Superseded -> Superseded | Cross-day velocity / unfinished-work signal | rated -
+MATCH            | Superseded -> Superseded | HiQS marketing label | rated -
+## base totals: match=141 missing=0 rating_mismatch=0
+
+## final-legacy: ROADMAP-final-legacy-268f968.md.txt — 147 parser entries
+MATCH            | In progress -> In progress | #310 — Opt-in RELEASES ledger scan + /daily close-loop inputs | rated 55/30/50/55
+MATCH            | In progress -> Completed | #316 — HiQS work activity naming with a backwards-compatibility adapter | rated 55/15/50/55
+MATCH            | In progress -> Completed | #315 — CLIO history and HiQS activity lookup skill | rated 55/30/50/90
+MATCH            | In progress -> In progress | #312 — CI/CD posture audit ladder — quarantine expiry + static pre-push gate (Rung 1 + Stage 1) | rated 70/55/50/75
+MATCH            | In progress -> Completed | #307 — Close-the-loop flags from the local GitHub corpus | rated 65/35/50/75
+MATCH            | In progress -> Completed | #296 — job_guard refuses healthy runs on small-swap Macs — scale swap corroboration, fix the inner embedding guard | rated 85/70/50/55
+MATCH            | In progress -> In progress | #282 — Fleet Pulse delivery | rated -
+MATCH            | In progress -> In progress | #255 — One install path — per-job installers folded into `stack.sh` | rated 70/65/55/60
+MATCH            | In progress -> Completed | #236 — Broken runtime virtualenv strands scheduler fleet at EX_CONFIG | rated 90/90/50/80
+MATCH            | In progress -> In progress | #233 — Daily established-work status reader | rated 70/45/50/45
+MATCH            | In progress -> Completed | #199 — CLIO first-prompt capture | rated 85/80/50/70
+MATCH            | In progress -> Completed | #215 — Guarded jobs that self-report lifecycle events log a second start/terminal pair | rated 50/40/50/85
+MATCH            | In progress -> In progress | #210 — Terra Low evidence-bound actual-work synthesis | rated -
+MATCH            | In progress -> Completed | #211 — Mac Studio bounded runtime recovery before Terra work synthesis | rated 95/90/50/30
+MATCH            | In progress -> Completed | #204 — Focus 5 full clone detection & parent grouping | rated 75/65/50/60
+MATCH            | In progress -> Completed | #196 — Shutdown — end-of-day triage and next-session continuity | rated 70/55/50/55
+MATCH            | In progress -> In progress | #144 — CI critical path halving — embeddings seam lane split | rated 45/35/50/35
+MATCH            | In progress -> Completed | #141 — CLIO prompt logs ingestion into RebalanceOS semantic index | rated -
+MATCH            | In progress -> Completed | #139 — CLIO multi-agent capture — ZCode, Codex, Agy alongside Claude Code | rated -
+MATCH            | In progress -> In progress | #120 — Focus 5 umbrella — horizontal layout mode + CLIO writer fix | rated -
+MATCH            | In progress -> In progress | Refactor & Rename 'vault-sync' to 'obsidian-vault-embeddings' + Lightweight Embedding Engine | rated -
+MATCH            | In progress -> In progress | Subsystem consolidation — too many subsystems reinventing the same concept | rated -
+MATCH            | In progress -> In progress | PR2 — one status vocabulary across every user-facing surface (predecessor GH-5) | rated -
+MATCH            | In progress -> In progress | #300 — GPT 6 Luna High held-out storyline trial | rated -
+MATCH            | In progress -> In progress | #232 — CLIO journey follow-up | rated -
+MATCH            | In progress -> In progress | #230 — CLIO journey replay | rated -
+MATCH            | In progress -> In progress | Architectural Audit: Complexity, DRY, and System Stability | rated -
+MATCH            | In progress -> In progress | HiQS build — marathon decomposition | rated -
+MATCH            | In progress -> In progress | HiQS — clean-room rebuild of the signal pipeline | rated -
+MATCH            | In progress -> In progress | Commit history coverage — backfill direct + merge commits | rated -
+MATCH            | In progress -> In progress | Cognee integration path for long-term memory | rated -
+MATCH            | In progress -> In progress | Signal-health nuance — collector panel over-states urgency | rated -
+MATCH            | In progress -> In progress | Git Pulse Daily Summary false "No git activity found today" | rated 65/45/55/60
+MATCH            | In progress -> In progress | VS Code extension: native Tree View pane for git-pulse/rebalance device data | rated -
+MATCH            | In progress -> In progress | Source health measures row COUNT, not row QUALITY | rated 75/70/75/85
+MATCH            | In progress -> In progress | Collector health bundle | rated -
+MATCH            | In progress -> In progress | HiQS — unify all six signals into one ranked pipeline | rated -
+MATCH            | In progress -> In progress | Auto-promote watched repos to active projects | rated -
+MATCH            | In progress -> In progress | Focus 5 off-roster reason badge | rated -
+MATCH            | In progress -> In progress | Adopt gsd-core patterns: hook guard + PDDA conventions + skills inventory + capabilities manifest | rated -
+MATCH            | In progress -> In progress | XYZ ⇄ Rebalance integration | rated -
+MATCH            | In progress -> In progress | Project health axes — concrete spec | rated -
+MATCH            | In progress -> In progress | Collector Path and Portability Audit — Phase 6 | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — reminders drawer (Apple + Obsidian) | rated -
+MATCH            | In progress -> In progress | Repo links open VS Code with "focus-if-open" | rated -
+MATCH            | In progress -> In progress | Unified UI refresh + restart (system-wide) | rated -
+MATCH            | In progress -> In progress | Focus 5 Native (standalone Mac App Store track) | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — reference-design UI refresh | rated -
+MATCH            | In progress -> In progress | Focus 5 Float — same-session resolution-change resilience | rated -
+MATCH            | In progress -> In progress | MARATHON-2026-07-21 bundle | rated -
+MATCH            | In progress -> In progress | #23 — publication durability | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | #348 — Retire ROADMAP.md: RELEASES SQLite ledger becomes the only work ledger | rated 70/55/50/25
+MATCH            | Queue / parked intake -> Queue / parked intake | #329 — Install XYZ Forge RELEASES overlay properly + migrate releases.db | rated 75/60/50/45
+MATCH            | Queue / parked intake -> Queue / parked intake | #202 — Claude session identity/status snapshot | rated -
+MATCH            | Queue / parked intake -> Completed | #194 — daily: machine CPU-health scanner — surface runaway CPU-bound processes in the /daily cycle | rated 70/60/50/70
+MATCH            | Queue / parked intake -> Completed | #158 — Monitored-repo rules: how repos are selected, added, and managed (and which rules to tweak) | rated 45/40/60/55
+MATCH            | Queue / parked intake -> Queue / parked intake | #174 — Test-suite directory-independence check: decide the cheap version before paying for the full differential | rated 55/45/65/90
+MATCH            | Queue / parked intake -> Queue / parked intake | #126 — CI ratchet: make canonical-path rules block new subsystem duplication | rated 60/55/65/45
+MATCH            | Queue / parked intake -> Completed | #148 — github-sync burns the GitHub API budget: 5–7k calls/hour, runs overrun the hourly tick, 403s leave repos stale | rated 90/90/85/30
+MATCH            | Queue / parked intake -> Queue / parked intake | #177 — doctor warns daily when the runtime trails origin/development | rated 75/70/80/60
+MATCH            | Queue / parked intake -> Completed | #182 — project_registry contested claims — 7 repos claimed by two projects each | rated 55/40/45/65
+MATCH            | Queue / parked intake -> Completed | #150 — Activity-signal read-layer consolidation | rated 70/65/75/25
+MATCH            | Queue / parked intake -> Queue / parked intake | Build 0.74.0 Hardened Core | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Build 0.75.0 Fleet Engine | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Sustained-activity auto-promotion | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | `three_eyes pause` does not stop launchd firing the job | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | launchd fleet: keep/merge/retire decision for all 14 jobs | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | /10days marathon-2026-07-25 | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | health_issue_reporter dedupes on title | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | doctor: crash-looping KeepAlive daemon reports OK | rated 50/55/60/55
+MATCH            | Queue / parked intake -> Queue / parked intake | Vault ingest lag and stuck pending-embed chunks unmonitored | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | 302 GitHub documents fetched but never projected into the semantic index | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Tests in a git worktree silently import the main checkout | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | github_sync holds the SQLite write lock across network I/O | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Scheduler jobs crash on a rare CPython EINTR at bootstrap | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard: 2 residual presentation gaps from the consistency pass (issue #135) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Explicit --database at a nonexistent path silently falls back | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO projection: no malformed-source-row test | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Simplify intake, definition, and exclusion of repos | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Local Qwen embedding proof on this Mac | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | 3-Eyes — unified local job supervisor | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | [CRITICAL] HiQS loses direct GitHub commits and file-level change signals | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Skill: rebalance live-signal-active-git (morning brief) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Focus 5 Float: Dock reopen + panel resize | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Ingest Claude Code Cloud jobs (web sessions) + status | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard redesign — master (one module per day) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Web app theme color picker | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Pulse dashboard consistency refactor | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Collector health signal reports a working system as broken | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | one-shot sentinel prompt (predecessor GH-144) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Collector sentinel — scheduled detect → triage → repair → PR loop | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | ROADMAP→dashboard collector | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO — durable, idempotent writes to the shared Obsidian note | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | CLIO prompt projection silently loses historical entries | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | rebalance-embed reaches 46.9 GB phys_footprint — MLX Metal buffer cache never released | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Instrument MLX memory per batch — the dominant consumer is unobserved | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Hard MLX memory limit — fail the job, not the machine | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | doctor reads an empty launchctl list as "no jobs loaded" | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Rebalance memory — unified project (8 lanes) | rated -
+MATCH            | Queue / parked intake -> Queue / parked intake | Skill: rebalance — optional PDDA lifecycle signal (third axis) | rated -
+MATCH            | Completed -> Completed | #338 — doctor: surface a Mac silent >72h on every other Mac | rated -
+MATCH            | Completed -> Completed | #336 — git-pulse-sync-repair: binary-safe stuck-rebase backup | rated -
+MATCH            | Completed -> Completed | #334 — git-pulse-sync-repair skill | rated -
+MATCH            | Completed -> Completed | #325 — Fleet enrollment: device-agnostic pulse clone path, enroll helper, doctor checks, self-repair on upgrade | rated -
+MATCH            | Completed -> Completed | #330 — Fleet safety follow-up | rated 88/88/50/65
+MATCH            | Completed -> Completed | #289 — Fix CI development red failure: Python interpreter seam for scheduler tests | rated 90/85/50/85
+MATCH            | Completed -> Completed | #241 — Audit and consolidate reader scripts and add mechanical script-inventory CI ratchet gate | rated 85/80/50/85
+MATCH            | Completed -> Completed | #229 — Executive portfolio planning matrix view & local API | rated 70/50/75/50
+MATCH            | Completed -> Completed | #157 — The embeddings job is gated on machine-wide compressor pressure it does not cause | rated -
+MATCH            | Completed -> Completed | #162 — Test suite gaps & Hypothesis adoption | rated -
+MATCH            | Completed -> Completed | #161 — `_read_config()` returns a non-dict for valid JSON of the wrong shape | rated -
+MATCH            | Completed -> Completed | #159 — hiqs_digest: the watched-set filter guards one section; every headline collector filters on date only | rated -
+MATCH            | Completed -> Completed | #136 — SQLite gateway routing — nine direct-connect bypasses retired behind a CI ratchet | rated -
+MATCH            | Completed -> Completed | Build 0.73.0 Subsystem Unification | rated -
+MATCH            | Completed -> Completed | github_embeddings vector bloat — reclaim, backfill, re-embed | rated -
+MATCH            | Completed -> Completed | Hard kernel panic — unbounded concurrent embedding runs | rated -
+MATCH            | Completed -> Completed | Audit: no launchd job declares a memory limit, nice value, or single-instance lock | rated -
+MATCH            | Completed -> Completed | Focus5Float telemetry viewer: .md support | rated -
+MATCH            | Completed -> Completed | Architecture diagram: show incoming (not-yet-active) XYZ HQ data | rated -
+MATCH            | Completed -> Completed | daily-sync fails daily — "database is locked" from collision with hourly github-sync | rated -
+MATCH            | Completed -> Completed | Centralize UTC→local time display | rated 40/30/50/30
+MATCH            | Completed -> Completed | Obsidian Vault Daily Activity Sync | rated -
+MATCH            | Completed -> Completed | Multi-device Git Pulse daily synthesis → Obsidian vault | rated -
+MATCH            | Completed -> Completed | focus5 refresh worktree-drop + repo-name font shrink | rated -
+MATCH            | Completed -> Completed | GSD Core pattern review | rated -
+MATCH            | Completed -> Completed | Focus 5 newest-dirty-repo banner | rated -
+MATCH            | Completed -> Completed | Client auto-discovery | rated -
+MATCH            | Completed -> Completed | Watch-list coverage guard | rated -
+MATCH            | Completed -> Completed | git-pulse stages PDDA registry projection (predecessor GH-96) | rated -
+MATCH            | Completed -> Completed | priority_tier soft down-weight (predecessor GH-94) | rated -
+MATCH            | Completed -> Completed | MCP probe tools (predecessor GH-93) | rated -
+MATCH            | Completed -> Completed | Gemini "What to do next" → fixed vault file | rated -
+MATCH            | Completed -> Completed | Apple Reminders unified integration | rated -
+MATCH            | Completed -> Completed | Focus 5 Float (floating macOS card stack) | rated -
+MATCH            | Completed -> Completed | Focus 5 Float — Telemetry tab | rated -
+MATCH            | Completed -> Completed | CLIO migration + Focus 5 Float — Prompt Log tab | rated -
+MATCH            | Completed -> Completed | Focus 5 Float — offline cache & manual server start | rated -
+MATCH            | Completed -> Completed | Focus 5 — identity-agnostic ranking vector | rated -
+MATCH            | Completed -> Completed | Focus 5 active repos bug remediation | rated -
+MATCH            | Completed -> Completed | Team Calendar as a Signal (HiQS) | rated -
+MATCH            | Completed -> Completed | Unified front-door, portability & auth hardening | rated -
+MATCH            | Completed -> Completed | AI-agent front door (ROUTER.md) | rated -
+MATCH            | Deferred · vision -> Deferred · vision | Fused retrieval measurement — PAUSED by operator decision 2026-08-20, do not restart unasked | rated -
+MATCH            | Superseded -> Superseded | Signal-quality contract (observe-first source health) | rated -
+MATCH            | Superseded -> Superseded | Zapier ingest: alternative email & calendar streams | rated -
+MATCH            | Superseded -> Superseded | Cross-day velocity / unfinished-work signal | rated -
+MATCH            | Superseded -> Superseded | HiQS marketing label | rated -
+## final-legacy totals: match=147 missing=0 rating_mismatch=0
+
+RESULT: PASS
+exit=0
