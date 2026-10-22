@@ -12,7 +12,7 @@ whoever picks up the next task, human or model, and it is binding on both.
 > **Verified beats plausible. A claim whose evidence is unpublished is an assertion.**
 
 If you state that something was measured — in a GitHub issue, a PR body, a commit
-message, `ROADMAP.md`, a code comment, or a reply to the operator — the measurement
+message, a roadmap ledger row, a code comment, or a reply to the operator — the measurement
 must be retained in [`TESTS-RESULTS/`](TESTS-RESULTS) where a reader can check it
 without access to your machine.
 

@@ -1,6 +1,6 @@
 # rebalance OS — ARCHITECTURE.md
 
-> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
+> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, the roadmap ledger's In progress rows, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
 
 
 > How data flows through the system. For execution decisions see the [PROJECT/](PROJECT) docs — canonical detail for a specific effort, governed by [PROJECT/PDDA.md](PROJECT/PDDA.md) — for tool specs see [MCP.md](MCP.md), for the *why* behind these decisions see [GUIDING-PRINCIPLES.md](GUIDING-PRINCIPLES.md).
@@ -137,7 +137,7 @@ A `rebalance refresh` (or the `refresh_index` MCP tool) flows through real symbo
 
 ## Signal Sources
 
-Raw incoming sources have a priority, a collector module, and a target table. The table below is the canonical field spec; for per-effort execution detail see the [PROJECT/](PROJECT) docs, and for current status see [ROADMAP.md](ROADMAP.md).
+Raw incoming sources have a priority, a collector module, and a target table. The table below is the canonical field spec; for per-effort execution detail see the [PROJECT/](PROJECT) docs, and for current status run `python3 utils/py/releases_app.py roadmap list` (the work ledger lives in `releases.db`; ROADMAP.md was retired in GH-348).
 
 | Priority | Source | Collector | Storage | Vectorized | Status |
 |----------|--------|-----------|---------|------------|--------|

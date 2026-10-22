@@ -1,6 +1,6 @@
 ## Working with the rebalance MCP server (Codex, Gemini, Claude, others)
 
-> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, `ROADMAP.md` → In progress, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
+> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, the roadmap ledger's In progress rows, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
 
 > **Before making any empirical claim — including "I tested it and it didn't help" — read [SOP.md](SOP.md).** Measurements that get cited must be published as a campaign in [`TESTS-RESULTS/`](./TESTS-RESULTS/); an unverifiable small test is worse than none.
 
