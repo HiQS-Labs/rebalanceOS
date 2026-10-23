@@ -164,4 +164,12 @@ Basis: The final audit receipt closes Round 1's only requested correction. The c
 
 Relay closed (Approved), no further review turn needed. Producer (claude-a) receives the approved result; the harness owns the file-scoped commit and final gates.
 
+
+### Attestation · relay-drive — 2026-10-23T14:06:07Z
+task: RELAY-gh358-final-qa
+reviewer: codex
+status: Approved
+reviewed-head: 9c9794527a53846b43e9a66b1911469067091978
+added-range: 12646+3600
+added-sha256: b53dc464574b89167d373ea60a7bd14fcfff7b40f0fa7d9eff771ae5089bda19
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
