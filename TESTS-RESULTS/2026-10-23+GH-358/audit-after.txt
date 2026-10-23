@@ -1,0 +1,27 @@
+# npm audit report
+
+braces  *
+Severity: high
+braces vulnerable to stack-exhaustion denial of service through deeply nested patterns - https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+fix available via `npm audit fix`
+node_modules/braces
+  micromatch  >=0.2.0
+  Depends on vulnerable versions of braces
+  node_modules/micromatch
+    fast-glob  *
+    Depends on vulnerable versions of micromatch
+    node_modules/fast-glob
+      globby  >=8.0.0
+      Depends on vulnerable versions of fast-glob
+      node_modules/globby
+        secretlint  <=12.3.1
+        Depends on vulnerable versions of globby
+        node_modules/secretlint
+          @vscode/vsce  3.3.3-0 - 3.9.2
+          Depends on vulnerable versions of secretlint
+          node_modules/@vscode/vsce
+
+6 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix

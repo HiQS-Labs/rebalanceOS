@@ -2,7 +2,7 @@
 gh_issue: 358
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/358
 title: "CLIO VS Code extension: npm audit — markdown-it ReDoS (runtime) + 11 build-tool advisories"
-status: "Proposed (1-INBOX)"
+status: "Implemented — awaiting final QA and PR"
 created: 2026-10-23
 updated: 2026-10-23
 owner: noel
@@ -33,3 +33,15 @@ Simple change (lockfile bump via `npm audit fix`, no `--force`), so it skips pla
 1. `npm audit fix` in `vscode-extensions/clio` → verify `npm audit` and `npm audit --omit=dev` both report 0.
 2. Rebuild, lint, test and package with the extension's own `package.json` scripts; then smoke-load the built bundle.
 3. Commit the lockfile (and `package.json` only if the ranges changed).
+
+## Result (2026-10-23)
+
+- `npm audit fix` (non-breaking): `markdown-it` 14.3.1 → 14.3.3 (runtime), plus 5 tooling bumps → `npm audit --omit=dev` = 0.
+  Six high findings remained, all through `@vscode/vsce` 3.9.2 → secretlint → globby → fast-glob → micromatch →
+  `braces`, whose latest release (3.0.3) is itself in the GHSA-vfj7-8cjw-p6xm range.
+- **Deviation from "no `--force`":** bumped devDependency `@vscode/vsce` `^3.3.0` → `^4.0.0` (semver-major, packaging
+  tool only, not shipped). This follows the extension README's own policy ("tools with no runtime presence ... track
+  latest"). Result: `npm audit` = 0. vsce 4 requires Node >= 22, so packaging needs Node 22+ (local v22.22.3);
+  no CI builds this extension.
+- Gates before/after: `check`, `lint`, `test` (14/14), `build:prod` all rc 0; `npm run package -- --allow-missing-repository`
+  produced `sidebar-markdown-0.2.1.vsix` with vsce 4.0.0. Evidence: `TESTS-RESULTS/2026-10-23+GH-358/`.
