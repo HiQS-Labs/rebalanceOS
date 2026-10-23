@@ -36,7 +36,7 @@ Simple change (lockfile bump via `npm audit fix`, no `--force`), so it skips pla
 
 ## Result (2026-10-23)
 
-- `npm audit fix` (non-breaking): `markdown-it` 14.3.1 → 14.3.3 (runtime), plus 5 tooling bumps → `npm audit --omit=dev` = 0.
+- `npm audit fix` (non-breaking): `markdown-it` 14.3.0 → 14.3.3 (runtime), plus 5 tooling bumps → `npm audit --omit=dev` = 0.
   Six high findings remained, all through `@vscode/vsce` 3.9.2 → secretlint → globby → fast-glob → micromatch →
   `braces`, whose latest release (3.0.3) is itself in the GHSA-vfj7-8cjw-p6xm range.
 - **Deviation from "no `--force`":** bumped devDependency `@vscode/vsce` `^3.3.0` → `^4.0.0` (semver-major, packaging
