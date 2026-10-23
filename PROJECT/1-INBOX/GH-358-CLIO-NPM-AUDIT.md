@@ -44,4 +44,4 @@ Simple change (lockfile bump via `npm audit fix`, no `--force`), so it skips pla
   latest"). Result: `npm audit` = 0. vsce 4 requires Node >= 22, so packaging needs Node 22+ (local v22.22.3);
   no CI builds this extension.
 - Gates before/after: `check`, `lint`, `test` (14/14), `build:prod` all rc 0; `npm run package -- --allow-missing-repository`
-  produced `sidebar-markdown-0.2.1.vsix` with vsce 4.0.0. Evidence: `TESTS-RESULTS/2026-10-23+GH-358/`.
+  produced `sidebar-markdown-0.2.1.vsix` with vsce 4.0.0. Evidence: `TESTS-RESULTS/2026-10-23+GH-358/` (final audit receipt: `audit-final.txt`).

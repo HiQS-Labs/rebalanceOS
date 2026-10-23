@@ -1,0 +1,8 @@
+# Final full audit at candidate lockfile (beeed31), disposable --no-local clone, npm ci
+$ npm audit
+found 0 vulnerabilities
+exit=0
+
+$ npm audit --omit=dev
+found 0 vulnerabilities
+exit=0
