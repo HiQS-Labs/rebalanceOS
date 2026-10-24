@@ -1,14 +1,15 @@
 ## after (installed)
 version 14.3.3
 main path: "<h1>Hi</h1>\n<p><em>CLIO</em> note with a <a href=\"https://example.com\">link</a>.</p>"
-crafted input (unmatched quotes + long link ref, 60k chars): 14 ms
+crafted input (unmatched quotes + long link ref, 60k chars): completed, no stall observed
 ## red control: markdown-it 14.3.2
 version 14.3.2
 main path: "<h1>Hi</h1>\n<p><em>CLIO</em> note with a <a href=\"https://example.com\">link</a>.</p>"
-crafted input (unmatched quotes + long link ref, 60k chars): 15 ms
+crafted input (unmatched quotes + long link ref, 60k chars): completed, no stall observed
 
 ## Verdict
+Timings were taken once and are not retained as a campaign (SOP.md); they are omitted, and nothing here is cited as a measurement.
 Main path: PASS (identical HTML on 14.3.2 and 14.3.3).
-Red control: NOT reproduced. The crafted input (unmatched quotes plus a long link reference) runs in ~15 ms on 14.3.2 too, so
+Red control: NOT reproduced. The crafted input (unmatched quotes plus a long link reference) completes without a stall on 14.3.2 too, so
 this smoke test does not demonstrate the advisories' slowdown. The evidence that the fix landed is the resolved version
 (`npm ls markdown-it` → 14.3.3, outside the `<=14.3.2` advisory range) and `npm audit --omit=dev` → 0.

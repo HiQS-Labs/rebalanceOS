@@ -13,4 +13,4 @@ rc=0
 rc=0
 => Run vsce ls --tree to see all included files.
 
- DONE  Packaged: /Users/noelsaw/Documents/GH Repos/rebalanceOS-gh358-clio-npm-audit-2026-10-23/vscode-extensions/clio/sidebar-markdown-0.2.1.vsix (187 files, 836.56 KB)
+ DONE  Packaged: vscode-extensions/clio/sidebar-markdown-0.2.1.vsix (187 files, 836.56 KB)

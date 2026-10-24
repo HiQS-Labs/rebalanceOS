@@ -14,6 +14,13 @@ goal: >
 
 # GH-358 — CLIO extension npm audit
 
+## Contents
+
+- [Why](#why)
+- [Rating rationale](#rating-rationale-2026-10-23)
+- [Plan](#plan)
+- [Result](#result-2026-10-23)
+
 ## Why
 
 `npm audit` in `vscode-extensions/clio` reports 12 findings (11 high, 1 moderate). Only `markdown-it`

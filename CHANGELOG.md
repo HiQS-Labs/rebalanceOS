@@ -12,9 +12,9 @@
 
 ## [0.103.2] - 2026-10-23
 
-### Security
+### Fixed
 
-- The CLIO VS Code extension's markdown renderer is updated, so crafted markdown can no longer stall the editor. Its packaging tools are updated too, and `npm audit` now reports no vulnerabilities. Building the extension package now needs Node 22 or later.
+- The VS Code extension's markdown renderer moves to a release outside the range of four known advisories, where crafted markdown could slow rendering. Its packaging tools are updated too, and `npm audit` now reports no vulnerabilities. Building the extension package now needs Node 22 or later.
 
 ## [0.103.1] - 2026-10-23
 
