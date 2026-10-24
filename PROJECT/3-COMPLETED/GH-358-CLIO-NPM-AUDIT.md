@@ -2,9 +2,9 @@
 gh_issue: 358
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/358
 title: "CLIO VS Code extension: npm audit — markdown-it ReDoS (runtime) + 11 build-tool advisories"
-status: "Implemented — awaiting final QA and PR"
+status: Complete
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-10-24
 owner: noel
 doc_type: bugfix
 goal: >
@@ -20,6 +20,7 @@ goal: >
 - [Rating rationale](#rating-rationale-2026-10-23)
 - [Plan](#plan)
 - [Result](#result-2026-10-23)
+- [Lessons Learned](#lessons-learned-for-future-agents)
 
 ## Why
 
@@ -52,3 +53,13 @@ Simple change (lockfile bump via `npm audit fix`, no `--force`), so it skips pla
   no CI builds this extension.
 - Gates before/after: `check`, `lint`, `test` (14/14), `build:prod` all rc 0; `npm run package -- --allow-missing-repository`
   produced `sidebar-markdown-0.2.1.vsix` with vsce 4.0.0. Evidence: `TESTS-RESULTS/2026-10-23+GH-358/` (final audit receipt: `audit-final.txt`).
+
+Shipped in PR #360 (squash 79bb320, 2026-10-24); Codex final QA approved; CodeRabbit and Greptile findings addressed in 3fe00b6 and c1edab7.
+
+## Lessons Learned (For Future Agents)
+
+- `npm audit fix` without `--force` cannot clear advisories whose only fix is a semver-major bump of a parent tool;
+  here `braces` was reachable only through `@vscode/vsce` 3. Check the dependency path before promising a lockfile-only fix.
+- A red control that does not reproduce is a finding, not a pass: say so, and do not publish one-off timings as
+  measurements (SOP.md). Cite the resolved version and the clean audit instead.
+- Name audit receipts by lockfile blob id, not a commit SHA; a rebase rewrites the commit but keeps the blob.
