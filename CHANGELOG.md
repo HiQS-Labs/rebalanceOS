@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.103.2] - 2026-10-23
+
+### Fixed
+
+- The VS Code extension's markdown renderer moves to a release outside the range of four known advisories, where crafted markdown could slow rendering. Its packaging tools are updated too, and `npm audit` now reports no vulnerabilities. Building the extension package now needs Node 22 or later.
+
 ## [0.103.1] - 2026-10-23
 
 ### Fixed

@@ -1,0 +1,16 @@
+## npm run check
+rc=0
+## npm run lint
+rc=0
+## npm run test
+rc=0
+## npm run build:prod
+rc=0
+# tests 14
+# pass 14
+# fail 0
+## npm run package -- --allow-missing-repository
+rc=0
+=> Run vsce ls --tree to see all included files.
+
+ DONE  Packaged: vscode-extensions/clio/sidebar-markdown-0.2.1.vsix (187 files, 836.56 KB)
