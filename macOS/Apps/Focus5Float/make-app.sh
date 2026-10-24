@@ -19,7 +19,9 @@ cd "$PKG_DIR"
 APP_NAME="Focus 5 Float"
 EXEC_NAME="Focus5Float"
 BUNDLE_ID="me.neochro.Focus5Float"
-VERSION="0.50.3"
+# The app ships with the package; one version source keeps the label from going stale.
+VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$PKG_DIR/../../../pyproject.toml")"
+[ -n "$VERSION" ] || { echo "✗ version not found in pyproject.toml"; exit 1; }
 DIST="$PKG_DIR/dist"
 APP="$DIST/$APP_NAME.app"
 

@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.103.1] - 2026-10-23
+
+### Fixed
+
+- The Focus 5 menu-bar app now reports the same version as the release it was built from. Its build script carried a fixed version that was never updated, so a freshly built app looked identical to an old one.
+
 ## [0.103.0] - 2026-10-21
 
 ### Changed
