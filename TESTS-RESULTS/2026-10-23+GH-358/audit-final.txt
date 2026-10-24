@@ -1,4 +1,6 @@
-# Final full audit at candidate lockfile (beeed31), disposable --no-local clone, npm ci
+# Final full audit, disposable --no-local clone, npm ci, at vscode-extensions/clio/package-lock.json
+# blob f2252b29ac0076c20a6e167db6c7a7ee263756e5 (package.json blob efd534dfd1065bd2895b85e67c27c680b6709e51).
+# Run at pre-rebase commit beeed31; both blobs are identical at PR head (git rev-parse HEAD:<path>).
 $ npm audit
 found 0 vulnerabilities
 exit=0
