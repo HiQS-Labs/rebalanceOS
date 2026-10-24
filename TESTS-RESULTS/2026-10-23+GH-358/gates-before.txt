@@ -1,0 +1,14 @@
+## npm run check
+rc=0
+## npm run lint
+rc=0
+## npm run test
+rc=0
+# skipped 0
+# todo 0
+# duration_ms 58.74975
+## npm run build:prod
+rc=0
+  dist/extension.js  151.0kb
+
+⚡ Done in 8ms

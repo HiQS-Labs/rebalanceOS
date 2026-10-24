@@ -58,7 +58,7 @@ Tools with no runtime presence — `esbuild`, `eslint`, `@vscode/vsce` — track
 ## Production build and install
 
 1. When distributing a new build, bump `"version"` in `package.json` first — a changed version defeats any caching of a same-version install and keeps builds distinguishable.
-2. `npm install` — only needed if dependencies have not been installed yet.
+2. Use Node.js 22 or later (the packaging tool `@vscode/vsce` 4 requires it), then run `npm install` — only needed if dependencies have not been installed yet.
 3. `npm run package -- --allow-missing-repository` — type-checks, produces the production bundle (minified, no sourcemaps) and packages it as `sidebar-markdown-<version>.vsix` in the project root. The flag suppresses vsce's interactive prompt about the missing `repository` field; CI passes the same flag.
 4. In VS Code, open the command palette (`Cmd+Shift+P`), run **Extensions: Install from VSIX…** and select the `.vsix`. Installing over an already-installed version replaces it.
 5. Run **Developer: Reload Window** so the newly installed code takes over — VS Code can keep the previous extension host running until a reload.
