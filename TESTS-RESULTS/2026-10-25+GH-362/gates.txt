@@ -1,0 +1,12 @@
+## gates after changes (working tree)
+$ ruff check .
+All checks passed!
+$ ruff format --check .
+663 files already formatted
+$ python3 utils/pdda/check_script_inventory.py --check
+exit=0
+$ utils/pdda/pdda.sh run
+exit=0
+
+PDDA run complete: 26 error(s) found, not blocking in observe mode — pdda-check-frontmatter pdda-check-status-table pdda-check-roadmap-coverage pdda-check-banned-imports
+Run with PDDA_MODE=full (or .pdda-mode) once these are fixed, so they block.

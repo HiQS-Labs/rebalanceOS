@@ -16,6 +16,8 @@
 # newlines and only after the writer accepted the chunk, rescan on inode
 # change or size regression, no history import on first sighting unless
 # CLIO_TAIL_BACKFILL=1, and a busy append lock aborts without advancing.
+# A busy tailer lock is a silent no-op; a lock older than 300 s is reaped by
+# one serialized reaper.
 set -euo pipefail
 AGY_ROOT="${CLIO_AGY_ROOT:-$HOME/.gemini/antigravity-cli}"
 STATE="$HOME/.claude/prompt-log-agy-tail.state"
@@ -37,17 +39,21 @@ else
 fi
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-# Stale lock detection: reap any lock held longer than 300s so dead processes cannot deadlock tailing.
+# A lock older than 300 s is a dead run's leftover; reap it, or that agent's capture
+# stops for good. Reaping is serialized and rechecked so no contender deletes a lock
+# another one just took.
+lock_stale() { # born stamp, else dir mtime; empty/non-numeric = not stale
+  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "")
+  case "$born" in ''|*[!0-9]*) return 1 ;; esac
+  [ $(( $(date +%s) - born )) -gt 300 ]
+}
 if ! mkdir "$TAIL_LOCK" 2>/dev/null; then
-  now=$(date +%s)
-  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "$now")
-  if [ -n "$born" ] && [ "$born" -gt 0 ] 2>/dev/null && [ $((now - born)) -gt 300 ]; then
-    diag "reaped stale tail lock born at $born ($((now - born))s old)"
-    rm -rf "$TAIL_LOCK"
-    mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
-  else
-    exit 0
-  fi
+  lock_stale || exit 0
+  mkdir "$TAIL_LOCK.reap" 2>/dev/null || exit 0
+  lock_stale && { rm -rf "$TAIL_LOCK"; diag "reaped stale tail lock born at $born"; }
+  got=0; mkdir "$TAIL_LOCK" 2>/dev/null || got=1
+  rmdir "$TAIL_LOCK.reap"
+  [ "$got" = 0 ] || exit 0
 fi
 trap 'rm -rf "$TAIL_LOCK"' EXIT
 date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
@@ -87,7 +93,7 @@ state_update() {
 # the cursor only ever lands after a terminating newline.
 extract_rows() {
   python3 - "$1" "$2" <<'PYEOF'
-import json, sys
+import hashlib, json, sys
 from datetime import datetime, timezone
 
 def norm_ts(ts):
@@ -122,7 +128,7 @@ if "brain" in parts:
     import sqlite3, re, urllib.parse
     db_path = "/".join(parts[:brain_idx]) + "/conversations/" + session_id + ".db"
     try:
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect("file:" + urllib.parse.quote(db_path, safe="/") + "?mode=ro", uri=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT data FROM trajectory_metadata_blob")
             row = cursor.fetchone()
@@ -134,7 +140,9 @@ if "brain" in parts:
     except Exception:
         pass
 
+pos = offset
 for line in complete.split(b"\n"):
+    line_start, pos = pos, pos + len(line) + 1
     if not line.strip():
         continue
     try:
@@ -153,6 +161,7 @@ for line in complete.split(b"\n"):
         "machine": "",
         "session_id": session_id,
         "prompt": text,
+        "source_event_id": str(line_start) + ":" + hashlib.sha256(line).hexdigest(),
     }, ensure_ascii=False))
 print(f"CONSUMED {consumed}", file=sys.stderr)
 PYEOF
@@ -188,9 +197,8 @@ while IFS= read -r file; do
   fi
 
   if [ "$offset" -ge "$size" ]; then
-    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ]; then
-      state_update "$file" "$inode" "$offset"
-    fi
+    # Idle tick: rewrite state only when the stored record would change.
+    [ "$cached" = "$inode $offset" ] || state_update "$file" "$inode" "$offset"
     continue
   fi
 

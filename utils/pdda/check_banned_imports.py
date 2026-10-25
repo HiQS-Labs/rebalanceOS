@@ -7,11 +7,13 @@ One file, two checks (GH-126's "choose one owner" rule forbids a second validato
    ``rebalance.lib``. The exact baseline is keyed by relative path, import family,
    and occurrence count; line numbers remain diagnostic only. A same-line
    ``# CANONICAL-PATH-OK: <reason>`` pragma exempts a reviewed import.
-2. SQLite gateway ratchet (GH-136, blocking via ``--check``): no file outside the two
-   gateway directories may call ``sqlite3.connect``. The two gateways are separate
+2. SQLite gateway ratchet (GH-136, blocking via ``--check``): no file outside the
+   gateway directories may call ``sqlite3.connect``. The three gateways are separate
    stores by design — ``src/rebalance/ingest/db/`` (rebalance's own DB, resolved from
-   ``REBALANCE_DB``) and ``HiQS/hiqs/`` (the clean-room rebuild's app-data store) — so
-   they are not to be converged, only bypassing code is to be routed. ``--check``
+   ``REBALANCE_DB``), ``HiQS/hiqs/`` (the clean-room rebuild's app-data store) and
+   ``utils/CLIO/`` (CLIO's private prompt-history store; its stdlib helper runs installed
+   beside the capture hooks, outside this package, GH-362) — so they are not to be
+   converged, only bypassing code is to be routed. ``--check``
    compares the tree against an exact per-file baseline and fails on additions (new
    debt) and on shrinks (a stale baseline that must be tightened deliberately).
    Finding identity is relative path + occurrence count; line numbers are diagnostic
@@ -30,7 +32,7 @@ from pathlib import Path
 SQLITE_CALL_RE = re.compile(r"sqlite3\.connect\s*\(")
 SQLITE_PRAGMA_RE = re.compile(r"#\s*GATEWAY-OK:\s*(.*)$")
 SQLITE_ROOTS = ("src", "utils", "HiQS")
-SQLITE_GATEWAY_DIRS = ("src/rebalance/ingest/db", "HiQS/hiqs")
+SQLITE_GATEWAY_DIRS = ("src/rebalance/ingest/db", "HiQS/hiqs", "utils/CLIO")
 SQLITE_SELF_EXEMPT = ("utils/pdda/check_banned_imports.py",)
 SQLITE_PRUNED_DIRS = {"tests", "__pycache__"}
 SQLITE_BASELINE_PATH = Path(__file__).with_name("sqlite_connect_baseline.json")
@@ -133,7 +135,7 @@ def find_banned_import_errors(root: Path) -> list[str]:
 def scan_sqlite_calls(root: Path) -> dict[str, int]:
     """Count direct SQLite connection call sites per file under the scanned roots.
 
-    Tests directories, hidden/build directories, the two gateway directories, and this
+    Tests directories, hidden/build directories, the gateway directories, and this
     checker itself are exempt. A same-line ``# GATEWAY-OK: <reason>`` pragma exempts a
     reviewed call site; a pragma with an empty reason still counts (fail closed, per
     the pragma contract #126 specifies). Raises ``SystemExit`` on unreadable files

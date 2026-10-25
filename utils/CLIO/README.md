@@ -1,5 +1,17 @@
 # CLIO
 
+## Upstream — edit here first
+
+This folder (`rebalanceOS/utils/CLIO/`) is **CLIO's canonical source**. It is published
+unchanged to [HiQS-Labs/XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO) `utils/CLIO/`.
+The exceptions are this README and `LICENSE`; XYZ-CLIO keeps its own at the repository root.
+
+- Make every CLIO change here first, through a reviewed rebalanceOS PR, then publish it to
+  XYZ-CLIO. Never edit XYZ-CLIO's copy directly.
+- Devices get CLIO only through Skills Army HQ deployment from this repository, never by
+  hand-copying files or editing installed hooks.
+- The direction flipped with GH-362, which synced this folder to XYZ-CLIO `bacd26f`.
+
 A Claude Code skill that installs a `UserPromptSubmit` hook logging every prompt
 you submit — across every repo, on one machine — to a single centralized file:
 `~/.claude/prompt-log.jsonl`.

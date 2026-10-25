@@ -1,0 +1,24 @@
+## at 1bf7ea8 (disposable clone), CLIO_MIN_PROMPT_CHARS unset
+### byte identity vs XYZ-CLIO bacd26f
+identical+mode utils/CLIO/INSTALL.md
+identical+mode utils/CLIO/clio-agy-tail.sh
+identical+mode utils/CLIO/clio-codex-tail.sh
+identical+mode utils/CLIO/prompt-log-to-md.sh
+identical+mode utils/CLIO/clio-store.py
+identical+mode test/clio-store.py
+identical+mode test/clio-capture.sh
+identical+mode test/clio-exporter.sh
+DIFF test/clio-codex-tail.sh
+DIFF test/clio-agy-tail.sh
+identical test/fixtures/clio
+### red control: base 6672892 vs XYZ-CLIO
+differs utils/CLIO/INSTALL.md (expected)
+differs utils/CLIO/clio-codex-tail.sh (expected)
+### suites
+bash test/clio-capture.sh -> exit 0 (PASS: all capture cases (bash))
+bash test/clio-exporter.sh -> exit 0 (      a second run would repeat the first, not widen coverag)
+bash test/clio-codex-tail.sh -> exit 0 (PASS: codex tailer)
+bash test/clio-agy-tail.sh -> exit 0 (PASS: agy tailer)
+python3 test/clio-store.py -> exit 1 (FAILED (failures=1)); failures: test_activation_import_gate_and_source_preservation 
+
+Note: test/clio-codex-tail.sh and test/clio-agy-tail.sh had identical content but mode 100644 here vs 100755 upstream (pre-existing). Aligned to 100755 in the follow-up commit so the folder and tests match upstream in content and mode. The store failure (test_activation_import_gate_and_source_preservation) is the known date-dependent case; it also fails in XYZ-CLIO at d17e521 and bacd26f.

@@ -1,7 +1,7 @@
 """GH-136: the SQLite gateway ratchet in utils/pdda/check_banned_imports.py.
 
-The ratchet pins every direct ``sqlite3.connect`` outside the two gateway
-directories (``src/rebalance/ingest/db/`` and ``HiQS/hiqs/``) to an exact
+The ratchet pins every direct ``sqlite3.connect`` outside the gateway
+directories (``src/rebalance/ingest/db/``, ``HiQS/hiqs/`` and ``utils/CLIO/``) to an exact
 per-file baseline. Additions are new debt and fail; shrinks mean the baseline
 is stale and also fail until deliberately updated. These tests constrain both
 directions plus the exemptions and the fail-closed read path.

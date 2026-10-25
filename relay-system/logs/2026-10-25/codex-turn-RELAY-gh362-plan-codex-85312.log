@@ -1,0 +1,1483 @@
+Reading additional input from stdin...
+OpenAI Codex v0.153.4
+--------
+workdir: /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25/.tick]
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a17368-23f8-7a43-a97e-8dd4cf61b605
+--------
+user
+You are agent codex, taking your turn in a file-based relay. Read relay-system/2026-10-25/gh362-plan-codex.md and follow its embedded "▶ TAKE YOUR TURN" steps for your role. For the RELAY-gh362-plan-codex token ALWAYS use the absolute, env-pinned tick — a bare or ./bin/tick from a worktree/foreign CWD silently no-ops and DEADLOCKS the relay: TICK_REPO_ROOT="/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25" "/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25/.xyz/bin/tick". Token sequence: (1) claim it FIRST — claim RELAY-gh362-plan-codex --agent codex --paths relay-system/2026-10-25/gh362-plan-codex.md — the --paths flag is MANDATORY; without it the claim silently fails (prints usage) and your later release errors "task ... is open". (2) ping is optional. (3) when finished, if you set STATUS: Approved or Closed, close the token with: done RELAY-gh362-plan-codex --agent codex (never release --to done — done is a verb, not an agent); otherwise release --to the other agent (the role named by NEXT in the file). Edit ONLY relay-system/2026-10-25/gh362-plan-codex.md. You are the REVIEWER this turn: do NOT edit or create any artifact or source file; the relay file is the only tracked file you may change. You MAY run narrow, non-mutating probes and queries against the seeded artifact to measure a claim. Put probe output and temp files under .relay-scratch/ or $TMPDIR, never elsewhere in the tree: export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR". Scratch is discarded after your turn, so quote the command, exit status and decisive output in the finding itself. Do NOT run validate.sh, test/*.sh, pytest, or executable fixtures here — those belong in a disposable full clone; a claim that can only be measured that way is graded [Unverified — needs clone run], and the harness gate runs after your turn. Any other change to the tree is reverted and fails your turn. When approving, hand the token off with done and set STATUS: Approved. The artifact under review is at .relay-artifacts/gh362-evidence.txt — READ it for your review, but do NOT edit it (any edit fails your turn). NEVER run git yourself — no add/commit/push/reset; a self-commit FAILS your whole turn. Do NOT touch any other file. The harness makes the one file-scoped commit for you after you hand off the token. Verification output (probe results, generated JSON, logs) goes under .relay-scratch/ — pre-created for you, exempt from containment, never copied back; scratch files anywhere else in the tree are reverted and FAIL your turn.
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+I’ll claim the relay token, inspect the reviewer instructions and seeded evidence, then record only the review finding in the relay file.
+exec
+/bin/zsh -lc 'TICK_REPO_ROOT="/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25" "/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25/.xyz/bin/tick" claim RELAY-gh362-plan-codex --agent codex --paths relay-system/2026-10-25/gh362-plan-codex.md' in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+won: RELAY-gh362-plan-codex claimed by codex
+
+exec
+/bin/zsh -lc 'export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"; sed -n '"'1,260p' relay-system/2026-10-25/gh362-plan-codex.md; printf '\\n--- EVIDENCE ---\\n'; sed -n '1,320p' .relay-artifacts/gh362-evidence.txt" in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+# RELAY · gh362-plan-codex
+<!--
+  Single source of truth for this two-agent relay. Read the ENTIRE file before acting.
+  Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
+-->
+
+NEXT: Reviewer
+STATUS: Open
+ROUND: 2 / 3
+
+## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
+1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
+2. **Check it's your turn:** `NEXT` (top) names the role to act. Confirm you are bound to it and the
+   last Log block isn't already yours. If not → STOP and reply "wrong window — nudge the <other> window."
+3. **Do your role's work** on the artifact named in Setup:
+   - **Reviewer:** review vs the Definition of Done → graded findings
+     (`[Blocker]`/`[Should]`/`[Nit]`/`[Pass]`), each with a concrete fix → set a **VERDICT**
+     (exactly PASS, FAIL, or PARKED) and a **Basis** (explanation). **Review the whole file, not just the diff** (GH-268):
+     a beta test had this loop reach `Approved` in two rounds while an independent audit of the same
+     branch found 20 issues (1 critical, 4 high) — every one of them in the pre-existing code the
+     change sat on, which nobody had read. Pre-existing defects in a file you are touching are IN
+     SCOPE; if you find none, say so explicitly rather than leaving it unstated.
+     **Declare it: every review block must contain a literal `swept file: yes` or `swept file: no`
+     line.** Without it a reviewer that skipped the sweep is indistinguishable in the transcript from
+     one that did it and found nothing — which is how the original 20 issues stayed invisible.
+     Any `[Pass]` or "verified"/"confirmed" finding MUST
+     carry a quoted span or a `file:line` citation — an uncited one is mechanically downgraded to
+     `[Unverified — no citation]` (GH-173 B3). Do **not** edit the artifact; only append findings here.
+     **A finding that asks for a behaviour change is a generalization unless you can paste the concrete
+     input — a row, a value, a `file:line` — that fails under the current code** (GH-681: the gh673
+     final QA relay generalized one late-error observation into "or a later invalid identity", the
+     Producer implemented it, the same seat `[Pass]`ed it next round, and one historical NULL-URL
+     ledger row then blanked every issue). Every `[Blocker]` or `[Should]` requesting a behaviour
+     change MUST carry three lines: `Observed input:` (the failing input you saw), `Affected scope:`
+     (the input predicate the change would govern), `Falsifier:` (the fixture or data that would show
+     the change unnecessary or wrong, and its expected result).
+     A `[Blocker]` must cite an observed failure. This is a protocol rule, not a mechanical check —
+     the Producer may disposition a request lacking these as `Declined — unproven generalization`.
+   - **Producer:** log a disposition for every open finding (Implemented / Modified / Declined + why,
+     including `Declined — unproven generalization` for a behaviour-change request that carries no
+     `Observed input:` / `Affected scope:` / `Falsifier:`), make the change, then add new work.
+4. **Append ONE block** at the very bottom, directly **above** the marker line. Never edit earlier turns.
+   Reviewer headings may be `### Reviewer · Round N`, `### Round N · Reviewer · <agent>`, `### Reviewer (<agent>)` (optionally followed by `— rN`), or `### Reviewer — Round N` (optionally followed by `(<agent>)`); follow the heading with a non-empty review body.
+5. **Update the header:** flip `NEXT`; set `STATUS` (`Approved` closes — Reviewer only; else `Open`);
+   the Producer bumps `ROUND` when opening a new cycle. If the max `ROUND` ends without `Approved`,
+   set `STATUS: Escalated`.
+6. **Commit only the relay file** (`relay(gh362-plan-codex): <role> r<N>`); no push. **Stop** and report one line.
+7. **Hand off explicitly — EVERY turn, not just the first** (GH-268). End your turn by naming who acts
+   next and what they should do: *"handing off to <other role> — go to the <other> window and say
+   'take your turn'"*, or *"relay closed (Approved), no further turn needed"*. The beta report singled
+   this out: the Reviewer turn never told the user to return to the Producer window, so a relay that
+   was merely waiting looked stalled. A turn that ends without this line is not finished.
+
+## Setup
+- Artifact under review: `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md` (plan only; no code written yet)
+- Evidence (read-only, seeded): `.relay-artifacts/gh362-evidence.txt`. It holds the exact `diff -u` of each synced path (this repo vs XYZ-CLIO `bacd26f`; XYZ-CLIO is not in this clone), proof that the tests and fixtures are already identical, the ruff output for the two upstream Python files under this repo's config, and the writer's `dirname "$0"` helper calls.
+- Source to read for grounding: `utils/CLIO/` (current), `utils/pdda/check_script_inventory.py` and `utils/pdda/script_inventory_baseline.json` (L58-60), `pyproject.toml` `[tool.ruff] extend-exclude`, `.githooks/pre-push` (ruff stages ~L111-112), `.github/workflows/ci.yml` (ruff steps), `.agents/skills/clio/SKILL.md`, `AGENTS.md` (CLIO pointer L14), `PROJECT/PDDA.md`, `ROUTER.md`.
+- Requirements (issue #362, operator decision D): make `utils/CLIO` byte-identical to XYZ-CLIO `bacd26f` (adding `clio-store.py` and its test); declare this copy CLIO's upstream where maintainers will see it; keep every repo gate green; install nothing.
+- Operational envelope: a personal repo and a ~4-Mac fleet; this is a file sync plus doc lines. Grade against commensurate complexity: no new suites, services or automation (the publisher is a separate later step).
+- Reviewer: codex   ·   Producer: claude-a
+- Started: 2026-10-25
+- Definition of Done: the plan's recon matches the evidence, the sync list is complete (nothing in XYZ-CLIO's `utils/CLIO` or CLIO tests left out, nothing Rebalance-only clobbered), the gate decisions are sound, the upstream declaration is visible to maintainers, and the checks have red controls. Answer explicitly:
+  1. Is the sync list complete and correct? Does any Rebalance consumer depend on behaviour or anchors the new INSTALL.md or the scripts remove?
+  2. Script-inventory ratchet: is growing the baseline with exactly one entry the right call, versus the #249 relocation precedent or a pragma exemption? Cite the checker's rules.
+  3. Ruff: is extending `extend-exclude` to `utils/CLIO` and `test/clio-store.py` justified (byte-identity for the 0c publisher), versus fixing the five findings and reformatting here? Does the exclude hide anything first-party that should stay linted?
+  4. Is the README "Upstream" section plus the AGENTS.md line enough for maintainers to see the direction, given INSTALL.md stays upstream bytes until 0c?
+  5. Are PDDA/RELEASES intake and the docs gate handled per `PROJECT/PDDA.md` (capture, park, rate, promote, repoint)?
+  6. Anything over-engineered, or a requirement missed?
+
+## Ground rules
+1. This file is the single source of truth. The agents never share memory — read the whole file.
+2. Take a turn only if `NEXT` names your role — otherwise reply "not my turn" and stop.
+3. One turn = one block appended at the very bottom, above the marker. Never edit earlier turns.
+4. Stay tight — findings are bullets, not essays. Grade every finding.
+5. **The Reviewer never edits the artifact.** It proposes graded findings; the Producer implements.
+6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
+
+## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+
+- [Blocker] The planned `pdda.sh run` gate cannot substantiate this active plan as written: `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:17-87` has no required near-top `## Status` table, while `PROJECT/PDDA.md:48-59` requires its exact heading and columns for every active doc; the intake lifecycle repeats that the promoted doc must satisfy this contract (`PROJECT/PDDA.md:274-277`). Add the table, record the current QA state/next action, and explicitly record the existing ledger row's capture → rate → repoint → move lifecycle (or cite its verified completion) before claiming the docs/roadmap gate green. This is a documentation-contract failure, not a proposed runtime behaviour change.
+
+- [Should] The proposed `AGENTS.md` line and README declaration leave the two repository CLIO skills contradicting the new direction: `.agents/skills/clio/SKILL.md:17-20` (identical `.claude` copy) tells an absent-installed-helper reader to use an **XYZ-CLIO** checkout and says this repository's copy “may not contain” the helper. The plan itself says Rebalance's `utils/CLIO` becomes upstream (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:27-31`) but excludes skill edits at line 75. Update both mirrored skills in the plan to prefer this repository's upstream copy after the installed helper, revise the canonical-install reference accordingly, and preserve XYZ-CLIO only as the published downstream/reference. This is an observed stale instruction, not a request to change CLIO runtime behaviour.
+
+- [Pass] The sync inventory is otherwise complete against the seeded comparison: it identifies all changed/new sync inputs and preserves the two documented Rebalance-only files (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:33-42`; `.relay-artifacts/gh362-evidence.txt:804-810`). No current consumer targets the removed INSTALL heading per the plan's recon (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:44-49`), and the remaining JSONL/Markdown consumers use the existing configured/export paths rather than the repo copy.
+
+- [Pass] Growing the inventory baseline by exactly `utils/CLIO/clio-store.py` is the correct exception-free ratchet route: additions otherwise fail as “NEW script detected,” while a pragma also requires both a non-empty first-ten-lines marker and a registered exemption (`utils/pdda/check_script_inventory.py:163-188`). The helper is adjacent-path deployed by the writer (`.relay-artifacts/gh362-evidence.txt:848-850`), so relocation would break the stated deployable unit.
+
+- [Pass] The narrow Ruff exclusion is justified by byte identity and does not hide adjacent first-party Python: the seeded evidence records the five upstream-only lint findings and formatter rewrites (`.relay-artifacts/gh362-evidence.txt:826-844`), and the existing config already uses individual—not parent-directory—vendor exclusions (`pyproject.toml:99-105`). Keep the planned explicit comment and red control.
+
+VERDICT: FAIL
+
+Basis: The plan has sound sync, ratchet, Ruff, and red-control reasoning, but it cannot pass its stated PDDA/docs gate without the mandatory active-document status/lifecycle record, and it leaves two checked-in CLIO retrieval instructions factually stale immediately after declaring this copy upstream. No pre-existing defect was found in the reviewed source files beyond those documented instruction/plan inconsistencies. Probes were read-only: `rg -n ...` (exit 0) located the two skill statements and all current CLIO consumers; `sed`/`nl` reads (exit 0) confirmed the cited plan, PDDA, checker, and Ruff spans. No test, fixture, validation script, or executable artifact was run.
+
+handing off to Producer — go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1
+
+- [Blocker] missing `## Status` table → **Implemented**: added near the top with the exact columns. It records the ledger lifecycle completed so far (capture, park as `rmi-01M5SP89MGBXQKJ8667P2PD5MG`, rate, promote, repoint) and the next steps (move to In progress on approval). The `pdda.sh run` claim stays a verification step, not an assertion.
+- [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+- [Pass] items acknowledged.
+
+<!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
+--- EVIDENCE ---
+# Evidence for GH-362 plan QA (generated 2026-10-25; XYZ-CLIO main bacd26f, rebalanceOS base 6672892)
+
+## diff -u rebalanceOS (a/) vs XYZ-CLIO bacd26f (b/) for the synced paths
+--- a/utils/CLIO/INSTALL.md
++++ b/utils/CLIO/INSTALL.md
+@@ -26,12 +26,26 @@
+ 
+ ## Install
+ 
+-Run once from the root of this CLIO checkout (macOS/Linux). CLIO requires `jq`
+-(the Codex and Agy tailers additionally use `python3`):
++Run once (macOS/Linux), either from the root of a CLIO checkout or from an installed
++`clio` skill directory — the resolver below finds CLIO's source files in both layouts.
++CLIO requires `jq` (the Codex and Agy tailers additionally use `python3`):
+ 
+ ```bash
+ command -v jq >/dev/null 2>&1 || { echo "jq is required. Install it: brew install jq (macOS) / apt install jq (Linux)"; return 1 2>/dev/null || exit 1; }
+ 
++# --- resolve CLIO's source files (checkout OR installed skill dir) ----------
++# In a checkout the scripts live under utils/CLIO/; in an installed skill they
++# sit beside INSTALL.md with no prefix. Export CLIO_SRC yourself to override.
++if [ -z "${CLIO_SRC:-}" ]; then
++  for c in "$PWD/utils/CLIO" "$PWD" \
++           "$HOME/.claude/skills/clio" \
++           "$(git rev-parse --show-toplevel 2>/dev/null)/utils/CLIO" \
++           "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/skills/clio"; do
++    [ -f "$c/prompt-log-to-md.sh" ] && { CLIO_SRC="$c"; break; }
++  done
++fi
++[ -n "${CLIO_SRC:-}" ] || { echo "CLIO source not found — set CLIO_SRC to the folder holding prompt-log-to-md.sh"; return 1 2>/dev/null || exit 1; }
++
+ mkdir -p ~/.claude/hooks
+ 
+ # --- shared capture writer (one append path for every agent) ----------------
+@@ -43,7 +57,7 @@
+ #   clio-capture.sh --agent <claude-code|zcode|codex|agy>            # hook mode: one JSON object on stdin
+ #   clio-capture.sh --agent <name> --record                          # tailer mode: one complete JSON row on stdin
+ #
+-# Contract:
++# Legacy contract (SQLite mode returns nonzero if no durable receipt is possible):
+ #   exit 0 — row appended, or deliberately skipped (filters, validation, ID
+ #            collision). Capture NEVER blocks the calling agent.
+ #   exit 2 — usage error (missing/invalid --agent or unknown option).
+@@ -139,6 +153,30 @@
+ fi
+ 
+ # --- serialized scan-suppress-append (one writer at a time) -----------------
++# CLIO_SQLITE_V1: a switched writer never appends to the legacy authority.
++sqlite_capture() {
++  local cfg="${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}"
++  [ -f "$cfg" ] || return 1
++  local helper="$(dirname "$0")/clio-store.py"
++  # Preserve optional source context without changing the legacy seven-field row.
++  local sqlite_row
++  sqlite_row=$(printf '%s' "$input" | jq -c --argjson base "$row" \
++    --arg cwd "$project_dir" --argjson record "$RECORD" '
++    $base + {checkout:(if $record == 1 then (.cwd // .checkout // "") else $cwd end),
++      source_event_id:(.source_event_id // ""), repo_slug:(.repo_slug // ""), references:(.references // []), extras:(.extras // {})}')
++  if printf '%s' "$sqlite_row" | python3 "$helper" capture >/dev/null; then
++    return 0
++  else
++    local rc=$?
++    diag "SQLite capture failed (rc=$rc); no success receipt"
++    return "$rc"
++  fi
++}
++if [ -f "${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}" ]; then
++  sqlite_capture
++  exit $?
++fi
++
+ acquire_lock() {
+   # Give up after ~10s (tailers then defer the chunk; hooks never block).
+   # The stale-break threshold (60s) MUST far exceed the give-up window, and
+@@ -172,6 +210,13 @@
+   exit 0
+ fi
+ 
++# A writer may have waited while activation held this lock. Recheck before append.
++if [ -f "${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}" ]; then
++  release_lock
++  sqlite_capture
++  exit $?
++fi
++
+ row_id=$(printf '%s' "$row" | jq -r '(.session_id) + ":" + (.timestamp)')
+ if [ -s "$LOG" ]; then
+   # Capture the full ID set BEFORE matching: grep -q early-exit would SIGPIPE
+@@ -230,7 +275,8 @@
+   fi
+ fi
+ 
+-install -m 0755 utils/CLIO/prompt-log-to-md.sh ~/.claude/hooks/prompt-log-to-md.sh
++install -m 0755 "$CLIO_SRC/clio-store.py" ~/.claude/hooks/clio-store.py
++install -m 0755 "$CLIO_SRC/prompt-log-to-md.sh" ~/.claude/hooks/prompt-log-to-md.sh
+ 
+ echo "✅ Installed. Smoke test (uses the Claude shim; expects agent=claude-code):"
+ echo '{"prompt":"a substantive session-opening prompt that runs well past the twenty character capture threshold on its own","session_id":"install-check"}' | ~/.claude/hooks/log-prompt.sh
+@@ -270,7 +316,269 @@
+ ```
+ 
+ Each captured line carries `"agent":"claude-code"` or `"agent":"zcode"`.
++
++## SQLite history and seven-day view (opt-in pilot)
++
++Python **3.8+** is required for this mode. The installer above copies `clio-store.py`
++beside the shared writer. Existing capture remains JSONL until explicit activation;
++installing these scripts alone does not migrate private history. Migration reuses
++the **same Obsidian path, filename and existing exporter schedule**. A verified
++backup and complete coverage of the existing note are required before that file
++becomes the rolling view; tailer states and full history are retained.
++
++The database defaults to `~/.claude/prompt-log.sqlite3`; pass `--db /private/path/history.sqlite3`
++**before** a subcommand to use another local path. Files are private. Never put a live
++SQLite database, its WAL, or its pending directory in a synchronized folder.
++
++For a local installation where historical gaps are accepted but other Macs still
++publish the shared note, use `activate --capture-only` after import/verification.
++New captures use SQLite. The unchanged scheduled exporter drains receipts and
++refreshes `~/.claude/prompt-log-compat.jsonl`, reporting `note_publication: paused`;
++it does not touch the Obsidian note or create another Markdown note. Existing
++sources/backups remain intact. Point existing downstream readers at this full-history
++compatibility file; the original JSONL stops growing after activation. Other Macs
++remain unchanged until individually installed. This is not a rolling-note cutover
++or proof of complete fleet coverage. `migrate-view` still requires its explicit
++single-publisher and historical-coverage checks before the same note can be replaced.
++An explicit `project --jsonl PATH --jsonl-only` uses the same guarded export path.
++
++### Per-Mac installation and retry
++
++Use this existing procedure per device; do not assume another Mac's paths, jobs,
++available agents or history. Inspect the actual source, helper/writer versions,
++storage config, exporter plist and tailer cursor paths before replacing anything.
++Back them up privately, verify hashes, install the helper before enabling capture,
++and preserve existing job arguments and intervals. Install only the adapters that
++the device uses. A missing collector source is not permission to reset its cursor.
++
++If a valid CLIO config already exists, retain its database and owner, query/drain it
++and upgrade the runtime files; do not initialize or activate a second store. If a
++database exists without config, inspect its schema, owner and import receipts before
++resuming the interrupted install; never delete/reinitialize it just to make retry
++pass. Keep incomplete backups and pending receipts until accounted for. A busy lock,
++changed source or failed verification should leave the current capture mode intact.
++Use `--db` and `activate --source` for a device's inspected alternate paths; use
++`--fresh` only when the legacy source genuinely does not exist.
++
++Prefer `--capture-only` while shared-note ownership or historical reconciliation is
++unresolved. Verify the installed shared writer, receipt draining and full-history
++compatibility export before pointing downstream readers at the new source. Keep
++unavailable historical data in its verified original backups without claiming it is
++in SQLite. Imported laptop adoption stores are private history namespaces, not proof
++of installed device identities; inspect their retained mapping before a later device
++installation to avoid importing the same historical log under a second origin.
++
++After each install, verify the routes actually present on that Mac, inspect pending
++receipts and exporter status, and confirm source/note/plist preservation. On failure,
++retain diagnostics and SQLite-era arrivals, use the rollback below, and adapt the
++existing procedure to the observed device rather than adding another job or writer.
++
++1. Pause the Markdown exporter on **every device writing the shared note**, and
++   designate one publisher. Install the updated shared writer/helper, exporter and
++   tailers; verify all registrations use them. Preserve source JSONL, registrations
++   and tailer states. Capture can continue during backfill. A fresh installation
++   should run its legacy exporter once before activation to establish the normal
++   note/header. For an existing installation, keep its current note and job unchanged.
++2. Initialize and import while legacy capture continues:
++
++   ```bash
++   python3 ~/.claude/hooks/clio-store.py init
++   python3 ~/.claude/hooks/clio-store.py import-jsonl ~/.claude/prompt-log.jsonl
++   ```
++
++   Import commits at most 1,000 complete lines per invocation. Repeat until
++   `remaining_bytes` is zero; investigate after ten batches instead of leaving an
++   unbounded retry loop. `--max-records` selects a different explicit batch size.
++   Complete invalid lines are retained privately in `source_lines.quarantine`, with
++   line/hash/reason accounting; an unterminated tail stays pending. Replaced or altered
++   sources fail closed; use an explicit new `--source label` only after inspecting
++   the replacement. Repeated valid rows are deduplicated while every occurrence is counted.
++3. Verify nonempty source parity, then activate. Activation takes the existing append
++   lock without breaking another owner's lock, imports at most 100 final arrivals,
++   verifies parity/integrity, saves an untouched source backup and atomically writes
++   `~/.claude/clio-storage.json`. If backlog remains, repeat online import first.
++   Import, parity and backup loops check a five-second cutover deadline. Slow storage
++   may extend an individual I/O call; a budget failure leaves legacy mode active.
++   If a large source repeatedly exceeds the budget, pause submissions for an offline
++   migration review instead of bypassing the gate. A failed backup may leave a private
++   partial `.pre-sqlite-*` file; activation has not completed unless config exists.
++
++   ```bash
++   python3 ~/.claude/hooks/clio-store.py verify-import ~/.claude/prompt-log.jsonl
++   python3 ~/.claude/hooks/clio-store.py activate
++   ```
++
++   For a genuinely fresh installation with **no legacy source file**, initialize then
++   use `activate --fresh`; this does not bypass migration checks on an existing file.
++   A busy lock or invalid source prevents activation. A queued legacy writer rechecks
++   activation after obtaining its lock. Do not manually create the configuration to
++   bypass these gates.
++4. Import other devices' histories using the existing JSONL/device import commands,
++   then register the **existing note** for rolling publication:
++
++   ```bash
++   python3 ~/.claude/hooks/clio-store.py migrate-view --publishers-paused
++   ```
++
++   This reads `~/Library/LaunchAgents/com.claude.prompt-log-to-md.plist` to discover
++   its existing destination. It never rewrites that plist: filename, vault location,
++   interval, label, arguments and logs stay unchanged. For a cron/manual setup with
++   no plist, pass `--markdown "/the/existing/Obsidian note.md"`; otherwise the legacy
++   `~/.claude/prompt-log.md` default applies. Conflicting explicit/detected paths or
++   unsupported job arguments stop migration instead of guessing a new file.
++
++   The command verifies every historical entry against SQLite, including prompt and
++   device/branch/agent metadata, and saves an exclusive, hash-verified backup beside
++   the local DB under `<database>.view-backups/` (outside the vault when the DB is
++   correctly local). Your header, frontmatter and personal notes above the historical
++   marker are preserved verbatim. Unrecognized content below it, unsupported older
++   entry formats or missing device records stop migration for reconciliation. No
++   entries are guessed or discarded. The note itself is unchanged until publication.
++
++   If the operator explicitly accepts unrecoverable historical gaps or repeated
++   sections, use `migrate-view --publishers-paused --archive-unreconciled-note`.
++   This preserves the entire original note in the same exclusive verified backup
++   and keeps the exact header through the first historical marker. Remaining
++   original content is archived, not claimed imported into SQLite: the receipt
++   reports `coverage: archived-not-reconciled` and `covered_entries: null`.
++   Default migration still requires full entry parity. This option retains the
++   single-publisher assertion, destination checks, backup verification, and
++   rejection of later foreign edits. It never guesses lost prompt metadata.
++
++   `--publishers-paused` asserts that you paused all shared-note writers and selected
++   this publisher; it does not discover or control other Macs. Verify fleet convergence
++   and resolve the existing Pulse ownership dependency before shared deployment.
++   Resume **only this publisher's existing job**, using its unchanged command/path.
++   That command now drains receipts and atomically renders the rolling view to the
++   same note, plus `~/.claude/prompt-log-compat.jsonl`. No new timer, new note or changed
++   bookmark is needed. Other devices keep capturing but must not publish this file.
++
++   For manual publication after registration, `prompt-log-to-md.sh --sqlite` uses
++   the registered path automatically. `clio-store.py project` does too. An explicit
++   `project --markdown /scratch/preview.md` is only a preview, not migration. Activation
++   without `migrate-view` makes the scheduled exporter report a migration-required
++   error; it does not silently create a separate recent note.
++
++   Hook capture waits at most 500 ms for SQLite contention; durable queued rows
++   survive in `<database>.pending/`. Inspect `drain`'s pending count if a backlog
++   persists across two runs. A failed note replacement retains the prior file; the
++   next job can retry. Unexpected edits/foreign arrivals or a changed backup stop
++   publication rather than overwrite them. Preserve and reconcile those bytes before
++   continuing; don't manually edit hashes in `clio-storage.json`. Diagnostics use
++   `~/.claude/prompt-log-errors.log` and existing job stderr.
++5. Point Rebalance/Daily's existing source configuration (`clio_prompt_log_path` or
++   `REBALANCE_CLIO_PROMPT_LOG` in the **scheduled process's** environment) to the full
++   chronological compatibility JSONL. Verify that effective configuration in Rebalance.
++   Do not substitute the rolling Markdown or snapshot transport file. The old local
++   JSONL stops growing after activation and remains a migration/rollback source.
++
++The rolling view uses UTC, newest timestamp first with record-ID tie-breaking. Its
++inclusive window is `[cutoff - 168 hours, cutoff]`; future-dated rows remain in the
++DB but are omitted. `project --cutoff 2026-09-30T00:00:00Z` provides repeatable output.
++Stdout reports row/byte counts; large prompts are not truncated. Legacy exporter
++`--status`, `--backfill`, `--repair` and reconciliation are refused in activated
++SQLite mode; use `query`, `drain` and `project`. Old cursors/receipts remain preserved.
++Path compatibility does not make the new rolling entry format identical to the
++legacy journey-replay format; that consumer upgrade remains separately tracked.
++
++### Read-only agent lookup
++
++```bash
++python3 ~/.claude/hooks/clio-store.py query --repo rebalanceOS \
++  --since 2026-09-23T00:00:00Z --until 2026-09-30T00:00:00Z \
++  --text 'frozen packet' --limit 20
++python3 ~/.claude/hooks/clio-store.py query --device 'MBP 14"' --agent codex
++python3 ~/.claude/hooks/clio-store.py query --session SESSION --offset 20 --limit 20
++python3 ~/.claude/hooks/clio-store.py query --record-id clio1-RECORD_HASH
++python3 ~/.claude/hooks/clio-store.py query \
++  --reference https://github.com/HiQS-Labs/XYZ-CLIO/issues/3 --explain
++```
++
++Queries open the existing CLIO DB with SQLite `mode=rw` and enforce SQL
++`query_only` before reading. This permits WAL/SHM bookkeeping across SQLite
++runtimes while refusing changes to event data. Queries never initialize a missing
++DB and use bound parameters. Text is a literal, case-sensitive substring. Results include
++prompt, time, device (`machine`), agent, session, branch, checkout, canonical repo
++when supplied, identity, references and extras. `--origin` filters the stable store
++owner rather than a mutable human device label. Tailers include `source_event_id`
++(raw source-line hash plus byte offset, scoped by origin/agent/session). Its retry
++identity excludes repo/branch/device/checkout labels resolved at poll time; the
++first committed labels remain stored even if those labels change before a retry.
++Imports reject conflicting payloads; they do not silently rewrite provenance. Pagination is timestamp/ID descending;
++concurrent new arrivals can shift offsets, so fix a time range for stable paging.
+ 
++References are **explicit producer metadata**, not inferred task status. A capture
++record can include `repo_slug`, `checkout` (or a tailer's `cwd`), `extras`, and:
++
++```json
++{"references":[{"type":"issue","url":"https://github.com/HiQS-Labs/XYZ-CLIO/issues/3","relation":"task-context"},{"type":"ledger","repo_slug":"HiQS-Labs/XYZ-forge","row_id":"ROW_ID","relation":"mentioned"}]}
++```
++
++Use `type:"pr"` with a qualified `/pull/N` URL. Only `mentioned` and `task-context`
++relations are accepted. No status or accepted-start writes occur. Existing client
++payloads need not provide these optional fields; unknown historical values remain
++unknown. Rebalance's consumer upgrade will carry this provenance through its existing
++semantic provider and readonly XYZ status adapter; it is not installed by CLIO.
++
++### Device snapshots and coverage
++
++```bash
++python3 ~/.claude/hooks/clio-store.py export-device /private/staging/clio.jsonl
++python3 ~/.claude/hooks/clio-store.py import-device /private/received/clio.jsonl
++```
++
++A snapshot is one atomic file: versioned first-line manifest (owner UUID, generation
++UTC, count and content hash), followed by source records. The caller can stage it at
++`devices/<owner-uuid>/clio.jsonl` for the existing Git Pulse Sync publisher. CLIO never
++commits, pushes or creates a timer. That integration uses Rebalance #282's
++file ownership/publisher work; a local query is **not** proof of complete fleet coverage.
++Read accepted snapshot receipts from `device_imports` to see the source generation and
++receipt time. Expected/missing device reporting belongs in the downstream consumer.
+
+exec
+/bin/zsh -lc 'export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"; nl -ba PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md; printf '"'\\n--- PDDA relevant ---\\n'; nl -ba PROJECT/PDDA.md | sed -n '35,75p;250,295p'; printf '\\n--- SKILLS ---\\n'; nl -ba .agents/skills/clio/SKILL.md | sed -n '1,70p'; printf '\\n--- AGENTS CLIO ---\\n'; nl -ba AGENTS.md | sed -n '1,25p'; printf '\\n--- inventory ---\\n'; nl -ba utils/pdda/check_script_inventory.py | sed -n '145,200p'; printf '\\n--- ruff ---\\n'; nl -ba pyproject.toml | sed -n '88,115p'" in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+     1	---
+     2	gh_issue: 362
+     3	source: https://github.com/HiQS-Labs/rebalanceOS/issues/362
+     4	title: "GH-362 sync utils/CLIO up to XYZ-CLIO and make Rebalance CLIO's upstream"
+     5	status: "Working — plan under Codex QA"
+     6	created: 2026-10-25
+     7	updated: 2026-10-25
+     8	owner: noel
+     9	doc_type: chore
+    10	related: "HiQS-Labs/XYZ-CLIO#13, HiQS-Labs/XYZ-CLIO#15, HiQS-Labs/XYZ-CLIO#14, noelsaw1/noels-cross-project-tasks#52"
+    11	goal: >
+    12	  Make rebalanceOS utils/CLIO byte-identical to XYZ-CLIO main (bacd26f) and declare it CLIO's
+    13	  upstream, so every later CLIO change starts here and is published to XYZ-CLIO.
+    14	roadmap_exempt: false
+    15	---
+    16	
+    17	# GH-362 — CLIO upstream sync
+    18	
+    19	## Status
+    20	
+    21	| What was just completed | What's next |
+    22	|---|---|
+    23	| Ledger lifecycle so far: captured in `1-INBOX`, parked (`roadmap add`, row `rmi-01M5SP89MGBXQKJ8667P2PD5MG`), rated `75/55/50/80`, promoted to `2-WORKING`, `roadmap repoint`ed. Plan QA R1 (Codex) dispositioned. | Plan QA R2. On approval: `roadmap move` to In progress, implement, verify, final QA, PR. |
+    24	
+    25	Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/362 · Base `origin/development` 6672892 · Clone/branch `rebalanceOS-gh362-clio-upstream-sync-2026-10-25` / `chore/<same>`.
+    26	Rating `rated 75/55/50/80` (calc 260), 2026-10-25.
+    27	- Priority: it blocks the publisher (0c), the CLIO installer and the Codex capture fix (XYZ-CLIO#14).
+    28	- Severity: no runtime effect by itself (nothing is installed by merging), but until it lands, any device installed from this copy runs the pre-SQLite capture, which lacks the stale-lock reaper.
+    29	- Appeal: neutral.
+    30	- Effort: a byte copy plus doc lines.
+    31	- Recurrence: n/a (a one-time direction flip).
+    32	
+    33	## Context
+    34	Operator decision D (noelsaw1/noels-cross-project-tasks#52, 2026-10-24) sets the order:
+    35	1. Finish the standalone XYZ-CLIO work. Done: XYZ-CLIO#12 (fleet discovery) and #15 (reconciled every Rebalance-only fix) are merged; `main` is at `bacd26f`.
+    36	2. Bring this copy up to it (**this task**).
+    37	3. From then on, **Rebalance's `utils/CLIO` is upstream**, and XYZ-CLIO is a published downstream (the publisher is step 0c, in XYZ-CLIO).
+    38	
+    39	## Recon (this clone vs XYZ-CLIO `bacd26f`)
+    40	| Path | State | Action |
+    41	|---|---|---|
+    42	| `utils/CLIO/INSTALL.md` | differs (452 changed lines; this is the pre-SQLite doc and says "This mirrored folder is not the canonical SQLite helper release", L494) | replace with upstream bytes |
+    43	| `utils/CLIO/clio-agy-tail.sh`, `clio-codex-tail.sh` | differ (38 / 60 lines; missing `source_event_id`, the RO Agy DB, the serialized reaper, the narrowed IDE strip) | replace |
+    44	| `utils/CLIO/prompt-log-to-md.sh` | differs (18 lines; missing the `--sqlite` and `scheduled-export` branches) | replace |
+    45	| `utils/CLIO/clio-store.py` | absent | add |
+    46	| `test/clio-store.py` | absent | add (unittest for `clio-store.py`; uses the existing `test/fixtures/clio/`) |
+    47	| `test/clio-{capture,exporter,codex-tail,agy-tail}.sh`, `test/fixtures/clio/*` | identical | none |
+    48	| `utils/CLIO/README.md`, `utils/CLIO/LICENSE` | Rebalance-only | keep. The README gains the upstream section; the 0c publisher will exclude both (XYZ-CLIO keeps one root README/LICENSE). |
+    49	
+    50	Consumers checked:
+    51	- `.agents/skills/clio` and `.claude/skills/clio` read the *installed* `~/.claude/hooks/clio-store.py` and link XYZ-CLIO's INSTALL anchor `#read-only-agent-lookup`, which still exists. Unaffected.
+    52	- Focus5 `PromptLogReader.swift` parses the exporter's Markdown note, whose format the SQLite projection keeps (same note/header, XYZ-CLIO #5). Unaffected by a repo sync; nothing is installed.
+    53	- `src/rebalance/ingest/clio.py` reads the configured runtime JSONL. Unaffected.
+    54	- No repo link targets the removed `Canonical SQLite fleet integration` heading (grep).
+    55	- CI (`.github/workflows/ci.yml`) does not run the `test/clio-*` suites; they are operator-run.
+    56	- **Script-inventory ratchet (GH-241):** `utils/pdda/check_script_inventory.py` freezes `.py/.sh/.swift` under `utils/`. Its baseline already lists the three CLIO siblings (`script_inventory_baseline.json` L58-60). Adding `clio-store.py` is an addition the ratchet rejects. Precedent #244/#249 *moved* `utils/CLIO/journey_replay.py` into the package, because it was Rebalance-side analytics. `clio-store.py` cannot move: the installed writer runs `$(dirname "$0")/clio-store.py`, and the folder is the deployable/published unit. **Decision:** grow the baseline with `--update-baseline`, recorded in this PR as a deliberate addition beside its siblings, with nothing else changing in the baseline (verified by diff). Rejected alternative: a `SCRIPT-INVENTORY-OK` pragma, which would edit the synced bytes and still need an exemptions entry.
+    57	
+    58	## Changes
+    59	1. Copy the five `utils/CLIO` files and `test/clio-store.py` byte-for-byte from XYZ-CLIO `bacd26f`, keeping file modes.
+    60	2. `utils/CLIO/README.md`: add an **Upstream** section near the top. It says:
+    61	   - this folder is CLIO's canonical source;
+    62	   - HiQS-Labs/XYZ-CLIO publishes it unchanged (except this README and LICENSE);
+    63	   - every change is made here first, through a reviewed rebalanceOS PR, then published;
+    64	   - devices get it only through Skills Army HQ, never by hand copy.
+    65	   It also records the sync revision (`bacd26f`).
+    66	3. `.agents/skills/clio/SKILL.md` and its identical `.claude/skills/clio/SKILL.md` (plan QA R1): under "Locate the existing store", after the installed reader, prefer this repository's upstream `utils/CLIO/clio-store.py` and keep an XYZ-CLIO checkout as the published downstream. Drop "This repository's older `utils/CLIO/` copy may not contain the SQLite helper". The "Canonical interface and setup reference" becomes this repo's `utils/CLIO/INSTALL.md#read-only-agent-lookup` (that anchor exists in the synced bytes), with XYZ-CLIO named as its published copy. Retrieval behaviour is otherwise unchanged. The deployed skill updates later through Skills Army HQ, not in this PR.
+    67	4. `AGENTS.md`: one line under the existing CLIO pointer saying `utils/CLIO/` is CLIO upstream and edited here first (see `utils/CLIO/README.md`).
+    68	5. `utils/pdda/script_inventory_baseline.json`: `--update-baseline`. The only diff is the added `utils/CLIO/clio-store.py`.
+    69	6. `pyproject.toml` `[tool.ruff] extend-exclude`: add `"utils/CLIO"` and `"test/clio-store.py"`, with a comment that the folder is published byte-for-byte to XYZ-CLIO and verified by its own suites. Recon: the repo's ruff (`ruff check .` and `ruff format --check .`, run by both the pre-push gate and `ci.yml`) rejects the upstream files:
+    70	   - `clio-store.py`: E731 at L754 and F841 (`since` unused) at L779;
+    71	   - `test/clio-store.py`: F401 and B023 ×2;
+    72	   - format would rewrite ~1,400 / ~1,200 lines.
+    73	
+    74	   That would fork the bytes on day one and make 0c's "first publish is an empty diff" proof impossible. The file already excludes vendored `releases_app.py` for the same reason. F841 is a dead leftover (the render path uses `cutoff_dt`), not a defect; it is logged as a follow-up for the first upstream change, not edited here.
+    75	7. `CHANGELOG.md`: entry per repo convention.
+    76	
+    77	## Non-goals
+    78	- No edits to synced bytes. INSTALL.md keeps upstream wording; the banner that names the upstream inside INSTALL.md is a first change made *here* after the flip and published in 0c.
+    79	- No publisher.
+    80	- No installer.
+    81	- No Codex format fix (#14).
+    82	- No skill edits beyond the stale locate/reference lines in change 3.
+    83	- No device installs.
+    84	
+    85	## Risks / rollback
+    86	- Purely repo files; nothing runs on merge. Rollback is a PR revert.
+    87	- Ratchet: the baseline grows by exactly one entry. A reviewer can see it in the diff.
+    88	
+    89	## Verification (disposable full clone; tests with throwaway HOME and synthetic data)
+    90	- `diff -r` of the six synced paths vs XYZ-CLIO `bacd26f`: empty, with modes equal (red control: run against the base → non-empty).
+    91	- `bash test/clio-{capture,exporter,codex-tail,agy-tail}.sh` and `python3 test/clio-store.py`: pass, apart from the known date-dependent `test_activation_import_gate_and_source_preservation`, which also fails in XYZ-CLIO at `bacd26f`.
+    92	- `python3 utils/pdda/check_script_inventory.py --check`: green after change 4 (red control: before change 5 it fails, naming `clio-store.py`).
+    93	- `ruff check .` and `ruff format --check .` green with the exclude (red control: without it, the five findings above). `utils/pdda/pdda.sh run` (docs and roadmap-coverage gate) green, plus the repo's pre-push static gate (ruff, repo guards, governance ratchets) on push.
+    94	- Smoke: run `python3 utils/CLIO/clio-store.py --help` and one `query` against a throwaway DB, from the repo copy (main path), plus `prompt-log-to-md.sh --help` (adjacent path).
+
+--- PDDA relevant ---
+    35	- `PROJECT/3-COMPLETED`: completed docs with an outcome
+    36	- `PROJECT/4-MISC`: reference, stale, superseded, or abandoned docs
+    37	
+    38	Within that model:
+    39	
+    40	- the roadmap ledger (`releases.db`, read with `releases_app.py roadmap list`) is the index of current, queued,
+    41	  completed, attempted, and deferred work
+    42	- project detail lives in the individual `PROJECT/**` documents
+    43	- a working doc is the canonical source of truth for that effort until it is completed, deferred, or superseded
+    44	- `blank.md` placeholders are scaffolding and should be ignored by PDDA checks
+    45	
+    46	## Required contract for active docs
+    47	
+    48	Every doc in `PROJECT/2-WORKING` should have:
+    49	
+    50	1. YAML frontmatter with at least `title`, `status`, `created`, `updated`, `owner`, and `goal`
+    51	2. a near-top status table with the exact columns:
+    52	
+    53	```md
+    54	## Status
+    55	
+    56	| What was just completed | What's next |
+    57	|---|---|
+    58	| ... | ... |
+    59	```
+    60	
+    61	3. clear phase or work sections if the doc is a plan. Specifically, any `PROJECT/2-WORKING` doc proposing a new tool, service, or query path must include a **Phase 0 - Prior Art Review** section explicitly explaining why existing layers (`semantic_query`, `three-eyes`, etc.) cannot be extended.
+    62	4. a table of contents (`## Table of contents`) listing each phase, if the plan is multi-phase — so a
+    63	   cold agent can see the full phase span and jump to the live one without scrolling the whole body
+    64	5. QA gates or acceptance criteria after each phase if the plan is multi-phase
+    65	6. for any discovery or spike phase, its findings written **back into this doc** before its QA gate can
+    66	   pass (see [Discovery & spike phases (Memory Injection)](#discovery--spike-phases-memory-injection))
+    67	7. repo-relative paths only; no hardcoded absolute local paths
+    68	8. before moving to `PROJECT/3-COMPLETED`, a `## Lessons Learned (For Future Agents)` section appended to capture quirks and gotchas
+    69	
+    70	Recommended fields when relevant:
+    71	
+    72	- `related`
+    73	- `context_tags` (e.g. `[auth, flaky-tests, build]`)
+    74	- `reviewed`
+    75	- `branch`
+   250	
+   251	Capture a tracked issue as a doc in `PROJECT/1-INBOX/` using this convention:
+   252	
+   253	- **Filename:** `GH-<number>-VERY-SHORT-DESCRIPTION.md` — the local plan doc is always named after
+   254	  its GitHub issue (e.g. `GH-1234-SHOWME-COMMAND.md`, `GH-11-CROSS-REPO-TARGETING.md`). Keep the
+   255	  description to ~2–4 words; the issue number is the real key, the slug is just a human hint.
+   256	  SCREAMING-KEBAB to match the other inbox docs; no zero-padding — mirror the GitHub issue number.
+   257	  `<number>` resolves against `origin` (a single canonical repo), so the bare number is unambiguous.
+   258	- **Minimum frontmatter:** `gh_issue`, `source` (the full issue URL), `title`, `status`
+   259	  (`Proposed (1-INBOX — not yet active)`), `created`, and `doc_type` (`feedback` or `bugfix`).
+   260	  For medium-large captures, also include the triage ratings `effort`, `complexity`, `risk`, `phases`
+   261	  at capture time, so the queue can be triaged before promotion (see
+   262	  [Triage ratings for medium-large work](#triage-ratings-for-medium-large-work)).
+   263	- **Body:** transcribe the issue's actionable substance (the asks / acceptance criteria), not the whole
+   264	  thread. The live issue stays the discussion surface; this doc is the in-repo capture and back-reference.
+   265	
+   266	Lifecycle:
+   267	
+   268	- The `GH-` inbox doc is the **capture**, not the active-work doc. It carries no `## Status` table while
+   269	  it sits in `1-INBOX` (the inbox is the rough/untriaged bucket).
+   270	- Capture time also adds a **queue row** linking that inbox doc: `python3 utils/py/releases_app.py roadmap add
+   271	  --issue-num N --issue-url U --title T --created YYYY-MM-DD --doc-path P`, then `roadmap rate`. This is a
+   272	  temporary parking slot: it makes fresh intake visible to humans and automation before promotion,
+   273	  which is the duplicate-prevention guard.
+   274	- When execution starts, **promote** it to `PROJECT/2-WORKING/` — keep the `GH-` prefix for provenance —
+   275	  and it must then satisfy the full active-doc contract (frontmatter, exact status table, QA gates if
+   276	  phased), **carrying `gh_issue` forward**. The ledger row is therefore required twice:
+   277	  first as a queued row at capture, then (after `roadmap repoint` + `roadmap move`) as an active-work row.
+   278	  This is the concrete mechanism behind "GitHub issues are not a substitute for the local active-work
+   279	  doc once execution starts" (bug-fix stance above).
+   280	- If a captured issue is never actioned it ages out of `1-INBOX` like any other untriaged note; if it is
+   281	  closed without work, move the doc to `PROJECT/4-MISC` and `roadmap move` its row out of the queue.
+   282	
+   283	A foreign-repo issue (not `origin`) is the rare exception: the `source:` URL disambiguates it, since the
+   284	bare `GH-<number>` only guarantees uniqueness within the canonical repo.
+   285	
+   286	## Automation layers
+   287	
+   288	PDDA should have two classes of automation:
+   289	
+   290	Implementation note:
+   291	
+   292	- the automation ships as a single dispatcher, `utils/pdda/pdda.sh`, which sources shared helpers from
+   293	  `utils/pdda/pdda-lib.sh`
+   294	- every deterministic check is a subcommand: `pdda.sh frontmatter`, `pdda.sh status-table`,
+   295	  `pdda.sh hardcoded-paths`, `pdda.sh roadmap`, `pdda.sh roadmap-coverage`, `pdda.sh changelog`,
+
+--- SKILLS ---
+     1	---
+     2	name: clio
+     3	description: >-
+     4	  Locate and search existing CLIO SQLite prompt history and the HiQS work activity
+     5	  authorship store (`github_activity`). Use for finding earlier instructions, sessions, repo or
+     6	  device activity, and tracing prompts to work evidence. Retrieval only; not CLIO
+     7	  installation, migration, capture setup, or a request to run the Daily workflow.
+     8	---
+     9	
+    10	# CLIO — prompt history and HiQS work activity
+    11	
+    12	Contents: [Locate](#locate-the-existing-store) · [Search](#search-prompt-history) ·
+    13	[Activity](#find-the-hiqs-work-activity-stream) · [Report](#report-with-provenance)
+    14	
+    15	## Locate the existing store
+    16	
+    17	- [ ] Prefer the installed reader at `~/.claude/hooks/clio-store.py`. If absent,
+    18	  use `utils/CLIO/clio-store.py` in an explicitly identified **XYZ-CLIO** checkout
+    19	  or an installed CLIO skill containing that helper. Check `query --help` first.
+    20	  This repository's older `utils/CLIO/` copy may not contain the SQLite helper.
+    21	- [ ] Let that helper resolve storage: explicit `--db` overrides the `db` field
+    22	  in `${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}`, then the fallback is
+    23	  `~/.claude/prompt-log.sqlite3`. Inspect only needed config fields, not a full
+    24	  config dump. Preserve an explicit path: do not silently search another store
+    25	  when it is missing or invalid.
+    26	- [ ] If no helper or configured DB is available, report the missing dependency.
+    27	  Do not install, initialize, migrate, drain, reconcile, project, or refresh data
+    28	  to answer a lookup. An existing configured compatibility JSONL or note can be
+    29	  used as a clearly labelled fallback with its actual coverage limits.
+    30	
+    31	Canonical interface and setup reference:
+    32	[XYZ-CLIO INSTALL — read-only agent lookup](https://github.com/HiQS-Labs/XYZ-CLIO/blob/main/utils/CLIO/INSTALL.md#read-only-agent-lookup).
+    33	SQLite lookup shipped in [PR #4](https://github.com/HiQS-Labs/XYZ-CLIO/pull/4);
+    34	fleet recovery followed in [PR #5](https://github.com/HiQS-Labs/XYZ-CLIO/pull/5).
+    35	
+    36	## Search prompt history
+    37	
+    38	Use the verified helper path in place of the installed path below when necessary.
+    39	Choose a bounded time range and start with 20 records. Convert the requested local
+    40	window to timezone-qualified ISO timestamps; both date endpoints are inclusive.
+    41	
+    42	```bash
+    43	python3 "$HOME/.claude/hooks/clio-store.py" query --text 'search phrase' --limit 20
+    44	python3 "$HOME/.claude/hooks/clio-store.py" query --repo rebalanceOS \
+    45	  --since 2026-10-01T00:00:00-07:00 --until 2026-10-02T23:59:59-07:00 --limit 20
+    46	python3 "$HOME/.claude/hooks/clio-store.py" query --session SESSION --offset 20 --limit 20
+    47	python3 "$HOME/.claude/hooks/clio-store.py" query --record-id clio1-RECORD_HASH
+    48	python3 "$HOME/.claude/hooks/clio-store.py" --db /explicit/private/history.sqlite3 query --limit 20
+    49	```
+    50	
+    51	Replace example dates/identifiers with the requested scope. Available filters:
+    52	`--repo`, `--repo-slug`, `--device`, `--origin`, `--agent`, `--session`,
+    53	`--record-id`, `--reference`, `--since`, `--until`, `--text`; `--explain` adds a query
+    54	plan. Filters combine with AND. Repo/device/agent/session filters are exact;
+    55	`--text` is a **literal, case-sensitive substring**, not full-text or semantic
+    56	search. Try a shorter substring or known spelling if the first query is empty.
+    57	`--reference` accepts a reference URL or `repo_slug:row_id` when recorded.
+    58	
+    59	Results are `records` ordered by timestamp then record ID, descending. Increase
+    60	`--offset` by the page size while the page is full and the request needs more;
+    61	limits must be 1–1000. Pin `--until` for a bounded investigation and deduplicate
+    62	by `record_id`; concurrent historical imports can still shift offset pages.
+    63	
+    64	The helper opens an **existing** DB using `mode=rw` plus `PRAGMA query_only`.
+    65	It cannot mutate event data or create a missing DB, but SQLite WAL/SHM bookkeeping
+    66	may occur. Do not promise byte-for-byte filesystem immutability. Inspect returned
+    67	`pending`, `fleet`, and `note_status` when present; absent fleet metadata is not
+    68	proof of complete fleet coverage. A successful query only covers this replica.
+    69	
+    70	## Find the HiQS work activity stream
+
+--- AGENTS CLIO ---
+     1	## Working with the rebalance MCP server (Codex, Gemini, Claude, others)
+     2	
+     3	> **Before building anything, check whether it already exists.** The four prior-art checks (open PRs on *both* repos, the roadmap ledger's In progress rows, a cross-package grep including `HiQS/` and `utils/3-eyes/`, and the full suite including the parts CI skips) are in [ROUTER.md](ROUTER.md) — canonical there, deliberately not restated here.
+     4	
+     5	> **Before making any empirical claim — including "I tested it and it didn't help" — read [SOP.md](SOP.md).** Measurements that get cited must be published as a campaign in [`TESTS-RESULTS/`](./TESTS-RESULTS/); an unverifiable small test is worse than none.
+     6	
+     7	> **`git log` does not reach this project's full history.** This repo's history begins **2026-08-16**; everything before that lives in the archived predecessor **[Hypercart-Dev-Tools/rebalance-OS](https://github.com/Hypercart-Dev-Tools/rebalance-OS)** (2026-03-28 → 2026-08-17, branch `development`). Blame, provenance, and "when did this change" questions must be answered there for anything older. Do **not** conclude a file "never existed" from this repo's history alone — that mistake has been made and published here once already ([#88](https://github.com/HiQS-Suite/rebalanceOS/issues/88)).
+     8	>
+     9	> The `PROJECT/` documents that CHANGELOG and ROADMAP reference but which were never migrated have since been recovered into **[`PROJECT/4-MISC/ARCHIVED-PREDECESSOR/`](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/README.md)**. Read anything in there as history: a document's stated status describes the predecessor repo at archive time, **not** this repo today.
+    10	
+    11	
+    12	This repo **is** an MCP server. Every refresh and query path is exposed through MCP tools — do not scan the codebase for `rebalance ...` CLI commands or write ad-hoc shell pipelines. Reach for the tools first.
+    13	
+    14	**CLIO history and HiQS activity lookup:** use the repository [CLIO skill](.agents/skills/clio/SKILL.md) for the configured SQLite reader and the `github_activity` authorship store, with optional Pulse/Daily summaries.
+    15	
+    16	**"Find my recent work" queries.** When the user asks to find, summarize, or locate recent work/activity (what they've been doing, which project touched X recently, etc.), use `ask()`, `get_next_actions()`, `hiqs_work_activity()` (alias: `github_balance()`), `peek_source()`, or `publish_pulse()` — not Spotlight (`mdfind`) or ad-hoc filesystem search. The MCP's SQLite index is purpose-built for this and stays current via `refresh_index`. Reserve Spotlight/`find` for pure disk-location questions the registry doesn't track (e.g. "where did this repo get moved to on disk").
+    17	
+    18	> ### 🧭 Start here — the central orchestrator (the data-plane spine)
+    19	>
+    20	> Every data source — `vault`, `github`, `calendar`, `sleuth`, `email`, `semantic` — is registered as a `Collector` in **[src/rebalance/ingest/index_ops.py](src/rebalance/ingest/index_ops.py)** (`register_collector` / `COLLECTORS`). That registry **is** the central orchestrator of the system: `refresh_index`, `index_status`, and the daily-sync cron all dispatch through it, and adding a source is one `register_collector(...)` call — no edits to the dispatch chain. **To understand or extend this system, read `index_ops.py` first.**
+    21	>
+    22	> - **Setup / health / "why is X empty?"** → run `rebalance doctor` (it names the exact remediation, e.g. a missing calendar OAuth token → `scripts/setup_calendar_oauth.py`). Don't grep for setup scripts.
+    23	> - **Orientation** → [ARCHITECTURE.md](ARCHITECTURE.md) (Signal Sources table, Source→Table fanout, "Adding a New Source"). Read it at session start.
+    24	> - **`querier.py`** is the read-side orchestrator (retrieval + synthesis); `index_ops.py` is the source/refresh orchestrator. Both consume the same source set, and the standing direction is for `doctor`, the morning brief, and `querier` to all iterate that one registry — [`COLLECTORS` in index_ops.py](src/rebalance/ingest/index_ops.py) — rather than keep private source lists. (This used to link a `P1-MODULE-REGISTRY.md` plan doc; that file was never committed and does not exist in any commit, so the code is the reference.)
+    25	
+
+--- inventory ---
+   145	        findings.append(
+   146	            f"script_inventory_baseline.json:1: invalid max_launchd_templates: {baseline_max}, "
+   147	            f"cannot exceed hard ceiling of {MAX_LAUNCHD_TEMPLATES} (GH-241)"
+   148	        )
+   149	        effective_max = MAX_LAUNCHD_TEMPLATES
+   150	    else:
+   151	        effective_max = baseline_max
+   152	
+   153	    # Ceiling guard
+   154	    template_count = len(actual.get("launchd_templates", []))
+   155	    if template_count > effective_max:
+   156	        findings.append(
+   157	            f"scripts:1: LaunchAgent ceiling exceeded: {template_count} templates found, "
+   158	            f"maximum allowed is {effective_max} (GH-241)"
+   159	        )
+   160	
+   161	    # Check exemptions: files with SCRIPT-INVENTORY-OK must be registered in baseline
+   162	    actual_exemptions = set(actual.get("exemptions", []))
+   163	    baseline_exemptions = set(baseline.get("exemptions", []))
+   164	
+   165	    for added_exempt in sorted(actual_exemptions - baseline_exemptions):
+   166	        findings.append(
+   167	            f"{added_exempt}:1: unrecorded exemption — SCRIPT-INVENTORY-OK pragma requires explicit operator review "
+   168	            f"and registration in script_inventory_baseline.json 'exemptions' (GH-241)"
+   169	        )
+   170	
+   171	    for removed_exempt in sorted(baseline_exemptions - actual_exemptions):
+   172	        findings.append(
+   173	            f"{removed_exempt}:1: stale exemption — registered in baseline 'exemptions' but lacks valid "
+   174	            f"SCRIPT-INVENTORY-OK pragma in tree (GH-241)"
+   175	        )
+   176	
+   177	    for section in ("launchd_templates", "scripts", "utils"):
+   178	        actual_files = set(actual.get(section, []))
+   179	        baseline_files = set(baseline.get(section, []))
+   180	
+   181	        # Check additions (new debt)
+   182	        for added in sorted(actual_files - baseline_files):
+   183	            findings.append(
+   184	                f"{added}:1: NEW script detected — ad-hoc scripts in scripts/ or utils/ are prohibited. "
+   185	                f"Route commands through src/rebalance/cli/ and tasks through the orchestrator (GH-241)"
+   186	            )
+   187	
+   188	        # Check removals (stale baseline that must be tightened)
+   189	        for removed in sorted(baseline_files - actual_files):
+   190	            findings.append(
+   191	                f"{removed}:1: script removed — inventory shrank; re-run with --update-baseline "
+   192	                f"to lock in the reduction (GH-241)"
+   193	            )
+   194	
+   195	    return findings
+   196	
+   197	
+   198	def update_baseline(path: Path = BASELINE_PATH, root: Path = REPO_ROOT) -> None:
+   199	    """Scan the repository and write the live inventory as the new baseline."""
+   200	    inv = scan_inventory(root)
+
+--- ruff ---
+    88	extend-exclude = [
+    89	  # .claude skills are prose documentation whose embedded code snippets are
+    90	  # illustrative, not product code the formatter should gate (GH-34).
+    91	  ".claude",
+    92	  # Restored predecessor documents (GH-88). Same reasoning as .claude above, plus one more:
+    93	  # these are an archival record of another repo. Reformatting their embedded snippets would
+    94	  # edit history to satisfy a formatter.
+    95	  "PROJECT/4-MISC/ARCHIVED-PREDECESSOR",
+    96	  "macOS",
+    97	  "vscode-extensions",
+    98	  "temp",
+    99	  "ask_self",
+   100	  "experimental",
+   101	  ".swe-diagram",
+   102	  # Vendored from XYZ-forge (the release-ledger app). Linting it here would fork
+   103	  # it from upstream over B007/B023 style nits. xyz-sync/xyz-vendor write only the
+   104	  # gitignored .xyz/, never this tracked copy: re-vendor it by hand from the Forge
+   105	  # SHA in .xyz-pin and re-apply the one marked "rebalanceOS local delta (#322)"
+   106	  # (GH-329). Named individually, not as `utils/py/`, so first-party code added
+   107	  # beside them is still linted.
+   108	  "utils/py/releases_app.py",
+   109	  "utils/py/releases_cycle.py",
+   110	  # Campaign measurements and experimental verification scripts (SOP.md).
+   111	  "TESTS-RESULTS",
+   112	]
+   113	
+   114	[tool.ruff.lint]
+   115	select = ["E", "F", "W", "B"]
+
+exec
+/bin/zsh -lc 'export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"; printf '"'%s\\n' '--- mirrored skill parity / references ---'; cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md; printf 'cmp exit=%s\\n' \""'$?"; rg -n -F '"'Canonical SQLite fleet integration' . --glob '"'!relay-system/**'"' --glob '"'!.relay-artifacts/**'"' --glob '"'!*.git/**'"'; printf 'removed-heading rg exit=%s\\n' \""'$?"; rg -n -F '"'utils/CLIO' .github/workflows/ci.yml .githooks/pre-push ROUTER.md utils/pdda/script_inventory_baseline.json utils/CLIO/README.md; printf 'paths rg exit=%s\\n' \""'$?"; printf '"'%s\\n' '--- exact named contexts ---'; nl -ba utils/pdda/script_inventory_baseline.json | sed -n '50,68p'; nl -ba .githooks/pre-push | sed -n '100,120p'; rg -n -C 2 'ruff (check|format)' .github/workflows/ci.yml; nl -ba ROUTER.md | sed -n '1,120p'; nl -ba utils/CLIO/README.md | sed -n '1,100p'" in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+--- mirrored skill parity / references ---
+cmp exit=0
+./utils/CLIO/INSTALL.md:492:## Canonical SQLite fleet integration
+./PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:54:- No repo link targets the removed `Canonical SQLite fleet integration` heading (grep).
+removed-heading rg exit=0
+utils/pdda/script_inventory_baseline.json:58:    "utils/CLIO/clio-agy-tail.sh",
+utils/pdda/script_inventory_baseline.json:59:    "utils/CLIO/clio-codex-tail.sh",
+utils/pdda/script_inventory_baseline.json:60:    "utils/CLIO/prompt-log-to-md.sh",
+paths rg exit=0
+--- exact named contexts ---
+    50	    "scripts/setup_calendar_oauth.py",
+    51	    "scripts/setup_gmail_oauth.py",
+    52	    "scripts/setup_sleuth_file_source.sh",
+    53	    "scripts/stack.sh",
+    54	    "scripts/uninstall_rebalance.sh"
+    55	  ],
+    56	  "utils": [
+    57	    "utils/3-eyes-session-log.py",
+    58	    "utils/CLIO/clio-agy-tail.sh",
+    59	    "utils/CLIO/clio-codex-tail.sh",
+    60	    "utils/CLIO/prompt-log-to-md.sh",
+    61	    "utils/claude_cloud_daily_grade.py",
+    62	    "utils/daily_synthesis.py",
+    63	    "utils/daily_synthesis.sh",
+    64	    "utils/daily_work_synthesis.py",
+    65	    "utils/frontdoor-check.sh",
+    66	    "utils/gh250/fence-writers.sh",
+    67	    "utils/gh250/reclaim.py",
+    68	    "utils/gh250/rehearse.sh",
+   100	    "$@"
+   101	    local rc=$?
+   102	    stages+="${sep}\"$name\": {\"exit\": $rc, \"wall_s\": $(( $(date +%s) - t0 ))}"
+   103	    sep=", "
+   104	    if [[ $rc -ne 0 ]]; then
+   105	        failures=$((failures + 1))
+   106	        echo "pre-push gate: FAIL stage=$name (exit $rc) — push BLOCKED. Full output above." >&2
+   107	    fi
+   108	    return 0  # keep going: report every stage, not just the first failure
+   109	}
+   110	
+   111	stage ruff-check                 "$PY" -m ruff check .
+   112	stage ruff-format                "$PY" -m ruff format --check .
+   113	stage ratchet-script-inventory   "$PY" utils/pdda/check_script_inventory.py --check
+   114	stage ratchet-machine-paths      "$PY" utils/pdda/check_machine_paths.py --check
+   115	stage ratchet-banned-imports     "$PY" utils/pdda/check_banned_imports.py --check
+   116	stage ratchet-read-layer         "$PY" utils/pdda/check_read_layer.py --check
+   117	stage ratchet-near-duplicates    "$PY" utils/pdda/check_near_duplicates.py --check
+   118	
+   119	# The two repo guards: same expressions as the ci.yml root-noembed job, with one
+   120	# hardening the CI original lacks (GH-312 CodeRabbit adjudication): the search
+30-        run: pip install ruff
+31-      - name: Lint
+32:        run: ruff check .
+33-      - name: Format check
+34:        run: ruff format --check .
+35-      # GH-136: no direct sqlite3.connect outside the two gateway directories
+36-      # (src/rebalance/ingest/db/ and HiQS/hiqs/ — separate stores by design, not
+     1	# ROUTER.md
+     2	
+     3	> ## 🛑 Before you build anything: check whether it already exists.
+     4	>
+     5	> This repo's most expensive recurring defect is **re-inventing a subsystem that is already
+     6	> here** — not writing bad code. It has happened repeatedly, to humans and agents alike, and
+     7	> reading this sentence is not enough to prevent it. **Run these four checks; they take under a
+     8	> minute and each one has caught a real duplicate:**
+     9	>
+    10	> 1. `gh pr list -R HiQS-Suite/rebalanceOS` **and** `gh pr list -R Hypercart-Dev-Tools/rebalance-OS`
+    11	>    — work in flight is invisible to a code search. An entire `rebalance/lib/*_ops` consolidation
+    12	>    campaign was resumed from scratch in 2026-08 because its remaining phases were sitting in
+    13	>    unmerged PRs on the *other* repo.
+    14	> 2. **The roadmap ledger's "In progress" rows** (`python3 utils/py/releases_app.py roadmap list`) — the campaigns already under way. `utils/pdda/prior-art-check.sh` reads them from `releases.db`.
+    15	> 3. **`grep -rn "<the concept>" --include="*.py" .` across `src/`, `utils/`, `HiQS/`** — a helper
+    16	>    you are about to write may exist in a package you were not looking at. A clean-room import
+    17	>    gate (`HiQS/tests/test_clean_room.py`) was duplicated in 2026-08 by someone who never looked
+    18	>    in `HiQS/`.
+    19	> 4. **Run the full suite, including the parts CI skips** — `pytest tests/ HiQS/tests`
+    20	>    (note: `utils/3-eyes/tests` is deferred per `AGENTS.md`). A test that exists but never runs
+    21	>    will not tell you it already covers your idea.
+    22	>
+    23	> If a thing exists and is inadequate, PDDA Phase 0 requires you to state **why extending it does
+    24	> not work** before replacing it. "I did not know it was there" is the failure this block exists
+    25	> to stop, and it is not a reason.
+    26	
+    27	This file is the first entry point for an AI agent working in this repo: it tells you what to read, what to run, and which files are canonical. **This repo is an MCP server** — reach for the MCP tools before scanning code or writing ad-hoc shell pipelines.
+    28	
+    29	## Role split
+    30	
+    31	- `ROUTER.md` = startup order and canonical entry points (this file)
+    32	- `AGENTS.md` = behavioral rules, the MCP tool surface, the onboarding flow, and decision quality
+    33	- `ARCHITECTURE.md` = system orientation (Signal Sources, Source→Table fanout, "Adding a New Source") — read at session start
+    34	- `GUIDING-PRINCIPLES.md` = the *why* behind architecture and design decisions; includes the AI doc-review heuristics appendix
+    35	- `README.md` = human-facing repo/product overview and install path
+    36	- `CLAUDE.md` = the Claude Code entry stub; it defers to `AGENTS.md` for all behavioral rules
+    37	- `releases.db` (dumped to `releases.sql`) = the work ledger of in-progress, queued, completed, attempted, and deferred work — read with `releases_app.py roadmap list`, write only with `roadmap add|update|move|rate|repoint`. `ROADMAP.md` was retired in GH-348 (`.pdda-mode` carries `ROADMAP_SOURCE=releases`); do not recreate it.
+    38	- `CHANGELOG.md` = the end-of-iteration running log
+    39	- `RELEASES.md` = forward-looking release-planning ledger (governed by `PROJECT/PDDA.md`)
+    40	- `PROJECT/**` docs = canonical execution detail for a specific effort
+    41	- `PROJECT/PDDA.md` = document contract and PDDA automation rules
+    42	
+    43	## Startup sequence
+    44	
+    45	1. Read `ROUTER.md` to understand the repo's operating order and canonical files. -> expect one clear next file, not a repo-wide scavenger hunt.
+    46	2. Read `AGENTS.md` before making recommendations or edits. -> expect the MCP tool surface, the onboarding flow, explicit assumptions, and verified-claims-only discipline.
+    47	3. Read `ARCHITECTURE.md` for orientation, then `src/rebalance/ingest/index_ops.py` — the `COLLECTORS` registry is the data-plane spine. -> expect to extend a source with one `register_collector(...)` call, not edits to the dispatch chain.
+    48	4. Run `python3 utils/py/releases_app.py roadmap list` to find the active effort or parked intake. -> expect each row to link outward to its canonical `PROJECT/**` doc; the ledger is a pointer index, not a plan body.
+    49	5. Read the linked `PROJECT/**` document that owns the work you are touching. -> expect a near-top `## Status` table telling you what was just completed and what is next.
+    50	6. If the task touches project docs, read `PROJECT/PDDA.md` and follow the PDDA contract. -> expect `PROJECT/2-WORKING` docs to have frontmatter, the exact status table, and QA gates when phased.
+    51	7. Before reporting success on code or runtime work, run `rebalance doctor` and `pytest tests/`. -> expect doctor clean and the suite green; do not claim completion if either fails or was skipped.
+    52	8. Before reporting success on doc-hygiene or roadmap work, run `utils/pdda/pdda.sh run` (or the relevant `utils/pdda/pdda.sh <check>` command). -> expect deterministic findings first, then any LLM review.
+    53	
+    54	## Canonical rules
+    55	
+    56	- This repo **is** an MCP server. Use the MCP tools (`index_status`, `refresh_index`, `semantic_query`, …) for data refresh and retrieval, and `rebalance doctor` for setup/health. Do not write ad-hoc `rebalance ...` shell pipelines or grep for setup scripts.
+    57	- Do not put phase checklists, build steps, or deep execution notes in roadmap ledger rows.
+    58	- Every active doc in `PROJECT/2-WORKING/` must be reflected by a roadmap ledger row that links it (`roadmap repoint`/`update`/`move` when a capture is promoted) — or opt out with `roadmap_exempt: true` in its frontmatter. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
+    59	- Every captured GitHub issue doc in `PROJECT/1-INBOX/GH-*.md` is first-class intake and must also be parked as a queue row immediately at capture — `python3 utils/py/releases_app.py roadmap add --issue-num N --issue-url U --title T --created YYYY-MM-DD --doc-path P` (lands in "Queue / parked intake"), then `roadmap rate --issue-num N --rated P/S/A/E` — and promoted or removed later with `roadmap move`. Closed-issue drift is reported by `utils/pdda/pdda.sh issue-doc-sync` and fixed with `roadmap reconcile-state`. Enforced by `utils/pdda/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md`.
+    60	- Do not create a second competing plan when a canonical `PROJECT/**` doc already exists.
+    61	- Do not build a redundant solution when extending an existing one is viable (enforced by PDDA Phase 0 review). If >50% of the new solution overlaps with an existing one, the plan MUST include deprecating/deleting the old one.
+    62	- SQLite has exactly two gateways, and they are **separate stores by design** — `src/rebalance/ingest/db/` opens this project's own index (path resolved from `REBALANCE_DB`), while `HiQS/hiqs/db.py` opens the HiQS clean-room rebuild's app-data store, staged to spin out to its own repo. They address different database files and are not converged (settled in GH-136, 2026-08-30). New SQLite access goes through one of them: a direct `sqlite3.connect` anywhere else is pinned by `utils/pdda/check_banned_imports.py --check` against `utils/pdda/sqlite_connect_baseline.json` and fails CI — additions *and* stale baselines both block.
+    63	- **No script or LaunchAgent sprawl (GH-241)**: Do not create ad-hoc `.sh` or `.py` files in `scripts/` or `utils/`, and do not add new LaunchAgent plists. New CLI commands go to `src/rebalance/cli/`, MCP tools to `src/rebalance/mcp/`, and background workflows to the central orchestrator (`index_ops.py`). Enforced mechanically in CI by `python utils/pdda/check_script_inventory.py --check` against `utils/pdda/script_inventory_baseline.json` — scanning all `.py`, `.sh`, and `.swift` files under `scripts/` and `utils/`, plus `*.plist.template` files (excluding non-template `.plist` files and `SCHEDULER.md`). Governance checks and baselines live exclusively in `utils/pdda/check_*.py` and `utils/pdda/*_baseline.json`. Exemptions require a non-empty `SCRIPT-INVENTORY-OK: <reason>` pragma in the first 10 lines AND explicit registration in `script_inventory_baseline.json`'s `exemptions` list with operator review. Additions and stale baselines both block.
+    64	- Do not override deterministic PDDA findings with prose.
+    65	- Do not report a win you did not verify with `rebalance doctor`, `pytest tests/`, or the relevant PDDA check.
+    66	
+    67	## Command rails
+    68	
+    69	For setup/health:
+    70	
+    71	```bash
+    72	rebalance doctor
+    73	```
+    74	
+    75	For code correctness:
+    76	
+    77	```bash
+    78	pytest tests/
+    79	```
+    80	
+    81	For script inventory sprawl check (GH-241):
+    82	
+    83	```bash
+    84	python utils/pdda/check_script_inventory.py --check
+    85	```
+    86	
+    87	For document hygiene:
+    88	
+    89	```bash
+    90	utils/pdda/pdda.sh run
+    91	```
+    92	
+    93	For local job health and launchd status:
+    94	
+    95	```bash
+    96	bash scripts/stack.sh status                                 # managed jobs, state, and bound checkout
+    97	rebalance doctor                                             # operator-facing setup, health, and remediation
+    98	```
+    99	
+   100	*(Note: 3-Eyes under `utils/3-eyes/` is stood down / deferred per `AGENTS.md`; use `stack.sh status`, `rebalance doctor`, and `/launchd-triage` for all health and launchd triage).*
+   101	
+   102	For targeted PDDA debugging:
+   103	
+   104	```bash
+   105	utils/pdda/pdda.sh frontmatter
+   106	utils/pdda/pdda.sh status-table
+   107	utils/pdda/pdda.sh hardcoded-paths
+   108	utils/pdda/pdda.sh roadmap
+   109	utils/pdda/pdda.sh roadmap-coverage
+   110	utils/pdda/pdda.sh changelog
+   111	utils/pdda/pdda.sh stale
+   112	utils/pdda/pdda.sh quad-concepts     # opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
+   113	utils/pdda/pdda.sh glance            # read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
+   114	utils/pdda/pdda.sh issue-doc-sync    # flag 2-WORKING/GH-*.md docs drifted from their GitHub issue state (warn-only)
+   115	utils/pdda/pdda.sh gh-refresh        # refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
+   116	utils/pdda/pdda.sh releases    # validate RELEASES.md, the release-planning ledger (warn-only nudge)
+   117	utils/pdda/pdda.sh releases-current  # read-only roll-up: RELEASES.md entries whose Status isn't "Shipped"
+   118	utils/pdda/pdda.sh governance  # governance-doc cross-reference + doc/code drift (this file, AGENTS.md, CLAUDE.md, ...)
+   119	utils/pdda/pdda.sh banned-imports # AST-level import linter flagging banned modules outside rebalance.lib
+   120	utils/pdda/pdda.sh doc-ready   # LLM readiness review — set PDDA_LLM_BIN (codex/claude/agy) for recommendations, else it self-skips
+     1	# CLIO
+     2	
+     3	A Claude Code skill that installs a `UserPromptSubmit` hook logging every prompt
+     4	you submit — across every repo, on one machine — to a single centralized file:
+     5	`~/.claude/prompt-log.jsonl`.
+     6	
+     7	Each line records a timestamp, repo name, git branch, machine name, session ID,
+     8	and the prompt text (with auto-injected context like `<ide_selection>` blocks
+     9	stripped out, so it's a record of what you actually typed).
+    10	
+    11	An optional second script converts that JSONL into human-readable Markdown —
+    12	newest entry first — at any location you choose, such as a note in an Obsidian
+    13	vault. It can run on demand or on a 5-minute `launchd` schedule (macOS).
+    14	
+    15	See [INSTALL.md](INSTALL.md) for the full install, verify, export, auto-sync, and
+    16	uninstall instructions.
+    17	
+    18	## Why
+    19	
+    20	If you use Claude Code across many repos and machines, there's no built-in way
+    21	to see everything you've asked it over time. This gives you one append-only
+    22	log you can grep, sync to notes, or just keep as an audit trail.
+    23	
+    24	## Use cases
+    25	
+    26	- **Cross-device recall.** You work on the same project from a laptop and a
+    27	  desktop (or any multiple-device setup) and want to answer "where/when did I
+    28	  ask Claude to do X on this project?" without digging through separate
+    29	  session histories per machine.
+    30	- **Branch-level recall.** Each entry records the git branch checked out at
+    31	  prompt time, so you can trace a specific ask back to the branch it happened
+    32	  on — even after that branch is merged or deleted.
+    33	- **Cross-project AI memory, layered into a "second brain."** Point the
+    34	  Markdown export at an Obsidian vault and, once that vault is vectorized/
+    35	  indexed for retrieval, an AI assistant can search across *what you asked
+    36	  Claude Code to do*, alongside your other notes — one more layer in a
+    37	  multi-layered personal knowledge system, not just a flat log file.
+    38	
+    39	## Requirements
+    40	
+    41	- macOS or Linux
+    42	- [`jq`](https://jqlang.org/) (`brew install jq` / `apt install jq`)
+    43	
+    44	## License
+    45	
+    46	Apache License 2.0 — see [LICENSE](LICENSE).
+    47	
+    48	This project is provided **"AS IS," WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    49	KIND**, either express or implied (Apache 2.0 §7). It runs on your machine
+    50	with a hook that shells out and edits your Claude Code `settings.json` —
+    51	read the scripts before running them, and use at your own risk.
+
+exec
+/bin/zsh -lc 'export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"; rg -n -i '"'identical|ruff|dirname|summary|no other|changed paths|mode|test/clio-store' .relay-artifacts/gh362-evidence.txt > \""'$TMPDIR/gh362-evidence-index.txt"; rc=$?; printf '"'evidence index exit=%s\\n' \""'$rc"; sed -n '"'1,180p' \""'$TMPDIR/gh362-evidence-index.txt"; printf '"'%s\\n' '--- consumer scan ---'; rg -n -i 'canonical sqlite fleet integration|read-only-agent-lookup|clio-store\\.py|prompt-log-to-md\\.sh' --glob '"'!relay-system/**'"' --glob '"'!.relay-artifacts/**'"' --glob '"'!PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md'"' . > \""'$TMPDIR/gh362-consumers.txt"; rc=$?; printf '"'consumer scan exit=%s\\n' \""'$rc"; sed -n '"'1,220p' \""'$TMPDIR/gh362-consumers.txt"' in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+evidence index exit=0
+36: #   clio-capture.sh --agent <claude-code|zcode|codex|agy>            # hook mode: one JSON object on stdin
+37: #   clio-capture.sh --agent <name> --record                          # tailer mode: one complete JSON row on stdin
+40:+# Legacy contract (SQLite mode returns nonzero if no durable receipt is possible):
+52:+  local helper="$(dirname "$0")/clio-store.py"
+106:+Python **3.8+** is required for this mode. The installer above copies `clio-store.py`
+143:+changed source or failed verification should leave the current capture mode intact.
+185:+   may extend an individual I/O call; a budget failure leaves legacy mode active.
+264:+SQLite mode; use `query`, `drain` and `project`. Old cursors/receipts remain preserved.
+265:+Path compatibility does not make the new rolling entry format identical to the
+281:+Queries open the existing CLIO DB with SQLite `mode=rw` and enforce SQL
+325:+Identical legacy files separately adopted by different stores may have different IDs;
+375:+same exporter command and output path. **In legacy JSONL mode only**, each device
+513:+`--repair-generated-note` explicitly makes the content below `<!-- CLIO:ENTRIES -->` machine-owned. Keep personal edits above that marker. Exact header and verified original backup remain protected. Unknown or merged bodies are archived completely and verified before replacement; unknown record IDs defer replacement for at most two hours while capture, imports and compatibility JSONL continue. Archives are private, deduplicated, limited to 128 files/256 MiB total (64 MiB each), and never automatically deleted. Capacity exhaustion refuses replacement and appears in status. A missing derived note can rebuild in this mode. Without opt-in, the original foreign-edit refusal remains.
+526:+running; five delivery jobs were briefly unloaded and restored with identical plist hashes.
+532:+uses legacy health until the upgraded collector first advertises fleet mode. Verify queued output
+556:+# Device that already publishes the note: keep repair mode (and any --origin pins you still want).
+628:+        with sqlite3.connect("file:" + urllib.parse.quote(db_path, safe="/") + "?mode=ro", uri=True) as conn:
+787:+# Explicit SQLite mode defaults to the registered existing note.
+790:+  helper="$(dirname "$0")/clio-store.py"
+796: MODE=export
+805:+  helper="$(dirname "$0")/clio-store.py"
+807:+    echo "Legacy reconciliation is unavailable in SQLite mode; use query." >&2
+810:+  exec python3 "$helper" scheduled-export "$OUT" --mode "$MODE"
+816:## new files: utils/CLIO/clio-store.py (    1232 lines), test/clio-store.py (    1042 lines)
+818:## identical already:
+819:test/clio-capture.sh identical
+820:test/clio-exporter.sh identical
+821:test/clio-codex-tail.sh identical
+822:test/clio-agy-tail.sh identical
+823:test/fixtures/clio identical
+825:## ruff (rebalanceOS config) on the upstream python files
+830:ruff format would change 1421 lines of utils/CLIO/clio-store.py
+831:test/clio-store.py:6:8: F401 [*] `hashlib` imported but unused
+832:test/clio-store.py:183:46: B023 Function definition does not bind loop variable `shown`
+833:test/clio-store.py:192:47: B023 Function definition does not bind loop variable `shown`
+836:ruff format would change 1198 lines of test/clio-store.py
+854:../XYZ-CLIO/utils/CLIO/INSTALL.md:160:  local helper="$(dirname "$0")/clio-store.py"
+855:../XYZ-CLIO/utils/CLIO/prompt-log-to-md.sh:27:  helper="$(dirname "$0")/clio-store.py"
+856:../XYZ-CLIO/utils/CLIO/prompt-log-to-md.sh:57:  helper="$(dirname "$0")/clio-store.py"
+--- consumer scan ---
+consumer scan exit=0
+./releases.sql:182:INSERT INTO roadmap_items(global_id, repo_gid, gh_number, title, section, position, status_marker, complexity, risk, effort, doc_path, issue_url, raw_text, first_seen, updated_at, rating_pri, rating_sev, rating_appeal, rating_effort, rating_ovr, status_label) VALUES('rmi-01M1DNJK7F1JQE0F656TK3FR3Q', 'repo-01M0V6SMAYVR4WS5ASTP68TEE5', NULL, 'CLIO prompt projection silently loses historical entries', 'Queue / parked intake', '43', NULL, NULL, NULL, NULL, 'PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md', NULL, '- **CLIO prompt projection silently loses historical entries** ([#156](https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/156)) — captured 2026-07-18, **rescoped 2026-07-19**. P0 historical-integrity defect: the rendered Obsidian note, not the raw JSONL, is the operator-facing record, and the line-count cursor claims delivery whether or not the write survived. Original capture predated the durable-writes marathon by one day, so its Phase 1 (stable IDs) and most of Phase 2 (idempotent reconciliation, quarantine, dry-run preview) **already shipped** — the doc is rescoped to the genuine remainder: a **source-owned manifest** of rendered IDs (zero `manifest` refs in `INSTALL.md` today), **cross-run loss detection** (the shipped verify-after-write is intra-run only — it cannot notice an entry delivered last week and since deleted), and **targeted repair** (the only lever today is deleting the state file, i.e. a full replay). Reproduced live during the 2026-07-19 Mac Studio reinstall, which added the load-bearing finding the capture missed: **~330 legacy entries carry no `clio:id`** and are invisible to dedup, so repair-before-backfill would duplicate all of them — demonstrated in miniature when a rewound cursor produced 3 duplicate blocks (detected by multiset diff, reverted). Marker displacement is real and already present (marker at line 331 of 4291). 3 phases on `marathon/gh-156-critical-clio-projection-reconciliation-2026-07-19`. P1 also extracts the exporter out of the `INSTALL.md` heredoc into a tested script (`utils/CLIO/prompt-log-to-md.sh` + `test/clio-exporter.sh`) — it had no test surface at all before. **DONE — fired and merged 2026-07-20 via PR #176**, all 3 phases approved (corrected 2026-07-21; this line previously said "Not fired", stale). One acceptance gap remains (no malformed-source-row test) and `--repair` has never been run against the live `0. Claude Prompts.md` note (operator-supervised step, not yet done). → [GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md)', '2026-09-01T05:02:54Z', '2026-10-22T03:54:14Z', NULL, NULL, NULL, NULL, NULL, NULL);
+./test/clio-exporter.sh:2:# Fixture harness for utils/CLIO/prompt-log-to-md.sh.
+./test/clio-exporter.sh:6:EXPORTER="$ROOT/utils/CLIO/prompt-log-to-md.sh"
+./utils/3-eyes/registry/commands.local.allow.example:23:exec = "/ABSOLUTE/PATH/.claude/hooks/prompt-log-to-md.sh"
+./utils/pdda/script_inventory_baseline.json:60:    "utils/CLIO/prompt-log-to-md.sh",
+./utils/CLIO/prompt-log-to-md.sh:15:# Usage: prompt-log-to-md.sh [--status|--backfill|--repair] [--apply] [output_md_path]
+./utils/CLIO/INSTALL.md:233:install -m 0755 utils/CLIO/prompt-log-to-md.sh ~/.claude/hooks/prompt-log-to-md.sh
+./utils/CLIO/INSTALL.md:289:~/.claude/hooks/prompt-log-to-md.sh
+./utils/CLIO/INSTALL.md:295:~/.claude/hooks/prompt-log-to-md.sh ~/vault/_meta/prompt-log/prompt-log.md
+./utils/CLIO/INSTALL.md:301:CLIO_RECONCILE_DRY_RUN=1 ~/.claude/hooks/prompt-log-to-md.sh ~/vault/_meta/prompt-log/prompt-log.md
+./utils/CLIO/INSTALL.md:326:        <string>$HOME/.claude/hooks/prompt-log-to-md.sh</string>
+./utils/CLIO/INSTALL.md:470:      ~/.claude/hooks/prompt-log-to-md.sh ~/.claude/prompt-log-to-md.state \
+./utils/CLIO/INSTALL.md:492:## Canonical SQLite fleet integration
+./src/rebalance/ingest/clio_journey.py:116:    Contract: utils/CLIO/prompt-log-to-md.sh:500. UTC is taken from the source
+./CHANGELOG.md:1789:  `prompt-log-to-md.sh` exporter in `utils/CLIO/INSTALL.md`:
+./PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:67:Also: the scheduled script is `~/.claude/hooks/prompt-log-to-md.sh`, **not** the repo copy at
+./PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:68:`utils/CLIO/prompt-log-to-md.sh`. Reconcile the two, or a fix lands in a file nothing runs.
+./PROJECT/3-COMPLETED/GH-141-CLIO-INGEST.md:114:- `utils/CLIO/INSTALL.md` and `utils/CLIO/prompt-log-to-md.sh` — CLIO capture/export machinery GH-139 owns; this issue must not fork it.
+./PROJECT/2-WORKING/GH-139-CLIO-MULTI-AGENT-CAPTURE.md:205:   **no within-batch ID dedup** (`prompt-log-to-md.sh` render step, ~lines 496–503), so duplicate
+./PROJECT/2-WORKING/GH-315-CLIO-READER-SKILL.md:37:Base: `cfb91a2180adac9e550d9de5b314bff89ddfda94`. XYZ-CLIO #4 merged September 30; #5 and #6 merged October 2. Canonical `utils/CLIO/clio-store.py` implements config, query and argument parsing. This repository's legacy CLIO directory does not carry that helper. The graph generation was September 2 and reported changed source metadata, so current source was read directly. No Rebalance retrieval MCP was exposed in this session.
+./PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md:176:`<!-- clio:id:session:UTC-timestamp -->` blocks (`prompt-log-to-md.sh:500`). Personal/unmarked legacy
+./PROJECT/2-WORKING/GH-282-RECON.md:40:only older mirrored collector/install assets, no canonical clio-store.py.
+./PROJECT/4-MISC/GH-230-RECON.md:49:| `utils/CLIO/prompt-log-to-md.sh:529` | Existing prompt-note exporter has its own cursor/atomic replacement | Leave it untouched; separate private preview |
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/CLIO-DURABLE-IDEMPOTENT-WRITES.md:65:(`~/.claude/prompt-log.jsonl`), and a **separate** exporter (`prompt-log-to-md.sh`)
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/1-INBOX/CLIO-DURABLE-IDEMPOTENT-WRITES.md:164:- [ ] Emit a `<!-- clio:id:ID -->` comment per rendered entry in `prompt-log-to-md.sh`, where `ID = session_id + ":" + timestamp`, **emitted inline by the existing `jq` render pass** (no per-line subprocess loop).
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/2-WORKING/P2-FOCUS5-CLIO-PROMPT-LOG-TAB.md:93:- [x] Re-install on this Mac Studio: rewrite `~/.claude/hooks/log-prompt.sh` (unchanged), replace `~/.claude/hooks/prompt-log-to-md.sh` with the append+cursor version.
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/2-WORKING/GH-202-CLIO-MALFORMED-ROW-TEST.md:30:exclusions retain current semantics" as unchecked. `utils/CLIO/prompt-log-to-md.sh`
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md:146:- [ ] Extract the exporter heredoc to `utils/CLIO/prompt-log-to-md.sh`; rewrite
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md:178:  "gate":        "if [ -x test/clio-exporter.sh ]; then bash test/clio-exporter.sh; else awk \"/prompt-log-to-md.sh << .EOF.$/{f=1;next} f&&/^EOF$/{exit} f\" utils/CLIO/INSTALL.md > \"${TMPDIR:-/tmp}/clio-gate.sh\" && bash -n \"${TMPDIR:-/tmp}/clio-gate.sh\"; fi",
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md:181:    { "type": "path_absent", "path": "utils/CLIO/prompt-log-to-md.sh" },
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md:184:  "artifacts":     [ "utils/CLIO/INSTALL.md", "utils/CLIO/prompt-log-to-md.sh", "test/clio-exporter.sh" ],
+./PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md:185:  "artifacts_new": [ "utils/CLIO/prompt-log-to-md.sh", "test/clio-exporter.sh" ],
+./TESTS-RESULTS/2026-10-21+GH-329/conservation/ROADMAP-base-44c318d.md.txt:107:- **CLIO prompt projection silently loses historical entries** ([#156](https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/156)) — captured 2026-07-18, **rescoped 2026-07-19**. P0 historical-integrity defect: the rendered Obsidian note, not the raw JSONL, is the operator-facing record, and the line-count cursor claims delivery whether or not the write survived. Original capture predated the durable-writes marathon by one day, so its Phase 1 (stable IDs) and most of Phase 2 (idempotent reconciliation, quarantine, dry-run preview) **already shipped** — the doc is rescoped to the genuine remainder: a **source-owned manifest** of rendered IDs (zero `manifest` refs in `INSTALL.md` today), **cross-run loss detection** (the shipped verify-after-write is intra-run only — it cannot notice an entry delivered last week and since deleted), and **targeted repair** (the only lever today is deleting the state file, i.e. a full replay). Reproduced live during the 2026-07-19 Mac Studio reinstall, which added the load-bearing finding the capture missed: **~330 legacy entries carry no `clio:id`** and are invisible to dedup, so repair-before-backfill would duplicate all of them — demonstrated in miniature when a rewound cursor produced 3 duplicate blocks (detected by multiset diff, reverted). Marker displacement is real and already present (marker at line 331 of 4291). 3 phases on `marathon/gh-156-critical-clio-projection-reconciliation-2026-07-19`. P1 also extracts the exporter out of the `INSTALL.md` heredoc into a tested script (`utils/CLIO/prompt-log-to-md.sh` + `test/clio-exporter.sh`) — it had no test surface at all before. **DONE — fired and merged 2026-07-20 via PR #176**, all 3 phases approved (corrected 2026-07-21; this line previously said "Not fired", stale). One acceptance gap remains (no malformed-source-row test) and `--repair` has never been run against the live `0. Claude Prompts.md` note (operator-supervised step, not yet done). → [GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md)
+./TESTS-RESULTS/2026-10-21+GH-329/conservation/ROADMAP-final-legacy-268f968.md.txt:131:- **CLIO prompt projection silently loses historical entries** ([#156](https://github.com/Hypercart-Dev-Tools/rebalance-OS/issues/156)) — captured 2026-07-18, **rescoped 2026-07-19**. P0 historical-integrity defect: the rendered Obsidian note, not the raw JSONL, is the operator-facing record, and the line-count cursor claims delivery whether or not the write survived. Original capture predated the durable-writes marathon by one day, so its Phase 1 (stable IDs) and most of Phase 2 (idempotent reconciliation, quarantine, dry-run preview) **already shipped** — the doc is rescoped to the genuine remainder: a **source-owned manifest** of rendered IDs (zero `manifest` refs in `INSTALL.md` today), **cross-run loss detection** (the shipped verify-after-write is intra-run only — it cannot notice an entry delivered last week and since deleted), and **targeted repair** (the only lever today is deleting the state file, i.e. a full replay). Reproduced live during the 2026-07-19 Mac Studio reinstall, which added the load-bearing finding the capture missed: **~330 legacy entries carry no `clio:id`** and are invisible to dedup, so repair-before-backfill would duplicate all of them — demonstrated in miniature when a rewound cursor produced 3 duplicate blocks (detected by multiset diff, reverted). Marker displacement is real and already present (marker at line 331 of 4291). 3 phases on `marathon/gh-156-critical-clio-projection-reconciliation-2026-07-19`. P1 also extracts the exporter out of the `INSTALL.md` heredoc into a tested script (`utils/CLIO/prompt-log-to-md.sh` + `test/clio-exporter.sh`) — it had no test surface at all before. **DONE — fired and merged 2026-07-20 via PR #176**, all 3 phases approved (corrected 2026-07-21; this line previously said "Not fired", stale). One acceptance gap remains (no malformed-source-row test) and `--repair` has never been run against the live `0. Claude Prompts.md` note (operator-supervised step, not yet done). → [GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md](PROJECT/4-MISC/ARCHIVED-PREDECESSOR/3-COMPLETED/GH-156-CRITICAL-CLIO-PROJECTION-RECONCILIATION.md)
+
+exec
+/bin/zsh -lc 'export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"; mkdir -p "$TMPDIR"; printf '"'%s\\n' '--- Rebalance consumer contract ---'; nl -ba src/rebalance/ingest/clio_journey.py | sed -n '90,140p'; printf '%s\\n' '--- current exporter anchor ---'; nl -ba utils/CLIO/prompt-log-to-md.sh | sed -n '470,535p'; printf '%s\\n' '--- upstream exporter diff / end ---'; sed -n '750,815p' .relay-artifacts/gh362-evidence.txt; printf '%s\\n' '--- exact non-artifact refs to the old anchor ---'; rg -n -F 'prompt-log-to-md.sh:500' --glob '"'!relay-system/**'"' --glob '"'!.relay-artifacts/**'"' .; printf 'anchor scan exit=%s\\n' \""'$?"' in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+--- Rebalance consumer contract ---
+    90	def snapshot(path):
+    91	    with path.open("rb") as handle:
+    92	        size = os.fstat(handle.fileno()).st_size
+    93	        raw = handle.read(min(size, MAX_BYTES))
+    94	    end = raw.rfind(b"\n") + 1
+    95	    raw = raw[:end]
+    96	    if not raw:
+    97	        raise ValueError("no complete capture records")
+    98	    return raw, {
+    99	        "bytes": len(raw),
+   100	        "sha256": hashlib.sha256(raw).hexdigest(),
+   101	        "byte_cap_hit": size > MAX_BYTES,
+   102	        "partial_tail": end < min(size, MAX_BYTES),
+   103	    }
+   104	
+   105	
+   106	def verify_prefix(path, meta):
+   107	    with path.open("rb") as handle:
+   108	        raw = handle.read(meta["bytes"])
+   109	    if len(raw) != meta["bytes"] or hashlib.sha256(raw).hexdigest() != meta["sha256"]:
+   110	        raise ValueError("source prefix changed; refusing publication")
+   111	
+   112	
+   113	def markdown_rows(raw):
+   114	    """Decode only canonical exporter blocks, never free-form personal notes.
+   115	
+   116	    Contract: utils/CLIO/prompt-log-to-md.sh:500. UTC is taken from the source
+   117	    marker, not the localized display timestamp. Unmarked legacy entries omitted.
+   118	    """
+   119	    text = raw.decode("utf-8")
+   120	    blocks = re.split(r"(?m)^<!-- clio:id:", text)[1:]
+   121	    rows = []
+   122	    for block in blocks:
+   123	        match = re.match(
+   124	            r"([^\n]+?):(\d{4}-\d{2}-\d{2}T[^\n ]+) -->\n## ([^\n]+)\n[^\n]*\n([^\n]*)\n\n(> .*?)(?=\n[^>]|\Z)",
+   125	            block,
+   126	            re.S,
+   127	        )
+   128	        if not match:
+   129	            rows.append(b"null")  # counted as malformed, not silently accepted
+   130	            continue
+   131	        session, stamp, repo, metadata, quoted = match.groups()
+   132	        parts = metadata.split(" · ")
+   133	        prompt = "\n".join(line[2:] for line in quoted.splitlines())
+   134	        if not (prompt.startswith('"') and prompt.endswith('"')):
+   135	            rows.append(b"null")
+   136	            continue
+   137	        rows.append(
+   138	            _json_dumps(
+   139	                dict(
+   140	                    session_id=session,
+--- current exporter anchor ---
+   470	    mkdir -p "$quarantine_dir"
+   471	    mv "$conflict" "$destination"
+   472	    echo "reconciled $(basename "$conflict"): merged=$merged_count quarantined=$destination"
+   473	  fi
+   474	  rm -f "$recovered"
+   475	done
+   476	
+   477	# Reconciliation dry-run is a read-only operation: do not continue into the
+   478	# normal exporter, which could create the note or advance its cursor.
+   479	[ "$RECONCILE_DRY_RUN" = 1 ] && exit 0
+   480	
+   481	[ -f "$JSONL" ] || { echo "No log yet at $JSONL"; exit 0; }
+   482	
+   483	TOTAL_LINES=$(grep -c '' "$JSONL")
+   484	LAST_LINE=$( [ -f "$STATE" ] && cat "$STATE" || echo 0 )
+   485	case "$LAST_LINE" in ''|*[!0-9]*) LAST_LINE=0 ;; esac   # corrupt state → start over
+   486	[ "$LAST_LINE" -gt "$TOTAL_LINES" ] && LAST_LINE=0      # JSONL shrank/rotated → re-emit all
+   487	
+   488	reverse_lines() { if command -v tac >/dev/null 2>&1; then tac; else tail -r; fi; }
+   489	
+   490	# Render the new entries (newest first). jq -R reads each raw line; fromjson parses
+   491	# it; malformed lines, excluded prompts, and IDs already in the note are dropped
+   492	# without aborting the run. The ID is derived inline without per-entry subprocesses.
+   493	new_entries=$(mktemp)
+   494	ensure_local_map
+   495	if [ "$LAST_LINE" -lt "$TOTAL_LINES" ]; then
+   496	tail -n +"$((LAST_LINE + 1))" "$JSONL" | reverse_lines | jq -Rr \
+   497	  --arg exclude "$EXCLUDE_REGEX" --arg existing_ids "$existing_ids" --argjson localmap "$LOCALMAP" '
+   498	  (fromjson? // empty)
+   499	  | select(($exclude | length) == 0 or ((.prompt // "") | test($exclude; "i") | not))
+   500	  | ((.session_id // "") + ":" + (.timestamp // "")) as $id
+   501	  | select(($existing_ids | split("\n") | index("clio:id:" + $id)) == null)
+   502	  | "<!-- clio:id:\($id) -->\n## \(.repo // "unknown" | ascii_upcase)\n\($localmap[.timestamp] // .timestamp)  \n\(.machine // "")\(if (.branch // "") != "" then " · \(.branch)" else "" end) · \(if (.agent // "") != "" then .agent else "claude-code" end)\n\n> \"\((.prompt // "") | gsub("\n"; "\n> "))\"\n"
+   503	' > "$new_entries"
+   504	else
+   505	  : > "$new_entries"
+   506	fi
+   507	
+   508	# Belt-and-braces: render only the FIRST block per ID. The writer's collision
+   509	# suppression normally prevents same-ID rows; this guards the note even if
+   510	# duplicates ever land between exporter runs (GL-139 adversarial review).
+   511	if [ -s "$new_entries" ]; then
+   512	  awk '
+   513	    /^<!-- clio:id:[^ ]+ -->$/ {
+   514	      id = $0
+   515	      sub(/^<!-- clio:id:/, "", id); sub(/ -->$/, "", id)
+   516	      if (seen[id]) { skip = 1; dups++; next }
+   517	      seen[id] = 1
+   518	      skip = 0
+   519	      print
+   520	      next
+   521	    }
+   522	    skip == 0 { print }
+   523	  ' "$new_entries" > "$new_entries.d" && mv "$new_entries.d" "$new_entries"
+   524	fi
+   525	
+   526	emitted_ids=$(grep -o 'clio:id:[^ ]*' "$new_entries" 2>/dev/null || true)
+   527	emitted_count=$(grep -c '^<!-- clio:id:' "$new_entries" 2>/dev/null || true)
+   528	
+   529	# Insert the new entries right after the MARKER, preserving everything else. Write
+   530	# atomically (temp + mv) so a reader like Obsidian never sees a half-written file.
+   531	if [ -s "$new_entries" ]; then
+   532	  marker_line=$(grep -nF "$MARKER" "$OUT" | head -1 | cut -d: -f1)
+   533	  merged="$OUT.tmp.$$"   # same dir as $OUT so the mv is a true atomic rename
+   534	  {
+   535	    head -n "$marker_line" "$OUT"
+--- upstream exporter diff / end ---
++            "source_event_id": str(line_start) + ":" + hashlib.sha256(line).hexdigest(),
+         }, ensure_ascii=False))
+ else:
+     consumed = 0
+@@ -218,7 +227,11 @@
+ 
+   offset=""
+   if cached=$(state_lookup "$file"); then
+-    IFS=$'\t' read -r cached_inode cached_offset cached_sid cached_cwd cached_since <<< "$cached"
++    cached_inode=$(printf '%s' "$cached" | awk -F'\t' '{print $1}')
++    cached_offset=$(printf '%s' "$cached" | awk -F'\t' '{print $2}')
++    cached_sid=$(printf '%s' "$cached" | awk -F'\t' '{print $3}')
++    cached_cwd=$(printf '%s' "$cached" | awk -F'\t' '{print $4}')
++    cached_since=$(printf '%s' "$cached" | awk -F'\t' '{print $5}')
+     cached_since=${cached_since:-legacy}
+     case "$cached_offset" in ''|*[!0-9]*) cached_offset=0 ;; esac
+     if [ "$cached_inode" != "$inode" ] || [ "$size" -lt "$cached_offset" ]; then
+@@ -236,9 +249,10 @@
+   fi
+ 
+   if [ "$offset" -ge "$size" ]; then
+-    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ] || [ "${cached_since:-}" != "$cached_since" ]; then
+-      state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"
+-    fi
++    # Idle tick: rewrite state only when the stored record would change.
++    record=$(printf '%s\t%s\t%s\t%s\t%s' "$inode" "$offset" \
++      "$(printf '%s' "$cached_sid" | tr '\t' ' ')" "$(printf '%s' "$cached_cwd" | tr '\t' ' ')" "$cached_since")
++    [ "$cached" = "$record" ] || state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"
+     continue
+   fi
+ 
+--- a/utils/CLIO/prompt-log-to-md.sh
++++ b/utils/CLIO/prompt-log-to-md.sh
+@@ -21,6 +21,14 @@
+ 
+ set -euo pipefail
+ 
++# Explicit SQLite mode defaults to the registered existing note.
++if [ "${1:-}" = "--sqlite" ]; then
++  shift
++  helper="$(dirname "$0")/clio-store.py"
++  python3 "$helper" drain
++  exec python3 "$helper" project "$@"
++fi
++
+ JSONL="$HOME/.claude/prompt-log.jsonl"
+ MODE=export
+ APPLY=0
+@@ -43,6 +51,16 @@
+   shift
+ done
+ OUT="${OUT:-$HOME/.claude/prompt-log.md}"
++# Keep the installed positional invocation and schedule. Activation alone cannot
++# authorize replacing a shared historical note: migrate-view records that boundary.
++if [ -f "${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}" ]; then
++  helper="$(dirname "$0")/clio-store.py"
++  if [ "${CLIO_RECONCILE_DRY_RUN:-0}" = 1 ]; then
++    echo "Legacy reconciliation is unavailable in SQLite mode; use query." >&2
++    exit 3
++  fi
++  exec python3 "$helper" scheduled-export "$OUT" --mode "$MODE"
++fi
+ STATE="$HOME/.claude/prompt-log-to-md.state"
+ MANIFEST="${CLIO_MANIFEST:-$HOME/.claude/prompt-log-manifest.txt}"
+ STATUS_SNAPSHOT="${CLIO_STATUS_SNAPSHOT:-$STATE.target-count}"
+
+--- exact non-artifact refs to the old anchor ---
+./src/rebalance/ingest/clio_journey.py:116:    Contract: utils/CLIO/prompt-log-to-md.sh:500. UTC is taken from the source
+./PROJECT/2-WORKING/GH-230-CLIO-JOURNEY-SPIKE.md:176:`<!-- clio:id:session:UTC-timestamp -->` blocks (`prompt-log-to-md.sh:500`). Personal/unmarked legacy
+anchor scan exit=0
+
+codex
+The prior two plan defects are resolved. One remaining source-contract check found a stale numeric exporter anchor that the byte-for-byte sync will shift, so I’m recording it for the producer rather than approving prematurely.
+apply patch
+patch: completed
+/private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO/relay-system/2026-10-25/gh362-plan-codex.md
+diff --git a/relay-system/2026-10-25/gh362-plan-codex.md b/relay-system/2026-10-25/gh362-plan-codex.md
+index 84799ce2be2f87834a5023ea288b7b7e57f5ff7c..109913a5f8e54fc52ad2209b2e902278b3ae9c9e
+--- a/relay-system/2026-10-25/gh362-plan-codex.md
++++ b/relay-system/2026-10-25/gh362-plan-codex.md
+@@ -4,7 +4,7 @@
+   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
+ -->
+ 
+-NEXT: Reviewer
++NEXT: Producer
+ STATUS: Open
+ ROUND: 2 / 3
+ 
+@@ -103,4 +103,18 @@
+ - [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+ - [Pass] items acknowledged.
+ 
++### Reviewer · Round 2
++
++swept file: yes
++
++- [Should] The sync list misses one Rebalance source-contract anchor that will become false when the upstream exporter is copied: `src/rebalance/ingest/clio_journey.py:116-118` names `utils/CLIO/prompt-log-to-md.sh:500`, while the current renderer is indeed at `utils/CLIO/prompt-log-to-md.sh:490-503`. The exact upstream patch adds 14 lines before old line 21 and 10 before old line 43 (`.relay-artifacts/gh362-evidence.txt:787-813`), moving old line 500 to line 524; the literal `:500` will therefore point at a different statement after the planned byte copy. Add a small source-comment update (prefer a stable descriptive reference over a line number) to the plan and verification list. Observed input: `src/rebalance/ingest/clio_journey.py:116` contains the literal `prompt-log-to-md.sh:500`; the narrow scan command `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned that consumer plus a historical plan. Affected scope: the live `markdown_rows` exporter-format contract comment. Falsifier: after syncing, `rg -n -F 'prompt-log-to-md.sh:500' src/rebalance/ingest/clio_journey.py` should return no result, while the descriptive contract still identifies the canonical `<!-- clio:id:... -->` block format.
++
++- [Pass] Round-1 PDDA and retrieval-documentation fixes are now specified: the active-doc status table records capture → park → rate → promote → repoint and the pending move (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`); change 3 updates both mirrored skills to prefer this repository's copy and declares the new canonical INSTALL reference (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:66`). This meets the active-doc table contract in `PROJECT/PDDA.md:48-59` and the lifecycle record in `PROJECT/PDDA.md:266-279`.
++
++VERDICT: FAIL
++
++Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
++
++handing off to Producer — go to the Producer window and say 'take your turn'.
++
+ <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
+diff --git a/relay-system/2026-10-25/gh362-plan-codex.md b/relay-system/2026-10-25/gh362-plan-codex.md
+index 84799ce2be2f87834a5023ea288b7b7e57f5ff7c..109913a5f8e54fc52ad2209b2e902278b3ae9c9e
+--- a/relay-system/2026-10-25/gh362-plan-codex.md
++++ b/relay-system/2026-10-25/gh362-plan-codex.md
+@@ -4,7 +4,7 @@
+   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
+ -->
+ 
+-NEXT: Reviewer
++NEXT: Producer
+ STATUS: Open
+ ROUND: 2 / 3
+ 
+@@ -103,4 +103,18 @@
+ - [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+ - [Pass] items acknowledged.
+ 
++### Reviewer · Round 2
++
++swept file: yes
++
++- [Should] The sync list misses one Rebalance source-contract anchor that will become false when the upstream exporter is copied: `src/rebalance/ingest/clio_journey.py:116-118` names `utils/CLIO/prompt-log-to-md.sh:500`, while the current renderer is indeed at `utils/CLIO/prompt-log-to-md.sh:490-503`. The exact upstream patch adds 14 lines before old line 21 and 10 before old line 43 (`.relay-artifacts/gh362-evidence.txt:787-813`), moving old line 500 to line 524; the literal `:500` will therefore point at a different statement after the planned byte copy. Add a small source-comment update (prefer a stable descriptive reference over a line number) to the plan and verification list. Observed input: `src/rebalance/ingest/clio_journey.py:116` contains the literal `prompt-log-to-md.sh:500`; the narrow scan command `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned that consumer plus a historical plan. Affected scope: the live `markdown_rows` exporter-format contract comment. Falsifier: after syncing, `rg -n -F 'prompt-log-to-md.sh:500' src/rebalance/ingest/clio_journey.py` should return no result, while the descriptive contract still identifies the canonical `<!-- clio:id:... -->` block format.
++
++- [Pass] Round-1 PDDA and retrieval-documentation fixes are now specified: the active-doc status table records capture → park → rate → promote → repoint and the pending move (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`); change 3 updates both mirrored skills to prefer this repository's copy and declares the new canonical INSTALL reference (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:66`). This meets the active-doc table contract in `PROJECT/PDDA.md:48-59` and the lifecycle record in `PROJECT/PDDA.md:266-279`.
++
++VERDICT: FAIL
++
++Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
++
++handing off to Producer — go to the Producer window and say 'take your turn'.
++
+ <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
+exec
+/bin/zsh -lc 'TICK_REPO_ROOT="/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25" "/Users/noelsaw/Documents/GitHub Repos/rebalanceOS-gh362-clio-upstream-sync-2026-10-25/.xyz/bin/tick" release RELAY-gh362-plan-codex --agent codex --to claude-a' in /private/var/folders/z0/92pfvhnn06z2_7hnpdb4kkbw0000gn/T/rtl-wt.ugXKwO
+ succeeded in 0ms:
+released: RELAY-gh362-plan-codex
+
+diff --git a/relay-system/2026-10-25/gh362-plan-codex.md b/relay-system/2026-10-25/gh362-plan-codex.md
+index 84799ce2be2f87834a5023ea288b7b7e57f5ff7c..109913a5f8e54fc52ad2209b2e902278b3ae9c9e
+--- a/relay-system/2026-10-25/gh362-plan-codex.md
++++ b/relay-system/2026-10-25/gh362-plan-codex.md
+@@ -4,7 +4,7 @@
+   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
+ -->
+ 
+-NEXT: Reviewer
++NEXT: Producer
+ STATUS: Open
+ ROUND: 2 / 3
+ 
+@@ -103,4 +103,18 @@
+ - [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+ - [Pass] items acknowledged.
+ 
++### Reviewer · Round 2
++
++swept file: yes
++
++- [Should] The sync list misses one Rebalance source-contract anchor that will become false when the upstream exporter is copied: `src/rebalance/ingest/clio_journey.py:116-118` names `utils/CLIO/prompt-log-to-md.sh:500`, while the current renderer is indeed at `utils/CLIO/prompt-log-to-md.sh:490-503`. The exact upstream patch adds 14 lines before old line 21 and 10 before old line 43 (`.relay-artifacts/gh362-evidence.txt:787-813`), moving old line 500 to line 524; the literal `:500` will therefore point at a different statement after the planned byte copy. Add a small source-comment update (prefer a stable descriptive reference over a line number) to the plan and verification list. Observed input: `src/rebalance/ingest/clio_journey.py:116` contains the literal `prompt-log-to-md.sh:500`; the narrow scan command `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned that consumer plus a historical plan. Affected scope: the live `markdown_rows` exporter-format contract comment. Falsifier: after syncing, `rg -n -F 'prompt-log-to-md.sh:500' src/rebalance/ingest/clio_journey.py` should return no result, while the descriptive contract still identifies the canonical `<!-- clio:id:... -->` block format.
++
++- [Pass] Round-1 PDDA and retrieval-documentation fixes are now specified: the active-doc status table records capture → park → rate → promote → repoint and the pending move (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`); change 3 updates both mirrored skills to prefer this repository's copy and declares the new canonical INSTALL reference (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:66`). This meets the active-doc table contract in `PROJECT/PDDA.md:48-59` and the lifecycle record in `PROJECT/PDDA.md:266-279`.
++
++VERDICT: FAIL
++
++Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
++
++handing off to Producer — go to the Producer window and say 'take your turn'.
++
+ <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
+codex
+Review recorded: one remaining stale exporter line-number contract blocks approval. Handing off to Producer — go to the Producer window and say “take your turn.”
+diff --git a/relay-system/2026-10-25/gh362-plan-codex.md b/relay-system/2026-10-25/gh362-plan-codex.md
+index 84799ce2be2f87834a5023ea288b7b7e57f5ff7c..109913a5f8e54fc52ad2209b2e902278b3ae9c9e
+--- a/relay-system/2026-10-25/gh362-plan-codex.md
++++ b/relay-system/2026-10-25/gh362-plan-codex.md
+@@ -4,7 +4,7 @@
+   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
+ -->
+ 
+-NEXT: Reviewer
++NEXT: Producer
+ STATUS: Open
+ ROUND: 2 / 3
+ 
+@@ -103,4 +103,18 @@
+ - [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+ - [Pass] items acknowledged.
+ 
++### Reviewer · Round 2
++
++swept file: yes
++
++- [Should] The sync list misses one Rebalance source-contract anchor that will become false when the upstream exporter is copied: `src/rebalance/ingest/clio_journey.py:116-118` names `utils/CLIO/prompt-log-to-md.sh:500`, while the current renderer is indeed at `utils/CLIO/prompt-log-to-md.sh:490-503`. The exact upstream patch adds 14 lines before old line 21 and 10 before old line 43 (`.relay-artifacts/gh362-evidence.txt:787-813`), moving old line 500 to line 524; the literal `:500` will therefore point at a different statement after the planned byte copy. Add a small source-comment update (prefer a stable descriptive reference over a line number) to the plan and verification list. Observed input: `src/rebalance/ingest/clio_journey.py:116` contains the literal `prompt-log-to-md.sh:500`; the narrow scan command `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned that consumer plus a historical plan. Affected scope: the live `markdown_rows` exporter-format contract comment. Falsifier: after syncing, `rg -n -F 'prompt-log-to-md.sh:500' src/rebalance/ingest/clio_journey.py` should return no result, while the descriptive contract still identifies the canonical `<!-- clio:id:... -->` block format.
++
++- [Pass] Round-1 PDDA and retrieval-documentation fixes are now specified: the active-doc status table records capture → park → rate → promote → repoint and the pending move (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`); change 3 updates both mirrored skills to prefer this repository's copy and declares the new canonical INSTALL reference (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:66`). This meets the active-doc table contract in `PROJECT/PDDA.md:48-59` and the lifecycle record in `PROJECT/PDDA.md:266-279`.
++
++VERDICT: FAIL
++
++Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
++
++handing off to Producer — go to the Producer window and say 'take your turn'.
++
+ <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
+
+tokens used
+68,353
+Review recorded: one remaining stale exporter line-number contract blocks approval. Handing off to Producer — go to the Producer window and say “take your turn.”
+[trace] rtl_enforce: COMMIT e5537ed agent=codex
+[trace] rtl_enforce: token-handoff branch=warn-stuck task=RELAY-gh362-plan-codex

@@ -27,7 +27,8 @@
 #   migration = legacy pending bytes remain eligible on their original inode; a
 #             reset adopts capture-start eligibility instead of importing old history.
 #   overlap = a tailer lock serializes invocations; a busy lock is a silent
-#             no-op (the next tick catches up).
+#             no-op (the next tick catches up); a lock older than 300 s is
+#             reaped by one serialized reaper.
 #   lock-busy on the shared append lock (writer exit 3) aborts WITHOUT
 #             advancing the cursor; the chunk is retried next run.
 set -euo pipefail
@@ -46,17 +47,21 @@ command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is requir
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-# Stale lock detection: reap any lock held longer than 300s so dead processes cannot deadlock tailing.
+# A lock older than 300 s is a dead run's leftover; reap it, or that agent's capture
+# stops for good. Reaping is serialized and rechecked so no contender deletes a lock
+# another one just took.
+lock_stale() { # born stamp, else dir mtime; empty/non-numeric = not stale
+  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "")
+  case "$born" in ''|*[!0-9]*) return 1 ;; esac
+  [ $(( $(date +%s) - born )) -gt 300 ]
+}
 if ! mkdir "$TAIL_LOCK" 2>/dev/null; then
-  now=$(date +%s)
-  born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "$now")
-  if [ -n "$born" ] && [ "$born" -gt 0 ] 2>/dev/null && [ $((now - born)) -gt 300 ]; then
-    diag "reaped stale tail lock born at $born ($((now - born))s old)"
-    rm -rf "$TAIL_LOCK"
-    mkdir "$TAIL_LOCK" 2>/dev/null || exit 0
-  else
-    exit 0
-  fi
+  lock_stale || exit 0
+  mkdir "$TAIL_LOCK.reap" 2>/dev/null || exit 0
+  lock_stale && { rm -rf "$TAIL_LOCK"; diag "reaped stale tail lock born at $born"; }
+  got=0; mkdir "$TAIL_LOCK" 2>/dev/null || got=1
+  rmdir "$TAIL_LOCK.reap"
+  [ "$got" = 0 ] || exit 0
 fi
 trap 'rm -rf "$TAIL_LOCK"' EXIT
 date +%s > "$TAIL_LOCK/born" 2>/dev/null || true
@@ -93,8 +98,10 @@ state_update() { # $1 = path, $2 = inode, $3 = offset, $4 = session_id, $5 = cwd
 # preceding session_meta before the offset.
 extract_rows() {
   python3 - "$1" "$2" "${3:-}" "${4:-}" "$5" <<'PYEOF'
-import json, sys
+import hashlib, json, re, sys
 from datetime import datetime, timezone
+
+IDE_REQUEST = re.compile(r"^## My request(?: for Codex)?:[ \t]*\n?", re.M)
 
 def parse_ts(ts):
     """Validate before cutoff comparison; output IDs still use UTC seconds."""
@@ -165,19 +172,20 @@ if cut != -1 and cut >= (offset - scan_start):
         if obj.get("type") != "event_msg" or payload.get("type") != "user_message":
             continue
         text = payload.get("message")
+        if not isinstance(text, str) or not text.strip() or not session_id:
+            continue
         instant = parse_ts(obj.get("timestamp"))
         if instant is None:
             malformed += 1
             continue
         if since is not None and instant < since:
             continue
-        if "# Context from my IDE setup:" in text and "## My request:" in text:
-            text = text.split("## My request:", 1)[-1].strip()
-        elif "## My request:" in text:
-            text = text.split("## My request:", 1)[-1].strip()
-        if not text:
-            continue
-            continue
+        if text.lstrip().startswith("# Context from my IDE setup:"):
+            # Codex IDE turns prepend editor context; keep only the request itself.
+            parts = IDE_REQUEST.split(text, 1)
+            text = parts[1].strip() if len(parts) == 2 else text
+            if not text:
+                continue
         repo = cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else ""
         print(json.dumps({
             "timestamp": instant.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -187,6 +195,7 @@ if cut != -1 and cut >= (offset - scan_start):
             "session_id": session_id,
             "prompt": text,
             "cwd": cwd,
+            "source_event_id": str(line_start) + ":" + hashlib.sha256(line).hexdigest(),
         }, ensure_ascii=False))
 else:
     consumed = 0
@@ -218,7 +227,11 @@ while IFS= read -r -d '' file; do
 
   offset=""
   if cached=$(state_lookup "$file"); then
-    IFS=$'\t' read -r cached_inode cached_offset cached_sid cached_cwd cached_since <<< "$cached"
+    cached_inode=$(printf '%s' "$cached" | awk -F'\t' '{print $1}')
+    cached_offset=$(printf '%s' "$cached" | awk -F'\t' '{print $2}')
+    cached_sid=$(printf '%s' "$cached" | awk -F'\t' '{print $3}')
+    cached_cwd=$(printf '%s' "$cached" | awk -F'\t' '{print $4}')
+    cached_since=$(printf '%s' "$cached" | awk -F'\t' '{print $5}')
     cached_since=${cached_since:-legacy}
     case "$cached_offset" in ''|*[!0-9]*) cached_offset=0 ;; esac
     if [ "$cached_inode" != "$inode" ] || [ "$size" -lt "$cached_offset" ]; then
@@ -236,9 +249,10 @@ while IFS= read -r -d '' file; do
   fi
 
   if [ "$offset" -ge "$size" ]; then
-    if [ "${cached_offset:-}" != "$offset" ] || [ "${cached_inode:-}" != "$inode" ] || [ "${cached_since:-}" != "$cached_since" ]; then
-      state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"
-    fi
+    # Idle tick: rewrite state only when the stored record would change.
+    record=$(printf '%s\t%s\t%s\t%s\t%s' "$inode" "$offset" \
+      "$(printf '%s' "$cached_sid" | tr '\t' ' ')" "$(printf '%s' "$cached_cwd" | tr '\t' ' ')" "$cached_since")
+    [ "$cached" = "$record" ] || state_update "$file" "$inode" "$offset" "$cached_sid" "$cached_cwd" "$cached_since"
     continue
   fi
 
