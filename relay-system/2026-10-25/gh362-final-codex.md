@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: None (relay closed)
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -74,5 +74,22 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+
+- [Pass] Exact-copy proof is sufficient: every listed copied file has matching content digest and mode in `.relay-artifacts/gh362-final-evidence.txt:5-14`. Aligning `test/clio-codex-tail.sh` and `test/clio-agy-tail.sh` from `100644` to upstream's `100755` is an acceptable, necessary scope extension because it closes the otherwise documented mode-only mismatch (`.relay-artifacts/gh362-final-evidence.txt:5216-5221`) and makes the test assets exact too.
+- [Pass] Changes 2–8 match the approved plan: the upstream declaration is present at `utils/CLIO/README.md:3-13`; the two skills are byte-identical by `cmp` (exit 0) and correctly prefer the local upstream with an absolute published link (`.agents/skills/clio/SKILL.md:17-20`, `.agents/skills/clio/SKILL.md:31-34`); the AGENTS pointer is at `AGENTS.md:16`; the baseline contains only the added helper at `utils/pdda/script_inventory_baseline.json:57-61`; the Ruff excludes are narrow at `pyproject.toml:110-115`; all three version locations are `0.104.0` (`pyproject.toml:7`, `manifest.json:5`, `src/rebalance/__init__.py:31`); and the source comment is now stable at `src/rebalance/ingest/clio_journey.py:113-119`.
+- [Pass] The CHANGELOG does not name a project, filename, or path: its two entries describe the package and behavior only (`CHANGELOG.md:13-18`), satisfying the repository rule.
+- [Pass] The receipt is candid about limitations: it records the store suite as exit 1 and names the known date-dependent failing case (`TESTS-RESULTS/2026-10-25+GH-362/suites.txt:19-24`), while PDDA is explicitly reported as observe mode with 26 non-blocking errors (`TESTS-RESULTS/2026-10-25+GH-362/gates.txt:9-12`). The documented comparison says that count equals the base and names no changed file (`TESTS-RESULTS/2026-10-25+GH-362/README.md:9-11`).
+- [Pass] No unplanned implementation change is evident in the complete seeded changed-path inventory: the non-copy diffs cover the declared documentation, ledger/receipt, version, baseline, Ruff, and comment work; the two additional mode changes are justified above (`.relay-artifacts/gh362-final-evidence.txt:5189-5261`). No pre-existing defect was found in the swept changed source files.
+- [Unverified — needs clone run] I did not execute the CLIO suites, PDDA, Ruff, smoke, or fixtures, as required by this relay's reviewer constraints. The recorded commands and outcomes are cited above; the disposable-clone harness gate must independently decide execution validity.
+
+VERDICT: PASS
+
+Basis: The byte/mode evidence, current-file sweep, and scoped diffs satisfy all eight approved changes with no substantive out-of-scope implementation work. The sole remaining verification boundary is the required post-review harness run, not an unaddressed finding.
+
+relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
