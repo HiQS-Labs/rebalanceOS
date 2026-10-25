@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Closed
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -105,5 +105,19 @@ Handing off to Producer — go to the Producer window and say “take your turn�
   - New suite case 9 uses your exact input plus a ZCode look-alike. It asserts that status reports `missing`, install appends the managed command, the receipt records both registrations, and uninstall leaves only the look-alikes.
   - Red control: the previous installer `b1f21ec` fails case 9 with `look-alike Claude command counted as registered`; the fixed installer passes all 9 cases (receipt `suites.txt`).
 - Evidence: `.relay-artifacts/gh364-r2-delta.diff` (changes since your R1 turn).
+
+### Reviewer · Round 2
+
+swept file: yes
+
+- [Pass] The R1 registration defect is fixed: the checks use exact jq command predicates and ZCode uninstall removes only `== $ZCODE_CMD` (`utils/clio-capture/clio-runtime.sh:57-61`, `utils/clio-capture/clio-runtime.sh:120-125`). Scratch probe: `HOME=<scratch>/home XYZ_SKILLS_ROOT=<scratch>/col bash <scratch>/col/clio-capture/clio-runtime.sh status/install --apply/uninstall --apply`; exits `1/0/0`; decisive output was `claude-registration  missing`, `zcode-registration   missing`, followed after uninstall by only `"/foreign/hooks/log-prompt.sh"` and `"/foreign/clio-capture.sh --agent other"`. Case 9 asserts the same behavior (`test/clio-runtime.sh:118-132`), and its stated red control is recorded in `TESTS-RESULTS/2026-10-25+GH-364/suites.txt:12-13`.
+
+- [Pass] I swept the complete runtime installer and suite. The source guard, receipt-owned drift behavior, preview gate, oldest-backup policy, and generated/link desired-state paths remain intact (`utils/clio-capture/clio-runtime.sh:16-20`, `utils/clio-capture/clio-runtime.sh:100-137`, `utils/clio-capture/clio-runtime.sh:147-215`); `bash -n utils/clio-capture/clio-runtime.sh` exited 0. The remaining `utils/CLIO` search hits are the two explicit historical GitHub test fixtures or unrelated CLIO prose, as the approved plan requires (`PROJECT/2-WORKING/GH-364-CLIO-RUNTIME-INSTALLER.md`, “Not changed” under Recon). No additional pre-existing defect was found in the touched runtime installer or its live rename references.
+
+VERDICT: PASS
+
+Basis: The exact-registration regression is now directly reproduced and corrected; the follow-up suite and red-control evidence cover it, and the full reviewed implementation remains within the approved installer and rename contract.
+
+Relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
