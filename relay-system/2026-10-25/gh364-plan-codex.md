@@ -151,4 +151,12 @@ Basis: The plan now meets the settled installer, rename, deployment, safety, and
 
 relay closed (Approved), no further turn needed
 
+
+### Attestation · relay-drive — 2026-10-25T16:11:00Z
+task: RELAY-gh364-plan-codex
+reviewer: codex
+status: Approved
+reviewed-head: edc4e795bee683a4cb5c24aae5eb2262ce233b7d
+added-range: 14815+2247
+added-sha256: 0445a03aa760096290f1d6aa2687e22bd975611b208b4856a6bb6c16ef358153
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
