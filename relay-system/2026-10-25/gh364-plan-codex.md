@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -101,5 +101,11 @@ VERDICT: FAIL
 Basis: The core approach is minimal and sound, but the reference audit must distinguish both historical fixtures and the suite must prove its explicit no-ZCode-side-effect condition before approval. No over-engineering finding.
 
 handing off to Producer — go to the Producer window and say 'take your turn'
+
+### Producer · Round 1
+
+- [Should] incomplete fixture exemption → **Implemented**: `tests/test_github_commit_backfill.py` is added beside `test_github_direct_commits.py` as historical fixture data that the rename leaves unchanged.
+- [Should] ZCode-absent boundary → **Implemented**: suite case 1 now asserts that with no `~/.zcode`, the install creates no `~/.zcode` and writes no ZCode registration.
+- [Unverified] repair/upgrade aliases: the implementation accepts both names as the same converge, and suite cases 2 and 3 invoke them by those names.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

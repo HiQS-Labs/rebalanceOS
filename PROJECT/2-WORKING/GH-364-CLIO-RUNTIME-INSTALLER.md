@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
+| Plan QA R1 dispositioned. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/364 · Base `origin/development` e4a7abb · Clone/branch `rebalanceOS-gh364-clio-runtime-installer-2026-10-25` / `feat/<same>`.
 
@@ -67,7 +67,7 @@ The source plan is the operator-reviewed `temp/clio-runtime-installer-plan.md` (
   - `utils/pdda/script_inventory_baseline.json` (via `--update-baseline`);
   - `src/rebalance/ingest/clio_journey.py` (docstring), the two Focus5 Swift comments, `.agents`/`.claude` `skills/clio/SKILL.md`.
 
-  **Not changed:** history (`CHANGELOG.md`, `releases.sql`, `PROJECT/**` plan docs, `TESTS-RESULTS`, relay threads), and `tests/test_github_direct_commits.py`, whose `utils/CLIO/...` strings are fixture data from a real historical commit, not paths.
+  **Not changed:** history (`CHANGELOG.md`, `releases.sql`, `PROJECT/**` plan docs, `TESTS-RESULTS`, relay threads), and `tests/test_github_direct_commits.py` / `tests/test_github_commit_backfill.py`, whose `utils/CLIO/...` strings are fixture data from a real historical commit, not paths (plan QA R1).
 
 ## Changes
 1. **Rename** with `git mv utils/CLIO utils/clio-capture` and update the live references listed above.
@@ -99,7 +99,7 @@ The source plan is the operator-reviewed `temp/clio-runtime-installer-plan.md` (
 4. **`test/clio-runtime.sh`** (new suite; the README Tests block lists it).
    - **Setup:** a throwaway HOME and a fake collection (`XYZ_SKILLS_ROOT=<tmp>/col`) holding a copy of `utils/clio-capture`; `launchctl` is stubbed on PATH and logs its calls. Every temp dir uses guarded `mktemp` with `${VAR:?}` on cleanup.
    - **Cases, each with an observed assertion:**
-     1. A fresh install: preview writes nothing; `--apply` → `status` exit 0; a prompt piped through `log-prompt.sh` lands a row; both tailer plists are created and loaded via the stub; the exporter plist is untouched and absent.
+     1. A fresh install: preview writes nothing; `--apply` → `status` exit 0; a prompt piped through `log-prompt.sh` lands a row; both tailer plists are created and loaded via the stub; the exporter plist is untouched and absent; with no `~/.zcode` in the throwaway HOME, none is created and no ZCode registration is written (plan QA R1).
      2. A deleted link → `status` exit 1 `missing`; `repair --apply` restores only it (all other files keep their inode/mtime).
      3. An edit to the collection copy's writer heredoc → `status` `stale`; `upgrade --apply` regenerates it; `status` 0.
      4. A pre-existing hand-made `log-prompt.sh` (red control): `install` preview names it and changes nothing; `--apply` backs it up and replaces it.
