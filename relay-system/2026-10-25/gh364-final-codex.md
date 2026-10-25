@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -76,5 +76,25 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+
+- [Blocker] The Claude registration check is a substring `grep`, so it treats an unrelated command ending in `hooks/log-prompt.sh` as the managed `$HOME/.claude/hooks/log-prompt.sh` registration. `install --apply` consequently does not add the required hook and does not record it in the receipt; `status` falsely prints `ok` (the same loose pattern exists for ZCode). `utils/clio-capture/clio-runtime.sh:57`, `utils/clio-capture/clio-runtime.sh:160`, `utils/clio-capture/clio-runtime.sh:162`.
+  - Observed input: `settings.json` containing only `{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command":"/foreign/hooks/log-prompt.sh"}]}]}}`.
+  - Affected scope: any pre-existing Claude or ZCode hook whose command merely contains the basename/path substring but is not the exact managed command.
+  - Falsifier: a scratch HOME with that input should make `install --apply` add and receipt-record `$HOME/.claude/hooks/log-prompt.sh`; status should report the managed registration only after that exact command exists.
+  - Probe (scratch-only): `HOME=<scratch>/home XYZ_SKILLS_ROOT=<scratch>/col bash <scratch>/col/clio-capture/clio-runtime.sh status`; exit `1`; decisive output: `claude-registration  ok` despite no managed command. Replace the grep checks with exact jq predicates matching the registration shape/command, make uninstall remove only that exact owned command, and add this regression for Claude plus its ZCode analogue.
+
+- [Pass] The source guard compares resolved script and deployed collection paths before any managed-path operation, so a repository invocation is rejected (`utils/clio-capture/clio-runtime.sh:16-20`); the suite also asserts exit 2 and an unchanged snapshot (`test/clio-runtime.sh:31-35`).
+
+- [Pass] The sweep found no additional pre-existing defect in the touched runtime installer beyond the registration issue above. The receipt-scoped hook removal and retained trimmed receipt are implemented at `utils/clio-capture/clio-runtime.sh:100-135`; the drift red control asserts the edited hook, backup, exit 1, and unchanged-item removal at `test/clio-runtime.sh:105-116`.
+
+VERDICT: FAIL
+
+Basis: The rename, source guard, receipt/drift behavior, and documented red controls are substantially aligned with the plan, but the observed false-positive registration state violates the required desired state and can leave capture disabled after an apparently successful install.
+
+Handing off to Producer — go to the Producer window and say “take your turn”.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
