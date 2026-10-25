@@ -113,7 +113,8 @@ def verify_prefix(path, meta):
 def markdown_rows(raw):
     """Decode only canonical exporter blocks, never free-form personal notes.
 
-    Contract: utils/CLIO/prompt-log-to-md.sh:500. UTC is taken from the source
+    Contract: the legacy exporter's jq render of ``<!-- clio:id:SESSION:UTC -->``
+    blocks in utils/CLIO/prompt-log-to-md.sh. UTC is taken from the source
     marker, not the localized display timestamp. Unmarked legacy entries omitted.
     """
     text = raw.decode("utf-8")

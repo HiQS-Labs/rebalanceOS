@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.104.0] - 2026-10-25
+
+### Changed
+
+- The prompt-capture package bundled here now matches its standalone release, including the SQLite history store and the recent capture fixes. These are a stale-lock reaper so a crashed capture run can no longer stop an agent's capture for good, no rewrite of capture state on idle runs, Codex IDE context stripped from captured prompts, and a 20-character minimum prompt length.
+- This copy is now the source of truth for that package: changes are made here first and then published to the standalone repository.
+
 ## [0.103.2] - 2026-10-23
 
 ### Fixed

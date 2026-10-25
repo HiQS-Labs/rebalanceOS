@@ -1,0 +1,33 @@
+## red controls (synced files present, gates not yet updated)
+$ python3 utils/pdda/check_script_inventory.py --check
+utils/CLIO/clio-store.py:1: NEW script detected — ad-hoc scripts in scripts/ or utils/ are prohibited. Route commands through src/rebalance/cli/ and tasks through the orchestrator (GH-241)
+exit=
+$ ruff check . (concise, CLIO paths)
+test/clio-store.py:6:8: F401 [*] `hashlib` imported but unused
+test/clio-store.py:183:46: B023 Function definition does not bind loop variable `shown`
+test/clio-store.py:192:47: B023 Function definition does not bind loop variable `shown`
+utils/CLIO/clio-store.py:754:9: E731 Do not assign a `lambda` expression, use a `def`
+utils/CLIO/clio-store.py:779:18: F841 Local variable `since` is assigned to but never used
+Found 5 errors.
+$ ruff format --check . (CLIO paths)
+unformatted: File would be reformatted
+    --> test/clio-store.py:3:1
+     - spec = importlib.util.spec_from_file_location('clio_store', ROOT / 'utils/CLIO/clio-store.py')
+25   + spec = importlib.util.spec_from_file_location("clio_store", ROOT / "utils/CLIO/clio-store.py")
+     -         shutil.copyfile(ROOT / 'utils/CLIO/clio-store.py', hooks / 'clio-store.py')
+57   +         shutil.copyfile(ROOT / "utils/CLIO/clio-store.py", hooks / "clio-store.py")
+     -             helper = ROOT / 'utils/CLIO/clio-store.py'
+501  +             helper = ROOT / "utils/CLIO/clio-store.py"
+     -             return subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'), '--db', str(node[2]),
+610  +                     str(ROOT / "utils/CLIO/clio-store.py"),
+     -         scheduled = subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'), '--db', str(b[2]),
+972  +                 str(ROOT / "utils/CLIO/clio-store.py"),
+     -         explicit = subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'),
+1233 +                 str(ROOT / "utils/CLIO/clio-store.py"),
+unformatted: File would be reformatted
+    --> utils/CLIO/clio-store.py:3:1
+     -         stream.write(utc() + ' clio-store: ' + message + '\n')
+94   +         stream.write(utc() + " clio-store: " + message + "\n")
+     -     helper = writer.with_name('clio-store.py')
+474  +     helper = writer.with_name("clio-store.py")
+2 files would be reformatted, 665 files already formatted

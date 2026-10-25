@@ -21,6 +21,14 @@
 
 set -euo pipefail
 
+# Explicit SQLite mode defaults to the registered existing note.
+if [ "${1:-}" = "--sqlite" ]; then
+  shift
+  helper="$(dirname "$0")/clio-store.py"
+  python3 "$helper" drain
+  exec python3 "$helper" project "$@"
+fi
+
 JSONL="$HOME/.claude/prompt-log.jsonl"
 MODE=export
 APPLY=0
@@ -43,6 +51,16 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 OUT="${OUT:-$HOME/.claude/prompt-log.md}"
+# Keep the installed positional invocation and schedule. Activation alone cannot
+# authorize replacing a shared historical note: migrate-view records that boundary.
+if [ -f "${CLIO_CONFIG:-$HOME/.claude/clio-storage.json}" ]; then
+  helper="$(dirname "$0")/clio-store.py"
+  if [ "${CLIO_RECONCILE_DRY_RUN:-0}" = 1 ]; then
+    echo "Legacy reconciliation is unavailable in SQLite mode; use query." >&2
+    exit 3
+  fi
+  exec python3 "$helper" scheduled-export "$OUT" --mode "$MODE"
+fi
 STATE="$HOME/.claude/prompt-log-to-md.state"
 MANIFEST="${CLIO_MANIFEST:-$HOME/.claude/prompt-log-manifest.txt}"
 STATUS_SNAPSHOT="${CLIO_STATUS_SNAPSHOT:-$STATE.target-count}"

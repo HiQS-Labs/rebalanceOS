@@ -2,7 +2,7 @@
 gh_issue: 362
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/362
 title: "GH-362 sync utils/CLIO up to XYZ-CLIO and make Rebalance CLIO's upstream"
-status: "Working — plan under Codex QA"
+status: "Working — implemented; verification and final QA"
 created: 2026-10-25
 updated: 2026-10-25
 owner: noel
@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Ledger lifecycle so far: captured in `1-INBOX`, parked (`roadmap add`, row `rmi-01M5SP89MGBXQKJ8667P2PD5MG`), rated `75/55/50/80`, promoted to `2-WORKING`, `roadmap repoint`ed. Plan QA R1 (Codex) dispositioned. | Plan QA R3 (R2 dispositioned). On approval: `roadmap move` to In progress, implement, verify, final QA, PR. |
+| Plan QA approved (R3). Row moved to In progress. Changes 1–8 implemented; gates green (ruff, inventory, PDDA run with no new errors). | Suites and smoke in a disposable clone, receipt, final Codex QA, PR. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/362 · Base `origin/development` 6672892 · Clone/branch `rebalanceOS-gh362-clio-upstream-sync-2026-10-25` / `chore/<same>`.
 Rating `rated 75/55/50/80` (calc 260), 2026-10-25.
