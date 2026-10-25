@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -96,5 +96,14 @@ VERDICT: FAIL
 Basis: The rename, source guard, receipt/drift behavior, and documented red controls are substantially aligned with the plan, but the observed false-positive registration state violates the required desired state and can leave capture disabled after an apparently successful install.
 
 Handing off to Producer — go to the Producer window and say “take your turn”.
+
+### Producer · Round 1
+
+- [Blocker] substring registration checks → **Implemented**:
+  - `claude_reg`/`zcode_reg` now use exact jq predicates over the registered commands (`[.hooks.UserPromptSubmit[]?.hooks[]?.command] | index($CLAUDE_CMD) != null`, and the ZCode `events` analogue). Install therefore adds the managed command beside a look-alike, and records it.
+  - ZCode uninstall now removes only `command == $ZCODE_CMD`, not any `contains("clio-capture.sh")`; Claude uninstall was already exact.
+  - New suite case 9 uses your exact input plus a ZCode look-alike. It asserts that status reports `missing`, install appends the managed command, the receipt records both registrations, and uninstall leaves only the look-alikes.
+  - Red control: the previous installer `b1f21ec` fails case 9 with `look-alike Claude command counted as registered`; the fixed installer passes all 9 cases (receipt `suites.txt`).
+- Evidence: `.relay-artifacts/gh364-r2-delta.diff` (changes since your R1 turn).
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
