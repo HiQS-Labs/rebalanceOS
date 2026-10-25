@@ -92,4 +92,12 @@ Basis: The byte/mode evidence, current-file sweep, and scoped diffs satisfy all 
 
 relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-25T14:23:30Z
+task: RELAY-gh362-final-codex
+reviewer: codex
+status: Approved
+reviewed-head: 753d6f52574d5c50fc46d5e4e9a5fb031c9535a2
+added-range: 6718+2857
+added-sha256: cc7043ffef3c25ac313074da6d5c18bf91f37fd1b62accbc26ec31fcefba0755
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
