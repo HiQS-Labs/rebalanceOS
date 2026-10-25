@@ -52,7 +52,7 @@ ROUND: 1 / 3
    was merely waiting looked stalled. A turn that ends without this line is not finished.
 
 ## Setup
-- Artifact under review: the implementation on this branch: the rename `utils/CLIO` → `utils/clio-capture` with its reference updates; `utils/clio-capture/SKILL.md`; `utils/clio-capture/clio-runtime.sh`; `test/clio-runtime.sh`; the README/INSTALL notes, gates and version. You cannot run git: `.relay-artifacts/gh364-impl.diff` is `git diff -M origin/development...HEAD` (renames shown as renames). Read the current files for the full scripts.
+- Artifact under review: the implementation on this branch: the folder rename to `utils/clio-capture` (from the old uppercase name) with its reference updates; `utils/clio-capture/SKILL.md`; `utils/clio-capture/clio-runtime.sh`; `test/clio-runtime.sh`; the README/INSTALL notes, gates and version. You cannot run git: `.relay-artifacts/gh364-impl.diff` is `git diff -M origin/development...HEAD` (renames shown as renames). Read the current files for the full scripts.
 - Approved plan: `PROJECT/2-WORKING/GH-364-CLIO-RUNTIME-INSTALLER.md` (plan QA `relay-system/2026-10-25/gh364-plan-codex.md`, Approved R3).
 - Test evidence: `TESTS-RESULTS/2026-10-25+GH-364/` (README, suites incl. two mutation red controls, read-only live smoke).
 - Operational envelope: one operator, about four Macs, bash 3.2 + jq + python3, launchd. Grade against the approved plan and commensurate complexity.
