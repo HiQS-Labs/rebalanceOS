@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -77,5 +77,29 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+
+- [Should] The rename inventory is not complete: the plan deliberately exempts only `tests/test_github_direct_commits.py` as historical fixture data (plan L70), but `tests/test_github_commit_backfill.py` also embeds the old paths as the historical CLIO commit fixture (L29-35, L67-69, L133, L147). Add it to the explicit history/fixture exemption so implementation neither rewrites provenance nor leaves the reference audit inaccurate.
+  Probe: `rg -n 'utils/CLIO' --glob '!CHANGELOG.md' --glob '!releases.sql' --glob '!PROJECT/**' --glob '!TESTS-RESULTS/**' --glob '!relay-system/**' .`; exit 0; decisive output included `tests/test_github_commit_backfill.py:34`, `:67-69`, `:133`, and `:147`.
+
+- [Should] The suite does not make the stated ZCode absence boundary falsifiable. Desired state says ZCode registration is created only when `~/.zcode` exists (plan L88), while the seven enumerated cases contain no assertion that an initially absent `~/.zcode` remains absent/unmodified (L100-108). Add that assertion to the fresh-install case (or a bounded separate case).
+  Observed input: a throwaway HOME with no `~/.zcode` (the suite setup in plan L100) and the requirement at plan L88.
+  Affected scope: installs where `$HOME/.zcode` does not exist before `install --apply`.
+  Falsifier: run fresh install with no `.zcode`; expected result is no `.zcode/cli/config.json` creation and no ZCode registration.
+  Probe: `awk 'NR>=82 && NR<=108 {print NR ":" $0}' PROJECT/2-WORKING/GH-364-CLIO-RUNTIME-INSTALLER.md`; exit 0; decisive output contains L88's conditional and L102-108's seven cases without that assertion.
+
+- [Pass] The generated writer/shim plus symlinked helpers is compatible with decision A and the existing path contracts: links land in `~/.claude/hooks` (plan L86), generated files also land there (L87), and the shim resolves the writer relative to that directory (`utils/CLIO/INSTALL.md:239-245`); the exporter resolves `clio-store.py` the same way (`utils/CLIO/prompt-log-to-md.sh:25-29`). Existing tailer/exporter plists therefore retain their required hook paths.
+
+- [Pass] The backup/receipt boundaries are appropriately narrow for the observed live state: the plan leaves existing tailer plists byte-identical and never creates or rewrites the exporter plist (plan L89, L96-98), matching INSTALL.md's explicit warning to preserve an existing exporter's bytes, arguments, and interval (`utils/CLIO/INSTALL.md:618-623`).
+
+- [Unverified — no citation] Collapsing repair and upgrade onto idempotent install is proportionate, provided the implementation accepts those names as aliases as exercised by suite cases 2–3 (plan L83, L103-104). Linux-without-launchd is not required by the Mac-only operational envelope; no unrelated pre-existing defect was found in the swept plan.
+
+VERDICT: FAIL
+Basis: The core approach is minimal and sound, but the reference audit must distinguish both historical fixtures and the suite must prove its explicit no-ZCode-side-effect condition before approval. No over-engineering finding.
+
+handing off to Producer — go to the Producer window and say 'take your turn'
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
