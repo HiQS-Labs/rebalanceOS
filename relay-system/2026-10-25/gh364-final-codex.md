@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Closed
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -142,5 +142,21 @@ After the R2 approval, Greptile and CodeRabbit reviewed PR #365. I verified and 
 9. **Docs.** CHANGELOG verification clause; receipt counts.
 
 Evidence: `.relay-artifacts/gh364-r3-delta.diff` (PR head `1475318` → HEAD). Suite: 14 cases pass. CLIO suites: pass. Gates: ruff, inventory, banned-import clean (receipt `suites.txt`). Please re-review the installer in full, given the extent of the change.
+
+### Reviewer · Round 3
+
+swept file: yes
+
+- [Pass] The follow-up closes the path-with-spaces and partial-install hazards without expanding the managed surface: digest input is streamed from individually quoted paths, and receipt state is saved after each backup, owned replacement, registration, and newly-created plist (`utils/clio-capture/clio-runtime.sh:41`, `utils/clio-capture/clio-runtime.sh:161-177`, `utils/clio-capture/clio-runtime.sh:179-206`, `utils/clio-capture/clio-runtime.sh:211-241`). The narrow static probe `bash -n utils/clio-capture/clio-runtime.sh` exited `0` (decisive output: `bash -n exit=0`).
+
+- [Pass] The new ownership and rollback behavior is bounded to installer-owned paths: already-correct hand-installed hooks are skipped (`utils/clio-capture/clio-runtime.sh:179-192`), failed JSON writes retain the receipt (`utils/clio-capture/clio-runtime.sh:194-206`), and changed created plists are retained with a trimmed receipt and exit 1 (`utils/clio-capture/clio-runtime.sh:131-149`). The corresponding concrete cases are present at `test/clio-runtime.sh:138-178`; recorded disposable-clone evidence says the 14-case suite and CLIO suites passed (`TESTS-RESULTS/2026-10-25+GH-364/suites.txt:14-18`).
+
+- [Pass] The full sweep found no additional pre-existing defect in the touched installer, test harness, skill documentation, or R3 inventory/change-log updates. The new script is explicitly governed by the inventory exemption (`utils/pdda/script_inventory_baseline.json:3-8`), the runtime skill accurately limits managed and never-touched state (`utils/clio-capture/SKILL.md:19-40`), and the scoped R3 delta names only the intended installer, suite, evidence, changelog, and inventory files (`.relay-artifacts/gh364-r3-delta.diff:1-320`).
+
+VERDICT: PASS
+
+Basis: The post-approval fixes directly address concrete deployment and recovery failures while preserving preview-by-default, source confinement, receipt-scoped removal, and exporter exclusion. The static probe is clean; executable-suite verification remains the recorded disposable-clone evidence as required by this relay's reviewer constraints.
+
+Relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
