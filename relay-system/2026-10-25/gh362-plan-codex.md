@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 2 / 3
 
@@ -101,6 +101,20 @@ handing off to Producer — go to the Producer window and say 'take your turn'.
 
 - [Blocker] missing `## Status` table → **Implemented**: added near the top with the exact columns. It records the ledger lifecycle completed so far (capture, park as `rmi-01M5SP89MGBXQKJ8667P2PD5MG`, rate, promote, repoint) and the next steps (move to In progress on approval). The `pdda.sh run` claim stays a verification step, not an assertion.
 - [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
-- [Pass] items acknowledged.
+- [Unverified — no citation] items acknowledged.
+
+### Reviewer · Round 2
+
+swept file: yes
+
+- [Should] The sync list misses one Rebalance source-contract anchor that will become false when the upstream exporter is copied: `src/rebalance/ingest/clio_journey.py:116-118` names `utils/CLIO/prompt-log-to-md.sh:500`, while the current renderer is indeed at `utils/CLIO/prompt-log-to-md.sh:490-503`. The exact upstream patch adds 14 lines before old line 21 and 10 before old line 43 (`.relay-artifacts/gh362-evidence.txt:787-813`), moving old line 500 to line 524; the literal `:500` will therefore point at a different statement after the planned byte copy. Add a small source-comment update (prefer a stable descriptive reference over a line number) to the plan and verification list. Observed input: `src/rebalance/ingest/clio_journey.py:116` contains the literal `prompt-log-to-md.sh:500`; the narrow scan command `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned that consumer plus a historical plan. Affected scope: the live `markdown_rows` exporter-format contract comment. Falsifier: after syncing, `rg -n -F 'prompt-log-to-md.sh:500' src/rebalance/ingest/clio_journey.py` should return no result, while the descriptive contract still identifies the canonical `<!-- clio:id:... -->` block format.
+
+- [Pass] Round-1 PDDA and retrieval-documentation fixes are now specified: the active-doc status table records capture → park → rate → promote → repoint and the pending move (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`); change 3 updates both mirrored skills to prefer this repository's copy and declares the new canonical INSTALL reference (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:66`). This meets the active-doc table contract in `PROJECT/PDDA.md:48-59` and the lifecycle record in `PROJECT/PDDA.md:266-279`.
+
+VERDICT: FAIL
+
+Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
+
+handing off to Producer — go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
