@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # clio-runtime.sh — install, repair, upgrade, check or remove CLIO prompt capture on this device (GH-364).
+# SCRIPT-INVENTORY-OK: CLIO's device installer; it runs from the Skills Army deployed copy, outside this package (GH-364)
 #
 #   clio-runtime.sh [status]                       read-only report; exit 1 when install would change something
 #   clio-runtime.sh install|repair|upgrade [--apply]   converge to the deployed copy (one idempotent operation)
@@ -19,6 +20,7 @@ DEPLOYED=$(cd "$COL/clio-capture" 2>/dev/null && pwd -P || true)
 [ -n "$DEPLOYED" ] && [ "$SRC" = "$DEPLOYED" ] \
   || die "run me from the Skills Army deployed copy ($COL/clio-capture), not from $SRC"
 command -v jq >/dev/null 2>&1 || die "jq is required (brew install jq)"
+command -v python3 >/dev/null 2>&1 || die "python3 is required (the Codex and Agy tailers and clio-store.py use it)"
 
 CMD="${1:-status}"; APPLY=0
 case "${2:-}" in --apply) APPLY=1 ;; "") ;; *) die "unknown option: $2" ;; esac
@@ -36,7 +38,7 @@ extract() { # $1 = hook name; the INSTALL.md heredoc, by the same marker test/cl
   awk -v n="$1" -v q="'" '$0 == "cat > ~/.claude/hooks/" n " << " q "EOF" q {f=1; next} f && /^EOF$/ {exit} f' "$SRC/INSTALL.md"
 }
 for g in $GENERATED; do [ -n "$(extract "$g")" ] || die "INSTALL.md has no $g heredoc"; done
-digest=$(cat "$SRC/INSTALL.md" $(for f in $LINKS; do echo "$SRC/$f"; done) | sha)
+digest=$({ cat "$SRC/INSTALL.md"; for f in $LINKS; do cat "$SRC/$f"; done; } | sha)   # paths may contain spaces
 hq_commit=$(jq -r '.skills["clio-capture"].commit // empty' "$COL/.deploy-skills.json" 2>/dev/null || true)
 rget() { [ -f "$RECEIPT" ] && jq -r "$1 // empty" "$RECEIPT" 2>/dev/null || true; }
 
@@ -94,7 +96,7 @@ fi
 if [ "$CMD" = uninstall ]; then
   [ -f "$RECEIPT" ] || { echo "nothing to uninstall: no receipt at $RECEIPT"; exit 0; }
   owned=$(jq -r '.owned | keys[]' "$RECEIPT")
-  regs=$(jq -r '.added_registrations[]?' "$RECEIPT"); plists=$(jq -r '.created_plists[]?' "$RECEIPT")
+  regs=$(jq -r '.added_registrations[]?' "$RECEIPT"); plists=$(jq -r '.created_plists | keys[]?' "$RECEIPT")
   echo "uninstall would: remove owned hooks (restoring backups), remove registrations [${regs//$'\n'/ }], remove plists [${plists//$'\n'/ }], delete the receipt"
   [ "$APPLY" = 1 ] || { echo "preview only; add --apply"; exit 0; }
   # Remove (and restore the backup of) only what still matches the receipt; keep anything changed since.
@@ -115,23 +117,33 @@ if [ "$CMD" = uninstall ]; then
           | map(.hooks = ((.hooks // []) | map(select(((.command // "") == "$HOME/.claude/hooks/log-prompt.sh") | not))))
           | map(select((.hooks // []) | length > 0)))
         | if (.hooks.UserPromptSubmit // []) == [] then del(.hooks.UserPromptSubmit) else . end end' \
-      "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+      "$SETTINGS" > "$SETTINGS.tmp" || die "could not update $SETTINGS; receipt kept, rerun uninstall after fixing it"
+    mv "$SETTINGS.tmp" "$SETTINGS"
   fi
   if grep -qx zcode <<< "$regs" && [ -f "$ZCONFIG" ]; then
     jq 'if (.hooks.events.UserPromptSubmit // null) == null then . else .hooks.events.UserPromptSubmit = (.hooks.events.UserPromptSubmit
           | map(.hooks = ((.hooks // []) | map(select((.command // "") != $c))))
           | map(select((.hooks // []) | length > 0)))
         | if .hooks.events.UserPromptSubmit == [] then del(.hooks.events.UserPromptSubmit) else . end end' \
-      --arg c "$ZCODE_CMD" "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"
+      --arg c "$ZCODE_CMD" "$ZCONFIG" > "$ZCONFIG.tmp" || die "could not update $ZCONFIG; receipt kept, rerun uninstall after fixing it"
+    mv "$ZCONFIG.tmp" "$ZCONFIG"
   fi
-  while IFS= read -r p; do [ -n "$p" ] || continue; launchctl unload "$p" 2>/dev/null || true; rm -f "$p"; done <<< "$plists"
+  # A created plist edited since install is left loaded and in place, like a drifted hook.
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if [ -f "$p" ] && [ "$(sha < "$p")" != "$(rget ".created_plists[\"$p\"]")" ]; then
+      drifted+=("$p"); echo "  drifted (left in place): $p"; continue; fi
+    launchctl unload "$p" 2>/dev/null || true; rm -f "$p"
+  done <<< "$plists"
   if [ ${#drifted[@]} -gt 0 ]; then
     # Keep a receipt naming only the drifted paths (with their backups) so nothing is forgotten.
     keep=$(printf '%s\n' "${drifted[@]}" | jq -R . | jq -s .)
     jq --argjson keep "$keep" '.owned |= with_entries(select(.key as $k | $keep | index($k)))
       | .generated |= with_entries(select(.key as $k | $keep | index($k)))
       | .backups |= with_entries(select(.key as $k | $keep | index($k)))
-      | .added_registrations = [] | .created_plists = []' "$RECEIPT" > "$RECEIPT.tmp" && mv "$RECEIPT.tmp" "$RECEIPT"
+      | .created_plists |= with_entries(select(.key as $k | $keep | index($k)))
+      | .added_registrations = []' "$RECEIPT" > "$RECEIPT.tmp" || die "could not update $RECEIPT"
+    mv "$RECEIPT.tmp" "$RECEIPT"
     echo "uninstalled except ${#drifted[@]} changed path(s); review them, then remove by hand or reinstall"; exit 1
   fi
   rm -f "$RECEIPT"; echo "uninstalled"; exit 0
@@ -146,34 +158,54 @@ foreign=(); for f in $LINKS $GENERATED; do [ "$(item_state "$f")" = foreign ] &&
 
 mkdir -p "$H"
 BK="$HOME/.claude/clio-runtime-backups/$(date -u +%Y%m%dT%H%M%SZ)"
-backups=$( [ -f "$RECEIPT" ] && jq -c '.backups // {}' "$RECEIPT" || echo '{}')
-for p in ${foreign[@]+"${foreign[@]}"}; do
-  mkdir -p "$BK"; mv "$p" "$BK/"
-  # Keep the oldest backup: it is the pre-install original.
-  backups=$(jq -c --arg p "$p" --arg b "$BK/$(basename "$p")" 'if has($p) then . else .[$p] = $b end' <<< "$backups")
+# Prior receipt state carries forward; the receipt is rewritten after every change, so a later
+# failure (a config write, a launchctl load) never loses a backup or ownership record.
+prior() { if [ -f "$RECEIPT" ]; then jq -c "$1 // {}" "$RECEIPT"; else echo '{}'; fi; }
+owned=$(prior .owned); generated=$(prior .generated); backups=$(prior .backups)
+added=$( [ -f "$RECEIPT" ] && jq -c '.added_registrations // []' "$RECEIPT" || echo '[]'); created=$(prior .created_plists)
+save_receipt() {
+  jq -n --arg src "$SRC" --arg hq "$hq_commit" --arg digest "$digest" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson owned "$owned" --argjson generated "$generated" --argjson backups "$backups" \
+    --argjson added "$added" --argjson created "$created" '{source: $src, hq_commit: $hq, digest: $digest,
+      installed_at: $at, owned: $owned, generated: $generated, backups: $backups,
+      added_registrations: $added, created_plists: $created}' > "$RECEIPT.tmp" || die "could not write $RECEIPT"
+  mv "$RECEIPT.tmp" "$RECEIPT"
+}
+own() { # $1 path, $2 kind: claim a path this run created or replaced
+  owned=$(jq -c --arg p "$1" --arg k "$2" '.[$p] = $k' <<< "$owned")
+  [ "$2" = link ] || generated=$(jq -c --arg p "$1" --arg s "$(sha < "$1")" '.[$p] = $s' <<< "$generated")
+  save_receipt
+}
+for f in $LINKS $GENERATED; do
+  p="$H/$f"; st=$(item_state "$f")
+  [ "$st" = ok ] && continue            # already correct: claimed only if an earlier run owned it
+  if [ "$st" = foreign ]; then   # someone else's file (or a hand edit): keep it before replacing
+    mkdir -p "$BK"; mv "$p" "$BK/"
+    # Keep the oldest backup: it is the pre-install original.
+    backups=$(jq -c --arg p "$p" --arg b "$BK/$f" 'if has($p) then . else .[$p] = $b end' <<< "$backups")
+    save_receipt
+  fi
+  rm -f "$p"
+  case " $LINKS " in
+    *" $f "*) ln -s "$SRC/$f" "$p"; own "$p" link ;;
+    *) extract "$f" > "$p.tmp.$$"; chmod 755 "$p.tmp.$$"; mv "$p.tmp.$$" "$p"; own "$p" generated ;;
+  esac
 done
-for f in $LINKS; do [ "$(item_state "$f")" = ok ] || { rm -f "$H/$f"; ln -s "$SRC/$f" "$H/$f"; }; done
-generated='{}'
-for f in $GENERATED; do
-  [ "$(item_state "$f")" = ok ] || { extract "$f" > "$H/$f.tmp.$$"; chmod 755 "$H/$f.tmp.$$"; mv "$H/$f.tmp.$$" "$H/$f"; }
-  generated=$(jq -c --arg p "$H/$f" --arg s "$(sha < "$H/$f")" '.[$p] = $s' <<< "$generated")
-done
-added=$( [ -f "$RECEIPT" ] && jq -c '.added_registrations // []' "$RECEIPT" || echo '[]')
 if ! claude_reg; then
   [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
   jq '.hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{"hooks":[{"type":"command","command":"$HOME/.claude/hooks/log-prompt.sh"}]}])' \
-    "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
-  added=$(jq -c '. + ["claude"] | unique' <<< "$added")
+    "$SETTINGS" > "$SETTINGS.tmp" || die "could not register the Claude hook in $SETTINGS (invalid JSON?)"
+  mv "$SETTINGS.tmp" "$SETTINGS"; added=$(jq -c '. + ["claude"] | unique' <<< "$added"); save_receipt
 fi
 if zcode_wanted && ! zcode_reg; then
   mkdir -p "$HOME/.zcode/cli"; [ -f "$ZCONFIG" ] || echo '{}' > "$ZCONFIG"
-  jq '.hooks = ((.hooks // {}) + (if (.hooks | has("enabled") | not) then {enabled: true} else {} end))
+  jq '.hooks = ((.hooks // {}) + (if ((.hooks // {}) | has("enabled") | not) then {enabled: true} else {} end))
       | .hooks.events = ((.hooks.events // {}) + {UserPromptSubmit: (((.hooks.events.UserPromptSubmit // [])
           + [{hooks: [{type: "command", command: "$HOME/.claude/hooks/clio-capture.sh --agent zcode"}]}]))})' \
-    "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"
-  added=$(jq -c '. + ["zcode"] | unique' <<< "$added")
+    "$ZCONFIG" > "$ZCONFIG.tmp" || die "could not register the ZCode hook in $ZCONFIG (invalid JSON?)"
+  mv "$ZCONFIG.tmp" "$ZCONFIG"; added=$(jq -c '. + ["zcode"] | unique' <<< "$added"); save_receipt
 fi
-created=$( [ -f "$RECEIPT" ] && jq -c '.created_plists // []' "$RECEIPT" || echo '[]')
+load_failed=0
 if [ "$DARWIN" = 1 ]; then
   mkdir -p "$LA"
   for t in $TAILERS; do
@@ -201,16 +233,11 @@ if [ "$DARWIN" = 1 ]; then
 </dict>
 </plist>
 EOF
-      created=$(jq -c --arg p "$p" '. + [$p] | unique' <<< "$created")
+      created=$(jq -c --arg p "$p" --arg s "$(sha < "$p")" '.[$p] = $s' <<< "$created"); save_receipt
     fi
-    loaded "$l" || launchctl load "$p"
+    loaded "$l" || launchctl load "$p" || { echo "clio-runtime: could not load $l; the receipt is saved, rerun install --apply" >&2; load_failed=1; }
   done
 fi
-owned=$(for f in $LINKS; do printf '%s\tlink\n' "$H/$f"; done; for f in $GENERATED; do printf '%s\tgenerated\n' "$H/$f"; done)
-jq -n --arg src "$SRC" --arg hq "$hq_commit" --arg digest "$digest" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --argjson generated "$generated" --argjson backups "$backups" --argjson added "$added" --argjson created "$created" \
-  --arg owned "$owned" '{source: $src, hq_commit: $hq, digest: $digest, installed_at: $at,
-     owned: ($owned | split("\n") | map(select(length > 0) | split("\t") | {(.[0]): .[1]}) | add),
-     generated: $generated, backups: $backups, added_registrations: $added, created_plists: $created}' \
-  > "$RECEIPT.tmp" && mv "$RECEIPT.tmp" "$RECEIPT"
+save_receipt
+[ "$load_failed" = 0 ] || exit 1
 echo "installed from $SRC${hq_commit:+ (HQ ${hq_commit:0:12})}; receipt $RECEIPT"

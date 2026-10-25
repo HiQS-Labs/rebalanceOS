@@ -11,3 +11,8 @@ no-drift-check mutation: FAIL: uninstall with a drifted hook: expected exit 1, g
 restored: PASS: clio-runtime
 red control (installer b1f21ec, suite with case 9): FAIL: look-alike Claude command counted as registered
 test/clio-runtime.sh at the fixed installer: PASS (9 cases)
+bash test/clio-runtime.sh -> exit 0 (after PR #365 review fixes)
+bash test/clio-capture.sh -> exit 0 (after PR #365 review fixes)
+bash test/clio-codex-tail.sh -> exit 0 (after PR #365 review fixes)
+bash test/clio-agy-tail.sh -> exit 0 (after PR #365 review fixes)
+red control: PR-head installer 1475318 + spaced-path suite -> FAIL: install preview failed

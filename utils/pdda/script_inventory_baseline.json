@@ -1,6 +1,7 @@
 {
   "max_launchd_templates": 13,
   "exemptions": [
+    "utils/clio-capture/clio-runtime.sh",
     "utils/pdda/check_machine_paths.py",
     "utils/stickies-to-obsidian/com.user.stickies2obsidian.plist.template"
   ],
@@ -58,7 +59,6 @@
     "utils/claude_cloud_daily_grade.py",
     "utils/clio-capture/clio-agy-tail.sh",
     "utils/clio-capture/clio-codex-tail.sh",
-    "utils/clio-capture/clio-runtime.sh",
     "utils/clio-capture/clio-store.py",
     "utils/clio-capture/prompt-log-to-md.sh",
     "utils/daily_synthesis.py",

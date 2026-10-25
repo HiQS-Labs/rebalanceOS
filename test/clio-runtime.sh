@@ -10,7 +10,8 @@ trap 'rm -rf "${T:?}"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq is required to run this harness"
 
-export HOME="$T/home" XYZ_SKILLS_ROOT="$T/col"
+# The collection path has a space, like the real "~/git-pulse-sync/Deployed Skills" (PR #365 review).
+export HOME="$T/home" XYZ_SKILLS_ROOT="$T/Deployed Skills"
 mkdir -p "$HOME/.claude" "$XYZ_SKILLS_ROOT" "$T/bin"
 cp -R "$ROOT/utils/clio-capture" "$XYZ_SKILLS_ROOT/clio-capture"
 RT="$XYZ_SKILLS_ROOT/clio-capture/clio-runtime.sh"
@@ -19,6 +20,7 @@ H="$HOME/.claude/hooks"; LA="$HOME/Library/LaunchAgents"
 cat > "$T/bin/launchctl" <<'EOF'
 #!/bin/bash
 db="$HOME/.launchctl-loaded"
+[ "$1" = load ] && [ -n "${LAUNCHCTL_FAIL:-}" ] && exit 1
 case "$1" in
   list) [ -f "$db" ] && while read -r l; do printf -- '-\t0\t%s\n' "$l"; done < "$db"; exit 0 ;;
   load) echo "$*" >> "$HOME/.launchctl-calls"; touch "$db"; l=$(basename "$2" .plist); grep -qx "$l" "$db" || echo "$l" >> "$db" ;;
@@ -125,10 +127,55 @@ bash "$RT" install --apply >/dev/null || fail "case 9 install failed"
 jq -e '[.hooks.UserPromptSubmit[].hooks[].command] == ["/foreign/hooks/log-prompt.sh", "$HOME/.claude/hooks/log-prompt.sh"]' "$HOME/.claude/settings.json" >/dev/null \
   || fail "managed Claude registration not added beside the look-alike"
 jq -e '.added_registrations == ["claude", "zcode"]' "$HOME/.claude/clio-runtime.json" >/dev/null || fail "registrations not recorded in the receipt"
+jq -e '[.hooks.events.UserPromptSubmit[].hooks[].command] == ["/foreign/clio-capture.sh --agent other", "$HOME/.claude/hooks/clio-capture.sh --agent zcode"]' "$HOME/.zcode/cli/config.json" >/dev/null \
+  || fail "managed ZCode registration not added beside the look-alike"
 bash "$RT" uninstall --apply >/dev/null || fail "case 9 uninstall failed"
 jq -e '[.hooks.UserPromptSubmit[].hooks[].command] == ["/foreign/hooks/log-prompt.sh"]' "$HOME/.claude/settings.json" >/dev/null \
   || fail "uninstall removed or kept the wrong Claude registration"
 jq -e '[.hooks.events.UserPromptSubmit[].hooks[].command] == ["/foreign/clio-capture.sh --agent other"]' "$HOME/.zcode/cli/config.json" >/dev/null \
   || fail "uninstall removed or kept the wrong ZCode registration"
+
+# 10. ~/.zcode exists but has no config yet: the first install creates it with the managed hook
+export HOME="$T/home5"; mkdir -p "$HOME/.claude" "$HOME/.zcode"
+bash "$RT" install --apply >/dev/null || fail "case 10 install failed"
+jq -e '.hooks.enabled == true and ([.hooks.events.UserPromptSubmit[].hooks[].command] == ["$HOME/.claude/hooks/clio-capture.sh --agent zcode"])' \
+  "$HOME/.zcode/cli/config.json" >/dev/null || fail "ZCode config not created with the managed hook"
+
+# 11. a pre-existing hook that already matches is not claimed, so uninstall leaves it (and capture) working
+export HOME="$T/home6"; H="$HOME/.claude/hooks"; mkdir -p "$H"
+awk -v q="'" '$0 == "cat > ~/.claude/hooks/log-prompt.sh << " q "EOF" q {f=1; next} f && /^EOF$/ {exit} f' \
+  "$XYZ_SKILLS_ROOT/clio-capture/INSTALL.md" > "$H/log-prompt.sh"; chmod 755 "$H/log-prompt.sh"
+echo '{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$HOME/.claude/hooks/log-prompt.sh"}]}]}}' > "$HOME/.claude/settings.json"
+bash "$RT" install --apply >/dev/null || fail "case 11 install failed"
+jq -e --arg p "$H/log-prompt.sh" '.owned | has($p) | not' "$HOME/.claude/clio-runtime.json" >/dev/null || fail "matching pre-existing hook was claimed"
+bash "$RT" uninstall --apply >/dev/null || fail "case 11 uninstall failed"
+[ -f "$H/log-prompt.sh" ] || fail "uninstall deleted a pre-existing hook it never installed"
+claude_cmds=$(jq -c '[.hooks.UserPromptSubmit[].hooks[].command]' "$HOME/.claude/settings.json")
+[ "$claude_cmds" = '["$HOME/.claude/hooks/log-prompt.sh"]' ] || fail "pre-existing registration changed: $claude_cmds"
+
+# 12. invalid settings.json: install stops (exit 2) with every applied change already in the receipt
+export HOME="$T/home7"; H="$HOME/.claude/hooks"; mkdir -p "$H"
+printf '#!/bin/bash\n# hand-made\n' > "$H/clio-capture.sh"; echo '{not json' > "$HOME/.claude/settings.json"
+bash "$RT" install --apply >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "invalid settings.json: expected exit 2, got $rc"
+[ "$(cat "$HOME/.claude/settings.json")" = '{not json' ] || fail "invalid settings.json was rewritten"
+jq -e --arg p "$H/clio-capture.sh" '(.backups | has($p)) and (.owned | has($p)) and (.added_registrations == [])' \
+  "$HOME/.claude/clio-runtime.json" >/dev/null || fail "receipt lost the backup/ownership after a failed config write"
+
+if [ "$(uname -s)" = Darwin ]; then
+  # 13. launchctl load fails: exit 1, receipt still records the plists it created
+  export HOME="$T/home8"; mkdir -p "$HOME/.claude"
+  LAUNCHCTL_FAIL=1 bash "$RT" install --apply >/dev/null 2>&1; rc=$?
+  [ "$rc" = 1 ] || fail "failed launchctl load: expected exit 1, got $rc"
+  jq -e '.created_plists | length == 2' "$HOME/.claude/clio-runtime.json" >/dev/null || fail "receipt lost created plists after a load failure"
+  # 14. a created plist edited after install is left in place on uninstall
+  export HOME="$T/home9"; LA="$HOME/Library/LaunchAgents"; mkdir -p "$HOME/.claude"
+  bash "$RT" install --apply >/dev/null || fail "case 14 install failed"
+  echo '<!-- local edit -->' >> "$LA/com.claude.clio-agy-tail.plist"
+  bash "$RT" uninstall --apply > "$T/out"; rc=$?
+  [ "$rc" = 1 ] && grep -q "drifted (left in place): $LA/com.claude.clio-agy-tail.plist" "$T/out" || fail "edited plist not reported as drifted"
+  grep -q "local edit" "$LA/com.claude.clio-agy-tail.plist" || fail "uninstall removed an edited plist"
+  [ ! -e "$LA/com.claude.clio-codex-tail.plist" ] || fail "unchanged created plist not removed"
+fi
 
 echo "PASS: clio-runtime"
