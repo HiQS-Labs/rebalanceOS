@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -76,5 +76,25 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+swept file: yes
+
+- [Blocker] The planned `pdda.sh run` gate cannot substantiate this active plan as written: `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:17-87` has no required near-top `## Status` table, while `PROJECT/PDDA.md:48-59` requires its exact heading and columns for every active doc; the intake lifecycle repeats that the promoted doc must satisfy this contract (`PROJECT/PDDA.md:274-277`). Add the table, record the current QA state/next action, and explicitly record the existing ledger row's capture → rate → repoint → move lifecycle (or cite its verified completion) before claiming the docs/roadmap gate green. This is a documentation-contract failure, not a proposed runtime behaviour change.
+
+- [Should] The proposed `AGENTS.md` line and README declaration leave the two repository CLIO skills contradicting the new direction: `.agents/skills/clio/SKILL.md:17-20` (identical `.claude` copy) tells an absent-installed-helper reader to use an **XYZ-CLIO** checkout and says this repository's copy “may not contain” the helper. The plan itself says Rebalance's `utils/CLIO` becomes upstream (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:27-31`) but excludes skill edits at line 75. Update both mirrored skills in the plan to prefer this repository's upstream copy after the installed helper, revise the canonical-install reference accordingly, and preserve XYZ-CLIO only as the published downstream/reference. This is an observed stale instruction, not a request to change CLIO runtime behaviour.
+
+- [Pass] The sync inventory is otherwise complete against the seeded comparison: it identifies all changed/new sync inputs and preserves the two documented Rebalance-only files (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:33-42`; `.relay-artifacts/gh362-evidence.txt:804-810`). No current consumer targets the removed INSTALL heading per the plan's recon (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:44-49`), and the remaining JSONL/Markdown consumers use the existing configured/export paths rather than the repo copy.
+
+- [Pass] Growing the inventory baseline by exactly `utils/CLIO/clio-store.py` is the correct exception-free ratchet route: additions otherwise fail as “NEW script detected,” while a pragma also requires both a non-empty first-ten-lines marker and a registered exemption (`utils/pdda/check_script_inventory.py:163-188`). The helper is adjacent-path deployed by the writer (`.relay-artifacts/gh362-evidence.txt:848-850`), so relocation would break the stated deployable unit.
+
+- [Pass] The narrow Ruff exclusion is justified by byte identity and does not hide adjacent first-party Python: the seeded evidence records the five upstream-only lint findings and formatter rewrites (`.relay-artifacts/gh362-evidence.txt:826-844`), and the existing config already uses individual—not parent-directory—vendor exclusions (`pyproject.toml:99-105`). Keep the planned explicit comment and red control.
+
+VERDICT: FAIL
+
+Basis: The plan has sound sync, ratchet, Ruff, and red-control reasoning, but it cannot pass its stated PDDA/docs gate without the mandatory active-document status/lifecycle record, and it leaves two checked-in CLIO retrieval instructions factually stale immediately after declaring this copy upstream. No pre-existing defect was found in the reviewed source files beyond those documented instruction/plan inconsistencies. Probes were read-only: `rg -n ...` (exit 0) located the two skill statements and all current CLIO consumers; `sed`/`nl` reads (exit 0) confirmed the cited plan, PDDA, checker, and Ruff spans. No test, fixture, validation script, or executable artifact was run.
+
+handing off to Producer — go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
