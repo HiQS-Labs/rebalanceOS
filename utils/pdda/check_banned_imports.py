@@ -7,7 +7,7 @@ One file, two checks (GH-126's "choose one owner" rule forbids a second validato
    ``rebalance.lib``. The exact baseline is keyed by relative path, import family,
    and occurrence count; line numbers remain diagnostic only. A same-line
    ``# CANONICAL-PATH-OK: <reason>`` pragma exempts a reviewed import.
-2. SQLite gateway ratchet (GH-136, blocking via ``--check``): no file outside the two
+2. SQLite gateway ratchet (GH-136, blocking via ``--check``): no file outside the
    gateway directories may call ``sqlite3.connect``. The three gateways are separate
    stores by design — ``src/rebalance/ingest/db/`` (rebalance's own DB, resolved from
    ``REBALANCE_DB``), ``HiQS/hiqs/`` (the clean-room rebuild's app-data store) and
