@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: None (relay closed)
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -105,5 +105,20 @@ added-sha256: cc7043ffef3c25ac313074da6d5c18bf91f37fd1b62accbc26ec31fcefba0755
 - After the R1 Approval, the pre-push gate blocked the push at the SQLite gateway ratchet (GH-136): `utils/CLIO/clio-store.py:1: NEW sqlite3.connect bypass (3 site(s))`. Its baseline is `{}` (zero debt). Added **change 9**: `utils/CLIO` joins `SQLITE_GATEWAY_DIRS` as a separate store by design, beside `HiQS/hiqs`. The checker docstring and the ratchet test docstring are updated. Rejected: re-opening the zero baseline, or a `GATEWAY-OK` pragma (it would edit the synced bytes).
 - Evidence: `.relay-artifacts/gh362-r2-delta.diff` is the full diff from the reviewed head `753d6f5` to HEAD. `check_banned_imports.py --check` is clean on both ratchets; `tests/test_sqlite_gateway_ratchet.py` gives 9 passed; ruff is clean (receipt README, "Change 9").
 - Review requested on change 9 only: is registering CLIO's store as a gateway directory sound under the checker's own contract, and does it widen anything beyond `utils/CLIO/`?
+
+### Reviewer · Round 2
+
+swept file: yes
+
+- [Pass] Registering `utils/CLIO/` is sound and remains narrowly scoped: the scanner excludes only descendants of configured directory prefixes (`utils/pdda/check_banned_imports.py:145-171`), and the sole new prefix is exactly `utils/CLIO` (`utils/pdda/check_banned_imports.py:32-38`). The three direct connections are all in that private store (`utils/CLIO/clio-store.py:102`, `:128`, `:1070`), matching the approved change-9 rationale (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:78-81`). Narrow non-executing probe: `rg -n -C 2 'sqlite3\\.connect|SQLITE_GATEWAY_DIRS|two gateway|three gateways' utils/CLIO/clio-store.py utils/pdda/check_banned_imports.py tests/test_sqlite_gateway_ratchet.py` exited `0`; it found those three CLIO call sites and `SQLITE_GATEWAY_DIRS = (..., "utils/CLIO")`, with no broader prefix.
+- [Pass] The ratchet remains fail-closed for all non-gateway files: it detects new/growing calls and stale baseline entries (`utils/pdda/check_banned_imports.py:198-223`), while the current-tree exact-baseline assertion covers the added gateway exemption (`tests/test_sqlite_gateway_ratchet.py:45-59`). No pre-existing defect was found in the fully swept changed checker or ratchet-test file.
+- [Nit] Correct the stale phrase “outside the two gateway directories” to “outside the gateway directories” in `utils/pdda/check_banned_imports.py:10-11`; the immediately following text accurately says there are three.
+- [Unverified — needs clone run] Per the relay constraint, I did not execute the checker, pytest, ruff, PDDA, or fixtures. The recorded green results remain a post-review harness responsibility (`TESTS-RESULTS/2026-10-25+GH-362/README.md:16`).
+
+VERDICT: PASS
+
+Basis: Change 9 makes CLIO's independent, installed prompt-history store an explicit third gateway without exempting a sibling or widening the scanner outside `utils/CLIO/`. The sole discrepancy is documentation wording, not a behavioral or scope defect.
+
+relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
