@@ -178,4 +178,18 @@ if [ "$(uname -s)" = Darwin ]; then
   [ ! -e "$LA/com.claude.clio-codex-tail.plist" ] || fail "unchanged created plist not removed"
 fi
 
+# 15. two adoptions within the same second keep the first original (unique backup folder per run)
+export HOME="$T/home10"; H="$HOME/.claude/hooks"; mkdir -p "$H"
+# Pin the backup-folder timestamp so both runs fall in "the same second" deterministically.
+mkdir -p "$T/samesec"; printf '#!/bin/bash\ncase "$*" in *%%Y%%m%%dT%%H%%M%%SZ*) echo 20260101T000000Z ;; *) exec /bin/date "$@" ;; esac\n' > "$T/samesec/date"
+chmod +x "$T/samesec/date"; PATH="$T/samesec:$PATH"
+printf '#!/bin/bash\n# original A\n' > "$H/clio-agy-tail.sh"
+bash "$RT" install --apply >/dev/null || fail "case 15 first install failed"
+rm "$H/clio-agy-tail.sh"; printf '#!/bin/bash\n# later B\n' > "$H/clio-agy-tail.sh"
+bash "$RT" install --apply >/dev/null || fail "case 15 second install failed"
+bk=$(jq -r --arg p "$H/clio-agy-tail.sh" '.backups[$p]' "$HOME/.claude/clio-runtime.json")
+grep -q "original A" "$bk" || fail "the first original backup was overwritten"
+[ "$(grep -rl 'later B' "$HOME/.claude/clio-runtime-backups" | wc -l | tr -d ' ')" = 1 ] || fail "the second foreign file was not kept"
+PATH="${PATH#"$T/samesec:"}"
+
 echo "PASS: clio-runtime"

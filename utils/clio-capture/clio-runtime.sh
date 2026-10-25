@@ -157,7 +157,7 @@ foreign=(); for f in $LINKS $GENERATED; do [ "$(item_state "$f")" = foreign ] &&
 [ "$APPLY" = 1 ] || { echo "preview only; add --apply"; exit 0; }
 
 mkdir -p "$H"
-BK="$HOME/.claude/clio-runtime-backups/$(date -u +%Y%m%dT%H%M%SZ)"
+BK=""   # created on first backup; unique per run, so two runs in one second never share it
 # Prior receipt state carries forward; the receipt is rewritten after every change, so a later
 # failure (a config write, a launchctl load) never loses a backup or ownership record.
 prior() { if [ -f "$RECEIPT" ]; then jq -c "$1 // {}" "$RECEIPT"; else echo '{}'; fi; }
@@ -180,7 +180,11 @@ for f in $LINKS $GENERATED; do
   p="$H/$f"; st=$(item_state "$f")
   [ "$st" = ok ] && continue            # already correct: claimed only if an earlier run owned it
   if [ "$st" = foreign ]; then   # someone else's file (or a hand edit): keep it before replacing
-    mkdir -p "$BK"; mv "$p" "$BK/"
+    if [ -z "$BK" ]; then
+      mkdir -p "$HOME/.claude/clio-runtime-backups"
+      BK=$(mktemp -d "$HOME/.claude/clio-runtime-backups/$(date -u +%Y%m%dT%H%M%SZ).XXXXXX") && [ -d "$BK" ] || die "could not create a backup folder"
+    fi
+    mv "$p" "$BK/"
     # Keep the oldest backup: it is the pre-install original.
     backups=$(jq -c --arg p "$p" --arg b "$BK/$f" 'if has($p) then . else .[$p] = $b end' <<< "$backups")
     save_receipt

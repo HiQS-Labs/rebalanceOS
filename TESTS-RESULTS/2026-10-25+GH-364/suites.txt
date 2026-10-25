@@ -16,3 +16,4 @@ bash test/clio-capture.sh -> exit 0 (after PR #365 review fixes)
 bash test/clio-codex-tail.sh -> exit 0 (after PR #365 review fixes)
 bash test/clio-agy-tail.sh -> exit 0 (after PR #365 review fixes)
 red control: PR-head installer 1475318 + spaced-path suite -> FAIL: install preview failed
+red control: installer fb38916 + case 15 -> FAIL: the first original backup was overwritten; fixed installer -> PASS (15 cases)

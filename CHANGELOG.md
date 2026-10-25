@@ -14,7 +14,7 @@
 
 ### Added
 
-- Prompt capture can now be installed, repaired, upgraded, checked and removed on a device with one command, run from the copy the skills deployment tool places on each machine. Capture scripts link to that copy, so a sync upgrades them, and the generated parts are flagged when they fall behind. Any hand-installed file it replaces is backed up and restored on removal, and anything edited after install is left alone. Each device keeps a record of what was installed and from which revision. Verified by a fourteen-case install and removal suite run in a throwaway home folder, including a path with spaces, failed configuration writes and service-load failures; one existing date-dependent store test still fails as before.
+- Prompt capture can now be installed, repaired, upgraded, checked and removed on a device with one command, run from the copy the skills deployment tool places on each machine. Capture scripts link to that copy, so a sync upgrades them, and the generated parts are flagged when they fall behind. Any hand-installed file it replaces is backed up and restored on removal, and anything edited after install is left alone. Each device keeps a record of what was installed and from which revision. Verified by a fifteen-case install and removal suite run in a throwaway home folder, including a path with spaces, failed configuration writes and service-load failures; one existing date-dependent store test still fails as before.
 
 ### Changed
 

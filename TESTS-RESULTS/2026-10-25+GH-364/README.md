@@ -4,7 +4,7 @@ Issue https://github.com/HiQS-Labs/rebalanceOS/issues/364. Commits: rename `9ba7
 
 | Check | Result | Evidence |
 |---|---|---|
-| `test/clio-runtime.sh` (new; 14 cases, collection path containing a space: refusal outside the collection; fresh install with no ZCode side effects; converged rerun; repair of a deleted link; stale writer and upgrade; adoption with backup; receipt-scoped uninstall; drift-safe uninstall; look-alike registrations; ZCode dir without config; matching pre-existing hook not claimed; invalid settings.json keeps the receipt; launchctl load failure keeps the receipt; edited plist kept on uninstall) | PASS under macOS `/bin/bash` 3.2 in a disposable full clone | `suites.txt` |
+| `test/clio-runtime.sh` (new; 15 cases, collection path containing a space: refusal outside the collection; fresh install with no ZCode side effects; converged rerun; repair of a deleted link; stale writer and upgrade; adoption with backup; receipt-scoped uninstall; drift-safe uninstall; look-alike registrations; ZCode dir without config; matching pre-existing hook not claimed; invalid settings.json keeps the receipt; launchctl load failure keeps the receipt; edited plist kept on uninstall; two same-second adoptions keep the first original) | PASS under macOS `/bin/bash` 3.2 in a disposable full clone | `suites.txt` |
 | Existing CLIO suites after the rename | capture, exporter, codex-tail, agy-tail pass; `clio-store.py` has 1 known date-dependent failure (also fails upstream and on base) | `suites.txt` |
 | Red control: the installer stops backing up replaced files | suite fails: `hand-made file was not backed up` | `suites.txt` |
 | Red control: uninstall ignores drift | suite fails: `uninstall with a drifted hook: expected exit 1, got 0` | `suites.txt` |
@@ -24,3 +24,5 @@ The smoke run shows the real adoption plan for this Mac: the installed writer pr
 - **Created plists.** Their checksums are recorded, and an edited plist is left in place on uninstall (case 14).
 - **Prerequisites.** `python3` is now a checked prerequisite.
 - **Inventory.** `clio-runtime.sh` carries a `SCRIPT-INVENTORY-OK` pragma and sits in the baseline's `exemptions` (AGENTS.md GH-241), not the plain utils list.
+
+**CodeRabbit follow-up on `fb38916`.** Backup folders were named by the UTC second, so two runs in the same second shared one folder, and the second `mv` overwrote the receipt's original backup. Each run now creates a unique folder with `mktemp -d`, and only when a backup is needed. Case 15 pins the timestamp with a `date` stub. Red control: installer `fb38916` fails with `the first original backup was overwritten`; the fix passes all 15 cases. **Independent review did not run** on this three-line change: the Codex relay's three-round cap was spent. CodeRabbit reviewed it, and CI re-runs.
