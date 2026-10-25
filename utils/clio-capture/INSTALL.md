@@ -26,6 +26,13 @@ never rewritten). The dedup ID stays `session_id:timestamp` for every agent.
 
 ## Install
 
+> **Automated install (recommended on a fleet Mac):** once Skills Army HQ has deployed the
+> `clio-capture` skill, run `clio-runtime.sh status` and then `clio-runtime.sh install --apply`
+> from the deployed folder. It performs this block's steps, plus the Codex and Agy tailer jobs, from
+> the deployed bytes: helpers become symlinks, the writer and shim are generated from the heredocs
+> below, and existing files are backed up with a receipt. This manual block remains the reference
+> it follows.
+
 Run once (macOS/Linux), either from the root of a CLIO checkout or from an installed
 `clio-capture` skill directory — the resolver below finds CLIO's source files in both layouts.
 CLIO requires `jq` (the Codex and Agy tailers additionally use `python3`):

@@ -24,6 +24,10 @@ An optional second script converts that JSONL into human-readable Markdown —
 newest entry first — at any location you choose, such as a note in an Obsidian
 vault. It can run on demand or on a 5-minute `launchd` schedule (macOS).
 
+**Install on a device:** from the Skills Army deployed copy, run `clio-runtime.sh status`, then
+`clio-runtime.sh install --apply` (see [SKILL.md](SKILL.md)). It links the hooks into the deployed
+copy and records a receipt, so nothing is hand-copied.
+
 See [INSTALL.md](INSTALL.md) for the full install, verify, export, auto-sync, and
 uninstall instructions.
 

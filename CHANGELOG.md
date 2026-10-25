@@ -10,6 +10,16 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.105.0] - 2026-10-25
+
+### Added
+
+- Prompt capture can now be installed, repaired, upgraded, checked and removed on a device with one command, run from the copy the skills deployment tool places on each machine. Capture scripts link to that copy, so a sync upgrades them, and the generated parts are flagged when they fall behind. Any hand-installed file it replaces is backed up and restored on removal, and anything edited after install is left alone. Each device keeps a record of what was installed and from which revision.
+
+### Changed
+
+- The prompt-capture package moved to a lowercase folder name, so the skills deployment tool can deploy it as a skill.
+
 ## [0.104.0] - 2026-10-25
 
 ### Changed
