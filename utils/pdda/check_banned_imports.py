@@ -11,7 +11,7 @@ One file, two checks (GH-126's "choose one owner" rule forbids a second validato
    gateway directories may call ``sqlite3.connect``. The three gateways are separate
    stores by design — ``src/rebalance/ingest/db/`` (rebalance's own DB, resolved from
    ``REBALANCE_DB``), ``HiQS/hiqs/`` (the clean-room rebuild's app-data store) and
-   ``utils/CLIO/`` (CLIO's private prompt-history store; its stdlib helper runs installed
+   ``utils/clio-capture/`` (CLIO's private prompt-history store; its stdlib helper runs installed
    beside the capture hooks, outside this package, GH-362) — so they are not to be
    converged, only bypassing code is to be routed. ``--check``
    compares the tree against an exact per-file baseline and fails on additions (new
@@ -32,7 +32,7 @@ from pathlib import Path
 SQLITE_CALL_RE = re.compile(r"sqlite3\.connect\s*\(")
 SQLITE_PRAGMA_RE = re.compile(r"#\s*GATEWAY-OK:\s*(.*)$")
 SQLITE_ROOTS = ("src", "utils", "HiQS")
-SQLITE_GATEWAY_DIRS = ("src/rebalance/ingest/db", "HiQS/hiqs", "utils/CLIO")
+SQLITE_GATEWAY_DIRS = ("src/rebalance/ingest/db", "HiQS/hiqs", "utils/clio-capture")
 SQLITE_SELF_EXEMPT = ("utils/pdda/check_banned_imports.py",)
 SQLITE_PRUNED_DIRS = {"tests", "__pycache__"}
 SQLITE_BASELINE_PATH = Path(__file__).with_name("sqlite_connect_baseline.json")

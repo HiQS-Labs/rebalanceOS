@@ -1,6 +1,6 @@
 import Foundation
 
-// Parses the CLIO exporter's Markdown format (utils/CLIO/INSTALL.md in
+// Parses the CLIO exporter's Markdown format (utils/clio-capture/INSTALL.md in
 // rebalance-OS). Each entry below the `<!-- CLIO:ENTRIES -->` marker looks
 // like:
 //

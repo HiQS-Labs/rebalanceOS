@@ -270,7 +270,7 @@ baseline references become violations.
 | Pulse warning watch | scripts/pulse_warning_watch.py | 15 min | HTTP probe of pulse-server | none | temp JSONL | — |
 | Daily work synthesis canary | scripts/daily_work_synthesis.sh, utils/daily_work_synthesis.py | 15 min, opt-in | existing CLIO/calendar/reminder read APIs + Daily repository/CPU scanners | own (R2-baseline: utils/daily_work_synthesis.py) | append-only temp Daily log + sanitized receipt JSONL | — |
 | CLIO journey replay | src/rebalance/ingest/clio_journey.py (`rebalance clio-journey-replay`) | manual, opt-in | frozen CLIO export + bounded read-only GitHub snapshot (GH-230 exception) | none | new private replay directory | — |
-| CLIO capture store | utils/CLIO/clio-store.py | per prompt (installed capture hook) + 5-min exporter | CLIO's private prompt-history SQLite (a separate store by design; GH-136 gateway dir, GH-362) | none | CLIO SQLite + rolling Markdown note | — |
+| CLIO capture store | utils/clio-capture/clio-store.py | per prompt (installed capture hook) + 5-min exporter | CLIO's private prompt-history SQLite (a separate store by design; GH-136 gateway dir, GH-362) | none | CLIO SQLite + rolling Markdown note | — |
 | Health issue reporter | scripts/health_issue_reporter.py | hourly :10 + 3×/day triage | doctor subprocess + GitHub API | own (R2-baseline: scripts/health_issue_reporter.py) | GitHub issues | — |
 | Daily note rollover | utils/obsidian_rollover.sh, utils/obsidian_daily_rollover.py | daily 00:40 | vault filesystem | none | Obsidian daily note | — |
 | Progress digest | scripts/hiqs_digest.sh, utils/hiqs_digest.py | 2×/day 13:05/17:05 | own SQL (R1-baseline: utils/hiqs_digest.py) + doctor + semantic | querier | pulse repo digests/ → Slack relay | — |

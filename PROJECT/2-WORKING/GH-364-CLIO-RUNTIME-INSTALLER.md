@@ -2,7 +2,7 @@
 gh_issue: 364
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/364
 title: "GH-364 CLIO runtime installer (clio-capture skill)"
-status: "Working — plan under Codex QA"
+status: "Working — implementing (plan QA approved R3)"
 created: 2026-10-25
 updated: 2026-10-25
 owner: noel
@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA R1 and R2 dispositioned. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
+| Plan QA approved (R3). Moved to In progress. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/364 · Base `origin/development` e4a7abb · Clone/branch `rebalanceOS-gh364-clio-runtime-installer-2026-10-25` / `feat/<same>`.
 
@@ -106,8 +106,8 @@ The source plan is the operator-reviewed `temp/clio-runtime-installer-plan.md` (
      4. A pre-existing hand-made `log-prompt.sh` (red control): `install` preview names it and changes nothing; `--apply` backs it up and replaces it.
      5. `uninstall --apply` restores the hand-made file and leaves a pre-existing foreign registration and a pre-existing tailer plist in place. Only receipt-owned items are removed.
      6. Running the script from a repo path (not `<collection>/clio-capture`) → exit 2, nothing written.
-     8. A drift-safe uninstall (red control for R2): after install, edit the installed `log-prompt.sh`; `uninstall --apply` exits 1, leaves the edited file and its backup in place, reports it as drifted, keeps the receipt, and still removes the unchanged items.
      7. Rerunning `install --apply` on a converged HOME → "nothing to do", and no file changes.
+     8. A drift-safe uninstall (red control for R2): after install, edit the installed `log-prompt.sh`; `uninstall --apply` exits 1, leaves the edited file and its backup in place, reports it as drifted, keeps the receipt, and still removes the unchanged items.
 5. **Gates and docs:**
    - script-inventory `--update-baseline`; ruff exclude and SQLite gateway dir renamed; ARCHITECTURE catalog row path updated;
    - `utils/clio-capture/README.md` gets an "Install on a device" pointer to `clio-runtime.sh`;

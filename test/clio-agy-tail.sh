@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fixture harness for utils/CLIO/clio-agy-tail.sh (GH-139 Phase 3).
+# Fixture harness for utils/clio-capture/clio-agy-tail.sh (GH-139 Phase 3).
 #
 # Exercises the at-least-once contract against a synthetic transcript tree:
 # source/type row selection (only USER_EXPLICIT + USER_INPUT), start-now
@@ -9,9 +9,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TAILER="$ROOT/utils/CLIO/clio-agy-tail.sh"
+TAILER="$ROOT/utils/clio-capture/clio-agy-tail.sh"
 FIXTURE="$ROOT/test/fixtures/clio/agy-transcript.jsonl"
-INSTALL_DOC="$ROOT/utils/CLIO/INSTALL.md"
+INSTALL_DOC="$ROOT/utils/clio-capture/INSTALL.md"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/clio-agy-tail.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

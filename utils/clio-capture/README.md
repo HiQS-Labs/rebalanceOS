@@ -2,8 +2,8 @@
 
 ## Upstream — edit here first
 
-This folder (`rebalanceOS/utils/CLIO/`) is **CLIO's canonical source**. It is published
-unchanged to [HiQS-Labs/XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO) `utils/CLIO/`.
+This folder (`rebalanceOS/utils/clio-capture/`) is **CLIO's canonical source**. It is published
+unchanged to [HiQS-Labs/XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO).
 The exceptions are this README and `LICENSE`; XYZ-CLIO keeps its own at the repository root.
 
 - Make every CLIO change here first, through a reviewed rebalanceOS PR, then publish it to

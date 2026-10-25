@@ -27,20 +27,20 @@ never rewritten). The dedup ID stays `session_id:timestamp` for every agent.
 ## Install
 
 Run once (macOS/Linux), either from the root of a CLIO checkout or from an installed
-`clio` skill directory — the resolver below finds CLIO's source files in both layouts.
+`clio-capture` skill directory — the resolver below finds CLIO's source files in both layouts.
 CLIO requires `jq` (the Codex and Agy tailers additionally use `python3`):
 
 ```bash
 command -v jq >/dev/null 2>&1 || { echo "jq is required. Install it: brew install jq (macOS) / apt install jq (Linux)"; return 1 2>/dev/null || exit 1; }
 
 # --- resolve CLIO's source files (checkout OR installed skill dir) ----------
-# In a checkout the scripts live under utils/CLIO/; in an installed skill they
+# In a checkout the scripts live under utils/clio-capture/; in an installed skill they
 # sit beside INSTALL.md with no prefix. Export CLIO_SRC yourself to override.
 if [ -z "${CLIO_SRC:-}" ]; then
-  for c in "$PWD/utils/CLIO" "$PWD" \
-           "$HOME/.claude/skills/clio" \
-           "$(git rev-parse --show-toplevel 2>/dev/null)/utils/CLIO" \
-           "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/skills/clio"; do
+  for c in "$PWD/utils/clio-capture" "$PWD" \
+           "$HOME/.claude/skills/clio-capture" \
+           "$(git rev-parse --show-toplevel 2>/dev/null)/utils/clio-capture" \
+           "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/skills/clio-capture"; do
     [ -f "$c/prompt-log-to-md.sh" ] && { CLIO_SRC="$c"; break; }
   done
 fi
@@ -676,12 +676,12 @@ Codex has no prompt-submit hook, so a read-only tailer turns user prompts from C
 session rollouts into JSONL rows. It parses only `event_msg`/`user_message` records,
 never takes prompt text from `response_item` entries (where injected context can be
 combined with user input), and never writes to the source. Run once from a CLIO checkout
-or an installed `clio` skill directory (requires `jq` and `python3`). This is a separate
+or an installed `clio-capture` skill directory (requires `jq` and `python3`). This is a separate
 shell from the main install, so it re-resolves `CLIO_SRC` unless you exported it:
 
 ```bash
 if [ -z "${CLIO_SRC:-}" ]; then
-  for c in "$PWD/utils/CLIO" "$PWD" "$HOME/.claude/skills/clio"; do
+  for c in "$PWD/utils/clio-capture" "$PWD" "$HOME/.claude/skills/clio-capture"; do
     [ -f "$c/clio-codex-tail.sh" ] && { CLIO_SRC="$c"; break; }
   done
 fi
@@ -745,7 +745,7 @@ plain `transcript.jsonl` truncates large text), capturing only rows where `sourc
 
 ```bash
 if [ -z "${CLIO_SRC:-}" ]; then
-  for c in "$PWD/utils/CLIO" "$PWD" "$HOME/.claude/skills/clio"; do
+  for c in "$PWD/utils/clio-capture" "$PWD" "$HOME/.claude/skills/clio-capture"; do
     [ -f "$c/clio-agy-tail.sh" ] && { CLIO_SRC="$c"; break; }
   done
 fi
