@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -96,5 +96,11 @@ VERDICT: FAIL
 Basis: The plan has sound sync, ratchet, Ruff, and red-control reasoning, but it cannot pass its stated PDDA/docs gate without the mandatory active-document status/lifecycle record, and it leaves two checked-in CLIO retrieval instructions factually stale immediately after declaring this copy upstream. No pre-existing defect was found in the reviewed source files beyond those documented instruction/plan inconsistencies. Probes were read-only: `rg -n ...` (exit 0) located the two skill statements and all current CLIO consumers; `sed`/`nl` reads (exit 0) confirmed the cited plan, PDDA, checker, and Ruff spans. No test, fixture, validation script, or executable artifact was run.
 
 handing off to Producer — go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1
+
+- [Blocker] missing `## Status` table → **Implemented**: added near the top with the exact columns. It records the ledger lifecycle completed so far (capture, park as `rmi-01M5SP89MGBXQKJ8667P2PD5MG`, rate, promote, repoint) and the next steps (move to In progress on approval). The `pdda.sh run` claim stays a verification step, not an assertion.
+- [Should] stale CLIO skill instructions → **Implemented** as change 3: both identical skill copies prefer this repo's upstream helper after the installed one, drop the "older copy may not contain" line, and point the canonical reference at this repo's INSTALL anchor (present in the synced bytes), with XYZ-CLIO named as the published copy. Later changes are renumbered.
+- [Pass] items acknowledged.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

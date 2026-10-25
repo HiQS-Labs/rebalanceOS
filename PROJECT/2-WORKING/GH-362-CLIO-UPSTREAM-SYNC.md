@@ -16,6 +16,12 @@ roadmap_exempt: false
 
 # GH-362 — CLIO upstream sync
 
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Ledger lifecycle so far: captured in `1-INBOX`, parked (`roadmap add`, row `rmi-01M5SP89MGBXQKJ8667P2PD5MG`), rated `75/55/50/80`, promoted to `2-WORKING`, `roadmap repoint`ed. Plan QA R1 (Codex) dispositioned. | Plan QA R2. On approval: `roadmap move` to In progress, implement, verify, final QA, PR. |
+
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/362 · Base `origin/development` 6672892 · Clone/branch `rebalanceOS-gh362-clio-upstream-sync-2026-10-25` / `chore/<same>`.
 Rating `rated 75/55/50/80` (calc 260), 2026-10-25.
 - Priority: it blocks the publisher (0c), the CLIO installer and the Codex capture fix (XYZ-CLIO#14).
@@ -57,22 +63,23 @@ Consumers checked:
    - every change is made here first, through a reviewed rebalanceOS PR, then published;
    - devices get it only through Skills Army HQ, never by hand copy.
    It also records the sync revision (`bacd26f`).
-3. `AGENTS.md`: one line under the existing CLIO pointer saying `utils/CLIO/` is CLIO upstream and edited here first (see `utils/CLIO/README.md`).
-4. `utils/pdda/script_inventory_baseline.json`: `--update-baseline`. The only diff is the added `utils/CLIO/clio-store.py`.
-5. `pyproject.toml` `[tool.ruff] extend-exclude`: add `"utils/CLIO"` and `"test/clio-store.py"`, with a comment that the folder is published byte-for-byte to XYZ-CLIO and verified by its own suites. Recon: the repo's ruff (`ruff check .` and `ruff format --check .`, run by both the pre-push gate and `ci.yml`) rejects the upstream files:
+3. `.agents/skills/clio/SKILL.md` and its identical `.claude/skills/clio/SKILL.md` (plan QA R1): under "Locate the existing store", after the installed reader, prefer this repository's upstream `utils/CLIO/clio-store.py` and keep an XYZ-CLIO checkout as the published downstream. Drop "This repository's older `utils/CLIO/` copy may not contain the SQLite helper". The "Canonical interface and setup reference" becomes this repo's `utils/CLIO/INSTALL.md#read-only-agent-lookup` (that anchor exists in the synced bytes), with XYZ-CLIO named as its published copy. Retrieval behaviour is otherwise unchanged. The deployed skill updates later through Skills Army HQ, not in this PR.
+4. `AGENTS.md`: one line under the existing CLIO pointer saying `utils/CLIO/` is CLIO upstream and edited here first (see `utils/CLIO/README.md`).
+5. `utils/pdda/script_inventory_baseline.json`: `--update-baseline`. The only diff is the added `utils/CLIO/clio-store.py`.
+6. `pyproject.toml` `[tool.ruff] extend-exclude`: add `"utils/CLIO"` and `"test/clio-store.py"`, with a comment that the folder is published byte-for-byte to XYZ-CLIO and verified by its own suites. Recon: the repo's ruff (`ruff check .` and `ruff format --check .`, run by both the pre-push gate and `ci.yml`) rejects the upstream files:
    - `clio-store.py`: E731 at L754 and F841 (`since` unused) at L779;
    - `test/clio-store.py`: F401 and B023 ×2;
    - format would rewrite ~1,400 / ~1,200 lines.
 
    That would fork the bytes on day one and make 0c's "first publish is an empty diff" proof impossible. The file already excludes vendored `releases_app.py` for the same reason. F841 is a dead leftover (the render path uses `cutoff_dt`), not a defect; it is logged as a follow-up for the first upstream change, not edited here.
-6. `CHANGELOG.md`: entry per repo convention.
+7. `CHANGELOG.md`: entry per repo convention.
 
 ## Non-goals
 - No edits to synced bytes. INSTALL.md keeps upstream wording; the banner that names the upstream inside INSTALL.md is a first change made *here* after the flip and published in 0c.
 - No publisher.
 - No installer.
 - No Codex format fix (#14).
-- No skill edits.
+- No skill edits beyond the stale locate/reference lines in change 3.
 - No device installs.
 
 ## Risks / rollback
@@ -82,6 +89,6 @@ Consumers checked:
 ## Verification (disposable full clone; tests with throwaway HOME and synthetic data)
 - `diff -r` of the six synced paths vs XYZ-CLIO `bacd26f`: empty, with modes equal (red control: run against the base → non-empty).
 - `bash test/clio-{capture,exporter,codex-tail,agy-tail}.sh` and `python3 test/clio-store.py`: pass, apart from the known date-dependent `test_activation_import_gate_and_source_preservation`, which also fails in XYZ-CLIO at `bacd26f`.
-- `python3 utils/pdda/check_script_inventory.py --check`: green after change 4 (red control: before change 4 it fails, naming `clio-store.py`).
+- `python3 utils/pdda/check_script_inventory.py --check`: green after change 4 (red control: before change 5 it fails, naming `clio-store.py`).
 - `ruff check .` and `ruff format --check .` green with the exclude (red control: without it, the five findings above). `utils/pdda/pdda.sh run` (docs and roadmap-coverage gate) green, plus the repo's pre-push static gate (ruff, repo guards, governance ratchets) on push.
 - Smoke: run `python3 utils/CLIO/clio-store.py --help` and one `query` against a throwaway DB, from the repo copy (main path), plus `prompt-log-to-md.sh --help` (adjacent path).
