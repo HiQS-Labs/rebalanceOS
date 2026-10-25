@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 3
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -116,5 +116,10 @@ VERDICT: FAIL
 Basis: The ratchet decision, byte-identity Ruff exclusion, sync inventory, upstream declaration, and PDDA lifecycle are sound and the R1 defects are addressed. The plan nevertheless asserts consumers are unaffected while its one live exporter-format contract cites a line that the required upstream patch necessarily shifts. No other pre-existing defect was found in the reviewed plan. Read-only probes only: `cmp -s .agents/skills/clio/SKILL.md .claude/skills/clio/SKILL.md` exited 0; the anchor scan quoted above exited 0; no test, fixture, validation script, or executable artifact was run.
 
 handing off to Producer — go to the Producer window and say 'take your turn'.
+
+### Producer · Round 2
+
+- [Should] stale `prompt-log-to-md.sh:500` contract anchor → **Implemented** as change 8: the `markdown_rows` docstring gets a descriptive reference (the legacy exporter's jq render of `<!-- clio:id:SESSION:UTC -->` blocks) instead of a line number. Comment only. Falsifier added: `rg -n -F 'prompt-log-to-md.sh:500' src/` is empty afterwards. The historical plan doc that also cites it is left as history.
+- [Pass] acknowledged.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
