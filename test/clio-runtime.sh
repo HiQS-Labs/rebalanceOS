@@ -115,4 +115,20 @@ bk=$(jq -r --arg p "$H/log-prompt.sh" '.backups[$p]' "$HOME/.claude/clio-runtime
 grep -q "hand-made" "$bk" || fail "drifted hook's backup was not kept"
 [ ! -e "$H/clio-capture.sh" ] && [ ! -L "$H/clio-store.py" ] || fail "unchanged items were not removed"
 
+# 9. look-alike registrations are not mistaken for the managed ones (final QA R1)
+export HOME="$T/home4"; mkdir -p "$HOME/.claude" "$HOME/.zcode/cli"
+echo '{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"/foreign/hooks/log-prompt.sh"}]}]}}' > "$HOME/.claude/settings.json"
+echo '{"hooks":{"enabled":true,"events":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"/foreign/clio-capture.sh --agent other"}]}]}}}' > "$HOME/.zcode/cli/config.json"
+{ bash "$RT" status || true; } | grep -q "claude-registration *missing" || fail "look-alike Claude command counted as registered"
+{ bash "$RT" status || true; } | grep -q "zcode-registration *missing" || fail "look-alike ZCode command counted as registered"
+bash "$RT" install --apply >/dev/null || fail "case 9 install failed"
+jq -e '[.hooks.UserPromptSubmit[].hooks[].command] == ["/foreign/hooks/log-prompt.sh", "$HOME/.claude/hooks/log-prompt.sh"]' "$HOME/.claude/settings.json" >/dev/null \
+  || fail "managed Claude registration not added beside the look-alike"
+jq -e '.added_registrations == ["claude", "zcode"]' "$HOME/.claude/clio-runtime.json" >/dev/null || fail "registrations not recorded in the receipt"
+bash "$RT" uninstall --apply >/dev/null || fail "case 9 uninstall failed"
+jq -e '[.hooks.UserPromptSubmit[].hooks[].command] == ["/foreign/hooks/log-prompt.sh"]' "$HOME/.claude/settings.json" >/dev/null \
+  || fail "uninstall removed or kept the wrong Claude registration"
+jq -e '[.hooks.events.UserPromptSubmit[].hooks[].command] == ["/foreign/clio-capture.sh --agent other"]' "$HOME/.zcode/cli/config.json" >/dev/null \
+  || fail "uninstall removed or kept the wrong ZCode registration"
+
 echo "PASS: clio-runtime"

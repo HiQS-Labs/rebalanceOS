@@ -9,3 +9,5 @@ python3 test/clio-store.py -> exit 1 (FAILED (failures=1)) test_activation_impor
 no-backup mutation: FAIL: hand-made file was not backed up
 no-drift-check mutation: FAIL: uninstall with a drifted hook: expected exit 1, got 0
 restored: PASS: clio-runtime
+red control (installer b1f21ec, suite with case 9): FAIL: look-alike Claude command counted as registered
+test/clio-runtime.sh at the fixed installer: PASS (9 cases)

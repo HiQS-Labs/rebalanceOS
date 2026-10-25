@@ -54,9 +54,11 @@ item_state() { # $1 = hook name -> ok | missing | stale | wrong-target | foreign
     else echo foreign; fi
   elif [ -e "$p" ] || [ -L "$p" ]; then echo foreign; else echo missing; fi
 }
-claude_reg() { grep -q 'hooks/log-prompt.sh' "$SETTINGS" 2>/dev/null; }
+# Registrations match the exact managed command (not a substring), as INSTALL.md writes it.
+CLAUDE_CMD='$HOME/.claude/hooks/log-prompt.sh'; ZCODE_CMD='$HOME/.claude/hooks/clio-capture.sh --agent zcode'
+claude_reg() { jq -e --arg c "$CLAUDE_CMD" '[.hooks.UserPromptSubmit[]?.hooks[]?.command] | index($c) != null' "$SETTINGS" >/dev/null 2>&1; }
 zcode_wanted() { [ -d "$HOME/.zcode" ]; }
-zcode_reg() { grep -q 'clio-capture.sh' "$ZCONFIG" 2>/dev/null; }
+zcode_reg() { jq -e --arg c "$ZCODE_CMD" '[.hooks.events.UserPromptSubmit[]?.hooks[]?.command] | index($c) != null' "$ZCONFIG" >/dev/null 2>&1; }
 plist_of() { echo "$LA/com.claude.clio-$1-tail.plist"; }
 loaded() { launchctl list 2>/dev/null | awk '{print $3}' | grep -qx "$1"; }
 
@@ -117,10 +119,10 @@ if [ "$CMD" = uninstall ]; then
   fi
   if grep -qx zcode <<< "$regs" && [ -f "$ZCONFIG" ]; then
     jq 'if (.hooks.events.UserPromptSubmit // null) == null then . else .hooks.events.UserPromptSubmit = (.hooks.events.UserPromptSubmit
-          | map(.hooks = ((.hooks // []) | map(select(((.command // "") | contains("clio-capture.sh")) | not))))
+          | map(.hooks = ((.hooks // []) | map(select((.command // "") != $c))))
           | map(select((.hooks // []) | length > 0)))
         | if .hooks.events.UserPromptSubmit == [] then del(.hooks.events.UserPromptSubmit) else . end end' \
-      "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"
+      --arg c "$ZCODE_CMD" "$ZCONFIG" > "$ZCONFIG.tmp" && mv "$ZCONFIG.tmp" "$ZCONFIG"
   fi
   while IFS= read -r p; do [ -n "$p" ] || continue; launchctl unload "$p" 2>/dev/null || true; rm -f "$p"; done <<< "$plists"
   if [ ${#drifted[@]} -gt 0 ]; then
