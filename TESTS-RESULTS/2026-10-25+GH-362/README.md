@@ -12,3 +12,5 @@ Issue https://github.com/HiQS-Labs/rebalanceOS/issues/362. Implementation commit
 | `utils/pdda/pdda.sh run` | exit 0, observe mode; 26 errors, the same count as base `6672892`, none naming GH-362 or changed files | `gates.txt` |
 | `rg -F 'prompt-log-to-md.sh:500' src/` | no match (change 8) | – |
 | Smoke: `clio-store.py` help/init/query/re-init/missing-DB, legacy exporter render + `--status` | all as expected; a read-only query never creates a store | `smoke.txt` |
+
+**Change 9 (after final QA R1).** The pre-push gate blocked the push at `ratchet-banned-imports`: `utils/CLIO/clio-store.py:1: NEW sqlite3.connect bypass (3 site(s))` (red control). With `utils/CLIO` registered as a SQLite gateway directory, `python utils/pdda/check_banned_imports.py --check` reports both ratchets clean, `pytest tests/test_sqlite_gateway_ratchet.py` gives 9 passed, and ruff is clean on the checker. `pdda.sh run` had shown banned-imports as an observe-mode error only because the task clone has no `.venv` (the same as base), which is why it was not caught earlier.

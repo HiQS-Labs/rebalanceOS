@@ -2,7 +2,7 @@
 gh_issue: 362
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/362
 title: "GH-362 sync utils/CLIO up to XYZ-CLIO and make Rebalance CLIO's upstream"
-status: "Working — PR ready, awaiting merge"
+status: "Working — final QA R2 (change 9)"
 created: 2026-10-25
 updated: 2026-10-25
 owner: noel
@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Implemented and verified (receipt `TESTS-RESULTS/2026-10-25+GH-362/`); final Codex QA Approved R1. | PR ready; awaiting merge. After merge: XYZ-CLIO publisher (0c), then the CLIO installer. |
+| Implemented and verified (receipt `TESTS-RESULTS/2026-10-25+GH-362/`); final Codex QA Approved R1; then the pre-push gate found the SQLite gateway ratchet, so change 9 was added. | Final QA R2 on change 9, push, PR. After merge: XYZ-CLIO publisher (0c), then the CLIO installer. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/362 · Base `origin/development` 6672892 · Clone/branch `rebalanceOS-gh362-clio-upstream-sync-2026-10-25` / `chore/<same>`.
 Rating `rated 75/55/50/80` (calc 260), 2026-10-25.
@@ -74,6 +74,11 @@ Consumers checked:
    That would fork the bytes on day one and make 0c's "first publish is an empty diff" proof impossible. The file already excludes vendored `releases_app.py` for the same reason. F841 is a dead leftover (the render path uses `cutoff_dt`), not a defect; it is logged as a follow-up for the first upstream change, not edited here.
 7. `CHANGELOG.md`: entry per repo convention.
 8. `src/rebalance/ingest/clio_journey.py` `markdown_rows` docstring (plan QA R2): replace the line-number contract `utils/CLIO/prompt-log-to-md.sh:500` with a stable descriptive reference: the legacy exporter's jq render of `<!-- clio:id:SESSION:UTC -->` blocks in `utils/CLIO/prompt-log-to-md.sh`. The sync shifts that renderer by about 24 lines. This is a comment-only change; the parser is untouched. Check: `rg -n -F 'prompt-log-to-md.sh:500' src/` returns nothing after the change.
+
+9. *(Added after final QA R1, found by the pre-push gate.)* SQLite gateway ratchet (GH-136, `utils/pdda/check_banned_imports.py`): the push was blocked with `utils/CLIO/clio-store.py:1: NEW sqlite3.connect bypass (3 site(s))`. Its baseline `sqlite_connect_baseline.json` is `{}`: the repo has zero direct-connect debt. The checker's own model is a list of **gateway directories that are separate stores by design** (`src/rebalance/ingest/db`, `HiQS/hiqs`). CLIO's store is exactly that: a private prompt-history DB whose stdlib helper runs installed beside the capture hooks and cannot import the rebalance gateway. So `utils/CLIO` is added to `SQLITE_GATEWAY_DIRS`, with the docstring updated ("three gateways"). Rejected:
+   - Baseline debt: it would re-open a zero baseline for code that is not a bypass.
+   - A `# GATEWAY-OK` pragma: it would edit the synced bytes.
+   Checks: `check_banned_imports.py --check` clean; `tests/test_sqlite_gateway_ratchet.py` 9 passed. Red control: the blocked push.
 
 ## Non-goals
 - No edits to synced bytes. INSTALL.md keeps upstream wording; the banner that names the upstream inside INSTALL.md is a first change made *here* after the flip and published in 0c.
