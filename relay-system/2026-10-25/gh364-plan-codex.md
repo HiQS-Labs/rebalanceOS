@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Closed
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -131,5 +131,24 @@ handing off to Producer — go to the Producer window and say 'take your turn'
   - Uninstall removes and restores a receipt-owned path only while it still matches the receipt (a link to `<src>/<file>`, or a generated file with the recorded sha).
   - A drifted path stays untouched along with its backup and is reported as `drifted`. The receipt keeps only those paths, and the run exits 1 for an operator decision; there is no force flag.
   - New suite case 8 is the red control: an edited installed `log-prompt.sh` survives uninstall, exit 1, receipt kept, while unchanged items are still removed.
+
+### Reviewer · Round 3
+
+swept file: yes
+
+- [Pass] The receipt now makes uninstall safe against a post-install edit: it removes/restores only a still-matching recorded link or generated-file checksum, otherwise retains both the drifted path and its backup and exits 1 (plan L93-99). Suite case 8 supplies the requested red control (plan L109). This resolves the only open Round 2 finding.
+
+- [Pass] The rename inventory is complete for current references: plan L62-68 covers the live paths returned by `rg`, and plan L70 explicitly preserves both historical test fixtures. Probe: `rg -n 'utils/CLIO' --glob '!CHANGELOG.md' --glob '!releases.sql' --glob '!PROJECT/**' --glob '!TESTS-RESULTS/**' --glob '!relay-system/**' . | head -120`; exit 0; decisive output included the two named historical fixture files, live test/source/docs references enumerated in L62-68, and `utils/pdda/script_inventory_baseline.json`, covered by L67/L76.
+
+- [Pass] Decision A and the existing runtime contracts remain compatible: helpers are links in `~/.claude/hooks` and the writer/shim are generated there (plan L85-87); the shim resolves its writer through `$(dirname "$0")` (`utils/CLIO/INSTALL.md:239-245`) and the exporter resolves `clio-store.py` identically (`utils/CLIO/prompt-log-to-md.sh:25-29`). The tailer plist paths are consequently preserved (`utils/CLIO/INSTALL.md:713-737`).
+
+- [Pass] The plan explicitly provides all required operator verbs without extra machinery: read-only `status`, idempotent `install` with `repair`/`upgrade` aliases, and preview-gated `uninstall` (plan L82-84); the suite exercises the aliases and Mac-only launchd boundary, including absent-ZCode non-creation (plan L101-110). Linux is outside the stated Mac/launchd operational envelope. No unrelated pre-existing defect was found in the swept plan.
+
+- [Nit] Cases 8 and 7 are displayed out of numerical order (plan L109-110). Reorder them when implementing for readability; this does not affect coverage or the verdict.
+
+VERDICT: PASS
+Basis: The plan now meets the settled installer, rename, deployment, safety, and bounded-verification requirements with proportionate machinery. The only remaining note is presentational.
+
+relay closed (Approved), no further turn needed
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
