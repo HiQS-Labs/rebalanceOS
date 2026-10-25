@@ -2,7 +2,7 @@
 gh_issue: 362
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/362
 title: "GH-362 sync utils/CLIO up to XYZ-CLIO and make Rebalance CLIO's upstream"
-status: "Working — implemented; verification and final QA"
+status: "Working — PR ready, awaiting merge"
 created: 2026-10-25
 updated: 2026-10-25
 owner: noel
@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA approved (R3). Row moved to In progress. Changes 1–8 implemented; gates green (ruff, inventory, PDDA run with no new errors). | Suites and smoke in a disposable clone, receipt, final Codex QA, PR. |
+| Implemented and verified (receipt `TESTS-RESULTS/2026-10-25+GH-362/`); final Codex QA Approved R1. | PR ready; awaiting merge. After merge: XYZ-CLIO publisher (0c), then the CLIO installer. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/362 · Base `origin/development` 6672892 · Clone/branch `rebalanceOS-gh362-clio-upstream-sync-2026-10-25` / `chore/<same>`.
 Rating `rated 75/55/50/80` (calc 260), 2026-10-25.
