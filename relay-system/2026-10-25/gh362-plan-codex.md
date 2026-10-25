@@ -142,4 +142,12 @@ Basis: All three review-round findings are concretely planned, the complete upst
 
 relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-25T14:16:32Z
+task: RELAY-gh362-plan-codex
+reviewer: codex
+status: Approved
+reviewed-head: 650268172b859dedfa6bd1c2f574e21b6452dd7a
+added-range: 15178+3829
+added-sha256: a93a66117ed092232392fb55615aef4efcc3f5c946e11058a4363c09d7af95c5
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
