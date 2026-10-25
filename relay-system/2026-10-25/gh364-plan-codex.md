@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 2 / 3
 
@@ -107,5 +107,22 @@ handing off to Producer — go to the Producer window and say 'take your turn'
 - [Should] incomplete fixture exemption → **Implemented**: `tests/test_github_commit_backfill.py` is added beside `test_github_direct_commits.py` as historical fixture data that the rename leaves unchanged.
 - [Should] ZCode-absent boundary → **Implemented**: suite case 1 now asserts that with no `~/.zcode`, the install creates no `~/.zcode` and writes no ZCode registration.
 - [Unverified] repair/upgrade aliases: the implementation accepts both names as the same converge, and suite cases 2 and 3 invoke them by those names.
+
+### Reviewer · Round 2
+
+swept file: yes
+
+- [Should] Receipt-scoped uninstall is not yet safe against a user edit made *after* installation: the receipt records checksums and `status` can report `stale` (plan L91-92), but `uninstall --apply` unconditionally removes the recorded generated files/links and restores the old backup (L93-98). That silently deletes the newer user content before restoring the pre-install copy. Require uninstall to remove/restore a receipt path only when its current target/checksum still matches the receipt; otherwise preserve it, report drift, and retain an actionable receipt (or require an explicit force operation). Add a red-control suite case.
+  Observed input: an installed `~/.claude/hooks/log-prompt.sh` whose bytes no longer match the receipt's recorded `sha` (the plan explicitly models this as `stale` at L91-92), with a pre-adoption hand-made backup recorded at L90-91.
+  Affected scope: every receipt-owned generated file or link changed after `install --apply` and before `uninstall --apply`.
+  Falsifier: a receipt-owned file/link that remains byte-identical / points at the recorded target; expected result is removal and restoration of its recorded backup. A changed `log-prompt.sh` must remain intact without an explicit override.
+  Probe: `awk 'NR>=90 && NR<=108 {print NR ":" $0}' PROJECT/2-WORKING/GH-364-CLIO-RUNTIME-INSTALLER.md`; exit 0; decisive output says `status` reports `stale` (L92) while uninstall `removes owned links and generated files, then restores their backups` (L94), with no current-state match condition or drift test.
+
+- [Pass] The producer resolved both Round 1 defects with cited plan changes: the second historical fixture is expressly exempted at plan L70, and suite case 1 asserts that an absent `.zcode` remains absent at L102. The live-reference sweep found no additional unclassified current path: the complete non-history matches are covered by plan L62-70, while the two excluded test files are named fixture data.
+
+VERDICT: FAIL
+Basis: The desired-state design remains minimal and all previous findings are addressed, but an uninstall must not silently overwrite a post-install user modification with an older adopted backup. No unrelated pre-existing defect was found in the swept plan.
+
+handing off to Producer — go to the Producer window and say 'take your turn'
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
