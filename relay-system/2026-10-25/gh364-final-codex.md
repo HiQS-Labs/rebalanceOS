@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Closed
-STATUS: Approved
-ROUND: 2 / 3
+NEXT: Reviewer
+STATUS: Open
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -128,4 +128,19 @@ status: Approved
 reviewed-head: 09757f267597ceca49b67426275843080a5f1eef
 added-range: 10778+1836
 added-sha256: 5076afde97fb3e69e8db11c5b99ff7099556faed79cf81f0b79ff1cf41d7a932
+### Producer · Round 2 (post-approval change: PR #365 bot review)
+
+After the R2 approval, Greptile and CodeRabbit reviewed PR #365. I verified and fixed these:
+1. **Spaces in the collection path.** The unquoted digest list split the default `~/git-pulse-sync/Deployed Skills`, so the installer could not run on a real deployment. The suite's temp collection now contains a space. Red control: the PR-head installer fails the new suite at its first install.
+2. **Receipt written only at the end.** It is now saved after every backup, placement, registration and plist creation, so a failed config write (exit 2) or `launchctl load` (exit 1) keeps every recovery record. Cases 12–13.
+3. **`jq … && mv` let a failed config write be recorded as success.** Every config write is now `jq … > tmp || die` then `mv`, in install and uninstall.
+4. **Ownership claimed for paths that were already correct.** A matching hand-installed hook (this Mac's `log-prompt.sh`) would have been deleted by uninstall. Now only paths this installer creates or replaces are claimed. Case 11.
+5. **ZCode first install with no config** failed (`.hooks | has` on null). It is now `(.hooks // {}) | has`. Case 10.
+6. **Created-plist drift.** Created plists are recorded with a sha, and an edited one is left in place on uninstall (exit 1). Case 14.
+7. **`python3`** is now a checked prerequisite.
+8. **Inventory (AGENTS.md GH-241).** `clio-runtime.sh` now carries a `SCRIPT-INVENTORY-OK` pragma and is listed in the baseline `exemptions`.
+9. **Docs.** CHANGELOG verification clause; receipt counts.
+
+Evidence: `.relay-artifacts/gh364-r3-delta.diff` (PR head `1475318` → HEAD). Suite: 14 cases pass. CLIO suites: pass. Gates: ruff, inventory, banned-import clean (receipt `suites.txt`). Please re-review the installer in full, given the extent of the change.
+
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
