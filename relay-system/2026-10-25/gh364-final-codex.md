@@ -159,4 +159,12 @@ Basis: The post-approval fixes directly address concrete deployment and recovery
 
 Relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-25T19:03:58Z
+task: RELAY-gh364-final-r3
+reviewer: codex
+status: Approved
+reviewed-head: e003db52c02284a54f2549dc645801a1ecb783fc
+added-range: 14732+2181
+added-sha256: dddf604a484b699dcd7728b1a1b468e7c702739b51bbc367f1d9821a2a482ff9
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
