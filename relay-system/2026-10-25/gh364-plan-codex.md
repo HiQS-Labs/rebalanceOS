@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 2 / 3
+ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -124,5 +124,12 @@ VERDICT: FAIL
 Basis: The desired-state design remains minimal and all previous findings are addressed, but an uninstall must not silently overwrite a post-install user modification with an older adopted backup. No unrelated pre-existing defect was found in the swept plan.
 
 handing off to Producer — go to the Producer window and say 'take your turn'
+
+### Producer · Round 2
+
+- [Should] uninstall vs post-install edits → **Implemented**:
+  - Uninstall removes and restores a receipt-owned path only while it still matches the receipt (a link to `<src>/<file>`, or a generated file with the recorded sha).
+  - A drifted path stays untouched along with its backup and is reported as `drifted`. The receipt keeps only those paths, and the run exits 1 for an operator decision; there is no force flag.
+  - New suite case 8 is the red control: an edited installed `log-prompt.sh` survives uninstall, exit 1, receipt kept, while unchanged items are still removed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

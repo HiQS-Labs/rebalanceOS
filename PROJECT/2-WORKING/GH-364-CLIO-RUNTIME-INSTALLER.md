@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA R1 dispositioned. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
+| Plan QA R1 and R2 dispositioned. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/364 · Base `origin/development` e4a7abb · Clone/branch `rebalanceOS-gh364-clio-runtime-installer-2026-10-25` / `feat/<same>`.
 
@@ -90,12 +90,13 @@ The source plan is the operator-reviewed `temp/clio-runtime-installer-plan.md` (
    - **Replacing an existing file:** a regular file or foreign symlink at an owned hook path that differs from the desired state is shown in preview. Under `--apply` it is moved to `~/.claude/clio-runtime-backups/<UTC stamp>/` before replacement, and the backup is recorded.
    - **Receipt `~/.claude/clio-runtime.json`:** source dir, HQ-recorded commit (if any), a source digest (sha256 of INSTALL.md + the four scripts), installed time, the owned paths with kind and sha, the registrations it added, the plists it created, and the backups.
    - **`status`:** one line per owned item (`ok` / `missing` / `foreign` / `stale` / `wrong-target`), plus registrations, plists (present / loaded via `launchctl list`), the exporter plist, and whether the receipt digest matches the deployed copy. Exit 0 when nothing needs install, exit 1 otherwise.
-   - **`uninstall --apply`:**
-     - removes owned links and generated files, then restores their backups;
+   - **`uninstall --apply`** (drift-safe, plan QA R2):
+     - removes a receipt-owned path only while it still matches the receipt: a link still pointing at `<src>/<file>`, or a generated file whose sha equals the recorded sha. Only then is its backup restored;
+     - a path changed since install (edited, replaced, retargeted) is left untouched and reported as `drifted`, and so is its backup. The receipt is kept with just those paths, and the run exits 1 so the operator can decide; there is no force flag;
      - removes only the registrations the receipt says it added;
      - unloads and removes only the plists it created;
      - never touches the DB, state, logs, config or the exporter plist;
-     - deletes the receipt.
+     - deletes the receipt only when nothing drifted.
 4. **`test/clio-runtime.sh`** (new suite; the README Tests block lists it).
    - **Setup:** a throwaway HOME and a fake collection (`XYZ_SKILLS_ROOT=<tmp>/col`) holding a copy of `utils/clio-capture`; `launchctl` is stubbed on PATH and logs its calls. Every temp dir uses guarded `mktemp` with `${VAR:?}` on cleanup.
    - **Cases, each with an observed assertion:**
@@ -105,6 +106,7 @@ The source plan is the operator-reviewed `temp/clio-runtime-installer-plan.md` (
      4. A pre-existing hand-made `log-prompt.sh` (red control): `install` preview names it and changes nothing; `--apply` backs it up and replaces it.
      5. `uninstall --apply` restores the hand-made file and leaves a pre-existing foreign registration and a pre-existing tailer plist in place. Only receipt-owned items are removed.
      6. Running the script from a repo path (not `<collection>/clio-capture`) → exit 2, nothing written.
+     8. A drift-safe uninstall (red control for R2): after install, edit the installed `log-prompt.sh`; `uninstall --apply` exits 1, leaves the edited file and its backup in place, reports it as drifted, keeps the receipt, and still removes the unchanged items.
      7. Rerunning `install --apply` on a converged HOME → "nothing to do", and no file changes.
 5. **Gates and docs:**
    - script-inventory `--update-baseline`; ruff exclude and SQLite gateway dir renamed; ARCHITECTURE catalog row path updated;
