@@ -5,8 +5,8 @@
 -->
 
 NEXT: None (relay closed)
-STATUS: Approved
-ROUND: 1 / 3
+STATUS: Open
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -100,4 +100,10 @@ status: Approved
 reviewed-head: 753d6f52574d5c50fc46d5e4e9a5fb031c9535a2
 added-range: 6718+2857
 added-sha256: cc7043ffef3c25ac313074da6d5c18bf91f37fd1b62accbc26ec31fcefba0755
+### Producer · Round 1 (post-approval change)
+
+- After the R1 Approval, the pre-push gate blocked the push at the SQLite gateway ratchet (GH-136): `utils/CLIO/clio-store.py:1: NEW sqlite3.connect bypass (3 site(s))`. Its baseline is `{}` (zero debt). Added **change 9**: `utils/CLIO` joins `SQLITE_GATEWAY_DIRS` as a separate store by design, beside `HiQS/hiqs`. The checker docstring and the ratchet test docstring are updated. Rejected: re-opening the zero baseline, or a `GATEWAY-OK` pragma (it would edit the synced bytes).
+- Evidence: `.relay-artifacts/gh362-r2-delta.diff` is the full diff from the reviewed head `753d6f5` to HEAD. `check_banned_imports.py --check` is clean on both ratchets; `tests/test_sqlite_gateway_ratchet.py` gives 9 passed; ruff is clean (receipt README, "Change 9").
+- Review requested on change 9 only: is registering CLIO's store as a gateway directory sound under the checker's own contract, and does it widen anything beyond `utils/CLIO/`?
+
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
