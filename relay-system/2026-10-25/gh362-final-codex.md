@@ -121,4 +121,12 @@ Basis: Change 9 makes CLIO's independent, installed prompt-history store an expl
 
 relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-25T14:26:23Z
+task: RELAY-gh362-final-r2
+reviewer: codex
+status: Approved
+reviewed-head: 214051ca632cb2a1c722b1be7b94584a3dd96a78
+added-range: 10830+2052
+added-sha256: ec6d1b9c88a0b17c9be54eeb8236a4cf8376c1759c82dbd9e31a8919b0fb98ac
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
