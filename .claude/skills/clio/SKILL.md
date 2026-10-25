@@ -15,7 +15,7 @@ Contents: [Locate](#locate-the-existing-store) · [Search](#search-prompt-histor
 ## Locate the existing store
 
 - [ ] Prefer the installed reader at `~/.claude/hooks/clio-store.py`. If absent,
-  use this repository's upstream `utils/CLIO/clio-store.py`, an explicitly
+  use this repository's upstream `utils/clio-capture/clio-store.py`, an explicitly
   identified **XYZ-CLIO** checkout (its published copy), or an installed CLIO
   skill containing that helper. Check `query --help` first.
 - [ ] Let that helper resolve storage: explicit `--db` overrides the `db` field
@@ -29,9 +29,8 @@ Contents: [Locate](#locate-the-existing-store) · [Search](#search-prompt-histor
   used as a clearly labelled fallback with its actual coverage limits.
 
 Canonical interface and setup reference: this repository's
-[CLIO INSTALL — read-only agent lookup](https://github.com/HiQS-Labs/rebalanceOS/blob/development/utils/CLIO/INSTALL.md#read-only-agent-lookup)
-(upstream; also published unchanged in
-[XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO/blob/main/utils/CLIO/INSTALL.md#read-only-agent-lookup)).
+[CLIO INSTALL — read-only agent lookup](https://github.com/HiQS-Labs/rebalanceOS/blob/development/utils/clio-capture/INSTALL.md#read-only-agent-lookup)
+(upstream; also published unchanged in HiQS-Labs/XYZ-CLIO).
 SQLite lookup shipped in [PR #4](https://github.com/HiQS-Labs/XYZ-CLIO/pull/4);
 fleet recovery followed in [PR #5](https://github.com/HiQS-Labs/XYZ-CLIO/pull/5).
 

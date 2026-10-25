@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('clio_store', ROOT / 'utils/CLIO/clio-store.py')
+spec = importlib.util.spec_from_file_location('clio_store', ROOT / 'utils/clio-capture/clio-store.py')
 store = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(store)
 
@@ -47,14 +47,14 @@ class History(unittest.TestCase):
     def install(self):
         hooks = self.home / '.claude/hooks'
         hooks.mkdir(parents=True)
-        source = (ROOT / 'utils/CLIO/INSTALL.md').read_text(encoding='utf-8')
+        source = (ROOT / 'utils/clio-capture/INSTALL.md').read_text(encoding='utf-8')
         for name in ('clio-capture.sh', 'log-prompt.sh'):
             marker = 'cat > ~/.claude/hooks/' + name + " << 'EOF'\n"
             body = source.split(marker, 1)[1].split('\nEOF\n', 1)[0] + '\n'
             (hooks / name).write_text(body, encoding='utf-8')
             (hooks / name).chmod(0o755)
-        shutil.copyfile(ROOT / 'utils/CLIO/clio-store.py', hooks / 'clio-store.py')
-        shutil.copyfile(ROOT / 'utils/CLIO/prompt-log-to-md.sh', hooks / 'prompt-log-to-md.sh')
+        shutil.copyfile(ROOT / 'utils/clio-capture/clio-store.py', hooks / 'clio-store.py')
+        shutil.copyfile(ROOT / 'utils/clio-capture/prompt-log-to-md.sh', hooks / 'prompt-log-to-md.sh')
         (hooks / 'prompt-log-to-md.sh').chmod(0o755)
 
     def activate(self):
@@ -442,7 +442,7 @@ class History(unittest.TestCase):
         # interpreter. On macOS these can use different SQLite versions.
         if sys.platform == 'darwin' and Path('/usr/bin/python3').exists():
             cold = self.home / 'cross-runtime.sqlite3'
-            helper = ROOT / 'utils/CLIO/clio-store.py'
+            helper = ROOT / 'utils/clio-capture/clio-store.py'
             source = self.source([self.row(prompt='Synthetic cold WAL Unicode: 日本語')])
             for command in (['init'], ['import-jsonl', str(source)]):
                 subprocess.run([sys.executable, str(helper), '--db', str(cold), *command],
@@ -522,7 +522,7 @@ class History(unittest.TestCase):
         def context(node):
             return patch.object(store, 'CONFIG', node[0] / 'config.json')
         def scheduled(node, destination):
-            return subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'), '--db', str(node[2]),
+            return subprocess.run([sys.executable, str(ROOT / 'utils/clio-capture/clio-store.py'), '--db', str(node[2]),
                                    'scheduled-export', str(destination)], capture_output=True, text=True,
                                   env=dict(os.environ, HOME=str(node[0]), CLIO_CONFIG=str(node[0] / 'config.json')))
         for node in nodes:
@@ -828,7 +828,7 @@ class History(unittest.TestCase):
             joined = store.migrate_view(b[2], note_b, join_fleet_note=True)
             self.assertEqual(joined['coverage'], 'archived-not-reconciled')
             store.configure_fleet(b[2], b[1], [], True, discover=True)
-        scheduled = subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'), '--db', str(b[2]),
+        scheduled = subprocess.run([sys.executable, str(ROOT / 'utils/clio-capture/clio-store.py'), '--db', str(b[2]),
                                     'scheduled-export', str(note_b)], capture_output=True, text=True,
                                    env=dict(os.environ, HOME=str(b[0]), CLIO_CONFIG=str(b[0] / 'config.json')))
         self.assertEqual(scheduled.returncode, 0, scheduled.stderr)
@@ -878,7 +878,7 @@ class History(unittest.TestCase):
         conversations.mkdir()
         env = dict(os.environ, CLIO_TAIL_BACKFILL='1', CODEX_HOME=str(self.home / '.codex'), CLIO_AGY_ROOT=str(self.home / 'agy'))
         for agent in ('codex', 'agy'):
-            command = ['bash', str(ROOT / ('utils/CLIO/clio-' + agent + '-tail.sh'))]
+            command = ['bash', str(ROOT / ('utils/clio-capture/clio-' + agent + '-tail.sh'))]
             result = subprocess.run(command, text=True, capture_output=True, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
             before = len(self.rows())
@@ -896,7 +896,7 @@ class History(unittest.TestCase):
         conn.commit()
         conn.close()
         before_bytes = companion.read_bytes()
-        subprocess.run(['bash', str(ROOT / 'utils/CLIO/clio-agy-tail.sh')], env=env, check=True, capture_output=True)
+        subprocess.run(['bash', str(ROOT / 'utils/clio-capture/clio-agy-tail.sh')], env=env, check=True, capture_output=True)
         self.assertEqual(companion.read_bytes(), before_bytes)
         self.assertTrue(any(row['repo'] == 'fixture-repo' for row in self.rows(agent='agy')))
         self.assertFalse((self.home / '.claude/prompt-log.jsonl').exists())
@@ -934,7 +934,7 @@ class History(unittest.TestCase):
         real.chmod(0o755)
         writer.write_text('''#!/bin/bash\ninput=$(cat)\nif printf "%s" "$input" | jq -e 'contains({prompt:"second source prompt"})' >/dev/null; then exit 3; fi\nprintf "%s" "$input" | "$(dirname "$0")/real-capture.sh" "$@"\n''')
         env = dict(os.environ, CODEX_HOME=str(self.home / '.codex'), CLIO_TAIL_BACKFILL='1')
-        command = ['bash', str(ROOT / 'utils/CLIO/clio-codex-tail.sh')]
+        command = ['bash', str(ROOT / 'utils/clio-capture/clio-codex-tail.sh')]
         subprocess.run(command, env=env, check=True, capture_output=True)
         first = self.rows()
         self.assertEqual(len(first), 1)
@@ -1025,7 +1025,7 @@ class History(unittest.TestCase):
         self.assertEqual(cfg['view']['header'], note_bytes.decode().split('<!-- CLIO:ENTRIES -->', 1)[0] + '<!-- CLIO:ENTRIES -->\n')
         result = json.loads(subprocess.run(command, check=True, capture_output=True, text=True).stdout)
         self.assertEqual(result['rows'], 5)
-        explicit = subprocess.run([sys.executable, str(ROOT / 'utils/CLIO/clio-store.py'),
+        explicit = subprocess.run([sys.executable, str(ROOT / 'utils/clio-capture/clio-store.py'),
                                    '--db', str(self.db), 'scheduled-export', str(note)],
                                   check=True, capture_output=True, text=True)
         self.assertEqual(json.loads(explicit.stdout).get('rows'), 5)

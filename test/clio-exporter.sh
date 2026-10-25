@@ -1,9 +1,9 @@
 #!/bin/bash
-# Fixture harness for utils/CLIO/prompt-log-to-md.sh.
+# Fixture harness for utils/clio-capture/prompt-log-to-md.sh.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-EXPORTER="$ROOT/utils/CLIO/prompt-log-to-md.sh"
+EXPORTER="$ROOT/utils/clio-capture/prompt-log-to-md.sh"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/clio-exporter.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

@@ -2,8 +2,8 @@
 
 ## Upstream — edit here first
 
-This folder (`rebalanceOS/utils/CLIO/`) is **CLIO's canonical source**. It is published
-unchanged to [HiQS-Labs/XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO) `utils/CLIO/`.
+This folder (`rebalanceOS/utils/clio-capture/`) is **CLIO's canonical source**. It is published
+unchanged to [HiQS-Labs/XYZ-CLIO](https://github.com/HiQS-Labs/XYZ-CLIO).
 The exceptions are this README and `LICENSE`; XYZ-CLIO keeps its own at the repository root.
 
 - Make every CLIO change here first, through a reviewed rebalanceOS PR, then publish it to
@@ -23,6 +23,10 @@ stripped out, so it's a record of what you actually typed).
 An optional second script converts that JSONL into human-readable Markdown —
 newest entry first — at any location you choose, such as a note in an Obsidian
 vault. It can run on demand or on a 5-minute `launchd` schedule (macOS).
+
+**Install on a device:** from the Skills Army deployed copy, run `clio-runtime.sh status`, then
+`clio-runtime.sh install --apply` (see [SKILL.md](SKILL.md)). It links the hooks into the deployed
+copy and records a receipt, so nothing is hand-copied.
 
 See [INSTALL.md](INSTALL.md) for the full install, verify, export, auto-sync, and
 uninstall instructions.

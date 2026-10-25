@@ -114,7 +114,7 @@ def markdown_rows(raw):
     """Decode only canonical exporter blocks, never free-form personal notes.
 
     Contract: the legacy exporter's jq render of ``<!-- clio:id:SESSION:UTC -->``
-    blocks in utils/CLIO/prompt-log-to-md.sh. UTC is taken from the source
+    blocks in utils/clio-capture/prompt-log-to-md.sh. UTC is taken from the source
     marker, not the localized display timestamp. Unmarked legacy entries omitted.
     """
     text = raw.decode("utf-8")

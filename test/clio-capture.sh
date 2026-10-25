@@ -2,14 +2,14 @@
 # Fixture harness for the CLIO capture path (GH-139 schema v2).
 #
 # The shared writer (clio-capture.sh) and the Claude shim (log-prompt.sh) live
-# as heredocs inside utils/CLIO/INSTALL.md, so this harness extracts both by
+# as heredocs inside utils/clio-capture/INSTALL.md, so this harness extracts both by
 # MARKER (not line numbers — the heredocs get edited) and runs them against a
 # throwaway $HOME. Legacy cases run through the SHIM to prove delegation; the
 # new agent cases run the writer directly.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-INSTALL_DOC="$ROOT/utils/CLIO/INSTALL.md"
+INSTALL_DOC="$ROOT/utils/clio-capture/INSTALL.md"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/clio-capture.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

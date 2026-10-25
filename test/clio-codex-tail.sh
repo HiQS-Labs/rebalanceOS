@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fixture harness for utils/CLIO/clio-codex-tail.sh (GH-139 Phase 2).
+# Fixture harness for utils/clio-capture/clio-codex-tail.sh (GH-139 Phase 2).
 #
 # Exercises the at-least-once contract against a synthetic rollout tree:
 # start-now default, explicit backfill, restart-no-duplicates (tailer run
@@ -8,9 +8,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TAILER="$ROOT/utils/CLIO/clio-codex-tail.sh"
+TAILER="$ROOT/utils/clio-capture/clio-codex-tail.sh"
 FIXTURE="$ROOT/test/fixtures/clio/codex-rollout.jsonl"
-INSTALL_DOC="$ROOT/utils/CLIO/INSTALL.md"
+INSTALL_DOC="$ROOT/utils/clio-capture/INSTALL.md"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/clio-codex-tail.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

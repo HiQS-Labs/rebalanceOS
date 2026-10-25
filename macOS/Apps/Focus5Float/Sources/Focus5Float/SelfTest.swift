@@ -116,7 +116,7 @@ enum Focus5SelfTest {
         }
 
         // Prompt Log parser test: FOCUS5_PROMPTLOGTEST=1 swift run Focus5Float —
-        // parses a fixture matching the real CLIO exporter output (utils/CLIO/
+        // parses a fixture matching the real CLIO exporter output (utils/clio-capture/
         // INSTALL.md), including a multi-line prompt, and asserts field-level
         // extraction plus newest-first ordering (no re-sort — the fixture is
         // already in the file's natural newest-first order).
