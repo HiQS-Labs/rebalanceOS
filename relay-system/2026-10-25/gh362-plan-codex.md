@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: None (relay closed)
+STATUS: Approved
 ROUND: 3 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -120,6 +120,26 @@ handing off to Producer — go to the Producer window and say 'take your turn'.
 ### Producer · Round 2
 
 - [Should] stale `prompt-log-to-md.sh:500` contract anchor → **Implemented** as change 8: the `markdown_rows` docstring gets a descriptive reference (the legacy exporter's jq render of `<!-- clio:id:SESSION:UTC -->` blocks) instead of a line number. Comment only. Falsifier added: `rg -n -F 'prompt-log-to-md.sh:500' src/` is empty afterwards. The historical plan doc that also cites it is left as history.
-- [Pass] acknowledged.
+- [Unverified — no citation] acknowledged.
+
+### Reviewer · Round 3
+
+swept file: yes
+
+- [Pass] The R2 finding is fully dispositioned in the plan: change 8 replaces the brittle `prompt-log-to-md.sh:500` reference with the canonical marker-format contract and includes the precise absence control (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:76`). The live source contains that exact stale `:500` reference today (`src/rebalance/ingest/clio_journey.py:113-118`), so the planned comment-only edit is both necessary and correctly bounded.
+
+- [Pass] The sync inventory remains complete and preserves local ownership correctly: it enumerates every changed/new upstream input, declares the identical tests/fixtures untouched, and retains only Rebalance's README/LICENSE (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:39-48`). The seeded upstream comparison independently identifies the installer, three scripts, and new `clio-store.py` as the relevant changed inputs (`.relay-artifacts/gh362-evidence.txt:1-15`, `.relay-artifacts/gh362-evidence.txt:139-150`). No live consumer of the removed INSTALL heading was found by the documented narrow scan; the remaining live source contract is covered by change 8.
+
+- [Pass] The baseline addition is the sound, exception-free inventory route: new `utils` files fail as `NEW script detected` (`utils/pdda/check_script_inventory.py:177-186`), while a pragma additionally requires explicit baseline exemption registration (`utils/pdda/check_script_inventory.py:161-174`). The plan limits the baseline diff to the adjacent deployed helper and explains why relocation would violate its `dirname "$0"` deployment contract (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:56`, `.relay-artifacts/gh362-evidence.txt:148-150`).
+
+- [Pass] The byte-identity Ruff exclusion is narrowly scoped and justified: the plan names only `utils/CLIO` and `test/clio-store.py`, records the five upstream findings/formatter rewrites, and supplies the no-exclude red control (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:69-74`, `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:90-95`). This follows the existing individually-named vendor exclusion pattern rather than suppressing the parent utility tree (`pyproject.toml:102-108`).
+
+- [Pass] Maintainer direction and PDDA intake are explicit: the README upstream declaration, mirrored skill correction, and AGENTS pointer are planned at `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:60-67`; the required active-document Status table records capture, park, rate, promote, repoint, and the approval-dependent move at `PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:19-31`. Verification includes the docs/roadmap gate and disposable-clone checks with red controls (`PROJECT/2-WORKING/GH-362-CLIO-UPSTREAM-SYNC.md:90-95`). No over-engineering or unaddressed requirement remains in this plan.
+
+VERDICT: PASS
+
+Basis: All three review-round findings are concretely planned, the complete upstream sync and its intentional local exceptions are evidenced, and the implementation/verification scope is commensurate with a file sync plus documentation direction change. No pre-existing defect was found in the reviewed plan beyond the resolved stale instruction and source-anchor items. Read-only probes only: `rg -n -F 'prompt-log-to-md.sh:500' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and returned the live source anchor plus historical/plan records; `rg -n -i 'canonical sqlite fleet integration|read-only-agent-lookup|utils/CLIO/INSTALL' --glob '!relay-system/**' --glob '!.relay-artifacts/**' .` exited 0 and found no live removed-heading consumer. `nl` reads of the plan, source docstring, inventory checker, Ruff config, and both mirrored skills all exited 0. No test, fixture, validation script, or executable artifact was run.
+
+relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
