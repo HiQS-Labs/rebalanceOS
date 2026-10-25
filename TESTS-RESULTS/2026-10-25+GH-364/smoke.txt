@@ -1,0 +1,28 @@
+## smoke on the live HOME, read-only (XYZ_SKILLS_ROOT=<tmp collection copy of b1f21ec>)
+$ clio-runtime.sh status
+source: <tmp-collection>/clio-capture digest e7b4395eebe9
+  clio-store.py        foreign
+  prompt-log-to-md.sh  foreign
+  clio-codex-tail.sh   foreign
+  clio-agy-tail.sh     foreign
+  clio-capture.sh      foreign
+  log-prompt.sh        ok
+  claude-registration  ok
+  zcode-registration   ok
+  codex-tailer-plist   loaded
+  agy-tailer-plist     loaded
+  exporter-plist       present (not managed)
+  receipt              missing
+run: <tmp-collection>/clio-capture/clio-runtime.sh install --apply
+exit=1
+$ clio-runtime.sh install   (preview)
+install would change: clio-store.py:foreign prompt-log-to-md.sh:foreign clio-codex-tail.sh:foreign clio-agy-tail.sh:foreign clio-capture.sh:foreign receipt:missing
+existing files to back up and replace: ~/.claude/hooks/clio-store.py ~/.claude/hooks/prompt-log-to-md.sh ~/.claude/hooks/clio-codex-tail.sh ~/.claude/hooks/clio-agy-tail.sh ~/.claude/hooks/clio-capture.sh
+preview only; add --apply
+exit=0
+$ clio-runtime.sh install   (rerun preview, adjacent path)
+exit=0
+$ clio-runtime.sh uninstall   (preview, no receipt on this Mac)
+nothing to uninstall: no receipt at ~/.claude/clio-runtime.json
+exit=0
+live HOME fingerprint before=5ff8db7e43899ab7 after=5ff8db7e43899ab7 UNCHANGED

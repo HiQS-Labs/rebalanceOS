@@ -1,0 +1,11 @@
+## suites at b1f21ec (disposable clone), /bin/bash 3.2.57(1)-release, CLIO_MIN_PROMPT_CHARS unset
+bash test/clio-runtime.sh -> exit 0 (PASS: clio-runtime)
+bash test/clio-capture.sh -> exit 0 (PASS: all capture cases (bash))
+bash test/clio-exporter.sh -> exit 0 (      a second run would repeat the first, not widen coverage.)
+bash test/clio-codex-tail.sh -> exit 0 (PASS: codex tailer)
+bash test/clio-agy-tail.sh -> exit 0 (PASS: agy tailer)
+python3 test/clio-store.py -> exit 1 (FAILED (failures=1)) test_activation_import_gate_and_source_preservation
+## red controls (mutate the installer in this disposable clone, run test/clio-runtime.sh, restore)
+no-backup mutation: FAIL: hand-made file was not backed up
+no-drift-check mutation: FAIL: uninstall with a drifted hook: expected exit 1, got 0
+restored: PASS: clio-runtime

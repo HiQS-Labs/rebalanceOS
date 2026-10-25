@@ -2,7 +2,7 @@
 gh_issue: 364
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/364
 title: "GH-364 CLIO runtime installer (clio-capture skill)"
-status: "Working — implementing (plan QA approved R3)"
+status: "Working — final QA"
 created: 2026-10-25
 updated: 2026-10-25
 owner: noel
@@ -20,7 +20,7 @@ roadmap_exempt: false
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA approved (R3). Moved to In progress. Captured in `1-INBOX`, parked (`rmi-01M5SWVPG2WQ2D17HQQGEMJRV1`), rated `70/60/50/55`, promoted and repointed. Recon done; folder-name constraint resolved by operator (rename). | Codex plan QA; then move to In progress and implement. |
+| Implemented (rename `9ba7283`, installer `b1f21ec`) and verified (receipt `TESTS-RESULTS/2026-10-25+GH-364/`). | Final Codex QA, PR. |
 
 Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/364 · Base `origin/development` e4a7abb · Clone/branch `rebalanceOS-gh364-clio-runtime-installer-2026-10-25` / `feat/<same>`.
 
