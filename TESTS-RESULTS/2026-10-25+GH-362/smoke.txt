@@ -1,0 +1,32 @@
+## smoke at 1bf7ea8 (+test-script mode fix), repo copy, throwaway HOME/DB
+$ clio-store.py --help
+usage: clio-store.py [-h] [--db DB]
+                     {init,import-jsonl,verify-import,activate,migrate-view,scheduled-export,capture,drain,query,project,export-device,configure-fleet,reconcile-fleet,import-device,backup} ...
+
+CLIO's local history store. Stdlib only; no network or background process.
+exit=0
+$ clio-store.py --db <tmp>/h.sqlite3 init   (main path)
+{"db":"<tmp>/h.sqlite3","owner":"5c382b84-e5b2-4192-a0d5-dd886c84fbd8"}
+exit=0
+$ clio-store.py --db <tmp>/h.sqlite3 query --limit 5
+{"limit":5,"offset":0,"pending":0,"records":[]}
+exit=0
+$ init again (adjacent: rerun on an existing store)
+{"db":"<tmp>/h.sqlite3","owner":"5c382b84-e5b2-4192-a0d5-dd886c84fbd8"}
+exit=0
+$ query on a missing DB (adjacent: read-only lookup must not create a store)
+OperationalError: unable to open database file
+not created
+exit=0
+$ prompt-log-to-md.sh <tmp>/note.md   (legacy exporter, no SQLite config)
+✅ Synced 1 new prompt(s) to <tmp>/note.md
+source-count: 1
+manifest-count: 1
+target-rendered-id-count: 1
+exit=0
+$ prompt-log-to-md.sh --status <tmp>/note.md   (adjacent: rerun/status)
+source-count: 1
+manifest-count: 1
+target-rendered-id-count: 1
+cursor: 1
+exit=0
