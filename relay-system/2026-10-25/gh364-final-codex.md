@@ -120,4 +120,12 @@ Basis: The exact-registration regression is now directly reproduced and correcte
 
 Relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-10-25T16:21:22Z
+task: RELAY-gh364-final-codex
+reviewer: codex
+status: Approved
+reviewed-head: 09757f267597ceca49b67426275843080a5f1eef
+added-range: 10778+1836
+added-sha256: 5076afde97fb3e69e8db11c5b99ff7099556faed79cf81f0b79ff1cf41d7a932
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
