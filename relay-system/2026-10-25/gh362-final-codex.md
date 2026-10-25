@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-25.
 -->
 
-NEXT: None (relay closed)
+NEXT: Reviewer
 STATUS: Open
 ROUND: 2 / 3
 
