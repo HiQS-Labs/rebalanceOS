@@ -29,7 +29,7 @@ spec.loader.exec_module(store)
 class History(unittest.TestCase):
     def t3_source(self):
         source = self.home / 't3.sqlite3'
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.executescript('''
                 CREATE TABLE orchestration_events(sequence INTEGER PRIMARY KEY, event_id TEXT,
                     aggregate_kind TEXT, application_event_version INTEGER, event_type TEXT, payload_json TEXT);
@@ -58,7 +58,7 @@ class History(unittest.TestCase):
         message = {'id': message_id, 'threadId': thread, 'runId': run, 'role': 'user',
                    'createdBy': creator, 'creationSource': creation, 'text': text,
                    'createdAt': '2026-10-30T12:34:56.123Z'}
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             sequence = conn.execute('SELECT coalesce(max(sequence),0)+1 FROM orchestration_events').fetchone()[0]
             conn.execute('INSERT INTO orchestration_events VALUES (?,?,?,?,?,?)',
                          (sequence, 'event-' + str(sequence), 'thread', version, kind, json.dumps(message)))
@@ -98,7 +98,7 @@ class History(unittest.TestCase):
         self.assertEqual(by_id['original']['extras']['ide'], 't3-code')
         self.assertEqual(source.read_bytes(), source_before)
         self.t3_event(source, 'original', text='later projection update')
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.execute('UPDATE projection_projects SET workspace_root=?', ('/fixture/changed',))
         store.capture_t3(self.db)
         self.assertEqual(self.rows(), rows)
@@ -124,8 +124,9 @@ class History(unittest.TestCase):
             with self.assertRaises(OSError):
                 store.capture_t3(self.db)
         first = self.rows()
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.execute('UPDATE projection_projects SET workspace_root=?', ('/fixture/changed',))
+            conn.execute('DELETE FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',))
         store.capture_t3(self.db)
         self.assertEqual(self.rows(), first)
         self.t3_event(source, 'future', version=3)
@@ -133,13 +134,13 @@ class History(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'version'):
             store.capture_t3(self.db)
         self.assertEqual(cursor.read_bytes(), before)
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.execute('DELETE FROM orchestration_events WHERE application_event_version=3')
         self.t3_event(source, 'missing-run', run='not-present')
         with self.assertRaisesRegex(ValueError, 'run'):
             store.capture_t3(self.db)
         self.assertEqual(cursor.read_bytes(), before)
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.execute('DELETE FROM orchestration_events WHERE sequence>1')
             conn.execute('UPDATE orchestration_events SET event_id=? WHERE sequence=1', ('replaced',))
         with self.assertRaisesRegex(ValueError, 'replaced|regressed'):
@@ -161,13 +162,17 @@ class History(unittest.TestCase):
         receipts = list(store.pending_dir(self.db).glob('clio1-*.json'))
         self.assertEqual(len(receipts), 1)
         frozen = receipts[0].read_bytes()
-        with sqlite3.connect(source) as conn:
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
             conn.execute('DELETE FROM projection_projects')
+            saved_run = conn.execute('SELECT payload_json FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',)).fetchone()[0]
+            conn.execute('DELETE FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',))
         self.t3_event(source, 'queued')
         with contextlib.closing(store.database(self.db, True)) as busy:
             busy.execute('BEGIN IMMEDIATE')
             cli('capture-t3')
         self.assertEqual(receipts[0].read_bytes(), frozen)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('INSERT INTO orchestration_v2_projection_runs VALUES (?,?,?)', ('run', 'thread', saved_run))
         store.drain(self.db)
         self.assertEqual(len(self.rows()), 1)
         self.assertEqual(self.rows()[0]['repo'], 'work')

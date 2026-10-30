@@ -154,7 +154,13 @@ from reusing store/exports, with source-version uncertainty. No user override.
 Plan round 1: Changes requested. All four findings accepted: steering uses
 message.runId; exclusions apply per submission; explicit source UUID/boundary and
 first-observation identity; exact V2 contract and missing-metadata policy.
-Plan round 2: Approved. Final: pending. Implementation started after approval.
+Plan round 2: Approved. Final round 1: Changes requested for replay requiring
+current run metadata before checking a committed/pending payload. Accepted:
+resolve stable message identity and reuse retained payloads first. The existing
+interruption and queued-receipt fixtures now remove run projections before retry.
+The interruption fixture failed before the fix with run metadata unavailable;
+both cases pass after the lookup-order correction. Final round 2: pending.
+Implementation started after plan approval.
 
 Host orchestration requires T3-managed delegated review rather than a shell
 relay child. The independent review scope and three-round cap are unchanged.

@@ -33,6 +33,14 @@ an existing scheduled digest failure, plus configuration/staleness warnings.
 This change does not modify fleet or job configuration. No overall machine-health
 claim is made. Full repository tests and final independent QA are pending.
 
+Final QA round 1 found replay blocked by missing current run metadata despite a
+retained committed/pending payload. The existing interruption fixture was
+extended to delete the run projection and failed before the correction with
+`T3 submission run metadata unavailable`. The fix resolves stable identity and
+checks retained payloads before attributing unseen messages. Both committed and
+pending replay cases now remove the run projection before retry. The focused
+three-case T3 rerun is retained as `t3-recovery.txt`.
+
 ## Threats to validity
 
 The fixture matches the inspected unified V2 T3 event/projection contract; other

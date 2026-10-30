@@ -1174,7 +1174,25 @@ def capture_t3(path, limit=1000):
                             raise ValueError('invalid T3 human submission')
                         if message['text'].strip():
                             messages.append(message)
-                rows = t3_rows(conn, state, messages)
+                rows = []
+                unseen = []
+                for message in messages:
+                    identity = normalize({'timestamp': message['createdAt'], 'prompt': message['text'],
+                                          'source_event_id': 't3:' + state['source_id'] + ':' + message['id'],
+                                          'extras': {'ide': 't3-code'}}, cfg['owner'], 'captured')
+                    prior = destination.execute('SELECT 1 FROM events WHERE record_id=?',
+                                                (identity['record_id'],)).fetchone()
+                    if prior:
+                        continue
+                    pending = pending_dir(path) / (identity['record_id'] + '.json')
+                    if pending.exists():
+                        frozen = normalize(json.loads(pending.read_text()))
+                        if frozen['record_id'] != identity['record_id']:
+                            raise ValueError('T3 pending receipt identity mismatch')
+                        rows.append(frozen)
+                    else:
+                        unseen.append(message)
+                rows.extend(t3_rows(conn, state, unseen))
                 # Normalize the complete page before accepting any of it.
                 rows = [normalize(row, cfg['owner'], 'captured') for row in rows]
                 captured = 0
