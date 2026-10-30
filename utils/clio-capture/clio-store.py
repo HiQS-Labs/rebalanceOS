@@ -1235,12 +1235,13 @@ def t3_rows(conn, state, messages):
                              + ','.join('?' for _ in projects) + ')', projects))
     instances = list({run['providerInstanceId'] for run in runs})
     sessions = [json.loads(row[0]) for row in conn.execute(
-        'SELECT payload_json FROM orchestration_v2_projection_provider_sessions WHERE '
-        "json_extract(payload_json,'$.providerInstanceId') IN (" + ','.join('?' for _ in instances) + ') LIMIT 1001', instances)]
-    if len(sessions) > 1000:
-        raise ValueError('T3 provider attribution exceeds page bound')
-    drivers = {session['providerInstanceId']: session['driver']
-               for session in sorted(sessions, key=lambda session: session.get('updatedAt', ''))}
+        "SELECT payload_json FROM (SELECT payload_json, row_number() OVER ("
+        "PARTITION BY json_extract(payload_json,'$.providerInstanceId') "
+        "ORDER BY json_extract(payload_json,'$.updatedAt') DESC, rowid DESC) AS position "
+        "FROM orchestration_v2_projection_provider_sessions WHERE "
+        "json_extract(payload_json,'$.providerInstanceId') IN (" + ','.join('?' for _ in instances)
+        + ')) WHERE position=1', instances)]
+    drivers = {session['providerInstanceId']: session['driver'] for session in sessions}
     machine = os.uname().nodename.split('.')[0]
     try:
         computer_name = subprocess.run(['scutil', '--get', 'ComputerName'], capture_output=True,
@@ -1253,6 +1254,9 @@ def t3_rows(conn, state, messages):
         run = by_run.get(message['runId']) if message.get('runId') else by_message.get(message['id'])
         if not run or not run.get('providerInstanceId') or run.get('threadId') != message['threadId']:
             raise ValueError('T3 submission run metadata unavailable; retry after projections recover')
+        model_selection = run.get('modelSelection')
+        if not isinstance(model_selection, dict):
+            raise ValueError('invalid T3 model selection metadata')
         thread = thread_rows.get(message['threadId'])
         workspace = roots.get(thread['project_id'], '') if thread else ''
         details = json.loads(thread['payload_json']) if thread else {}
@@ -1268,7 +1272,7 @@ def t3_rows(conn, state, messages):
                        'source_event_id': 't3:' + state['source_id'] + ':' + message['id'],
                        'extras': {'ide': 't3-code', 't3_message_id': message['id'],
                                   't3_thread_id': message['threadId'], 'provider_instance_id': instance,
-                                  'driver': driver, 'model': run.get('modelSelection', {}).get('model'),
+                                  'driver': driver, 'model': model_selection.get('model'),
                                   'metadata_observed_at': utc(), 'metadata_basis': 'capture-time projections',
                                   'metadata_warning': None if workspace else 'project metadata unavailable'}})
     return result
@@ -1378,7 +1382,7 @@ def main():
             t3_result = None
             try:
                 t3_result = capture_t3(path)
-            except (ValueError, TypeError, KeyError, OSError, sqlite3.Error, TimeoutError) as error:
+            except (ValueError, TypeError, KeyError, AttributeError, OSError, sqlite3.Error, TimeoutError) as error:
                 diagnostic('T3 capture refused: ' + type(error).__name__ + '; cursor retained; run capture-t3')
                 t3_result = {'configured': True, 'state': 'refused', 'error': type(error).__name__}
             if activated.get('fleet'):

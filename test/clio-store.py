@@ -67,6 +67,10 @@ class History(unittest.TestCase):
         self.activate()
         source = self.t3_source()
         self.t3_event(source, 'old')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.executemany('INSERT INTO orchestration_v2_projection_provider_sessions VALUES (?)',
+                             [(json.dumps({'providerInstanceId': 'claude-personal', 'driver': 'obsolete',
+                                           'updatedAt': '2020-01-01'}),)] * 1001)
         registration = store.configure_t3(self.db, source)
         self.assertEqual(store.configure_t3(self.db, source), registration)
         self.t3_event(source, 'original')
@@ -184,6 +188,28 @@ class History(unittest.TestCase):
         self.assertEqual(by_id['no-project']['repo'], '')
         self.assertEqual(by_id['no-project']['extras']['metadata_warning'], 'project metadata unavailable')
         self.assertEqual(cli('scheduled-export', str(note))['t3']['captured'], 0)
+        self.t3_event(source, 'malformed-model')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            run = json.loads(saved_run)
+            run['modelSelection'] = None
+            conn.execute('UPDATE orchestration_v2_projection_runs SET payload_json=? WHERE run_id=?',
+                         (json.dumps(run), 'run'))
+        cursor = Path(str(self.db) + '.t3.json')
+        before = cursor.read_bytes()
+        result = cli('scheduled-export', str(note), code=3)
+        self.assertEqual(result['t3']['state'], 'refused')
+        self.assertEqual(cursor.read_bytes(), before)
+        compat = self.home / '.claude/prompt-log-compat.jsonl'
+        self.assertEqual(len(compat.read_text().splitlines()), 2)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_v2_projection_runs SET payload_json=? WHERE run_id=?', (saved_run, 'run'))
+            conn.execute('INSERT INTO projection_projects VALUES (?,?)', ('p', '/fixture/work'))
+            conn.execute('UPDATE orchestration_v2_projection_threads SET payload_json=? WHERE thread_id=?', ('null', 'thread'))
+        compat.unlink()
+        result = cli('scheduled-export', str(note), code=3)
+        self.assertEqual(result['t3']['error'], 'AttributeError')
+        self.assertEqual(len(compat.read_text().splitlines()), 2)
+        self.assertEqual(cursor.read_bytes(), before)
         self.t3_event(source, 'future', version=3)
         self.assertEqual(cli('scheduled-export', str(note), code=3)['t3']['state'], 'refused')
         self.assertEqual(len(self.rows()), 2)

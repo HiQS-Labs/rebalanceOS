@@ -75,6 +75,19 @@ three-case T3 rerun is retained as `t3-recovery.txt`.
 
 ## Threats to validity
 
+Greptile identified two reproducible cases after publication. An existing
+provider fixture with 1,001 older sessions stalled capture on the previous
+all-session cap; the query now returns only the newest session per referenced
+instance using a single grouped window query. A null modelSelection also escaped
+the local scheduled-capture guard and stopped existing-history publication.
+Model objects are now validated and AttributeError is contained at that boundary.
+The existing cases were extended (no new runner): both failed before correction;
+the full 20-case store suite rerun is `greptile-regressions.txt`. It also verifies
+that malformed thread metadata still allows a freshly rebuilt compatibility
+export while retaining the capture cursor. Broader package suites were not
+repeated because these changes affect only the standalone CLIO helper and its
+existing acceptance fixture; packaged Rebalance sources are unchanged.
+
 Hosted run `41103203124` cancelled `readme-install` before assigning a runner or
 executing any step. Its check annotation explicitly identifies GitHub's scheduled
 macOS 14 image brownout. The failure occurred inside the announced October 30
