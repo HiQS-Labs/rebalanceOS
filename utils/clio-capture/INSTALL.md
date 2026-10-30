@@ -706,6 +706,8 @@ and inherited subagent prompts are excluded. Set `CLIO_TAIL_BACKFILL=1` for an
 explicit history replay of **root files, including already-scanned files**. The
 per-file rewind and history eligibility are checkpointed before delivery; if a writer
 fails, the next ordinary tick retries that replay without requiring the flag again.
+Only files reached by that invocation have durable replay intent. Repeat the explicit
+flag after an interrupted whole-history scan to include files it never reached.
 The global capture boundary stays unchanged. Stable source IDs suppress already-captured
 rows; the printed `delivered` count means writer acceptance (including dedup/filtering),
 so verify actual SQLite rows to establish recovery. Source timestamps must be valid
@@ -728,30 +730,6 @@ file, one content-free warning is appended to `prompt-log-errors.log`. Idle tick
 accepted rows, deferred writes and explicit replay reset the streak. Assistant output
 also modifies rollouts: this warning asks you to inspect the event schema and capture
 filters; it does not establish that a prompt was lost.
-
-### Recover missed Codex history
-
-First land the reviewed upstream fix, publish it to XYZ-CLIO, and deploy through Skills
-Army HQ. Do not point installed hooks at a task checkout. For manual replay, record
-whether `com.claude.clio-codex-tail` is currently loaded and keep its existing plist.
-Temporarily boot out only that job, then verify no scheduled or manual Codex tailer
-invocation remains before backing up `prompt-log-codex-tail.state` and running
-`CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. Keep other invocations stopped
-throughout replay: the age-only lock is insufficient for a long backfill.
-
-Restore the identical previously loaded job from its existing plist in a cleanup/finally
-path on both success and failure. Leave a previously unloaded job unloaded. Do not change
-its interval, command or exporter job. Preserve the state backup; a failed replay leaves
-a durable per-file rewind so the restored normal schedule can retry without skipping
-pending history. Do not rewind the canonical SQLite database to undo a replay.
-
-Use `clio-store.py query --agent codex --session SESSION --limit 100` for each requested
-session and compare stable record IDs before/after a repeated replay. Timestamp a
-substantive new Desktop submission and observe its matching SQLite row within 120
-seconds to establish live acceptance. Report sessions with no legacy or modern
-submitted events as unrecoverable from this source; never substitute response-item
-context. A launchd configuration or a nonzero `delivered` count alone does not prove
-that the intended row reached SQLite.
 
 Schedule it every minute:
 
@@ -781,6 +759,32 @@ cat > "$PLIST" << EOF
 EOF
 launchctl unload "$PLIST" 2>/dev/null; launchctl load "$PLIST"
 ```
+
+### Recover missed Codex history
+
+First land the reviewed upstream fix, publish it to XYZ-CLIO, and deploy through Skills
+Army HQ. Do not point installed hooks at a task checkout. For manual replay, record
+whether `com.claude.clio-codex-tail` is currently loaded and keep its existing plist.
+Temporarily boot out only that job, then verify no scheduled or manual Codex tailer
+invocation remains before backing up `prompt-log-codex-tail.state` and running
+`CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. Keep other invocations stopped
+throughout replay: the age-only lock is insufficient for a long backfill.
+
+Restore the identical previously loaded job from its existing plist in a cleanup/finally
+path on both success and failure. Leave a previously unloaded job unloaded. Do not change
+its interval, command or exporter job. Preserve the state backup; a failed replay leaves
+a durable rewind for each file already visited, so the restored normal schedule retries
+those files. Files not yet visited retain their previous cursors; after an interrupted
+whole-history scan, pause the job again and repeat the explicit backfill flag to cover
+them. A completed full scan, followed by per-session SQLite checks, establishes recovery. Do not rewind the canonical SQLite database to undo a replay.
+
+Use `clio-store.py query --agent codex --session SESSION --limit 100` for each requested
+session and compare stable record IDs before/after a repeated replay. Timestamp a
+substantive new Desktop submission and observe its matching SQLite row within 120
+seconds to establish live acceptance. Report sessions with no legacy or modern
+submitted events as unrecoverable from this source; never substitute response-item
+context. A launchd configuration or a nonzero `delivered` count alone does not prove
+that the intended row reached SQLite.
 
 ## Optional: Agy capture (Antigravity CLI)
 
