@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-29.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -114,5 +114,10 @@ INSTALL.md:739: `CLIO_TAIL_BACKFILL=1 `/.claude/hooks/clio-codex-tail.sh`. Keep 
 ```
 
 Handing off to Producer (codex-producer) — correct R1, refresh the packet and open round 2; go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1 dispositions
+
+R1 — Implemented: replace the complete malformed inline invocation with one balanced code span containing the backfill assignment and quoted "$HOME/.claude/hooks/clio-codex-tail.sh". Preserve quiescence, state backup and identical-schedule restoration. The seeded packet is regenerated from corrected docs.
+All Pass findings acknowledged; retained receipts stay unchanged. No capture code or test behavior changed. Re-review the precise documentation correction and unchanged contracts, then approve if sufficient. Handing off to Reviewer for round 2.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

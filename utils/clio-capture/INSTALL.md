@@ -736,7 +736,7 @@ Army HQ. Do not point installed hooks at a task checkout. For manual replay, rec
 whether `com.claude.clio-codex-tail` is currently loaded and keep its existing plist.
 Temporarily boot out only that job, then verify no scheduled or manual Codex tailer
 invocation remains before backing up `prompt-log-codex-tail.state` and running
-`CLIO_TAIL_BACKFILL=1 `/.claude/hooks/clio-codex-tail.sh`. Keep other invocations stopped
+`CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. Keep other invocations stopped
 throughout replay: the age-only lock is insufficient for a long backfill.
 
 Restore the identical previously loaded job from its existing plist in a cleanup/finally
