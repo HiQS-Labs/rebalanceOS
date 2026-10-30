@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-29.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -99,5 +99,23 @@ R1 — Implemented in the revised plan: persist per-file rewind/eligibility thro
 R2 — Implemented via the cheapest documented procedure: record/temporarily stop only the scheduled Codex tailer, verify all invocations drained, back up state, replay exclusively and restore the identical prior schedule in a finally/cleanup path. Correct the age-only lock wording in INSTALL; no lock framework or scheduler code expansion.
 Pass findings acknowledged. Live-acceptance nit — Implemented: timestamp a substantive target Desktop submission, verify its SQLite row within 120 seconds, and report each requested session recovered/unrecoverable. Clone/live verification remains outstanding; no claim of delivery.
 Round 2 request: review these precise revisions against R1/R2 and the unchanged scope. Previously read upstream source is unchanged; avoid broadening into unrelated systems. Production code remains unchanged. Handing off to Reviewer.
+
+### Reviewer · Round 2
+
+VERDICT: PASS
+Basis: Approve the plan for implementation. R1/R2 and the live-acceptance clarification are addressed without adding another state store, scheduler, suite or gate. This is plan approval, not implementation, merge, deployment or recovery acceptance.
+swept file: yes
+
+Read the entire revised artifact, upstream `utils/clio-capture/clio-codex-tail.sh`, `utils/clio-capture/INSTALL.md`, `utils/clio-capture/clio-store.py`, and `test/clio-codex-tail.sh`, including unchanged sections. Re-read Forge #1255 and rebalanceOS #368 through the GitHub connector. No additional pre-existing defect requiring expansion of this capture plan was identified; the previously identified age-only lock limitation remains addressed by exclusive replay and corrected documentation.
+
+- [Pass] R1 resolved at plan level (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:70`): "Before any replay write, atomically checkpoint that file at offset zero/eligibility 0 through existing state_update, preserving the global capture cutoff." The same step requires an ordinary retry without the flag after the second writer call fails, exactly-once stored results and unchanged source bytes/cutoff. This uses the existing checkpoint owner (`clio-codex-tail.sh:80`) and preserves the success-only advancement path (`clio-codex-tail.sh:311`). Clone execution must still establish the behavior.
+- [Pass] R2 resolved at plan level (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:74`): stop only the existing scheduled tailer, verify scheduled/manual invocations drained, back up state, replay exclusively, and restore the identical previously loaded job in cleanup on success or failure; leave a previously unloaded job unloaded. Correcting INSTALL's claim accounts for the actual age-only predicate (`clio-codex-tail.sh:56`) without expanding the lock mechanism.
+- [Pass] Live-acceptance clarification resolved (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:74`): timestamp a substantive target Desktop submission and observe its matching `agent=codex` SQLite row within 120 seconds, with each requested session reported recovered/unrecoverable. Keep Forge #1255 open until acceptance is met. The unavailable session is not silently counted as recovered; the submitted-event-only constraint at plan lines 25 and 54 agrees with rebalanceOS #368's instruction to report response-item-only sessions unrecoverable.
+- [Pass] Complete-plan provenance and replay contracts remain sound: plan lines 25 and 69 exclude response-item capture and retain legacy parsing; line 70 retains child exclusion and stable stored identities. First-file provenance is enforced at `clio-codex-tail.sh:121-136`, source IDs derive from original line offset/hash at `:198`, the writer forwards them at `INSTALL.md:173-178`, and SQLite capture uses durable pending receipts with replay-aware insertion at `clio-store.py:258-271`.
+- [Pass] Scope, canary and evidence remain commensurate (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:61`, `:71-78`): one warning at three complete root-active zero-acceptance ticks, explicit reset/suppression, compatible stdout and an acknowledged assistant-activity false-positive limitation. Existing-suite/manual checks must prove nonempty SQLite rows, stable replay IDs, compatibility and sensitive red controls. No new monitoring service, suite or gate is needed.
+- [Pass] Rating, dependency order and rollback remain appropriate at plan level (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:29`, `:63`, `:68-74`): one continuing incident with unknown trend; plan approval before production edits, independent final review before upstream landing, publication after merge, then authorized deployment and acceptance. Code rollback preserves captured history and never rewinds the canonical DB.
+- [Unverified — needs clone run] No tailer, executable fixture, test suite, deployment or live DB probe ran in this review workspace. Modern-shape delivery, durable replay retry, canary sensitivity and compatibility still require the planned disposable-clone checks. Target schema/session observations and publication parity remain supplied evidence, not independently measured results in this turn.
+
+Relay closed (Approved), no further turn needed. Producer (codex-producer) may proceed with the approved implementation and required clone verification; later merge/deployment authority remains separate.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
