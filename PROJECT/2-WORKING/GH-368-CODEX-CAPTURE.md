@@ -50,7 +50,7 @@ Silent Codex history loss after submitted-event format changed.
 
 ## Verification
 
-The existing Codex suite passes the modern event, known-file replay after a failed second write, SQLite idempotency, live IDE request and canary threshold/reset cases in a disposable full clone. Red controls and remaining relevant CLIO suites are running; final review and live target acceptance are pending. Retained receipts will be linked here before publication.
+All six existing CLIO suites pass, including 17 store cases after the existing stale-window fixture correction. Three negative controls fail as expected. Receipts, commands, revisions, failures and dispositions: [verification summary](../../TESTS-RESULTS/2026-10-29+GH-368/SUMMARY.md), with provenance.jsonl in the same directory. Static push gate passes. Final review and live target acceptance remain pending.
 
 ## Canonical plan and rating rationale
 

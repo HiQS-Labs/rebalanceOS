@@ -1,0 +1,3 @@
+PASS: modern submitted events, seen-file replay after partial writer failure, SQLite stable IDs, live IDE request, canary threshold/reset
+PASS: GH-199 first discovery, history/rotation, precision, partials, child/root resume, legacy retry, backfill
+PASS: codex tailer

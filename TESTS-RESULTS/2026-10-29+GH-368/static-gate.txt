@@ -1,0 +1,9 @@
+All checks passed!
+665 files already formatted
+script-inventory ratchet: clean (matches baseline)
+check_machine_paths: clean (0 machine-local path violations)
+sqlite gateway ratchet: clean (0 baseline file(s) matched exactly)
+banned-import ratchet: clean (29 baseline file(s) matched exactly)
+read-layer ratchet: clean (52 baseline site(s) matched exactly)
+near-duplicate canary: clean (7 baseline pair(s) matched exactly)
+pre-push gate: PASS (2s, logged)
