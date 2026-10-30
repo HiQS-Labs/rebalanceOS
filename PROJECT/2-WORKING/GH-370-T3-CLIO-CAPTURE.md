@@ -16,7 +16,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Issue and isolated full clone created; canonical capture owner located. | Complete recon and obtain independent plan approval. |
+| Plan QA round 1 completed; four concrete gaps accepted below. | Obtain approval of the revised identity/source contract. |
 
 ## Quad Concepts
 - Missing T3 coverage → read durable human submissions across providers.
@@ -63,10 +63,51 @@ Use SQLite `mode=ro` for T3. Never open T3 via CLIO's writable database gateway.
 Use existing `capture()` and stable T3 message source IDs; advance only after the
 writer durably accepts rows. Serialize cursor operations with existing lock().
 Source identity is explicit configuration; refuse replaced/regressed sources.
-Capture original message text, not provider transcript transformations; exclude
-import-prefixed threads/messages, non-user creators, subagent lineage, and
-scheduled/task creation sources based on inspected T3 contracts. Resolve provider
-from the corresponding run rather than the thread's mutable default.
+Capture original message text, not provider transcript transformations. Accept
+only user-created web/mobile message events; server/provider/MCP historical,
+scheduled and delegated input is excluded. Do not exclude a whole imported or
+subagent thread: fresh direct human submissions in either remain eligible.
+
+### Frozen source and identity contract
+
+Supported source: unified `orchestration_events` with `application_event_version=2`
+for thread events and object message payloads matching the inspected T3 contract.
+Version 1 thread history is ignored; unknown (>2) thread versions stop scanning
+without cursor advance. Required event columns and V2 thread/run/project
+projection columns must exist. Unknown layouts refuse registration/capture.
+Rows are bounded to 1000 events per invocation; additional pages wait for the
+next scheduled run. Attribution queries see the same committed read transaction,
+including runs committed beyond a page boundary.
+
+Registration generates a UUID for the source, records the source device/inode,
+current committed maximum sequence and its event_id, and atomically writes a
+sidecar next to the CLIO DB. A repeated registration of the same path preserves
+UUID/cursor; a different path requires disabling first and explicit registration.
+Before each scan validate inode and the retained boundary event identity; source
+replacement/regression is a visible refusal. A registered empty DB has no
+boundary identity until its first page. Missing source never creates a DB.
+
+CLIO `source_event_id` is `t3:<source UUID>:<message id>`, session_id is the
+namespaced source UUID plus T3 thread ID. Extend existing identity_payload for
+this producer only: identity is origin_id, source_event_id and clio_version,
+not mutable observational labels or later message updates. First accepted text,
+timestamp and metadata win. Existing/native producer identity stays unchanged.
+The source lock serializes capture and configuration. For a known T3 record,
+reuse the already committed payload or durable pending receipt before capture;
+this freezes all metadata across retries, including crash after acceptance and
+before atomic cursor publication. Only then advance sequence/boundary together.
+Use the canonical capture/normalize/insert path; no second event writer/table.
+
+Use message.runId to find run_id in the V2 run projection (covers steering);
+fallback to matching userMessageId only when message.runId is absent. Run
+modelSelection/providerInstanceId supplies model and instance, never the mutable
+thread default. Resolve driver from the run's provider session when present;
+otherwise keep the instance as agent identity and mark driver unknown in extras.
+Missing run/instance metadata refuses that page visibly without advancing.
+Missing project metadata retains the submission with empty repo/checkout/branch
+and an explicit metadata warning. Current project/worktree/branch and driver
+labels are observation-time metadata, explicitly marked in extras, not claims
+about historical checkout state. Timestamp comes from message.createdAt.
 
 Existing alternative: provider hooks alone miss providers and IDE attribution.
 T3 app-specific hooks would require an application rebuild and separate write
@@ -80,10 +121,13 @@ once per T3 submission on retry, not global cross-harness reconciliation.
 
 ## Acceptance and verification
 
-1. Inspect source variants and immutable metadata; finalize exact supported layouts.
+1. Verify the explicit source/version/identity contract above against T3 code.
 2. Extend existing `test/clio-store.py` using small synthetic T3 SQLite fixtures:
    human short/multiline text, multiple providers, automated/import exclusions,
-   duplicate updates/rerun, queued capture/retry and source-regression refusal.
+   duplicate updates/rerun, queued capture/retry and source-regression refusal;
+   steering, fresh input in imported/subagent threads, page-boundary attribution,
+   unknown versions, missing metadata, projection changes between retries and
+   crash after acceptance before cursor publication.
 3. Implement reviewed helper, opt-in config and scheduled integration; preserve
    existing config and inactive default. Content-free failures must be visible.
 4. Run existing CLIO store/runtime/capture/exporter suites and inventory/gateway
@@ -107,4 +151,10 @@ from reusing store/exports, with source-version uncertainty. No user override.
 
 ## QA
 
-Plan: pending. Final: pending. No implementation before plan approval.
+Plan round 1: Changes requested. All four findings accepted: steering uses
+message.runId; exclusions apply per submission; explicit source UUID/boundary and
+first-observation identity; exact V2 contract and missing-metadata policy.
+Plan round 2: pending. Final: pending. No implementation before plan approval.
+
+Host orchestration requires T3-managed delegated review rather than a shell
+relay child. The independent review scope and three-round cap are unchanged.
