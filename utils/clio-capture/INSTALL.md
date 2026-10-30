@@ -493,6 +493,10 @@ legacy journey-replay format; that consumer upgrade remains separately tracked.
 After installing the current CLIO runtime and activating SQLite capture, register
 the database of the local T3 environment you use:
 
+If you sync CLIO history across devices, upgrade CLIO on every participating
+reader before enabling this source: older helpers cannot validate the new T3
+producer's stable record identities.
+
 ```bash
 python3 ~/.claude/hooks/clio-store.py configure-t3 ~/.t3/userdata/statev2.sqlite
 python3 ~/.claude/hooks/clio-store.py capture-t3

@@ -31,7 +31,39 @@ Codex delegation because host orchestration takes precedence over shell relay.
 Runtime doctor ran and returned failure for an existing silent fleet device and
 an existing scheduled digest failure, plus configuration/staleness warnings.
 This change does not modify fleet or job configuration. No overall machine-health
-claim is made. Full repository tests and final independent QA are pending.
+claim is made. A separate doctor run from the maintained base checkout also
+returned exit 1 with the same silent-device and scheduled-digest errors; private
+device labels and config paths are not published here.
+
+Final independent QA round 2 Approved code revision `e6b91f8`; the verbatim
+response is retained in `final-qa.md`. The final store suite also passed in the
+disposable full verification clone at that exact revision (`clio-store-final.txt`).
+Full repository verification completed at approved code revision `e6b91f8` in a
+disposable full clone whose HEAD remained unchanged and whose only untracked
+artifact was the retained final store log. Root suite: **2815 passed, 21 skipped,
+10 xfailed, 171 subtests passed** (`root-tests.txt`). HiQS: **163 passed, 1 skipped,
+1 xfailed** (`hiqs-tests.txt`). Both separate invocations exited 0. The root suite
+retains its existing platform/data skips; one optional pre-push fixture skipped
+because the disposable clone has no local venv. The real branch push uses the
+armed pre-push gate with the existing interpreter explicitly selected.
+
+The initial combined root+HiQS
+invocation finished with 2974 passed, 4 failed, 22 skipped, 11 xfailed and 171
+subtests passed (`combined-invocation.txt`, local checkout paths redacted). All
+four failures are quarantine tests importing the other suite's bare `conftest`
+module. They pass alone on unmodified base (`baseline-quarantine.txt`). The
+suites were therefore rerun in separate processes, matching CI; the combined
+run is retained as failed invocation evidence, not reported as a passing gate.
+The same minimal combined invocation reproduces all four failures on unmodified
+base (`baseline-combined-collision.txt`). Running HiQS separately passes:
+163 passed, 1 skipped, 1 xfailed (`hiqs-tests.txt`). Its existing private-name
+check is skipped because the private allowlist is absent, not counted as a pass.
+
+PDDA frontmatter/status/roadmap checks returned their existing warn-mode findings:
+7 frontmatter errors, 9 status-table errors and 9 missing roadmap pointers, all
+in other existing plans. The same results reproduced on the unmodified base
+`f081931` in a separate full clone; no new plan finding was reported. These
+commands returned exit 0 under the repo's configured enforcement mode.
 
 Final QA round 1 found replay blocked by missing current run metadata despite a
 retained committed/pending payload. The existing interruption fixture was
@@ -48,4 +80,6 @@ layouts deliberately refuse capture. No live installation or post-merge rollout
 was performed. Native provider capture may independently retain the same input;
 this proves T3 submission retry deduplication, not cross-harness reconciliation.
 Metadata is observed from projections at capture time. Full machine health is
-not qualified by these focused capture checks.
+not qualified by these focused capture checks. Fleet readers must receive the
+updated CLIO helper before T3 capture is enabled; older helpers cannot validate
+the T3 producer's identity rule. Cross-version fleet rollout was not performed.

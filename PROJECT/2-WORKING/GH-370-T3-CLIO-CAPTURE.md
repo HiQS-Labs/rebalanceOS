@@ -16,7 +16,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA round 2 Approved; capture and focused synthetic cases implemented. | Run required verification, smoke and independent final QA. |
+| Plan/final QA Approved; 20 CLIO, 2815 root and 163 HiQS tests passed. | Push through the static gate and publish the PR; await hosted checks/merge. |
 
 ## Quad Concepts
 - Missing T3 coverage → read durable human submissions across providers.
@@ -159,8 +159,18 @@ current run metadata before checking a committed/pending payload. Accepted:
 resolve stable message identity and reuse retained payloads first. The existing
 interruption and queued-receipt fixtures now remove run projections before retry.
 The interruption fixture failed before the fix with run metadata unavailable;
-both cases pass after the lookup-order correction. Final round 2: pending.
+both cases pass after the lookup-order correction. Final round 2: Approved at
+`e6b91f8`; see the retained final review in the verification campaign.
 Implementation started after plan approval.
 
 Host orchestration requires T3-managed delegated review rather than a shell
 relay child. The independent review scope and three-round cap are unchanged.
+
+## Handoff
+
+Broad suites ran separately after a combined invocation exposed the existing
+bare-conftest collision (reproduced on base). Existing skipped/xfail checks and
+unrelated runtime doctor failures remain disclosed in the campaign summary.
+Code review approved `e6b91f8`; subsequent changes are verification receipts and
+operator documentation only. No deployment or live source mutation occurred.
+Lessons: NO_ENTRY — no new general governance lesson is warranted by this scope.
