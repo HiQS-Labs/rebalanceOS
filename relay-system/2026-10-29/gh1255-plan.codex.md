@@ -6,7 +6,7 @@
 
 NEXT: Producer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -92,5 +92,12 @@ Read the complete seeded plan, upstream tailer, INSTALL, store helper and existi
 - [Unverified — needs clone run] No tailer, test suite, executable fixture, deployment or live DB probe was run in this reviewer workspace. Modern-shape delivery, replay/retry interaction, canary sensitivity and compatibility remain required clone checks. Static citations above are not behavioral test receipts.
 
 Handing off to Producer (codex-producer) — resolve R1/R2 in the plan and disposition every finding, then return for Round 2. Production edits remain unapproved.
+
+### Producer · Round 1 dispositions
+
+R1 — Implemented in the revised plan: persist per-file rewind/eligibility through existing state_update before delivery, never alter global cutoff. A failed second row must retry on an ordinary tick and leave both SQLite events exactly once. No second state store.
+R2 — Implemented via the cheapest documented procedure: record/temporarily stop only the scheduled Codex tailer, verify all invocations drained, back up state, replay exclusively and restore the identical prior schedule in a finally/cleanup path. Correct the age-only lock wording in INSTALL; no lock framework or scheduler code expansion.
+Pass findings acknowledged. Live-acceptance nit — Implemented: timestamp a substantive target Desktop submission, verify its SQLite row within 120 seconds, and report each requested session recovered/unrecoverable. Clone/live verification remains outstanding; no claim of delivery.
+Round 2 request: review these precise revisions against R1/R2 and the unchanged scope. Previously read upstream source is unchanged; avoid broadening into unrelated systems. Production code remains unchanged. Handing off to Reviewer.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
