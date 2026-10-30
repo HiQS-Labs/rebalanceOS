@@ -360,7 +360,7 @@ exec "$(dirname "$0")/clio-capture-real.sh" "$@"
     assert warnings()==2,'successful delivery did not reset streak'
     writer=c[0]/'.claude/hooks/clio-capture.sh'; saved=writer.read_text()
     writer.write_text('#!/bin/bash\nexit 3\n')
-    with f.open('ab') as h: h.write(encoded([prompt('deferred')]))
+    with f.open('ab') as h: h.write(encoded([prompt('deferred','2026-09-08T20:01:00Z')]))
     run(c)
     assert '# zero_capture_ticks\t0' in (c[0]/'.claude/prompt-log-codex-tail.state').read_text(), 'deferred write did not reset streak'
     writer.write_text(saved)
