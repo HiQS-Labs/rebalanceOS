@@ -118,4 +118,12 @@ Read the entire revised artifact, upstream `utils/clio-capture/clio-codex-tail.s
 
 Relay closed (Approved), no further turn needed. Producer (codex-producer) may proceed with the approved implementation and required clone verification; later merge/deployment authority remains separate.
 
+
+### Attestation · relay-drive — 2026-10-30T01:15:49Z
+task: RELAY-gh1255-plan
+reviewer: codex
+status: Approved
+reviewed-head: 7625b526bc4a0e43f3da0aae5ce5a9e8be872659
+added-range: 13381+4393
+added-sha256: 8e8fc3c3a45d9b15d4345a70e6fffc25fa9598a517ef8a9d75788a3b8c45fdc8
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
