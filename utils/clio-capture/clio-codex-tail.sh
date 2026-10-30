@@ -49,9 +49,9 @@ command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is requir
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-# A lock older than 300 s is a dead run's leftover; reap it, or that agent's capture
-# stops for good. Reaping is serialized and rechecked so no contender deletes a lock
-# another one just took.
+# A lock older than 300 s is treated as abandoned. This age-only check can
+# displace a long-running holder: manual replay must quiesce the schedule first
+# (INSTALL.md). Reaping is serialized and rechecked against newly acquired locks.
 lock_stale() { # born stamp, else dir mtime; empty/non-numeric = not stale
   born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "")
   case "$born" in ''|*[!0-9]*) return 1 ;; esac
