@@ -75,6 +75,22 @@ three-case T3 rerun is retained as `t3-recovery.txt`.
 
 ## Threats to validity
 
+CodeRabbit dispositions: accepted changelog spacing/verification, SQLite
+activation wording, explicit thread-object validation and the disabled-source
+switch promised by the plan. Switching an active source still refuses; after
+explicit disable, the old cursor is archived before a new UUID/current-end
+registration is published. Unchanged disabled sources resume as before. Existing
+fixtures cover new paths, same-path replacement and retry after registration
+publication fails; they retain the prior cursor/history. Null thread metadata
+now produces a descriptive ValueError. The extended cases failed before these
+corrections; `coderabbit-regressions.txt` retains the complete store suite rerun.
+
+The optional per-message skip/automatic-expiry proposal was declined (Out of
+Scope / Ponytail). Missing metadata for an unseen submission deliberately
+refuses without discarding input, as specified by the approved contract. Adding
+prompt-dropping policy and a new recovery command is a separate product choice,
+not required to implement this capture contract. Existing history still exports.
+
 Greptile identified two reproducible cases after publication. An existing
 provider fixture with 1,001 older sessions stalled capture on the previous
 all-session cap; the query now returns only the newest session per referenced

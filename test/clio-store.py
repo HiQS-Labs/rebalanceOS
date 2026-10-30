@@ -112,6 +112,29 @@ class History(unittest.TestCase):
         store.configure_t3(self.db, source)
         store.capture_t3(self.db)
         self.assertEqual(len(self.rows()), 6)
+        cursor = Path(str(self.db) + '.t3.json')
+        replacement = self.home / 'other-t3.sqlite3'
+        shutil.copyfile(source, replacement)
+        with self.assertRaisesRegex(ValueError, 'disable'):
+            store.configure_t3(self.db, replacement)
+        store.configure_t3(self.db, disable=True)
+        old_state = cursor.read_bytes()
+        publish = store.atomic
+        def fail_registration(path, data, **kwargs):
+            if Path(path) == cursor:
+                raise OSError('fixture interrupted registration')
+            return publish(path, data, **kwargs)
+        with patch.object(store, 'atomic', fail_registration):
+            with self.assertRaises(OSError):
+                store.configure_t3(self.db, replacement)
+        self.assertEqual(cursor.read_bytes(), old_state)
+        changed = store.configure_t3(self.db, replacement)
+        self.assertNotEqual(changed['source_id'], registration['source_id'])
+        archive = Path(str(cursor) + '.' + registration['source_id'] + '.json')
+        self.assertEqual(archive.read_bytes(), old_state)
+        self.t3_event(replacement, 'original', text='new environment')
+        store.capture_t3(self.db)
+        self.assertEqual(len(self.rows()), 7)
 
     def test_t3_refusals_and_durable_retry(self):
         self.activate()
@@ -149,6 +172,13 @@ class History(unittest.TestCase):
             conn.execute('UPDATE orchestration_events SET event_id=? WHERE sequence=1', ('replaced',))
         with self.assertRaisesRegex(ValueError, 'replaced|regressed'):
             store.capture_t3(self.db)
+        prior_source = json.loads(cursor.read_text())['source_id']
+        store.configure_t3(self.db, disable=True)
+        archived = cursor.read_bytes()
+        new_source = store.configure_t3(self.db, source)
+        self.assertNotEqual(new_source['source_id'], prior_source)
+        self.assertEqual(Path(str(cursor) + '.' + prior_source + '.json').read_bytes(), archived)
+        self.assertEqual(self.rows(), first)
 
     def test_t3_cli_schedule_and_pending_receipts(self):
         store.activate(self.db, self.home / '.claude/prompt-log.jsonl', fresh=True, capture_only=True)
@@ -207,7 +237,7 @@ class History(unittest.TestCase):
             conn.execute('UPDATE orchestration_v2_projection_threads SET payload_json=? WHERE thread_id=?', ('null', 'thread'))
         compat.unlink()
         result = cli('scheduled-export', str(note), code=3)
-        self.assertEqual(result['t3']['error'], 'AttributeError')
+        self.assertEqual(result['t3']['error'], 'ValueError')
         self.assertEqual(len(compat.read_text().splitlines()), 2)
         self.assertEqual(cursor.read_bytes(), before)
         self.t3_event(source, 'future', version=3)

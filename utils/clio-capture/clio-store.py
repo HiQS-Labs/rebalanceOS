@@ -1109,12 +1109,19 @@ def configure_t3(path, source=None, disable=False):
         if source is None:
             raise ValueError('configure-t3 requires the T3 statev2.sqlite path or --disable')
         source = Path(source).expanduser().resolve()
-        if state and state['source'] != str(source):
-            raise ValueError('T3 source already registered; preserve its cursor before changing sources')
+        old_state = state
+        replace = bool(state and state['source'] != str(source))
+        if replace and state['enabled']:
+            raise ValueError('T3 source already registered; run configure-t3 --disable before changing sources')
         with t3_database(source) as conn:
-            if state:
-                t3_boundary(conn, source, state)
-            else:
+            if state and not replace:
+                try:
+                    t3_boundary(conn, source, state)
+                except ValueError:
+                    if state['enabled']:
+                        raise
+                    replace = True
+            if not state or replace:
                 if conn.execute("SELECT 1 FROM orchestration_events WHERE aggregate_kind='thread' AND application_event_version NOT IN (1,2) LIMIT 1").fetchone():
                     raise ValueError('unsupported T3 thread event version')
                 boundary = conn.execute('SELECT sequence,event_id FROM orchestration_events ORDER BY sequence DESC LIMIT 1').fetchone()
@@ -1123,6 +1130,14 @@ def configure_t3(path, source=None, disable=False):
                          'device': info.st_dev, 'inode': info.st_ino,
                          'sequence': boundary['sequence'] if boundary else 0,
                          'event_id': boundary['event_id'] if boundary else None}
+        if replace:
+            archive = Path(str(state_path) + '.' + old_state['source_id'] + '.json')
+            archived = (encode(old_state) + '\n').encode()
+            if archive.exists():
+                if archive.read_bytes() != archived:
+                    raise ValueError('T3 archived cursor differs; preserve both registrations')
+            else:
+                atomic(archive, archived, exclusive=True)
         state['enabled'] = True
         atomic(state_path, (encode(state) + '\n').encode())
         return {'configured': True, 'source_id': state['source_id'], 'sequence': state['sequence']}
@@ -1259,7 +1274,9 @@ def t3_rows(conn, state, messages):
             raise ValueError('invalid T3 model selection metadata')
         thread = thread_rows.get(message['threadId'])
         workspace = roots.get(thread['project_id'], '') if thread else ''
-        details = json.loads(thread['payload_json']) if thread else {}
+        details = json.loads(thread['payload_json'] or 'null') if thread else {}
+        if not isinstance(details, dict):
+            raise ValueError('invalid T3 thread metadata')
         checkout = (details.get('worktreePath') or workspace) if workspace else ''
         instance = run['providerInstanceId']
         driver = drivers.get(instance)

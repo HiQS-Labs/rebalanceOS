@@ -31,8 +31,9 @@ copy and records a receipt, so nothing is hand-copied.
 See [INSTALL.md](INSTALL.md) for the full install, verify, export, auto-sync, and
 uninstall instructions.
 
-T3 Code is supported through opt-in SQLite capture across all providers. Register
-its local database with `clio-store.py configure-t3`, then use the existing export
+T3 Code is supported through opt-in SQLite capture across all providers. First
+[activate SQLite capture](INSTALL.md#sqlite-history-and-seven-day-view-opt-in-pilot),
+then register its local database with `clio-store.py configure-t3` and use the existing export
 schedule or `capture-t3`. See [T3 setup](INSTALL.md#t3-code-prompt-capture-opt-in-sqlite-mode)
 for source compatibility, metadata and overlap with native provider capture.
 

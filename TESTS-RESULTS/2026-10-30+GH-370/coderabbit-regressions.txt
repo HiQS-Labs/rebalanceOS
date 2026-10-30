@@ -1,0 +1,28 @@
+test_activation_four_agent_routes_and_rollback_export (__main__.History.test_activation_four_agent_routes_and_rollback_export) ... ok
+test_activation_import_gate_and_source_preservation (__main__.History.test_activation_import_gate_and_source_preservation) ... ok
+test_device_roundtrip_preserves_owner_extras_and_no_echo (__main__.History.test_device_roundtrip_preserves_owner_extras_and_no_echo) ... /opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/encoder.py:254: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x102bf08b0>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_existing_schedule_reuses_obsidian_path (__main__.History.test_existing_schedule_reuses_obsidian_path) ... ok
+test_fleet_discovery_and_peer_note_join (__main__.History.test_fleet_discovery_and_peer_note_join) ... ok
+test_identity_replay_collision_and_busy_receipt (__main__.History.test_identity_replay_collision_and_busy_receipt) ... ok
+test_import_accounting_resume_and_negative_controls (__main__.History.test_import_accounting_resume_and_negative_controls) ... ok
+test_migration_matches_actual_legacy_renderer (__main__.History.test_migration_matches_actual_legacy_renderer) ... ok
+test_readonly_queries_refs_pagination_and_large_prompt (__main__.History.test_readonly_queries_refs_pagination_and_large_prompt) ... ok
+test_rolling_window_atomicity_idle_expiry_and_compatibility (__main__.History.test_rolling_window_atomicity_idle_expiry_and_compatibility) ... ok
+test_same_path_default_failure_recovery_and_write_guards (__main__.History.test_same_path_default_failure_recovery_and_write_guards) ... ok
+test_same_path_migration_refuses_incomplete_or_ambiguous_inputs (__main__.History.test_same_path_migration_refuses_incomplete_or_ambiguous_inputs) ... ok
+test_simultaneous_capture_read_export (__main__.History.test_simultaneous_capture_read_export) ... ok
+test_source_change_and_transaction_interruption (__main__.History.test_source_change_and_transaction_interruption) ... ok
+test_t3_capture_submissions_and_retry (__main__.History.test_t3_capture_submissions_and_retry) ... ok
+test_t3_cli_schedule_and_pending_receipts (__main__.History.test_t3_cli_schedule_and_pending_receipts) ... ok
+test_t3_refusals_and_durable_retry (__main__.History.test_t3_refusals_and_durable_retry) ... ok
+test_tailer_retry_freezes_first_observed_context (__main__.History.test_tailer_retry_freezes_first_observed_context) ... ok
+test_waiting_legacy_writer_rechecks_activation (__main__.History.test_waiting_legacy_writer_rechecks_activation) ... ok
+test_write_failures_never_acknowledge_without_receipt (__main__.History.test_write_failures_never_acknowledge_without_receipt) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 13.090s
+
+OK

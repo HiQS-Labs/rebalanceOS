@@ -535,9 +535,12 @@ python3 ~/.claude/hooks/clio-store.py configure-t3 --disable
 ```
 
 Registering the same path again resumes from its preserved position, including
-submissions made while scans were disabled. Changing to another source path is
-refused: preserve the sidecar and existing history before deliberately setting
-up a different environment. Never reset a cursor to repair a source refusal.
+submissions made while scans were disabled. To change environments, disable
+capture first, then register the new source path. For a deliberately replaced or
+rebuilt database at the same path, also disable before registering again. The
+previous sidecar is archived beside it with its source UUID; existing history is
+retained, while the new source gets a new UUID and starts at its current end.
+Active registrations refuse replacement; no capture scan resets a cursor.
 
 ### Read-only agent lookup
 
