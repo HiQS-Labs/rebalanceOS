@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-29.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -66,5 +66,53 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+VERDICT: FAIL
+
+Basis: Implementation and retained clone receipts support the approved local capture contract. One recovery-command correction is required before approval; no production redesign or additional suite is requested.
+
+swept file: yes
+
+Read the entire packet, full tailer, both changed test files, rollout fixture, INSTALL, version files, upstream project document and retained verification receipts; reviewed Forge tracking/parity and release changes. No additional pre-existing defect found in the capture/replay paths examined. The documented age-only lock limitation remains an accepted constraint with exclusive replay instructions. No Git commands, suites, executable fixtures, live capture or deployment were run in this turn.
+
+- [Should] R1 — Repair the recovery command at `utils/clio-capture/INSTALL.md:739` (also packet line 426). It currently reads `` `CLIO_TAIL_BACKFILL=1 `/.claude/hooks/clio-codex-tail.sh` ``: the inline code closes before the executable, and the executable path lacks the home directory. This is the central operator step for recovering missed history, not merely cosmetic formatting. Replace the entire inline span with `CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`, enclosed in one balanced Markdown code span. Preserve the surrounding quiesce/restore procedure; refresh the packet from corrected upstream docs.
+  Observed input: literal source line 739 reproduced by the read-only probe below; no installed command was executed.
+  Affected scope: this one documented manual replay invocation, with no runtime behavior change.
+  Falsifier: the corrected source and refreshed packet each render one code span containing the assignment and the quoted home-relative executable path; a source line already containing those bytes would make this finding unnecessary.
+- [Pass] Parser/provenance and cursor contracts: `utils/clio-capture/clio-codex-tail.sh:121-150` establishes first-file provenance and newline consumption; `:172-198` excludes children/response items and accepts only legacy or modern UserMessage text with timestamp eligibility; `:269-274` checkpoints replay before extraction/delivery; `:325-341` retains that checkpoint after writer rejection. Existing suite assertions at `test/clio-codex-tail.sh:311-334` require one row after the second-write failure, offset/eligibility zero, two rows on ordinary retry, stable record IDs on repeated replay and unchanged source/cutoff. Retain these paths and assertions.
+- [Pass] Diagnostic scope stays bounded: `utils/clio-capture/clio-codex-tail.sh:345-361` caps the streak at three, warns only on threshold crossing, resets for idle/acceptance/deferred writer/backfill and explicitly says activity alone does not prove lost prompts. `test/clio-codex-tail.sh:343-368` covers threshold and resets; `red-disabled-canary.txt` contains "AssertionError: canary must warn once at three active ticks". No infrastructure expansion is warranted.
+- [Pass] Retained evidence distinguishes failures from corrected passes: `red-base-modern.txt` reports "expected the two user prompts delivered" versus `delivered=1`; `red-lost-replay-checkpoint.txt` reports "replay intent lost on writer failure"; `clio-codex-tail-final.txt` reports the modern/replay/SQLite/canary pass. `base-store-control.txt` retains `AssertionError: 4 != 5`, and `clio-store-final.txt` retains "Ran 17 tests" / "OK". The one-line `test/clio-store.py:978` timestamp change preserves the five-row checks at `:1027` and `:1031`. Eleven hashed logs match their provenance records (probe below). These are reviewed producer clone receipts, not an independent suite rerun; retain them and let the harness rerun its gate.
+- [Pass] Forge remains tracking/evidence scope: packet lines 725-727 pin parity to the baseline upstream/standalone/Forge revisions; its ending "Limits" explicitly leaves merge, publication and live 120-second acceptance outstanding. The tracking plan says "Keep Forge #1255 open until actual acceptance is met." Treat parity as baseline publication evidence, not candidate deployment proof; retain those boundaries.
+
+Read-only probe command (exit 0; no artifact execution):
+
+```sh
+export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+mkdir -p "$TMPDIR"
+python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+p = Path('TESTS-RESULTS/2026-10-29+GH-368')
+rows = [json.loads(s) for s in (p/'provenance.jsonl').read_text().splitlines()]
+checked = [r for r in rows if 'log_sha256' in r]
+for r in checked:
+    assert hashlib.sha256((p/r['log']).read_bytes()).hexdigest() == r['log_sha256'], r['log']
+print(f'{len(checked)} retained log SHA256 values match provenance')
+for n, line in enumerate(Path('utils/clio-capture/INSTALL.md').read_text().splitlines(), 1):
+    if line.startswith('`CLIO_TAIL_BACKFILL=1 '):
+        print(f'INSTALL.md:{n}: {line}')
+PY
+```
+
+Decisive output:
+
+```text
+11 retained log SHA256 values match provenance
+INSTALL.md:739: `CLIO_TAIL_BACKFILL=1 `/.claude/hooks/clio-codex-tail.sh`. Keep other invocations stopped
+```
+
+Handing off to Producer (codex-producer) — correct R1, refresh the packet and open round 2; go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
