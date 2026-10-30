@@ -27,6 +27,240 @@ spec.loader.exec_module(store)
 
 
 class History(unittest.TestCase):
+    def t3_source(self):
+        source = self.home / 't3.sqlite3'
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.executescript('''
+                CREATE TABLE orchestration_events(sequence INTEGER PRIMARY KEY, event_id TEXT,
+                    aggregate_kind TEXT, application_event_version INTEGER, event_type TEXT, payload_json TEXT);
+                CREATE TABLE orchestration_v2_projection_threads(thread_id TEXT PRIMARY KEY,
+                    project_id TEXT, payload_json TEXT);
+                CREATE TABLE orchestration_v2_projection_runs(run_id TEXT PRIMARY KEY,
+                    thread_id TEXT, payload_json TEXT);
+                CREATE TABLE projection_projects(project_id TEXT PRIMARY KEY, workspace_root TEXT);
+                CREATE TABLE orchestration_v2_projection_provider_sessions(payload_json TEXT);
+            ''')
+            conn.execute('INSERT INTO projection_projects VALUES (?,?)', ('p', '/fixture/work'))
+            for thread in ('thread', 'import:thread', 'child'):
+                conn.execute('INSERT INTO orchestration_v2_projection_threads VALUES (?,?,?)',
+                             (thread, 'p', json.dumps({'branch': 'feature', 'worktreePath': None})))
+            for run, thread, instance in [('run', 'thread', 'codex'), ('other', 'import:thread', 'claude-personal'),
+                                          ('child-run', 'child', 'opencode')]:
+                conn.execute('INSERT INTO orchestration_v2_projection_runs VALUES (?,?,?)',
+                             (run, thread, json.dumps({'id': run, 'threadId': thread, 'userMessageId': run + '-initial',
+                              'providerInstanceId': instance, 'modelSelection': {'instanceId': instance, 'model': 'fixture-model'}})))
+            conn.execute('INSERT INTO orchestration_v2_projection_provider_sessions VALUES (?)',
+                         (json.dumps({'providerInstanceId': 'claude-personal', 'driver': 'claudeAgent', 'updatedAt': '2026-10-30'}),))
+        return source
+
+    def t3_event(self, source, message_id='message', thread='thread', run='run', text='ok',
+                 creator='user', creation='web', version=2, kind='message.updated'):
+        message = {'id': message_id, 'threadId': thread, 'runId': run, 'role': 'user',
+                   'createdBy': creator, 'creationSource': creation, 'text': text,
+                   'createdAt': '2026-10-30T12:34:56.123Z'}
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            sequence = conn.execute('SELECT coalesce(max(sequence),0)+1 FROM orchestration_events').fetchone()[0]
+            conn.execute('INSERT INTO orchestration_events VALUES (?,?,?,?,?,?)',
+                         (sequence, 'event-' + str(sequence), 'thread', version, kind, json.dumps(message)))
+
+    def test_t3_capture_submissions_and_retry(self):
+        self.activate()
+        source = self.t3_source()
+        self.t3_event(source, 'old')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.executemany('INSERT INTO orchestration_v2_projection_provider_sessions VALUES (?)',
+                             [(json.dumps({'providerInstanceId': 'claude-personal', 'driver': 'obsolete',
+                                           'updatedAt': '2020-01-01'}),)] * 1001)
+        registration = store.configure_t3(self.db, source)
+        self.assertEqual(store.configure_t3(self.db, source), registration)
+        self.t3_event(source, 'original')
+        self.t3_event(source, 'steering', text='change this\n日本語')
+        self.t3_event(source, 'fresh-import', thread='import:thread', run='other', creation='mobile')
+        self.t3_event(source, 'human-child', thread='child', run='child-run')
+        self.t3_event(source, 'legacy', version=1)
+        self.t3_event(source, 'run-initial', run=None)
+        for creation in ('server', 'provider', 'mcp'):
+            self.t3_event(source, 'excluded-' + creation, creation=creation)
+        self.t3_event(source, 'agent', creator='agent')
+        source_before = source.read_bytes()
+        result = store.capture_t3(self.db, limit=2)
+        self.assertEqual(result['captured'], 2)
+        for _ in range(5):
+            store.capture_t3(self.db, limit=2)
+        self.assertEqual(store.capture_t3(self.db, limit=2)['scanned'], 0)
+        rows = self.rows()
+        self.assertEqual(len(rows), 5)
+        by_id = {r['extras']['t3_message_id']: r for r in rows}
+        self.assertEqual(by_id['steering']['prompt'], 'change this\n日本語')
+        self.assertEqual(by_id['steering']['agent'], 'codex')
+        self.assertEqual(by_id['fresh-import']['agent'], 'claude-code')
+        self.assertEqual(by_id['human-child']['agent'], 'opencode')
+        self.assertEqual(by_id['run-initial']['agent'], 'codex')
+        self.assertEqual(by_id['original']['timestamp'], '2026-10-30T12:34:56.123000Z')
+        self.assertEqual(by_id['original']['repo'], 'work')
+        self.assertEqual(by_id['original']['branch'], 'feature')
+        self.assertEqual(by_id['original']['extras']['ide'], 't3-code')
+        self.assertEqual(source.read_bytes(), source_before)
+        self.t3_event(source, 'original', text='later projection update')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE projection_projects SET workspace_root=?', ('/fixture/changed',))
+        store.capture_t3(self.db)
+        self.assertEqual(self.rows(), rows)
+        store.configure_t3(self.db, disable=True)
+        self.t3_event(source, 'disabled')
+        self.assertEqual(store.capture_t3(self.db)['configured'], False)
+        store.configure_t3(self.db, source)
+        store.capture_t3(self.db)
+        self.assertEqual(len(self.rows()), 6)
+        cursor = Path(str(self.db) + '.t3.json')
+        replacement = self.home / 'other-t3.sqlite3'
+        shutil.copyfile(source, replacement)
+        with self.assertRaisesRegex(ValueError, 'disable'):
+            store.configure_t3(self.db, replacement)
+        store.configure_t3(self.db, disable=True)
+        old_state = cursor.read_bytes()
+        publish = store.atomic
+        def fail_registration(path, data, **kwargs):
+            if Path(path) == cursor:
+                raise OSError('fixture interrupted registration')
+            return publish(path, data, **kwargs)
+        with patch.object(store, 'atomic', fail_registration):
+            with self.assertRaises(OSError):
+                store.configure_t3(self.db, replacement)
+        self.assertEqual(cursor.read_bytes(), old_state)
+        changed = store.configure_t3(self.db, replacement)
+        self.assertNotEqual(changed['source_id'], registration['source_id'])
+        archive = Path(str(cursor) + '.' + registration['source_id'] + '.json')
+        self.assertEqual(archive.read_bytes(), old_state)
+        self.t3_event(replacement, 'original', text='new environment')
+        store.capture_t3(self.db)
+        self.assertEqual(len(self.rows()), 7)
+
+    def test_t3_refusals_and_durable_retry(self):
+        self.activate()
+        source = self.t3_source()
+        def thread_event(event_type, event_id):
+            with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+                sequence = conn.execute('SELECT coalesce(max(sequence),0)+1 FROM orchestration_events').fetchone()[0]
+                conn.execute('INSERT INTO orchestration_events VALUES (?,?,?,?,?,?)',
+                             (sequence, event_id, 'thread', 2, event_type, '{}'))
+        thread_event('thread.created', 'thread-created')
+        store.configure_t3(self.db, source)
+        self.t3_event(source)
+        original_atomic = store.atomic
+        cursor = Path(str(self.db) + '.t3.json')
+        def fail_cursor(path, data, **kwargs):
+            if Path(path) == cursor:
+                raise OSError('fixture crash after acceptance')
+            return original_atomic(path, data, **kwargs)
+        with patch.object(store, 'atomic', fail_cursor):
+            with self.assertRaises(OSError):
+                store.capture_t3(self.db)
+        first = self.rows()
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE projection_projects SET workspace_root=?', ('/fixture/changed',))
+            conn.execute('DELETE FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',))
+        store.capture_t3(self.db)
+        self.assertEqual(self.rows(), first)
+        thread_event('thread.visited', 'visit-old')
+        self.assertEqual(store.capture_t3(self.db)['scanned'], 1)
+        thread_event('thread.visited', 'visit-new')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('DELETE FROM orchestration_events WHERE event_id=?', ('visit-old',))
+        self.assertEqual(store.capture_t3(self.db)['scanned'], 1)
+        self.t3_event(source, 'future', version=3)
+        before = cursor.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'version'):
+            store.capture_t3(self.db)
+        self.assertEqual(cursor.read_bytes(), before)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('DELETE FROM orchestration_events WHERE application_event_version=3')
+        self.t3_event(source, 'missing-run', run='not-present')
+        with self.assertRaisesRegex(ValueError, 'run'):
+            store.capture_t3(self.db)
+        self.assertEqual(cursor.read_bytes(), before)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_events SET event_id=? WHERE event_id=?', ('replaced-cursor', 'visit-new'))
+        with self.assertRaisesRegex(ValueError, 'replaced|regressed'):
+            store.capture_t3(self.db)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_events SET event_id=? WHERE event_id=?', ('visit-new', 'replaced-cursor'))
+            conn.execute('DELETE FROM orchestration_events WHERE sequence>1')
+            conn.execute('UPDATE orchestration_events SET event_id=? WHERE sequence=1', ('replaced',))
+        with self.assertRaisesRegex(ValueError, 'replaced|regressed'):
+            store.capture_t3(self.db)
+        prior_source = json.loads(cursor.read_text())['source_id']
+        store.configure_t3(self.db, disable=True)
+        archived = cursor.read_bytes()
+        new_source = store.configure_t3(self.db, source)
+        self.assertNotEqual(new_source['source_id'], prior_source)
+        self.assertEqual(Path(str(cursor) + '.' + prior_source + '.json').read_bytes(), archived)
+        self.assertEqual(self.rows(), first)
+
+    def test_t3_cli_schedule_and_pending_receipts(self):
+        store.activate(self.db, self.home / '.claude/prompt-log.jsonl', fresh=True, capture_only=True)
+        source = self.t3_source()
+        command = [sys.executable, str(ROOT / 'utils/clio-capture/clio-store.py')]
+        def cli(*args, code=0):
+            result = subprocess.run(command + list(args), capture_output=True, text=True)
+            self.assertEqual(result.returncode, code, result.stderr)
+            return json.loads(result.stdout)
+        self.assertTrue(cli('configure-t3', str(source))['configured'])
+        self.t3_event(source, 'queued')
+        with contextlib.closing(store.database(self.db, True)) as busy:
+            busy.execute('BEGIN IMMEDIATE')
+            self.assertEqual(cli('capture-t3')['captured'], 1)
+        receipts = list(store.pending_dir(self.db).glob('clio1-*.json'))
+        self.assertEqual(len(receipts), 1)
+        frozen = receipts[0].read_bytes()
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('DELETE FROM projection_projects')
+            saved_run = conn.execute('SELECT payload_json FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',)).fetchone()[0]
+            conn.execute('DELETE FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',))
+        self.t3_event(source, 'queued')
+        with contextlib.closing(store.database(self.db, True)) as busy:
+            busy.execute('BEGIN IMMEDIATE')
+            cli('capture-t3')
+        self.assertEqual(receipts[0].read_bytes(), frozen)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('INSERT INTO orchestration_v2_projection_runs VALUES (?,?,?)', ('run', 'thread', saved_run))
+        store.drain(self.db)
+        self.assertEqual(len(self.rows()), 1)
+        self.assertEqual(self.rows()[0]['repo'], 'work')
+        self.t3_event(source, 'no-project')
+        note = self.home / 'prompts.md'
+        result = cli('scheduled-export', str(note))
+        self.assertEqual(result['t3']['captured'], 1)
+        by_id = {r['extras']['t3_message_id']: r for r in self.rows()}
+        self.assertEqual(by_id['no-project']['repo'], '')
+        self.assertEqual(by_id['no-project']['extras']['metadata_warning'], 'project metadata unavailable')
+        self.assertEqual(cli('scheduled-export', str(note))['t3']['captured'], 0)
+        self.t3_event(source, 'malformed-model')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            run = json.loads(saved_run)
+            run['modelSelection'] = None
+            conn.execute('UPDATE orchestration_v2_projection_runs SET payload_json=? WHERE run_id=?',
+                         (json.dumps(run), 'run'))
+        cursor = Path(str(self.db) + '.t3.json')
+        before = cursor.read_bytes()
+        result = cli('scheduled-export', str(note), code=3)
+        self.assertEqual(result['t3']['state'], 'refused')
+        self.assertEqual(cursor.read_bytes(), before)
+        compat = self.home / '.claude/prompt-log-compat.jsonl'
+        self.assertEqual(len(compat.read_text().splitlines()), 2)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_v2_projection_runs SET payload_json=? WHERE run_id=?', (saved_run, 'run'))
+            conn.execute('INSERT INTO projection_projects VALUES (?,?)', ('p', '/fixture/work'))
+            conn.execute('UPDATE orchestration_v2_projection_threads SET payload_json=? WHERE thread_id=?', ('null', 'thread'))
+        compat.unlink()
+        result = cli('scheduled-export', str(note), code=3)
+        self.assertEqual(result['t3']['error'], 'ValueError')
+        self.assertEqual(len(compat.read_text().splitlines()), 2)
+        self.assertEqual(cursor.read_bytes(), before)
+        self.t3_event(source, 'future', version=3)
+        self.assertEqual(cli('scheduled-export', str(note), code=3)['t3']['state'], 'refused')
+        self.assertEqual(len(self.rows()), 2)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='clio-sqlite-')
         self.home = Path(self.tmp.name)

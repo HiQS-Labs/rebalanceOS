@@ -1,0 +1,8 @@
+test_t3_capture_submissions_and_retry (__main__.History.test_t3_capture_submissions_and_retry) ... ok
+test_t3_refusals_and_durable_retry (__main__.History.test_t3_refusals_and_durable_retry) ... ok
+test_t3_cli_schedule_and_pending_receipts (__main__.History.test_t3_cli_schedule_and_pending_receipts) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 1.543s
+
+OK
