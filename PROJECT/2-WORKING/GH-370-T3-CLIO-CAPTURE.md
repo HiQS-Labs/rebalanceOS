@@ -16,7 +16,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan/final QA Approved; 20 CLIO, 2815 root and 163 HiQS tests passed. | Push through the static gate and publish the PR; await hosted checks/merge. |
+| PR #371 published; hosted macOS 14 brownout traced to retired runner label. | Verify the README installation job on the supported macOS 15 runner. |
 
 ## Quad Concepts
 - Missing T3 coverage → read durable human submissions across providers.

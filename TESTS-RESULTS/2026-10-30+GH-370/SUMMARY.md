@@ -75,6 +75,17 @@ three-case T3 rerun is retained as `t3-recovery.txt`.
 
 ## Threats to validity
 
+Hosted run `41103203124` cancelled `readme-install` before assigning a runner or
+executing any step. Its check annotation explicitly identifies GitHub's scheduled
+macOS 14 image brownout. The failure occurred inside the announced October 30
+14:00–October 31 00:00 UTC interval. GitHub's
+[runner retirement notice](https://github.com/actions/runner-images/issues/13518)
+names `macos-15` as a supported migration. Only that job's runner label was
+updated; its README installation and test-collection steps are unchanged.
+Root cause: retired hosted image policy; fix site: the workflow's runner label;
+application code cannot run before runner assignment. Fresh hosted verification
+of the replacement runner remains pending.
+
 The fixture matches the inspected unified V2 T3 event/projection contract; other
 layouts deliberately refuse capture. No live installation or post-merge rollout
 was performed. Native provider capture may independently retain the same input;
