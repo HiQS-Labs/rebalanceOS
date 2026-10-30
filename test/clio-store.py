@@ -975,7 +975,7 @@ class History(unittest.TestCase):
         self.assertEqual(len(self.rows()), 2)
 
     def test_activation_import_gate_and_source_preservation(self):
-        path = self.source([self.row()], name='original.jsonl')
+        path = self.source([self.row(timestamp=store.utc())], name='original.jsonl')
         before = path.read_bytes()
         store.import_jsonl(self.db, path)
         with patch.object(store, 'check_deadline', side_effect=TimeoutError('cutover budget')):

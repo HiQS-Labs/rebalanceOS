@@ -59,3 +59,7 @@ The existing Codex suite passes the modern event, known-file replay after a fail
 ## Delivery boundary
 
 Author upstream here, then publish unchanged to standalone only after merge. Deployment through Skills Army HQ and target-device two-minute capture/backfill remain post-landing acceptance; no automatic merge or task-checkout installation. One requested source session has no submitted events and cannot be recovered via response_item under this contract. Rollback code only; preserve additive history.
+
+## Existing verification correction
+
+The adjacent store suite had a pre-existing date-dependent failure: its activation case expected five rows in the current seven-day projection, but its imported source row was fixed at September 29. The same failure (4 != 5) reproduced against unchanged development. Change only that case's source row to the existing store.utc() timestamp helper; preserve five-row assertions and all production store code. This keeps the existing suite truthful without a new test or relaxed check. Final QA includes the one-line fixture correction and retained base/control receipts.
