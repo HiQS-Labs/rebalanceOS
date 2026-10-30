@@ -1,0 +1,4 @@
+SKIP: /bin/bash — same interpreter as `bash` on this host;
+      a second run would repeat the first, not widen coverage.
+PASS: all capture cases (bash)
+jq: parse error: Invalid literal at line 1, column 5

@@ -1,0 +1,15 @@
+test_activation_import_gate_and_source_preservation (__main__.History.test_activation_import_gate_and_source_preservation) ... FAIL
+
+======================================================================
+FAIL: test_activation_import_gate_and_source_preservation (__main__.History.test_activation_import_gate_and_source_preservation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<task-gate>/temp/base-store-control/test/clio-store.py", line 1027, in test_activation_import_gate_and_source_preservation
+    self.assertEqual(result['rows'], 5)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 4 != 5
+
+----------------------------------------------------------------------
+Ran 1 test in 0.672s
+
+FAILED (failures=1)

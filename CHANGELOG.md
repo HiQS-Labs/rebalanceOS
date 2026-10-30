@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.105.1] - 2026-10-29
+
+### Fixed
+
+- Codex Desktop submissions are captured from the current user-message event shape alongside legacy events. Explicit history replay now revisits previously scanned sessions and persists pending replay after a failed write. A diagnostic warning identifies three consecutive source-active polls without prompt acceptance; recovery documentation requires pausing the existing schedule for an exclusive replay.
+
 ## [0.105.0] - 2026-10-25
 
 ### Added

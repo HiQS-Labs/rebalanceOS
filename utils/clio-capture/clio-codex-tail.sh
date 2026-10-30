@@ -4,7 +4,8 @@
 # writes go through the shared capture writer.
 #
 # Source of record: $CODEX_HOME/sessions/**/rollout-*.jsonl. Only
-# event_msg/user_message payloads carry submitted text; session identity and
+# event_msg/user_message and event_msg/item_completed/UserMessage carry submitted
+# text; session identity and
 # cwd come from the nearest preceding session_meta. response_item entries are
 # never parsed — product/context material can be combined with user input
 # there. history.jsonl is deliberately not used: it is TUI-only and can be
@@ -21,7 +22,8 @@
 #             forks) update the context in file order.
 #   rescan  = inode change or size regression resets the offset to 0.
 #   first sighting = read from byte 0, eligible since the persisted capture-start
-#             instant. CLIO_TAIL_BACKFILL=1 admits history for unseen ROOT files.
+#             instant. CLIO_TAIL_BACKFILL=1 rewinds ROOT history, including known
+#             files. Persist that rewind before delivery so normal ticks retry it.
 #   provenance = first session_meta identifies child files; inherited child prompts
 #             are never user submissions, even after later parent metadata.
 #   migration = legacy pending bytes remain eligible on their original inode; a
@@ -47,9 +49,9 @@ command -v python3 >/dev/null 2>&1 || { echo "clio-codex-tail: python3 is requir
 command -v jq >/dev/null 2>&1 || { echo "clio-codex-tail: jq is required" >&2; exit 1; }
 
 # Overlapping invocations: busy tailer lock is a silent no-op, never a failure.
-# A lock older than 300 s is a dead run's leftover; reap it, or that agent's capture
-# stops for good. Reaping is serialized and rechecked so no contender deletes a lock
-# another one just took.
+# A lock older than 300 s is treated as abandoned. This age-only check can
+# displace a long-running holder: manual replay must quiesce the schedule first
+# (INSTALL.md). Reaping is serialized and rechecked against newly acquired locks.
 lock_stale() { # born stamp, else dir mtime; empty/non-numeric = not stale
   born=$(cat "$TAIL_LOCK/born" 2>/dev/null || stat -f %m "$TAIL_LOCK" 2>/dev/null || stat -c %Y "$TAIL_LOCK" 2>/dev/null || echo "")
   case "$born" in ''|*[!0-9]*) return 1 ;; esac
@@ -169,9 +171,23 @@ if cut != -1 and cut >= (offset - scan_start):
             continue
         if child or line_start < offset:
             continue
-        if obj.get("type") != "event_msg" or payload.get("type") != "user_message":
+        if obj.get("type") != "event_msg":
             continue
-        text = payload.get("message")
+        if payload.get("type") == "user_message":
+            text = payload.get("message")
+        elif payload.get("type") == "item_completed":
+            item = payload.get("item")
+            if not isinstance(item, dict) or item.get("type") != "UserMessage":
+                continue
+            parts = item.get("content")
+            if not isinstance(parts, list):
+                malformed += 1
+                continue
+            text = "\n".join(part["text"] for part in parts
+                             if isinstance(part, dict) and part.get("type") == "text"
+                             and isinstance(part.get("text"), str))
+        else:
+            continue
         if not isinstance(text, str) or not text.strip() or not session_id:
             continue
         instant = parse_ts(obj.get("timestamp"))
@@ -202,6 +218,7 @@ else:
 print(f"CONSUMED {consumed}", file=sys.stderr)
 print(f"CTX\t{session_id}\t{cwd}", file=sys.stderr)
 print(f"MALFORMED {malformed}", file=sys.stderr)
+print(f"ROOT_ACTIVITY {int(consumed > 0 and not child)}", file=sys.stderr)
 PYEOF
 }
 
@@ -219,6 +236,7 @@ fi
 
 delivered=0
 skipped=0
+active_files=0
 
 while IFS= read -r -d '' file; do
   inode=$(file_id "$file")
@@ -248,6 +266,13 @@ while IFS= read -r -d '' file; do
     [ "$BACKFILL" != 1 ] || cached_since=0
   fi
 
+  if [ "$BACKFILL" = 1 ]; then
+    # Durable replay intent: a failed chunk must retry on an ordinary tick,
+    # even when the previous cursor was already at EOF. Global cutoff is intact.
+    offset=0; cached_sid=""; cached_cwd=""; cached_since=0
+    state_update "$file" "$inode" 0 "" "" 0
+  fi
+
   if [ "$offset" -ge "$size" ]; then
     # Idle tick: rewrite state only when the stored record would change.
     record=$(printf '%s\t%s\t%s\t%s\t%s' "$inode" "$offset" \
@@ -268,6 +293,8 @@ while IFS= read -r -d '' file; do
   ctx_sid=$(printf '%s' "$ctx_line" | awk -F'\t' '{print $1}')
   ctx_cwd=$(printf '%s' "$ctx_line" | awk -F'\t' '{print $2}')
   new_malformed=$(sed -n 's/^MALFORMED //p' "$err_file" | head -1)
+  root_activity=$(sed -n 's/^ROOT_ACTIVITY //p' "$err_file" | head -1)
+  [ "$root_activity" != 1 ] || active_files=$((active_files + 1))
   rm -f "$err_file"
   case "$consumed" in ''|*[!0-9]*) consumed=0 ;; esac
   case "$new_malformed" in ''|*[!0-9]*) new_malformed=0 ;; esac
@@ -314,6 +341,25 @@ while IFS= read -r -d '' file; do
     skipped=$((skipped + 1))
   fi
 done < <(find "$CODEX_SESSIONS" -type f -name 'rollout-*.jsonl' -print0 2>/dev/null)
+
+# Diagnostic only: source activity can be assistant output, not a missing prompt.
+# Keep the bounded streak in the existing state; idle/delivery/defer resets it.
+previous=$(awk -F'\t' '$1 == "# zero_capture_ticks" {print $2; exit}' "$STATE")
+case "$previous" in 0|1|2|3) ;; *) previous=0 ;; esac
+streak=0
+if [ "$active_files" -gt 0 ] && [ "$delivered" -eq 0 ] && [ "$skipped" -eq 0 ] && [ "$BACKFILL" != 1 ]; then
+  streak=$previous
+  [ "$streak" -ge 3 ] || streak=$((streak + 1))
+  if [ "$streak" -eq 3 ] && [ "$previous" -lt 3 ]; then
+    diag "warning: root rollout activity for 3 consecutive ticks without prompt acceptance; inspect Codex event schema and capture filters (activity alone does not prove lost prompts)"
+  fi
+fi
+if [ "$streak" != "$previous" ]; then
+  tmp="$STATE.tmp.$$"
+  awk -F'\t' '$1 != "# zero_capture_ticks"' "$STATE" > "$tmp"
+  printf '# zero_capture_ticks\t%s\n' "$streak" >> "$tmp"
+  mv "$tmp" "$STATE"
+fi
 
 echo "clio-codex-tail: delivered=$delivered deferred_files=$skipped"
 exit 0

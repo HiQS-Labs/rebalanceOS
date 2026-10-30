@@ -1,0 +1,7 @@
+BASE parser exit: 0
+Nonempty input records: 2
+Extracted rows: 0
+Expected modern capture: FAIL (witnessed red)
+CONSUMED 542
+CTX	synthetic-modern	/fixture/mock-repo
+MALFORMED 0

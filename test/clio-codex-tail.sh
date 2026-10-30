@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fixture harness for utils/clio-capture/clio-codex-tail.sh (GH-139 Phase 2).
 #
-# Exercises the at-least-once contract against a synthetic rollout tree:
+# Exercises legacy and Desktop 0.165 submitted events and the at-least-once contract:
 # start-now default, explicit backfill, restart-no-duplicates (tailer run
 # twice with NO exporter in between), truncated final record, rotation
 # rescan, overlapping invocations, and a busy append lock.
@@ -141,7 +141,7 @@ out=$(HOME="$home" CODEX_HOME="$TMP/backfill/codex" "$TAILER")
 
 # -- 9. GH-199: discovery boundary, provenance and migration -----------------
 python3 - "$TAILER" "$INSTALL_DOC" <<'PYTEST'
-import json, os, subprocess, sys, tempfile
+import json, os, subprocess, sys, tempfile, shutil
 from pathlib import Path
 
 tailer, install_doc = map(Path, sys.argv[1:])
@@ -264,6 +264,109 @@ with tempfile.TemporaryDirectory(prefix='clio-discovery-') as tmp:
     (c[1]/'rollout-root.jsonl').write_bytes(encoded([meta(),prompt('old-root',OLD)]))
     (c[1]/'rollout-child.jsonl').write_bytes(encoded([child,meta('parent'),prompt('old-child',OLD)]))
     assert labels(run(c,CLIO_TAIL_BACKFILL='1'))==['old-root']
+
+
+    # GH-368 / Forge GH-1255: modern submitted events, durable seen-file replay,
+    # SQLite idempotency, and the existing zero-acceptance diagnostic.
+    def modern(label, ts=OLD, item_type='UserMessage'):
+        return {'type':'event_msg', 'ordinal':7, 'timestamp':ts,
+                'payload':{'type':'item_completed','item':{'type':item_type,
+                 'id':'synthetic-'+label, 'client_id':'synthetic-client',
+                 'content':[{'type':'text','text':label,'text_elements':[]},
+                            {'type':'image','image_url':'must-not-be-prompt'},
+                            {'type':'text','text':'x'*120,'text_elements':[]}]}}}
+
+    c=setup('modern-sqlite'); state=pin(c)
+    hooks=c[0]/'.claude/hooks'
+    helper=hooks/'clio-store.py'
+    shutil.copyfile(tailer.parent/'clio-store.py',helper)
+    def store(*args):
+        p=subprocess.run(['python3',str(helper),*args],env=c[2],
+                         capture_output=True,text=True,timeout=30)
+        assert p.returncode==0,p.stderr
+        return json.loads(p.stdout)
+    store('init'); store('activate','--fresh','--capture-only')
+    f=c[1]/'rollout-modern.jsonl'
+    f.write_bytes(encoded([meta(),modern('modern-A'),modern('modern-B'),
+                          modern('assistant-only',item_type='AgentMessage'),
+                          {'type':'response_item','timestamp':OLD,
+                           'payload':{'type':'message','role':'user','content':[
+                               {'type':'input_text','text':'injected-not-a-submission'}]}}]))
+    child_file=c[1]/'rollout-child.jsonl'
+    child_file.write_bytes(encoded([child,modern('inherited-modern')]))
+    original=f.read_bytes(); cutoff=state.read_text().splitlines()[0]
+    assert run(c)==[]  # Existing-file history consumed with no eligible delivery.
+    assert store('query')['records']==[]
+    assert str(len(original)) in state.read_text(), 'fixture did not reach known EOF'
+
+    real_writer=hooks/'clio-capture.sh'
+    saved=real_writer.read_text()
+    underlying=hooks/'clio-capture-real.sh'
+    underlying.write_text(saved); underlying.chmod(0o755)
+    real_writer.write_text("""#!/bin/bash
+countfile="$HOME/.claude/replay-writes"
+n=$(cat "$countfile" 2>/dev/null || echo 0)
+n=$((n+1)); echo "$n" > "$countfile"
+[ "$n" != 2 ] || exit 3
+exec "$(dirname "$0")/clio-capture-real.sh" "$@"
+""")
+    run(c,CLIO_TAIL_BACKFILL='1')
+    one=store('query')['records']
+    assert len(one)==1 and one[0]['prompt'].startswith('modern-A\n'), one
+    pending=[l for l in state.read_text().splitlines() if l.startswith(str(f)+'\t')][0].split('\t')
+    assert pending[2]=='0' and pending[5]=='0','replay intent lost on writer failure'
+    real_writer.write_text(saved)
+    run(c)  # Normal scheduled retry, with NO backfill flag.
+    rows=store('query')['records']
+    assert len(rows)==2 and sorted(r['prompt'].splitlines()[0] for r in rows)==['modern-A','modern-B']
+    assert all(r['agent']=='codex' and r['source_event_id'] and r['record_id'] for r in rows)
+    ids=sorted(r['record_id'] for r in rows)
+    run(c); run(c,CLIO_TAIL_BACKFILL='1')
+    assert sorted(r['record_id'] for r in store('query')['records'])==ids,'SQLite replay duplicated rows'
+    assert f.read_bytes()==original and state.read_text().splitlines()[0]==cutoff
+    assert all('must-not-be-prompt' not in r['prompt'] and 'injected' not in r['prompt'] for r in rows)
+
+    # An eligible live append reaches SQLite; IDE context is stripped for modern events too.
+    live=modern('# Context from my IDE setup:\n- synthetic editor\n## My request for Codex:\nCapture this live submitted request',NEW)
+    with f.open('ab') as h: h.write(encoded([live]))
+    run(c)
+    rows=store('query')['records']
+    assert len(rows)==3 and any(r['prompt'].startswith('Capture this live submitted request') for r in rows)
+    assert all('# Context from my IDE setup:' not in r['prompt'] for r in rows)
+
+    c=setup('canary'); pin(c); f=c[1]/'rollout-active.jsonl'
+    f.write_bytes(encoded([meta()]))
+    def active():
+        with f.open('ab') as h: h.write(encoded([modern('assistant',NEW,'AgentMessage')]))
+        run(c)
+    def warnings():
+        log=c[0]/'.claude/prompt-log-errors.log'
+        return log.read_text().count('warning: root rollout activity') if log.exists() else 0
+    active(); active()
+    assert warnings()==0,'canary warned before threshold'
+    active(); active()
+    assert warnings()==1,'canary must warn once at three active ticks'
+    run(c)  # Idle resets; it must never increase a zero-delivery streak.
+    active(); active()
+    assert warnings()==1,'idle tick did not reset streak'
+    run(c,CLIO_TAIL_BACKFILL='1')
+    active(); active()
+    assert warnings()==1,'explicit backfill did not suppress/reset warning'
+    active()
+    assert warnings()==2,'canary did not rearm after reset'
+    with f.open('ab') as h: h.write(encoded([prompt('accepted')]))
+    assert labels(run(c))==['accepted']
+    active(); active()
+    assert warnings()==2,'successful delivery did not reset streak'
+    writer=c[0]/'.claude/hooks/clio-capture.sh'; saved=writer.read_text()
+    writer.write_text('#!/bin/bash\nexit 3\n')
+    with f.open('ab') as h: h.write(encoded([prompt('deferred','2026-09-08T20:01:00Z')]))
+    run(c)
+    assert '# zero_capture_ticks\t0' in (c[0]/'.claude/prompt-log-codex-tail.state').read_text(), 'deferred write did not reset streak'
+    writer.write_text(saved)
+    assert labels(run(c))==['accepted','deferred']
+
+print('PASS: modern submitted events, seen-file replay after partial writer failure, SQLite stable IDs, live IDE request, canary threshold/reset')
 
 print('PASS: GH-199 first discovery, history/rotation, precision, partials, child/root resume, legacy retry, backfill')
 PYTEST
