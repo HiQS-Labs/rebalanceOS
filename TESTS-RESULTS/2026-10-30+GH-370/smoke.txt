@@ -1,0 +1,4 @@
+configure-t3: {"configured":true,"sequence":0,"source_id":"68aa7304-233c-4ffa-abdd-d97e2833af9d"}
+main path: {"captured":1,"configured":true,"scanned":1,"sequence":1}
+adjacent rerun: {"captured":0,"configured":true,"scanned":0,"sequence":1}
+verified: one original short prompt; T3 IDE + Codex agent + UTC timestamp + thread/project metadata; source read-only

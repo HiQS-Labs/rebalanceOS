@@ -1,6 +1,6 @@
 ---
 title: T3 Code prompt capture in CLIO
-status: planning
+status: in-progress
 created: 2026-10-30
 updated: 2026-10-30
 owner: Codex
@@ -16,7 +16,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA round 1 completed; four concrete gaps accepted below. | Obtain approval of the revised identity/source contract. |
+| Plan QA round 2 Approved; capture and focused synthetic cases implemented. | Run required verification, smoke and independent final QA. |
 
 ## Quad Concepts
 - Missing T3 coverage → read durable human submissions across providers.
@@ -154,7 +154,7 @@ from reusing store/exports, with source-version uncertainty. No user override.
 Plan round 1: Changes requested. All four findings accepted: steering uses
 message.runId; exclusions apply per submission; explicit source UUID/boundary and
 first-observation identity; exact V2 contract and missing-metadata policy.
-Plan round 2: pending. Final: pending. No implementation before plan approval.
+Plan round 2: Approved. Final: pending. Implementation started after approval.
 
 Host orchestration requires T3-managed delegated review rather than a shell
 relay child. The independent review scope and three-round cap are unchanged.

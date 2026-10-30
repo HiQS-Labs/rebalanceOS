@@ -10,6 +10,11 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.106.0] - 2026-10-30
+
+### Added
+- Opt-in T3 Code prompt capture across providers preserves human submissions, IDE and agent provenance in the existing SQLite history. Repeated scans retain the first accepted record and leave the source read-only.
+
 ## [0.105.1] - 2026-10-29
 
 ### Fixed

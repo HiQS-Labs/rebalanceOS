@@ -488,6 +488,53 @@ SQLite mode; use `query`, `drain` and `project`. Old cursors/receipts remain pre
 Path compatibility does not make the new rolling entry format identical to the
 legacy journey-replay format; that consumer upgrade remains separately tracked.
 
+### T3 Code prompt capture (opt-in, SQLite mode)
+
+After installing the current CLIO runtime and activating SQLite capture, register
+the database of the local T3 environment you use:
+
+```bash
+python3 ~/.claude/hooks/clio-store.py configure-t3 ~/.t3/userdata/statev2.sqlite
+python3 ~/.claude/hooks/clio-store.py capture-t3
+```
+
+For a custom T3 home or development environment, pass its actual
+`userdata/statev2.sqlite` path. Registration starts at the current committed end;
+it does not import historical conversations. Repeating registration preserves the
+source identity and position. Each invocation reads at most 1,000 events. The
+existing SQLite export schedule also captures one page before exporting; if you
+have no exporter scheduled, run `capture-t3` yourself. No new job is installed.
+
+All providers share this path. Direct web/desktop and mobile text submissions,
+including short prompts and steering, retain their original text and UTC time.
+Imported/automated/server/MCP input is excluded; a fresh human submission within
+an imported or child thread remains eligible. Attachment contents are excluded.
+Rows carry `extras.ide=t3-code`, T3 message/thread IDs, instance and model.
+Agent names use the driver when available (`claude-code` and `agy` retain CLIO's
+existing names), otherwise the provider instance. Project, branch and driver
+labels describe the projections observed at capture time, not historical state.
+Missing project metadata is explicitly marked; missing run metadata stops that
+page for retry. A provider's native hook/tailer may independently record the
+same text; this feature deduplicates T3 retries, not cross-harness observations.
+
+The reader supports T3's unified version-2 application thread events. Unknown
+layouts/versions, replaced databases or a regressed cursor refuse capture with
+an error. The exporter still publishes existing CLIO history and exits nonzero
+when T3 capture refuses; inspect `prompt-log-errors.log` and run `capture-t3` to
+see the error. T3 is opened read-only. First accepted text and metadata win for
+each T3 message, including queued writes and replay after interruption.
+
+To stop capture while preserving history and its private `.t3.json` sidecar:
+
+```bash
+python3 ~/.claude/hooks/clio-store.py configure-t3 --disable
+```
+
+Registering the same path again resumes from its preserved position, including
+submissions made while scans were disabled. Changing to another source path is
+refused: preserve the sidecar and existing history before deliberately setting
+up a different environment. Never reset a cursor to repair a source refusal.
+
 ### Read-only agent lookup
 
 ```bash
