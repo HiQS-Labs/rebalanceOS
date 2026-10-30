@@ -680,7 +680,9 @@ rm -f ~/.claude/prompt-log-to-md.out.log ~/.claude/prompt-log-to-md.err.log
 ## Optional: Codex capture (VS Code / CLI)
 
 Codex has no prompt-submit hook, so a read-only tailer turns user prompts from Codex
-session rollouts into JSONL rows. It parses only `event_msg`/`user_message` records,
+session rollouts into CLIO history. It accepts legacy `event_msg`/`user_message`
+and Desktop 0.165 `event_msg`/`item_completed` records whose item is `UserMessage`,
+joining string text parts in order and ignoring image/nontext parts. It
 never takes prompt text from `response_item` entries (where injected context can be
 combined with user input), and never writes to the source. Run once from a CLIO checkout
 or an installed `clio-capture` skill directory (requires `jq` and `python3`). This is a separate
@@ -701,8 +703,13 @@ First run starts **now** and persists that capture boundary, even before a sessi
 folder exists. Later polls capture eligible first prompts from newly discovered root
 sessions, including prompts completed between polls. Existing pre-boundary history
 and inherited subagent prompts are excluded. Set `CLIO_TAIL_BACKFILL=1` for an
-explicit history import from **previously unseen root files**; known files retain
-their existing policy. Source timestamps must be valid and timezone-aware.
+explicit history replay of **root files, including already-scanned files**. The
+per-file rewind and history eligibility are checkpointed before delivery; if a writer
+fails, the next ordinary tick retries that replay without requiring the flag again.
+The global capture boundary stays unchanged. Stable source IDs suppress already-captured
+rows; the printed `delivered` count means writer acceptance (including dedup/filtering),
+so verify actual SQLite rows to establish recovery. Source timestamps must be valid
+and timezone-aware. Child-file inherited prompts remain excluded during replay.
 
 Upgrading preserves legacy pending records on their original file. Replacement or
 truncation switches those legacy files to the capture boundary, so previously
@@ -710,9 +717,41 @@ skipped history is not imported; older pending records cannot be recovered
 automatically once that file provenance is lost. Clean polling delays retain the
 boundary. An abandoned tailer lock (a run killed mid-tick) is reaped by the next
 tick once it is older than 300 seconds; reaping is serialized behind
-`<lock>.reap` and rechecked, so a live lock is never taken. Only a kill inside that
+`<lock>.reap` and rechecked. This is an age check, not an owner-liveness check:
+a run lasting more than 300 seconds can have its lock displaced. Only a kill inside that
 millisecond reap step can leave `<lock>.reap` behind, which disables reaping (not
 capture of a healthy lock); remove it after verifying no tailer is running.
+
+The existing state also records a bounded zero-capture streak. After three consecutive
+ticks that consume complete root-rollout data without any writer acceptance or deferred
+file, one content-free warning is appended to `prompt-log-errors.log`. Idle ticks,
+accepted rows, deferred writes and explicit replay reset the streak. Assistant output
+also modifies rollouts: this warning asks you to inspect the event schema and capture
+filters; it does not establish that a prompt was lost.
+
+### Recover missed Codex history
+
+First land the reviewed upstream fix, publish it to XYZ-CLIO, and deploy through Skills
+Army HQ. Do not point installed hooks at a task checkout. For manual replay, record
+whether `com.claude.clio-codex-tail` is currently loaded and keep its existing plist.
+Temporarily boot out only that job, then verify no scheduled or manual Codex tailer
+invocation remains before backing up `prompt-log-codex-tail.state` and running
+`CLIO_TAIL_BACKFILL=1 `/.claude/hooks/clio-codex-tail.sh`. Keep other invocations stopped
+throughout replay: the age-only lock is insufficient for a long backfill.
+
+Restore the identical previously loaded job from its existing plist in a cleanup/finally
+path on both success and failure. Leave a previously unloaded job unloaded. Do not change
+its interval, command or exporter job. Preserve the state backup; a failed replay leaves
+a durable per-file rewind so the restored normal schedule can retry without skipping
+pending history. Do not rewind the canonical SQLite database to undo a replay.
+
+Use `clio-store.py query --agent codex --session SESSION --limit 100` for each requested
+session and compare stable record IDs before/after a repeated replay. Timestamp a
+substantive new Desktop submission and observe its matching SQLite row within 120
+seconds to establish live acceptance. Report sessions with no legacy or modern
+submitted events as unrecoverable from this source; never substitute response-item
+context. A launchd configuration or a nonzero `delivered` count alone does not prove
+that the intended row reached SQLite.
 
 Schedule it every minute:
 
