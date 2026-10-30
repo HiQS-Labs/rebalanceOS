@@ -26,3 +26,5 @@ Target-device live delivery within 120 seconds, requested-session backfill, upst
 ## Repository documentation hygiene
 
 The repository-wide PDDA check is in observe mode and reports 25 existing frontmatter/status/roadmap findings. All affected project documents are unchanged from development; GH-368 has no finding. These are not a green full-repository hygiene result. The initial missing local checker environment was corrected, and the direct banned-import ratchet passes. See pdda-existing-findings.txt. No unrelated governance cleanup is included.
+
+Final machine gate: the cross-repo transcript approval could not publish its machine record because its parent is ignored. The supported Forge external-artifact review supersedes that attempt: [round-3 final QA and driver attestation](https://github.com/HiQS-Labs/XYZ-forge/blob/126ccd2a/relay-system/2026-10-29/gh1255-publication.codex.md). relay-drive returned 0 and its receipt validated; capture code remains unchanged since the tested revision.
