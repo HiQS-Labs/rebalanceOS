@@ -358,6 +358,13 @@ exec "$(dirname "$0")/clio-capture-real.sh" "$@"
     assert labels(run(c))==['accepted']
     active(); active()
     assert warnings()==2,'successful delivery did not reset streak'
+    writer=c[0]/'.claude/hooks/clio-capture.sh'; saved=writer.read_text()
+    writer.write_text('#!/bin/bash\nexit 3\n')
+    with f.open('ab') as h: h.write(encoded([prompt('deferred')]))
+    run(c)
+    assert '# zero_capture_ticks\t0' in (c[0]/'.claude/prompt-log-codex-tail.state').read_text(), 'deferred write did not reset streak'
+    writer.write_text(saved)
+    assert labels(run(c))==['accepted','deferred']
 
 print('PASS: modern submitted events, seen-file replay after partial writer failure, SQLite stable IDs, live IDE request, canary threshold/reset')
 

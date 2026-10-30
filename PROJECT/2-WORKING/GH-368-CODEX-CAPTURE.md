@@ -11,7 +11,7 @@ complexity: 2
 risk: 2
 effort: 2
 phases: 1
-ratings_provisional: true
+ratings_provisional: false
 non_goals:
   - No response_item import
   - No new suite or gate
@@ -38,7 +38,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Captured via HQ (`/hq park`) for project **rebalanceOS** → repo `rebalanceOS`. The GitHub issue is the signal stream; this doc is the in-repo capture and back-reference. | Run isolated existing CLIO suites, witness red controls, then final independent Codex QA. |
+| Plan QA Approved; implemented modern parsing, durable replay and diagnostic warning. | Run isolated existing CLIO suites, witness red controls, then final independent Codex QA. |
 
 ## Idea
 
@@ -48,15 +48,9 @@ Implementation of Forge #1255; canonical plan in XYZ-forge PROJECT/2-WORKING/GH-
 
 Silent Codex history loss after submitted-event format changed.
 
-## Phase 0 — Explore & scope
+## Verification
 
-### Checklist
-
-- [ ] Not applicable to this bounded bugfix: scope-specific checklist items for this idea's Phase 0 pass.
-
-### QA checklist — Phase 0
-
-- [ ] Not applicable to this bounded bugfix: acceptance criteria for the Phase 0 pass above.
+The existing Codex suite passes the modern event, known-file replay after a failed second write, SQLite idempotency, live IDE request and canary threshold/reset cases in a disposable full clone. Red controls and remaining relevant CLIO suites are running; final review and live target acceptance are pending. Retained receipts will be linked here before publication.
 
 ## Canonical plan and rating rationale
 
