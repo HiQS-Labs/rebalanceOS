@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-29.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -119,5 +119,56 @@ Handing off to Producer (codex-producer) — correct R1, refresh the packet and 
 
 R1 — Implemented: replace the complete malformed inline invocation with one balanced code span containing the backfill assignment and quoted "$HOME/.claude/hooks/clio-codex-tail.sh". Preserve quiescence, state backup and identical-schedule restoration. The seeded packet is regenerated from corrected docs.
 All Pass findings acknowledged; retained receipts stay unchanged. No capture code or test behavior changed. Re-review the precise documentation correction and unchanged contracts, then approve if sufficient. Handing off to Reviewer for round 2.
+
+### Reviewer · Round 2
+
+VERDICT: PASS
+
+Basis: Ship the reviewed implementation and tracking packet. R1 is resolved in both the canonical installation instructions and refreshed packet. The local capture contract and retained clone evidence support approval; deployment and live acceptance remain separate.
+
+swept file: yes
+
+Read the entire packet, complete tailer, both changed test files, rollout fixture, INSTALL and upstream project document, including pre-existing sections; rechecked verification provenance and decisive retained logs. No additional material pre-existing defect found in the reviewed capture/replay paths. No Git commands, suites, executable fixtures or installed capture were run this turn.
+
+- [Pass] R1 closed: `utils/clio-capture/INSTALL.md:739` and packet `:426` now contain the single balanced span `CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. The surrounding procedure at INSTALL `:733-747` retains quiescence, state backup and restoration of the identical previously loaded job on success or failure. Read-only probe below exits 0. Retain this correction.
+- [Pass] Capture and retry contracts remain sound on source inspection: `utils/clio-capture/clio-codex-tail.sh:121-150` keeps first-file child provenance and complete-line consumption; `:172-198` accepts submitted modern/legacy text only; `:269-274` checkpoints replay before delivery; `:325-341` leaves that checkpoint pending after a rejected write. `test/clio-codex-tail.sh:311-334` requires nonempty SQLite capture, ordinary retry without the replay flag, stable IDs and unchanged source/cutoff. No behavior change requested.
+- [Pass] Diagnostic and evidence scope stays bounded: tailer `:345-361` implements the capped threshold/reset warning and says activity alone does not prove lost prompts; existing suite `:343-368` covers threshold/reset. Retained `red-base-modern.txt` says "expected the two user prompts delivered" with `delivered=1`; `red-lost-replay-checkpoint.txt` says "replay intent lost on writer failure"; `red-disabled-canary.txt` says "canary must warn once at three active ticks". `clio-codex-tail-final.txt` records the corrected pass; `clio-store-final.txt` records "Ran 17 tests" and "OK". These are producer clone receipts, not a reviewer rerun. All 11 retained hashed logs match provenance in the read-only probe below.
+- [Pass] The stale-window correction remains one fixture line at `test/clio-store.py:978`, using `store.utc()` while preserving five-row assertions at `:1027` and `:1031`; `base-store-control.txt` retains "AssertionError: 4 != 5". No production store change or new suite is needed.
+- [Pass] Forge remains tracking/parity evidence: packet `:725-727` pins baseline revisions, and its "Limits" / "Final round 2 addendum" distinguish pending publication/live acceptance from implementation evidence and explicitly disclose existing Rebalance PDDA observe findings. The approved plan says "Keep Forge #1255 open until actual acceptance is met." Retain these boundaries and the planned final-push gate rerun; this relay approval is not deployment or merge authorization.
+
+Read-only probe command (exit 0; reads text/hashes only):
+
+```sh
+export PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/.relay-scratch/tmp"
+mkdir -p "$TMPDIR"
+python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+needle = '`CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`'
+for name in ("utils/clio-capture/INSTALL.md", ".relay-artifacts/gh1255-final-packet.md"):
+    lines = Path(name).read_text().splitlines()
+    hits = [(n, line) for n, line in enumerate(lines, 1) if needle in line]
+    assert len(hits) == 1, (name, hits)
+    for n, line in hits:
+        assert line.count("`") == 2
+        print(f"{name}:{n}: {line}")
+p = Path("TESTS-RESULTS/2026-10-29+GH-368")
+rows = [json.loads(line) for line in (p/"provenance.jsonl").read_text().splitlines()]
+checked = [r for r in rows if "log_sha256" in r]
+for r in checked:
+    assert hashlib.sha256((p/r["log"]).read_bytes()).hexdigest() == r["log_sha256"], r["log"]
+print(f"{len(checked)} retained log SHA256 values match provenance")
+PY
+```
+
+Decisive output:
+
+```text
+utils/clio-capture/INSTALL.md:739: `CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. Keep other invocations stopped
+.relay-artifacts/gh1255-final-packet.md:426: +`CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/clio-codex-tail.sh"`. Keep other invocations stopped
+11 retained log SHA256 values match provenance
+```
+
+Relay closed (Approved), no further turn needed. Harness owns the file-scoped commit and subsequent gate.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
