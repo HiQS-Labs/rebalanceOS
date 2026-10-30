@@ -1,0 +1,26 @@
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:1 missing YAML frontmatter
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md:1 missing YAML frontmatter
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing required frontmatter key 'updated'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing required frontmatter key 'owner'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing required frontmatter key 'updated'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing required frontmatter key 'owner'
+ERROR [pdda-check-frontmatter] PROJECT/2-WORKING/recon-gh255-phase2-consolidation.md:1 missing YAML frontmatter
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/BUILD-0.75.0-FLEET-ENGINE/RUNBOOK-signal-integrity.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-120-FOCUS5-UMBRELLA.md:20 status-table header must be exactly 'What was just completed|What's next' (got 'Item|State')
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-94-FUSED-RETRIEVAL-PROTOCOL.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/MARATHON-PLAN-2026-09-24-REBALANCEOS.md:1 missing usable '## Status' table
+ERROR [pdda-check-status-table] PROJECT/2-WORKING/recon-gh255-phase2-consolidation.md:1 missing usable '## Status' table
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/BUILD-0.76.0-SIGNAL-ALIGNMENT/SCOPE.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/BUILD-0.76.0-SIGNAL-ALIGNMENT/SCOPE.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/BUILD-0.77.0-RESOLVERS-AND-ONBOARDING/SCOPE.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/BUILD-0.77.0-RESOLVERS-AND-ONBOARDING/SCOPE.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-201-GITCANARY-PATTERNS.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-232-CLIO-JOURNEY-FOLLOWUP.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-232-CLIO-JOURNEY-FOLLOWUP.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-291-REPO-CONSOLIDATION.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-59-LAUNCHD-STACK-CONSOLIDATION.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-59-LAUNCHD-STACK-CONSOLIDATION.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-81-EMBEDDINGS-BAKEOFF-PROTOCOL.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/GH-97-PLUGGABLE-EMBEDDINGS.md) — park it with releases roadmap add, or set roadmap_exempt: true
+ERROR [pdda-check-roadmap-coverage] PROJECT/2-WORKING/recon-gh255-phase2-consolidation.md:1 active working doc has no pointer in releases.db (PROJECT/2-WORKING/recon-gh255-phase2-consolidation.md) — park it with releases roadmap add, or set roadmap_exempt: true
+All 13 affected project documents are byte-identical to origin/development. No GH-368 finding. Observe mode is nonblocking. Initial missing task-venv environment error resolved; direct banned-import ratchet now passes.

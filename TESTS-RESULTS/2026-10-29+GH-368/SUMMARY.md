@@ -22,3 +22,7 @@ All CLIO suites ran in a disposable full clone using synthetic data/temporary ho
 The synthetic SQLite capture plus ordinary retry and repeated replay are the main/adjacent smoke paths; nonempty rows and stable record IDs are asserted by the existing suite, rather than inferred from delivered counts. Live rollout text and databases were never committed. No installed hooks, schedules, SQLite history or remote runtime were modified.
 
 Target-device live delivery within 120 seconds, requested-session backfill, upstream merge and standalone publication remain outstanding. Session 01a18930 has no submitted events in the inspected source; response-item fallback remains forbidden. This verification establishes implementation behavior, not fleet acceptance. Independent final review is pending; plan review was Approved in round 2.
+
+## Repository documentation hygiene
+
+The repository-wide PDDA check is in observe mode and reports 25 existing frontmatter/status/roadmap findings. All affected project documents are unchanged from development; GH-368 has no finding. These are not a green full-repository hygiene result. The initial missing local checker environment was corrected, and the direct banned-import ratchet passes. See pdda-existing-findings.txt. No unrelated governance cleanup is included.
