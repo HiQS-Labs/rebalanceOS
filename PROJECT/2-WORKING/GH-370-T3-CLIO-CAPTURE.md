@@ -83,9 +83,12 @@ Registration generates a UUID for the source, records the source device/inode,
 current committed maximum sequence and its event_id, and atomically writes a
 sidecar next to the CLIO DB. A repeated registration of the same path preserves
 UUID/cursor; a different path requires disabling first and explicit registration.
-Before each scan validate inode and the retained boundary event identity; source
-replacement/regression is a visible refusal. A registered empty DB has no
-boundary identity until its first page. Missing source never creates a DB.
+Before each scan validate inode and the nearest retained `thread.created` anchor;
+T3 compaction preserves that event but may delete a superseded scan cursor. A
+missing cursor with an intact anchor is normal compaction. A mismatched surviving
+cursor, missing/changed anchor, or replaced/regressed source remains a visible
+refusal. A registered empty DB has no boundary identity until its first page.
+Missing source never creates a DB.
 
 CLIO `source_event_id` is `t3:<source UUID>:<message id>`, session_id is the
 namespaced source UUID plus T3 thread ID. Extend existing identity_payload for
@@ -171,6 +174,7 @@ relay child. The independent review scope and three-round cap are unchanged.
 Broad suites ran separately after a combined invocation exposed the existing
 bare-conftest collision (reproduced on base). Existing skipped/xfail checks and
 unrelated runtime doctor failures remain disclosed in the campaign summary.
-Code review approved `e6b91f8`; subsequent changes are verification receipts and
-operator documentation only. No deployment or live source mutation occurred.
+Independent code review approved `e6b91f8`; later review findings and their
+focused verification are recorded in the campaign summary. No deployment or live
+source mutation occurred.
 Lessons: NO_ENTRY — no new general governance lesson is warranted by this scope.

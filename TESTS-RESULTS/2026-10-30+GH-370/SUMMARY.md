@@ -73,6 +73,14 @@ checks retained payloads before attributing unseen messages. Both committed and
 pending replay cases now remove the run projection before retry. The focused
 three-case T3 rerun is retained as `t3-recovery.txt`.
 
+Kimi review found that routine T3 compaction could delete the exact cursor event
+and permanently stall later captures. The existing durable-retry case now models
+a preserved `thread.created` anchor, a superseded `thread.visited` cursor and a
+healthy successor. It failed at the old boundary check before the fix. Cursor
+validation now accepts a compacted-away cursor only with an intact durable anchor,
+while preserving mismatch/refusal checks. The red/green focused runs and complete
+20-case suite are retained in `compaction-regressions.txt`.
+
 ## Threats to validity
 
 CodeRabbit dispositions: accepted changelog spacing/verification, SQLite

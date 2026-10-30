@@ -139,6 +139,12 @@ class History(unittest.TestCase):
     def test_t3_refusals_and_durable_retry(self):
         self.activate()
         source = self.t3_source()
+        def thread_event(event_type, event_id):
+            with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+                sequence = conn.execute('SELECT coalesce(max(sequence),0)+1 FROM orchestration_events').fetchone()[0]
+                conn.execute('INSERT INTO orchestration_events VALUES (?,?,?,?,?,?)',
+                             (sequence, event_id, 'thread', 2, event_type, '{}'))
+        thread_event('thread.created', 'thread-created')
         store.configure_t3(self.db, source)
         self.t3_event(source)
         original_atomic = store.atomic
@@ -156,6 +162,12 @@ class History(unittest.TestCase):
             conn.execute('DELETE FROM orchestration_v2_projection_runs WHERE run_id=?', ('run',))
         store.capture_t3(self.db)
         self.assertEqual(self.rows(), first)
+        thread_event('thread.visited', 'visit-old')
+        self.assertEqual(store.capture_t3(self.db)['scanned'], 1)
+        thread_event('thread.visited', 'visit-new')
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('DELETE FROM orchestration_events WHERE event_id=?', ('visit-old',))
+        self.assertEqual(store.capture_t3(self.db)['scanned'], 1)
         self.t3_event(source, 'future', version=3)
         before = cursor.read_bytes()
         with self.assertRaisesRegex(ValueError, 'version'):
@@ -168,6 +180,11 @@ class History(unittest.TestCase):
             store.capture_t3(self.db)
         self.assertEqual(cursor.read_bytes(), before)
         with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_events SET event_id=? WHERE event_id=?', ('replaced-cursor', 'visit-new'))
+        with self.assertRaisesRegex(ValueError, 'replaced|regressed'):
+            store.capture_t3(self.db)
+        with contextlib.closing(sqlite3.connect(source)) as conn, conn:
+            conn.execute('UPDATE orchestration_events SET event_id=? WHERE event_id=?', ('visit-new', 'replaced-cursor'))
             conn.execute('DELETE FROM orchestration_events WHERE sequence>1')
             conn.execute('UPDATE orchestration_events SET event_id=? WHERE sequence=1', ('replaced',))
         with self.assertRaisesRegex(ValueError, 'replaced|regressed'):

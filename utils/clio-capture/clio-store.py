@@ -1126,10 +1126,12 @@ def configure_t3(path, source=None, disable=False):
                     raise ValueError('unsupported T3 thread event version')
                 boundary = conn.execute('SELECT sequence,event_id FROM orchestration_events ORDER BY sequence DESC LIMIT 1').fetchone()
                 info = source.stat()
+                sequence = boundary['sequence'] if boundary else 0
                 state = {'source': str(source), 'source_id': str(uuid.uuid4()),
                          'device': info.st_dev, 'inode': info.st_ino,
-                         'sequence': boundary['sequence'] if boundary else 0,
+                         'sequence': sequence,
                          'event_id': boundary['event_id'] if boundary else None}
+                state.update(t3_anchor(conn, sequence))
         if replace:
             archive = Path(str(state_path) + '.' + old_state['source_id'] + '.json')
             archived = (encode(old_state) + '\n').encode()
@@ -1143,15 +1145,32 @@ def configure_t3(path, source=None, disable=False):
         return {'configured': True, 'source_id': state['source_id'], 'sequence': state['sequence']}
 
 
+def t3_anchor(conn, sequence):
+    # T3 compaction preserves thread.created but may delete the scan cursor.
+    anchor = conn.execute("SELECT sequence,event_id FROM orchestration_events WHERE aggregate_kind='thread' "
+                          "AND application_event_version=2 AND event_type='thread.created' AND sequence<=? "
+                          'ORDER BY sequence DESC LIMIT 1', (sequence,)).fetchone() if sequence else None
+    return {'anchor_sequence': anchor['sequence'] if anchor else 0,
+            'anchor_event_id': anchor['event_id'] if anchor else None}
+
+
 def t3_boundary(conn, source, state):
     info = Path(source).stat()
     if (info.st_dev, info.st_ino) != (state['device'], state['inode']):
         raise ValueError('T3 source replaced; preserve the registered cursor')
+    boundary = None
     if state['sequence']:
         boundary = conn.execute('SELECT event_id FROM orchestration_events WHERE sequence=?',
                                 (state['sequence'],)).fetchone()
-        if not boundary or boundary[0] != state['event_id']:
+        if boundary and boundary[0] != state['event_id']:
             raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
+    if state.get('anchor_sequence'):
+        anchor = conn.execute('SELECT event_id FROM orchestration_events WHERE sequence=?',
+                              (state['anchor_sequence'],)).fetchone()
+        if not anchor or anchor[0] != state['anchor_event_id']:
+            raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
+    elif state['sequence'] and not boundary:
+        raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
 
 
 def capture_t3(path, limit=1000):
@@ -1224,6 +1243,8 @@ def capture_t3(path, limit=1000):
                     capture(path, cfg['owner'], row)
                 if events:
                     state.update(sequence=events[-1]['sequence'], event_id=events[-1]['event_id'])
+                    if not state.get('anchor_sequence'):
+                        state.update(t3_anchor(conn, state['sequence']))
                     atomic(state_path, (encode(state) + '\n').encode())
         return {'configured': True, 'scanned': len(events), 'captured': captured, 'sequence': state['sequence']}
 
