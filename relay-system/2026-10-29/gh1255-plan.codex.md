@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-10-29.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -66,5 +66,31 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+VERDICT: FAIL
+Basis: The parser direction and scope fit the request. Resolve the two replay-safety plan gaps below before implementation; neither requires another service, suite, schema or gate. This is static plan/source review, not a claim that candidate code has failed.
+swept file: yes
+
+Read the complete seeded plan, upstream tailer, INSTALL, store helper and existing Codex suite. The pre-existing age-only lock defect below is in scope; no additional pre-existing defect requiring expansion of this capture fix was identified. GitHub issue bodies #1255 and upstream #368 were read through the connector. Target-device/schema observations and publication parity remain supplied evidence, not independent runtime verification.
+
+- [Should] R1 — Specify durable replay intent and its retry acceptance. Step 3 (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:70`) requests a known-file rewind, while the retry description at line 50 says to leave the file cursor unchanged. With the existing success-only checkpoint, merely overriding offset/eligibility in memory loses that rewind when the writer fails: the following ordinary tick reloads the old EOF. State explicitly how the existing state records the pending rewind/eligibility before delivery, without advancing over unaccepted bytes or changing the global capture cutoff. Extend the existing retry case to cover this combination, including a failure after one accepted row and retry without the backfill environment variable. Do not introduce a second state store.
+  Observed input: `utils/clio-capture/clio-codex-tail.sh:229-256` reloads a known offset and skips EOF; `:298-315` leaves its stored state untouched on writer nonzero. The new known-file rewind is specified at plan line 70, but its failure checkpoint is unspecified.
+  Affected scope: explicit replay of an already-known root rollout whose prior cursor has passed the missed events, followed by writer failure and an ordinary scheduled retry.
+  Falsifier: in the disposable clone, seed a known EOF cursor, replay two eligible historical events, reject the second write, then run normally without `CLIO_TAIL_BACKFILL`. Both events must ultimately exist exactly once, original source bytes/global cutoff must match, and no undelivered event may be skipped. If the proposed design already achieves that, document its state transition and retain that existing-suite receipt.
+
+- [Should] R2 — Make replay exclusive against the scheduled tailer. Step 7 (`.relay-artifacts/GH-1255-CODEX-CAPTURE.md:74`) backs up state and replays history without specifying quiescence. The current lock treats age greater than 300 seconds as proof of death, with no owner-liveness check or renewal (`utils/clio-capture/clio-codex-tail.sh:53-67`); INSTALL's assertion that a live lock is never taken is too strong. A manual history replay overlapping a scheduled tick can therefore have its lock removed if it lasts beyond that age. Cheapest correction: document temporarily pausing the existing Codex tailer schedule, verifying no invocation remains, taking the state backup, performing replay, and restoring the identical schedule after completion or failure. Correct the lock wording in the already-planned INSTALL edit. No replacement scheduler or lock framework is requested.
+  Observed input: the concrete predicate at tailer line 56 is only `now - born > 300`; line 61 removes the lock and line 66 unconditionally removes it on exit. There is no distinction between a dead holder and a still-running replay. Plan line 74 supplies no exclusion procedure.
+  Affected scope: manual explicit replay while another invocation can start, particularly a replay lasting more than 300 seconds. Actual target replay duration has not been measured.
+  Falsifier: an existing, explicitly cited deployment procedure that already stops and drains all Codex tailer invocations through replay, or a clone-run overlapping long-holder check showing the live holder cannot be displaced. Either would remove the need for an additional procedure here.
+
+- [Pass] Provenance and storage scope are appropriate: plan lines 25, 69 and 78 prohibit response-item fallback, retain legacy/child behavior, and require nonempty SQLite rows plus stable replay IDs. Upstream first-file provenance is independent of resumed context (`clio-codex-tail.sh:121-139`); the writer forwards `source_event_id` (`INSTALL.md:173-178`), and the store supplies durable pending receipts plus replay dedup (`clio-store.py:229-271`). Preserve these paths.
+- [Pass] Canary remains diagnostic and bounded: plan line 71 specifies one warning at three complete root-active zero-acceptance ticks, reset/suppression conditions, and compatible stdout; it explicitly admits assistant activity can trigger the warning. Lines 72 and 78 reuse existing verification and require a red control. No additional monitoring subsystem is warranted.
+- [Pass] Rating, dependency order and rollback are grounded at plan level: line 29 treats the reports as one incident with unknown trend; lines 68-74 gate production edits, upstream landing, publication and deployment in order; lines 50 and 63 retain captured history on rollback. Session `01a18930` remains explicitly unrecoverable under the supplied submitted-event evidence (lines 52-54), consistent with upstream #368 rather than silently substituting injected text.
+- [Nit] Make the final live acceptance procedure explicit at plan line 74: timestamp a substantive new Desktop submission on the requested target, observe its `agent=codex` SQLite row within 120 seconds, and record each requested session as recovered or unrecoverable. Forge #1255's Acceptance section requires this; checking schedule configuration alone does not establish delivery latency.
+- [Unverified — needs clone run] No tailer, test suite, executable fixture, deployment or live DB probe was run in this reviewer workspace. Modern-shape delivery, replay/retry interaction, canary sensitivity and compatibility remain required clone checks. Static citations above are not behavioral test receipts.
+
+Handing off to Producer (codex-producer) — resolve R1/R2 in the plan and disposition every finding, then return for Round 2. Production edits remain unapproved.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
