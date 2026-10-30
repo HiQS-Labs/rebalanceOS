@@ -21,7 +21,7 @@ All CLIO suites ran in a disposable full clone using synthetic data/temporary ho
 
 The synthetic SQLite capture plus ordinary retry and repeated replay are the main/adjacent smoke paths; nonempty rows and stable record IDs are asserted by the existing suite, rather than inferred from delivered counts. Live rollout text and databases were never committed. No installed hooks, schedules, SQLite history or remote runtime were modified.
 
-Target-device live delivery within 120 seconds, requested-session backfill, upstream merge and standalone publication remain outstanding. Session 01a18930 has no submitted events in the inspected source; response-item fallback remains forbidden. This verification establishes implementation behavior, not fleet acceptance. Independent final review is pending; plan review was Approved in round 2.
+Target-device live delivery within 120 seconds, requested-session backfill, upstream merge and standalone publication remain outstanding. Session 01a18930 has no submitted events in the inspected source; response-item fallback remains forbidden. This verification establishes implementation behavior, not fleet acceptance. Independent plan and final Codex reviews were each Approved in round 2; relay receipts are committed under relay-system/2026-10-29.
 
 ## Repository documentation hygiene
 

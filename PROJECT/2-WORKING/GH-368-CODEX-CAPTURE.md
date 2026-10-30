@@ -2,7 +2,7 @@
 gh_issue: 368
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/368
 title: "Restore Codex prompt capture"
-status: Active — implementation and clone verification
+status: PR ready — merge and deployment acceptance pending
 created: 2026-10-29
 updated: 2026-10-29
 owner: Codex
@@ -38,7 +38,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA Approved; implemented modern parsing, durable replay and diagnostic warning. | Run isolated existing CLIO suites, witness red controls, then final independent Codex QA. |
+| Plan QA Approved; implemented modern parsing, durable replay and diagnostic warning. | Publish reviewed PR; after merge, publish standalone and verify authorized target deployment/backfill. |
 
 ## Idea
 
@@ -50,7 +50,7 @@ Silent Codex history loss after submitted-event format changed.
 
 ## Verification
 
-All six existing CLIO suites pass, including 17 store cases after the existing stale-window fixture correction. Three negative controls fail as expected. Receipts, commands, revisions, failures and dispositions: [verification summary](../../TESTS-RESULTS/2026-10-29+GH-368/SUMMARY.md), with provenance.jsonl in the same directory. Static push gate passes. Final review and live target acceptance remain pending.
+All six existing CLIO suites pass, including 17 store cases after the existing stale-window fixture correction. Three negative controls fail as expected. Receipts, commands, revisions, failures and dispositions: [verification summary](../../TESTS-RESULTS/2026-10-29+GH-368/SUMMARY.md), with provenance.jsonl in the same directory. Static push gate passes. Independent final Codex QA Approved in round 2; receipt: `relay-system/2026-10-29/gh1255-final.codex.md`. Live target acceptance remains pending.
 
 ## Canonical plan and rating rationale
 
@@ -63,3 +63,5 @@ Author upstream here, then publish unchanged to standalone only after merge. Dep
 ## Existing verification correction
 
 The adjacent store suite had a pre-existing date-dependent failure: its activation case expected five rows in the current seven-day projection, but its imported source row was fixed at September 29. The same failure (4 != 5) reproduced against unchanged development. Change only that case's source row to the existing store.utc() timestamp helper; preserve five-row assertions and all production store code. This keeps the existing suite truthful without a new test or relaxed check. Final QA includes the one-line fixture correction and retained base/control receipts.
+
+Lessons: NO_ENTRY. Existing dated-fixture correction and documentation typo are recorded with their controls; no general lesson is asserted from a single intervention.
