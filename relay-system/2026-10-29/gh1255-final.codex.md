@@ -171,4 +171,12 @@ utils/clio-capture/INSTALL.md:739: `CLIO_TAIL_BACKFILL=1 "$HOME/.claude/hooks/cl
 
 Relay closed (Approved), no further turn needed. Harness owns the file-scoped commit and subsequent gate.
 
+
+### Attestation · relay-drive — 2026-10-30T01:38:45Z
+task: RELAY-gh1255-final
+reviewer: codex
+status: Approved
+reviewed-head: f02b3ca1ea228f210e8917c11d3ef9c67efb32ef
+added-range: 11804+4587
+added-sha256: 082f144ac59c4ab8889f12cb71ad82ec051a506b5d1a6c5c0c2015fb4fdc64fb
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
