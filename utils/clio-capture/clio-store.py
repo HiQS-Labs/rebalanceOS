@@ -226,6 +226,9 @@ def identity_payload(row):
     # Tailer event identity is immutable; checkout/device labels are observations
     # made at delivery time. Retain the first committed observation on replay.
     payload = dict(row)
+    if (payload.get('extras', {}).get('ide') == 't3-code'
+            and payload.get('source_event_id', '').startswith('t3:')):
+        return {key: payload[key] for key in ('origin_id', 'source_event_id', 'clio_version')}
     if payload.get('source_event_id'):
         for key in ('repo', 'branch', 'machine', 'checkout', 'repo_slug'):
             payload.pop(key, None)
@@ -1072,6 +1075,247 @@ def backup(path, output):
     return {'backup': str(output)}
 
 
+@contextlib.contextmanager
+def t3_database(source):
+    """T3 is an external source: never use CLIO's rw gateway for it."""
+    uri = 'file:' + quote(str(Path(source).expanduser().resolve()), safe='/') + '?mode=ro'
+    with contextlib.closing(sqlite3.connect(uri, uri=True, timeout=0.5)) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA query_only=ON')
+        conn.execute('BEGIN')
+        required = {
+            'orchestration_events': 'sequence,event_id,aggregate_kind,application_event_version,event_type,payload_json',
+            'orchestration_v2_projection_threads': 'thread_id,project_id,payload_json',
+            'orchestration_v2_projection_runs': 'run_id,thread_id,payload_json',
+            'projection_projects': 'project_id,workspace_root',
+            'orchestration_v2_projection_provider_sessions': 'payload_json',
+        }
+        for table, columns in required.items():
+            conn.execute('SELECT ' + columns + ' FROM ' + table + ' LIMIT 0')
+        yield conn
+
+
+def configure_t3(path, source=None, disable=False):
+    state_path = Path(str(Path(path).expanduser().absolute()) + '.t3.json')
+    with lock(str(state_path) + '.lock'):
+        with contextlib.closing(database(path)) as conn:
+            active_config(conn, path)
+        state = json.loads(state_path.read_text()) if state_path.exists() else None
+        if disable:
+            if state:
+                state['enabled'] = False
+                atomic(state_path, (encode(state) + '\n').encode())
+            return {'configured': False}
+        if source is None:
+            raise ValueError('configure-t3 requires the T3 statev2.sqlite path or --disable')
+        source = Path(source).expanduser().resolve()
+        old_state = state
+        replace = bool(state and state['source'] != str(source))
+        if replace and state['enabled']:
+            raise ValueError('T3 source already registered; run configure-t3 --disable before changing sources')
+        with t3_database(source) as conn:
+            if state and not replace:
+                try:
+                    t3_boundary(conn, source, state)
+                except ValueError:
+                    if state['enabled']:
+                        raise
+                    replace = True
+            if not state or replace:
+                if conn.execute("SELECT 1 FROM orchestration_events WHERE aggregate_kind='thread' AND application_event_version NOT IN (1,2) LIMIT 1").fetchone():
+                    raise ValueError('unsupported T3 thread event version')
+                boundary = conn.execute('SELECT sequence,event_id FROM orchestration_events ORDER BY sequence DESC LIMIT 1').fetchone()
+                info = source.stat()
+                sequence = boundary['sequence'] if boundary else 0
+                state = {'source': str(source), 'source_id': str(uuid.uuid4()),
+                         'device': info.st_dev, 'inode': info.st_ino,
+                         'sequence': sequence,
+                         'event_id': boundary['event_id'] if boundary else None}
+                state.update(t3_anchor(conn, sequence))
+        if replace:
+            archive = Path(str(state_path) + '.' + old_state['source_id'] + '.json')
+            archived = (encode(old_state) + '\n').encode()
+            if archive.exists():
+                if archive.read_bytes() != archived:
+                    raise ValueError('T3 archived cursor differs; preserve both registrations')
+            else:
+                atomic(archive, archived, exclusive=True)
+        state['enabled'] = True
+        atomic(state_path, (encode(state) + '\n').encode())
+        return {'configured': True, 'source_id': state['source_id'], 'sequence': state['sequence']}
+
+
+def t3_anchor(conn, sequence):
+    # T3 compaction preserves thread.created but may delete the scan cursor.
+    anchor = conn.execute("SELECT sequence,event_id FROM orchestration_events WHERE aggregate_kind='thread' "
+                          "AND application_event_version=2 AND event_type='thread.created' AND sequence<=? "
+                          'ORDER BY sequence DESC LIMIT 1', (sequence,)).fetchone() if sequence else None
+    return {'anchor_sequence': anchor['sequence'] if anchor else 0,
+            'anchor_event_id': anchor['event_id'] if anchor else None}
+
+
+def t3_boundary(conn, source, state):
+    info = Path(source).stat()
+    if (info.st_dev, info.st_ino) != (state['device'], state['inode']):
+        raise ValueError('T3 source replaced; preserve the registered cursor')
+    boundary = None
+    if state['sequence']:
+        boundary = conn.execute('SELECT event_id FROM orchestration_events WHERE sequence=?',
+                                (state['sequence'],)).fetchone()
+        if boundary and boundary[0] != state['event_id']:
+            raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
+    if state.get('anchor_sequence'):
+        anchor = conn.execute('SELECT event_id FROM orchestration_events WHERE sequence=?',
+                              (state['anchor_sequence'],)).fetchone()
+        if not anchor or anchor[0] != state['anchor_event_id']:
+            raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
+    elif state['sequence'] and not boundary:
+        raise ValueError('T3 source replaced or regressed; preserve the registered cursor')
+
+
+def capture_t3(path, limit=1000):
+    if not 1 <= limit <= 1000:
+        raise ValueError('T3 page limit must be between 1 and 1000')
+    state_path = Path(str(Path(path).expanduser().absolute()) + '.t3.json')
+    with lock(str(state_path) + '.lock'):
+        if not state_path.exists():
+            return {'configured': False, 'scanned': 0, 'captured': 0}
+        state = json.loads(state_path.read_text())
+        if not state['enabled']:
+            return {'configured': False, 'scanned': 0, 'captured': 0}
+        with contextlib.closing(database(path)) as destination:
+            cfg = active_config(destination, path)
+            with t3_database(state['source']) as conn:
+                t3_boundary(conn, state['source'], state)
+                events = conn.execute('SELECT * FROM orchestration_events WHERE sequence>? ORDER BY sequence LIMIT ?',
+                                      (state['sequence'], limit)).fetchall()
+                messages = []
+                for event in events:
+                    if event['aggregate_kind'] != 'thread':
+                        continue
+                    version = event['application_event_version']
+                    if version not in (1, 2):
+                        raise ValueError('unsupported T3 thread event version')
+                    if version != 2 or event['event_type'] != 'message.updated':
+                        continue
+                    message = json.loads(event['payload_json'])
+                    if not isinstance(message, dict):
+                        raise ValueError('invalid T3 message payload')
+                    if (message.get('role') == 'user' and message.get('createdBy') == 'user'
+                            and message.get('creationSource') in ('web', 'mobile')):
+                        if not all(isinstance(message.get(key), str) and message[key]
+                                   for key in ('id', 'threadId', 'createdAt')) or not isinstance(message.get('text'), str):
+                            raise ValueError('invalid T3 human submission')
+                        if message['text'].strip():
+                            messages.append(message)
+                rows = []
+                unseen = []
+                for message in messages:
+                    identity = normalize({'timestamp': message['createdAt'], 'prompt': message['text'],
+                                          'source_event_id': 't3:' + state['source_id'] + ':' + message['id'],
+                                          'extras': {'ide': 't3-code'}}, cfg['owner'], 'captured')
+                    prior = destination.execute('SELECT 1 FROM events WHERE record_id=?',
+                                                (identity['record_id'],)).fetchone()
+                    if prior:
+                        continue
+                    pending = pending_dir(path) / (identity['record_id'] + '.json')
+                    if pending.exists():
+                        frozen = normalize(json.loads(pending.read_text()))
+                        if frozen['record_id'] != identity['record_id']:
+                            raise ValueError('T3 pending receipt identity mismatch')
+                        rows.append(frozen)
+                    else:
+                        unseen.append(message)
+                rows.extend(t3_rows(conn, state, unseen))
+                # Normalize the complete page before accepting any of it.
+                rows = [normalize(row, cfg['owner'], 'captured') for row in rows]
+                captured = 0
+                for row in rows:
+                    prior = destination.execute('SELECT payload FROM events WHERE record_id=?',
+                                                (row['record_id'],)).fetchone()
+                    pending = pending_dir(path) / (row['record_id'] + '.json')
+                    if prior:
+                        continue
+                    if pending.exists():
+                        row = json.loads(pending.read_text())
+                    else:
+                        captured += 1
+                    capture(path, cfg['owner'], row)
+                if events:
+                    state.update(sequence=events[-1]['sequence'], event_id=events[-1]['event_id'])
+                    if not state.get('anchor_sequence'):
+                        state.update(t3_anchor(conn, state['sequence']))
+                    atomic(state_path, (encode(state) + '\n').encode())
+        return {'configured': True, 'scanned': len(events), 'captured': captured, 'sequence': state['sequence']}
+
+
+def t3_rows(conn, state, messages):
+    if not messages:
+        return []
+    threads = list({message['threadId'] for message in messages})
+    marks = ','.join('?' for _ in threads)
+    thread_rows = {row['thread_id']: row for row in conn.execute(
+        'SELECT thread_id,project_id,payload_json FROM orchestration_v2_projection_threads WHERE thread_id IN (' + marks + ')', threads)}
+    run_ids = list({message.get('runId') for message in messages if message.get('runId')})
+    message_ids = [message['id'] for message in messages]
+    runs = [json.loads(row[0]) for row in conn.execute(
+        'SELECT payload_json FROM orchestration_v2_projection_runs WHERE run_id IN ('
+        + ','.join('?' for _ in run_ids) + ') OR json_extract(payload_json,\'$.userMessageId\') IN ('
+        + ','.join('?' for _ in message_ids) + ') LIMIT 2001', run_ids + message_ids)]
+    if len(runs) > 2000:
+        raise ValueError('T3 run attribution exceeds page bound')
+    by_run = {run['id']: run for run in runs}
+    by_message = {run['userMessageId']: run for run in runs}
+    projects = list({row['project_id'] for row in thread_rows.values()})
+    roots = dict(conn.execute('SELECT project_id,workspace_root FROM projection_projects WHERE project_id IN ('
+                             + ','.join('?' for _ in projects) + ')', projects))
+    instances = list({run['providerInstanceId'] for run in runs})
+    sessions = [json.loads(row[0]) for row in conn.execute(
+        "SELECT payload_json FROM (SELECT payload_json, row_number() OVER ("
+        "PARTITION BY json_extract(payload_json,'$.providerInstanceId') "
+        "ORDER BY json_extract(payload_json,'$.updatedAt') DESC, rowid DESC) AS position "
+        "FROM orchestration_v2_projection_provider_sessions WHERE "
+        "json_extract(payload_json,'$.providerInstanceId') IN (" + ','.join('?' for _ in instances)
+        + ')) WHERE position=1', instances)]
+    drivers = {session['providerInstanceId']: session['driver'] for session in sessions}
+    machine = os.uname().nodename.split('.')[0]
+    try:
+        computer_name = subprocess.run(['scutil', '--get', 'ComputerName'], capture_output=True,
+                                       text=True, timeout=5)
+        machine = computer_name.stdout.strip() if computer_name.returncode == 0 and computer_name.stdout.strip() else machine
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    result = []
+    for message in messages:
+        run = by_run.get(message['runId']) if message.get('runId') else by_message.get(message['id'])
+        if not run or not run.get('providerInstanceId') or run.get('threadId') != message['threadId']:
+            raise ValueError('T3 submission run metadata unavailable; retry after projections recover')
+        model_selection = run.get('modelSelection')
+        if not isinstance(model_selection, dict):
+            raise ValueError('invalid T3 model selection metadata')
+        thread = thread_rows.get(message['threadId'])
+        workspace = roots.get(thread['project_id'], '') if thread else ''
+        details = json.loads(thread['payload_json'] or 'null') if thread else {}
+        if not isinstance(details, dict):
+            raise ValueError('invalid T3 thread metadata')
+        checkout = (details.get('worktreePath') or workspace) if workspace else ''
+        instance = run['providerInstanceId']
+        driver = drivers.get(instance)
+        result.append({'timestamp': message['createdAt'], 'repo': Path(workspace).name if workspace else '',
+                       'branch': (details.get('branch') or '') if workspace else '',
+                       'machine': machine,
+                       'agent': {'claudeAgent': 'claude-code', 'antigravity': 'agy'}.get(driver, driver or instance),
+                       'session_id': 't3:' + state['source_id'] + ':' + message['threadId'],
+                       'prompt': message['text'], 'checkout': checkout,
+                       'source_event_id': 't3:' + state['source_id'] + ':' + message['id'],
+                       'extras': {'ide': 't3-code', 't3_message_id': message['id'],
+                                  't3_thread_id': message['threadId'], 'provider_instance_id': instance,
+                                  'driver': driver, 'model': model_selection.get('model'),
+                                  'metadata_observed_at': utc(), 'metadata_basis': 'capture-time projections',
+                                  'metadata_warning': None if workspace else 'project metadata unavailable'}})
+    return result
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1099,6 +1343,11 @@ def main():
     scheduled.add_argument('markdown')
     scheduled.add_argument('--mode', default='export')
     commands.add_parser('capture')
+    t3_setup = commands.add_parser('configure-t3', help='opt in to local T3 Code user-prompt capture')
+    t3_setup.add_argument('source', nargs='?', help='T3 userdata/statev2.sqlite; starts at its current end')
+    t3_setup.add_argument('--disable', action='store_true', help='stop scans and retain the cursor/history')
+    t3_scan = commands.add_parser('capture-t3', help='capture one bounded page from the registered T3 source')
+    t3_scan.add_argument('--limit', type=int, default=1000)
     recovery = commands.add_parser('drain')
     recovery.add_argument('--limit', type=int, default=100)
     reader = commands.add_parser('query')
@@ -1148,6 +1397,10 @@ def main():
             result = configure_fleet(path, args.checkout, args.origin, args.repair_generated_note, args.discover_origins)
         elif args.command == 'reconcile-fleet':
             result = reconcile_fleet(path)
+        elif args.command == 'configure-t3':
+            result = configure_t3(path, args.source, args.disable)
+        elif args.command == 'capture-t3':
+            result = capture_t3(path, args.limit)
         elif args.command == 'scheduled-export':
             destination = Path(args.markdown).expanduser()
             destination = destination.parent.resolve() / destination.name
@@ -1164,6 +1417,12 @@ def main():
                     if destination.resolve() != Path(activated['view']['path']):
                         raise ValueError('scheduled destination differs from registered note')
                     destination = Path(activated['view']['path'])
+            t3_result = None
+            try:
+                t3_result = capture_t3(path)
+            except (ValueError, TypeError, KeyError, AttributeError, OSError, sqlite3.Error, TimeoutError) as error:
+                diagnostic('T3 capture refused: ' + type(error).__name__ + '; cursor retained; run capture-t3')
+                t3_result = {'configured': True, 'state': 'refused', 'error': type(error).__name__}
             if activated.get('fleet'):
                 errors = []
                 try:
@@ -1198,6 +1457,10 @@ def main():
                 result = project(path, None if capture_only else destination,
                                  Path.home() / '.claude/prompt-log-compat.jsonl', jsonl_only=bool(capture_only))
             result['pending'] = recovery['pending']
+            result['t3'] = t3_result
+            if t3_result.get('state') == 'refused':
+                print(encode(result))
+                return 3
         elif args.command == 'capture':
             if not cfg or Path(cfg['db']).resolve() != Path(path).expanduser().resolve():
                 raise ValueError('capture requires the activated database')

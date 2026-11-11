@@ -1,0 +1,43 @@
+FFFF.........x                                                           [100%]
+=================================== FAILURES ===================================
+_____________________ test_quarantine_active_before_expiry _____________________
+
+    def test_quarantine_active_before_expiry():
+>       assert conftest.gh178_quarantine_expired(_expiry() - timedelta(seconds=1)) is False
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:19: AttributeError
+__________________ test_quarantine_boundary_exact_is_expired ___________________
+
+    def test_quarantine_boundary_exact_is_expired():
+        # now == expiry means expired: a marker that survives its own expiry instant
+        # is how quarantines silently become permanent.
+>       assert conftest.gh178_quarantine_expired(_expiry()) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:25: AttributeError
+_____________________ test_quarantine_expired_after_expiry _____________________
+
+    def test_quarantine_expired_after_expiry():
+>       assert conftest.gh178_quarantine_expired(_expiry() + timedelta(days=1)) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_expired'
+
+tests/test_conftest_quarantine.py:29: AttributeError
+_________________ test_quarantine_reason_carries_p13_elements __________________
+
+    def test_quarantine_reason_carries_p13_elements():
+>       reason = conftest.gh178_quarantine_reason()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'conftest' has no attribute 'gh178_quarantine_reason'
+
+tests/test_conftest_quarantine.py:33: AttributeError
+=========================== short test summary info ============================
+XFAIL HiQS/tests/test_contract.py::test_fake_candidates_reach_the_single_ranking_seam - M3 owns ranking; this protects the fake-source path until then.
+FAILED tests/test_conftest_quarantine.py::test_quarantine_active_before_expiry
+FAILED tests/test_conftest_quarantine.py::test_quarantine_boundary_exact_is_expired
+FAILED tests/test_conftest_quarantine.py::test_quarantine_expired_after_expiry
+FAILED tests/test_conftest_quarantine.py::test_quarantine_reason_carries_p13_elements
+4 failed, 9 passed, 1 xfailed in 1.84s

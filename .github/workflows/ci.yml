@@ -90,7 +90,7 @@ jobs:
   # split test lanes below: this job protects the documented install contract,
   # rather than changing their targeted dependency/cost trade-offs.
   readme-install:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
