@@ -25,7 +25,8 @@ INDEX_OPS = SRC / "ingest" / "index_ops.py"
 
 # Decision A: the only scopes `all` should expand to are raw incoming sources.
 # `clio` joined the set in GH-141 (CLIO prompt logs -> semantic index).
-RAW_SOURCES = {"vault", "github", "calendar", "sleuth", "email", "clio"}
+# `t3_code` joined in GH-375 (opt-in by config flag; skips without reading when off).
+RAW_SOURCES = {"vault", "github", "calendar", "sleuth", "email", "clio", "t3_code"}
 
 # Leaf ingest functions that user-facing surfaces (CLI/MCP/web) must not call
 # directly — they route through the orchestrator (`refresh_index`) instead.
