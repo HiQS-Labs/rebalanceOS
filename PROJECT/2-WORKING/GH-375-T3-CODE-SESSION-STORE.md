@@ -2,15 +2,16 @@
 gh_issue: 375
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/375
 title: "T3 Code session store as an opt-in Rebalance work-activity source"
-status: Proposed (1-INBOX — not yet active)
+status: in-progress
 created: 2026-11-11
-owner: unassigned
+owner: Claude
+updated: 2026-11-11
 doc_type: feedback
 complexity: 3
 risk: 2
 effort: 3
 phases: 3
-ratings_provisional: true
+ratings_provisional: false
 non_goals:
   - no T3 writes
   - no github_activity or hiqs_work_activity change
@@ -43,7 +44,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Captured via HQ (`/hq park`) for project **rebalanceOS** → repo `rebalanceOS`. The GitHub issue is the signal stream; this doc is the in-repo capture and back-reference. | Fill in Why/Key Concepts, correct the provisional ratings above, and run a Phase 0 explore pass before promoting to `2-WORKING`. |
+| Phase 0 recon + plan; Codex plan QA **Approved** r2/3 (`relay-system/2026-11-11/gh375-plan-codex.md`). Promoted to 2-WORKING. | Implement red-first per the Phase 0 ordered list; verification + final Codex QA; ready PR against `development`. |
 
 ## Idea
 
