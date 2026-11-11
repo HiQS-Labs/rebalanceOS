@@ -162,4 +162,12 @@ Basis: S1 is resolved, the health clarifications are explicit, and the full arti
 
 Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with implementation in the authorized task clone.
 
+
+### Attestation · relay-drive — 2026-11-11T20:56:00Z
+task: RELAY-gh375-plan-codex
+reviewer: codex
+status: Approved
+reviewed-head: ab8b5039a9fdcbc12cbf0b3c78c31271c7a1d6eb
+added-range: 21503+5933
+added-sha256: 88e38726a800a67f1631db8a67a8ae54480c167ed60f5ea7bf819d7cabe568d2
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
