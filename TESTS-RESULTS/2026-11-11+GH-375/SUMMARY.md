@@ -22,7 +22,7 @@
 | ruff check / format, mypy `src/` | clean / 669 formatted / no issues in 119 files | console |
 | Ratchets (banned imports, script inventory, machine paths, read layer, near duplicates) | all `--check` ok, no baseline change | console |
 | Doc links | 513 links, none broken | console |
-| `rebalance doctor` | new check `OK — not enabled (opt-in)`; exit 1 from a pre-existing `orphaned vectors:github` ERROR, identical on base | [doctor.txt](doctor.txt) |
+| `rebalance doctor` | new check `OK — not enabled (opt-in)`; exit 1 from a pre-existing `orphaned vectors:github` ERROR, identical on the base checkout `f081931` (same operator DB) | [doctor.txt](doctor.txt) |
 | Live smoke (dry run, this Mac's T3 store, 14-day window) | PASS: repo set and per-repo run/prompt totals and per-provider run splits equal an independent direct read-only count; rerun identical; dry runs created no DB; flag off skips without opening the store | [smoke.txt](smoke.txt), [scripts/smoke.py](scripts/smoke.py) |
 
 ## Threats to validity

@@ -357,7 +357,7 @@ def sync_t3_code_activity(
     dry_run: bool = False,
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Refresh this device's T3 Code activity rows. ``dry_run`` reads and writes nothing."""
+    """Refresh this device's T3 Code activity rows. ``dry_run`` reads the T3 store and writes nothing."""
     cfg = config if config is not None else get_t3_code_config()
     result: dict[str, Any] = {"scope": "t3_code", "dry_run": dry_run}
     if not cfg.get("t3_code_activity_enabled"):
