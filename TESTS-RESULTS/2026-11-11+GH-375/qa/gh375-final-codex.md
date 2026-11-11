@@ -109,4 +109,12 @@ Review limitations: no git commands, executable fixtures, pytest, validate.sh or
 
 Relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-11-11T21:09:58Z
+task: RELAY-gh375-final-codex
+reviewer: codex
+status: Approved
+reviewed-head: a0eb5229c56167831dc2d04a1fe60292b79629b5
+added-range: 9497+6600
+added-sha256: 0a472efdae0611bd9a535327777262524268a9115034095805dc618e7a16549e
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
