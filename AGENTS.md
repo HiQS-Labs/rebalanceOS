@@ -58,6 +58,7 @@ This repo **is** an MCP server. Every refresh and query path is exposed through 
 | `confirm_projects(projects, vault_path)` | Write registry and sync to DB |
 | `list_projects(status?)` | Query projects (default: active) |
 | `hiqs_work_activity(since_days?)` | HiQS work activity per project (deprecated alias: `github_balance`; requires prior refresh) |
+| `agent_session_activity(since_days?)` | Per-repo local agent-session activity by provider from the opt-in `t3_code` collector (metadata only; see MCP.md) |
 
 **Targeted retrieval and synthesis:**
 

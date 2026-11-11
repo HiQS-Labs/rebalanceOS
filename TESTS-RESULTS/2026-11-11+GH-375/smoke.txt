@@ -1,0 +1,15 @@
+# GH-375 live smoke — 2026-11-11T21:03:21Z, code 118653f
+# Command: .venv/bin/python TESTS-RESULTS/2026-11-11+GH-375/scripts/smoke.py <scratch db path that must not exist>
+# Main path: dry_run=True against this Mac's live T3 store (window 14 days) vs an independent read-only direct count.
+# Adjacent paths: immediate rerun (identical aggregates); flag off (skipped, store not opened). No writes; no config or job change.
+# Repo names anonymized (AGENTS.md: no client/project names in tracked files).
+window_start=2026-10-28 rows=19 unresolved_roots=0 schema_version=2
+rerun identical aggregates: True
+scratch DB created by dry runs: False
+repo | direct threads active | direct runs | collector runs | direct prompts | collector prompts | direct provider runs | collector provider runs/thread_days
+repo-A | 136 | 645 | 645 | 243 | 243 | {'acpRegistry_kimi_code': 19, 'antigravity': 13, 'claudeAgent': 19, 'codex': 594} | {'acpRegistry_kimi_code': {'runs': 19, 'thread_days': 3}, 'antigravity': {'runs': 13, 'thread_days': 10}, 'claudeAgent': {'runs': 19, 'thread_days': 14}, 'codex': {'runs': 594, 'thread_days': 128}} | MATCH
+repo-B | 1 | 2 | 2 | 2 | 2 | {'codex': 2} | {'codex': {'runs': 2, 'thread_days': 1}} | MATCH
+repo-C | 5 | 22 | 22 | 23 | 23 | {'acpRegistry_kimi_code': 3, 'antigravity': 16, 'claudeAgent': 2, 'codex': 1} | {'acpRegistry_kimi_code': {'runs': 3, 'thread_days': 1}, 'antigravity': {'runs': 16, 'thread_days': 3}, 'claudeAgent': {'runs': 2, 'thread_days': 1}, 'codex': {'runs': 1, 'thread_days': 1}} | MATCH
+repo set equal: True  overall: PASS
+flag off: {'scope': 't3_code', 'dry_run': False, 'skipped': True, 'reason': 'disabled (opt-in: t3_code_activity_enabled)'}
+scratch DB created after flag-off run: False

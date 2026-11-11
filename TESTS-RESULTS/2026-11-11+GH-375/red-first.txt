@@ -1,0 +1,12 @@
+# red-first run on base 5122250 (tests only; no implementation)
+    from rebalance.ingest import t3_code
+E   ImportError: cannot import name 't3_code' from 'rebalance.ingest' (<task-clone>/src/rebalance/ingest/__init__.py)
+=========================== short test summary info ============================
+ERROR tests/test_t3_code.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.12s
+FAILED tests/test_collector_contracts.py::test_all_expands_to_raw_sources_only
+FAILED tests/test_collector_contracts.py::test_default_refresh_recipe_preserves_follow_on_stages
+FAILED tests/test_collector_registry.py::CollectorRegistryTests::test_all_scope_is_raw_sources_only
+FAILED tests/test_collector_registry.py::CollectorRegistryTests::test_default_refresh_recipe_includes_follow_on_stages
+5 failed, 14 passed in 0.22s

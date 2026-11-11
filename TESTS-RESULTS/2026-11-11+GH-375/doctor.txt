@@ -1,0 +1,11 @@
+# rebalance doctor — task clone vs base checkout f081931, same operator DB (schema 9; doctor does not migrate)
+## task clone:
+   ERROR   orphaned vectors:github — 4 orphaned vectors (est. 6144 bytes wasted)
+    OK     apple reminders — not enabled (opt-in; never synced)
+    OK     t3 code activity — not enabled (opt-in)
+Health check found failures.
+EXIT=1
+## base f081931:
+   ERROR   orphaned vectors:github — 4 orphaned vectors (est. 6144 bytes wasted)
+Health check found failures.
+EXIT=1 (base)

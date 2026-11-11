@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -147,6 +147,15 @@ def now_utc() -> datetime:
 def _now_utc() -> datetime:
     """Backward-compatible private alias for :func:`now_utc`."""
     return now_utc()
+
+
+def utc_date_days_ago(days: int) -> str:
+    """The UTC calendar date ``days`` days before now, as ``YYYY-MM-DD``.
+
+    The shared start-of-window primitive for day-keyed tables (GH-375); honours
+    the test clock seam via :func:`now_utc`.
+    """
+    return (now_utc() - timedelta(days=days)).date().isoformat()
 
 
 def local_tz() -> ZoneInfo:

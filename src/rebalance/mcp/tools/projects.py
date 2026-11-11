@@ -5,6 +5,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from rebalance.ingest.db import db_connection
+from rebalance.ingest.db.queries import fetch_agent_activity
 from rebalance.ingest.github_scan import get_hiqs_work_activity
 from rebalance.ingest.registry import get_projects
 
@@ -48,3 +50,22 @@ def register(mcp: FastMCP, database_path: Path) -> None:
         `hiqs_work_activity` tool going forward.
         """
         return hiqs_work_activity(since_days=since_days)
+
+    @mcp.tool()
+    def agent_session_activity(since_days: int = 14) -> list[dict[str, Any]]:
+        """
+        Show local agent-session activity per repo (GH-375; source: T3 Code).
+
+        Read from `agent_session_activity`, filled by the opt-in `t3_code` collector
+        (config `t3_code_activity_enabled`). One row per repo over the last
+        `since_days` days (clamped to 1-90): `providers` maps each agent provider to
+        `thread_days`, `runs`, `runs_completed` and `user_prompts`; repo totals add
+        `thread_provider_days` (one thread on two providers in one day counts 2),
+        `branches`, `pr_urls` and `last_at`. Exposes repo, branch and PR metadata to
+        any client of this local server — never message or prompt text. Empty until
+        the collector has run. Separate from `hiqs_work_activity`, which is GitHub
+        authorship only.
+        """
+        days = max(1, min(90, int(since_days)))
+        with db_connection(database_path) as conn:
+            return fetch_agent_activity(conn, since_days=days)

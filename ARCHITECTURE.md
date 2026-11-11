@@ -147,6 +147,7 @@ Raw incoming sources have a priority, a collector module, and a target table. Th
 | P3 | Sleuth reminders (Slack) | `sleuth_reminders.py` | `sleuth_reminders` table | No — structured reminder rows | Active |
 | P4 | Email (Gmail) | `gmail.py` + `semantic_index.py` | `email_messages` | Yes — subject + snippet participate in the unified semantic index | Active (Phase 1, shipped 2026-05-12): newest 100 `in:inbox` messages per run; metadata + snippet only, no body parsing yet |
 | P4 | Figma comments | `figma.py` + `semantic_index.py` | `figma_comments` | Yes — registry-provider semantic docs for comments | Active (opt-in): requires a PAT plus explicit `figma_file_keys` allow-list |
+| P4 | T3 Code sessions (local) | `t3_code.py` | `agent_session_activity`, `agent_session_source_health` | No — per-device (repo, UTC day, provider) counts; read via MCP `agent_session_activity` | Opt-in (`t3_code_activity_enabled`, default off): read-only, metadata only (never message text); scope `t3_code` is in the default recipe but skips without reading when off. `watch_repos_from_agent_sessions` (default off) adds its repos to the GitHub watched set |
 
 ### Other registered collector scopes
 
@@ -197,6 +198,10 @@ Sleuth Web API ──────▶ sleuth_reminders.py       Bearer auth, stdl
 Gmail API ───────────▶ gmail.py                  desktop OAuth (gmail.readonly), ──▶ email_messages
   (gmail.googleapis.com)                           filter in:inbox by default,
                                                    newest 100 messages/run
+
+T3 Code session store ▶ t3_code.py               read-only, schema_version     ──▶ agent_session_activity
+  (local SQLite, opt-in)                           guard, metadata only,           agent_session_source_health
+                                                   per device/day/provider
 
 Gmail MCP connector ─▶ gmail.py                  agent-pushed message payloads ─▶ email_messages
   (opt-in push path)                               via ingest_email_messages()
@@ -356,7 +361,7 @@ Single SQLite file resolved by `src/rebalance/paths.py::resolve_database_path()`
 The single most important invariant for a new maintainer to preserve:
 
 - **Reads are unrestricted.** Anything may open `db_connection()` and `SELECT`. The "Tables by Domain" list below names the *writer* for each table — that ownership is about **writes**, not reads.
-- **One writer per table.** Each table is written by exactly one module (e.g. `github_activity` ← `github_scan.py`, `sleuth_reminders` ← `sleuth_reminders.py`, `semantic_documents` ← the `semantic` stage only). Do not add a second writer; extend the owning collector instead.
+- **One writer per table.** Each table is written by exactly one module (e.g. `sleuth_reminders` ← `sleuth_reminders.py`, `agent_session_activity` ← `t3_code.py`, `semantic_documents` ← the `semantic` stage only). Do not add a second writer; extend the owning collector instead. Known exception: `github_activity` has two writers in the same GitHub collector — `github_scan.py` (user events) and the `__watch__` rollups in `github_watch.py`.
 - **Writes go through the orchestrator.** New ingestion/refresh writes register as a `Collector` in `index_ops.py` and run under `refresh_index()` — not as a fresh leaf that opens `db_connection()` and upserts on its own.
 - **Known, accepted exceptions (direct `db_connection()` writers outside `refresh_index`).** A few interactive/operator commands write directly *by design* — they are human-in-the-loop mutations, not unattended ingest: `rebalance github-sync-artifacts` (`cli/github.py::github_sync_artifacts()`) and the `rebalance apple-reminders` write path (`cli/apple_reminders.py`). Most other direct `db_connection()` calls from `cli/*` (`onboard`, `config-doctor`, `raw`, `dashboard-render`) are **reads**, which are fine. If you add a new direct *writer*, document it here and say why it can't go through the registry.
 

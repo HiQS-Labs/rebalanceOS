@@ -31,6 +31,7 @@ Reconciliation semantics (SOP §6 — one entity counted twice is a defect):
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,7 @@ from urllib.parse import urlsplit
 
 from rebalance.ingest.agent_tags import classify as classify_source
 from rebalance.ingest.config import get_github_org_aliases
-from rebalance.lib.time_ops import now_utc, parse_utc_iso, parse_iso
+from rebalance.lib.time_ops import now_utc, parse_utc_iso, parse_iso, utc_date_days_ago
 
 
 # Default cloud agent bots recognized as automated commit authors
@@ -1447,3 +1448,69 @@ __all__ = [
     "fetch_repo_activity_counts",
     "fetch_open_prs",
 ]
+
+
+def fetch_agent_activity(
+    conn: sqlite3.Connection,
+    since_days: int = 14,
+    source: str | None = None,
+) -> list[dict[str, Any]]:
+    """Per-repo rollup of ``agent_session_activity`` since ``since_days`` ago (GH-375).
+
+    Counting units: per provider, ``thread_days`` sums that provider's daily distinct
+    threads; the repo total ``thread_provider_days`` sums over (day, provider) buckets,
+    so one thread on two providers in one day counts 2. No thread IDs are stored, so a
+    cross-day distinct-thread count is not derivable. Repo identity routes through the
+    alias map (SOP §6). Returns ``[]`` before migration 0010 has run.
+    """
+    since = utc_date_days_ago(since_days)
+    sql = (
+        "SELECT repo_full_name, provider, threads, runs, runs_completed, user_prompts,"
+        " branches_json, pr_urls_json, last_at FROM agent_session_activity WHERE day >= ?"
+    )
+    params: list[Any] = [since]
+    if source:
+        sql += " AND source = ?"
+        params.append(source)
+    sql += " ORDER BY repo_full_name, day, provider LIMIT 20000"
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+    alias_map = _get_alias_map()
+    repos: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        name = _canonical_name(row["repo_full_name"], alias_map)
+        r = repos.setdefault(
+            name.lower(),
+            {
+                "repo": name,
+                "providers": {},
+                "thread_provider_days": 0,
+                "runs": 0,
+                "runs_completed": 0,
+                "user_prompts": 0,
+                "branches": set(),
+                "pr_urls": set(),
+                "last_at": None,
+            },
+        )
+        p = r["providers"].setdefault(
+            row["provider"], {"thread_days": 0, "runs": 0, "runs_completed": 0, "user_prompts": 0}
+        )
+        p["thread_days"] += row["threads"]
+        r["thread_provider_days"] += row["threads"]
+        for key in ("runs", "runs_completed", "user_prompts"):
+            p[key] += row[key]
+            r[key] += row[key]
+        r["branches"].update(json.loads(row["branches_json"] or "[]"))
+        r["pr_urls"].update(json.loads(row["pr_urls_json"] or "[]"))
+        if row["last_at"] and (r["last_at"] is None or row["last_at"] > r["last_at"]):
+            r["last_at"] = row["last_at"]
+    out = []
+    for r in repos.values():
+        r["branches"] = sorted(r["branches"])
+        r["pr_urls"] = sorted(r["pr_urls"])
+        out.append(r)
+    return sorted(out, key=lambda r: r["last_at"] or "", reverse=True)

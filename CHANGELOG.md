@@ -10,6 +10,13 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.107.0] - 2026-11-11
+
+### Added
+
+- Opt-in, read-only collection of local T3 Code agent-session activity: per device, which repository was worked on, by which agent provider, on which day, with run, prompt, branch and pull-request counts. It is stored separately from GitHub authorship, which stays unchanged, and is readable through a new agent-session activity tool. It reads metadata only, never message or prompt text, and skips cleanly with a recorded reason when the session store is absent or its schema changes. A health check reports the source without opening the session store. Repositories seen this way join the monitored set only behind a second opt-in setting.
+- Verified with a new red-first suite (24 cases, every guard shown failing when removed) and the full repository suites.
+
 ## [0.106.0] - 2026-10-30
 
 ### Added

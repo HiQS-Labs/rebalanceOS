@@ -959,6 +959,16 @@ def _activity_repos(database_path: Path, *, since_days: int = 14) -> list[str]:
                 repo = (r["repo_full_name"] or "").strip()
                 if repo and repo not in repos:
                     repos.append(repo)
+            # GH-375: opt-in union with repos worked through local agent sessions.
+            # Default off — it widens the GitHub sync set beyond authorship.
+            from rebalance.ingest.config import get_t3_code_config
+
+            if get_t3_code_config()["watch_repos_from_agent_sessions"]:
+                from rebalance.ingest.db.queries import fetch_agent_activity
+
+                for row in fetch_agent_activity(conn, since_days=since_days):
+                    if row["repo"] not in repos:
+                        repos.append(row["repo"])
     except Exception:
         pass
     return repos
@@ -2111,6 +2121,17 @@ def _refresh_clio(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
 
 
 _clio_adapter = _dry_run_adapter(_refresh_clio)
+
+
+def _refresh_t3_code(database_path: Path, *, dry_run: bool) -> dict[str, Any]:
+    """T3 Code session activity (GH-375). Opt-in by config flag; when off it skips
+    without opening the T3 store. A dry run reads the store and writes nothing."""
+    from rebalance.ingest.t3_code import sync_t3_code_activity
+
+    return sync_t3_code_activity(database_path, dry_run=dry_run)
+
+
+_t3_code_adapter = _dry_run_adapter(_refresh_t3_code)
 _figma_adapter = _dry_run_adapter(_refresh_figma)
 
 
@@ -2396,6 +2417,11 @@ register_collector(
         included_in_all=True,
     )
 )
+
+# T3 Code session activity (GH-375) — a raw source in the default recipe so the
+# existing daily sync collects it once enabled; the config flag
+# `t3_code_activity_enabled` (default False) keeps it a no-op until then.
+register_collector(Collector("t3_code", _t3_code_adapter, kind="raw_source", included_in_all=True))
 
 register_collector(
     Collector(

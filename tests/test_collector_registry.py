@@ -30,10 +30,10 @@ class CollectorRegistryTests(unittest.TestCase):
 
     def test_all_scope_is_raw_sources_only(self) -> None:
         # `all` token narrowed to raw incoming sources (Decision A / Phase 1b).
-        # `clio` joined the raw sources in GH-141.
+        # `clio` joined the raw sources in GH-141; `t3_code` in GH-375 (flag-gated).
         self.assertEqual(
             sorted(_all_scope_names()),
-            sorted(["vault", "github", "calendar", "sleuth", "email", "clio"]),
+            sorted(["vault", "github", "calendar", "sleuth", "email", "clio", "t3_code"]),
         )
 
     def test_default_refresh_recipe_includes_follow_on_stages(self) -> None:
@@ -50,6 +50,7 @@ class CollectorRegistryTests(unittest.TestCase):
                     "sleuth",
                     "email",
                     "clio",
+                    "t3_code",
                     "code",
                     "semantic",
                     "sync",
