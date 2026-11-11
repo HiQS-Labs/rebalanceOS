@@ -44,7 +44,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Phase 0 recon + plan; Codex plan QA **Approved** r2/3 (`relay-system/2026-11-11/gh375-plan-codex.md`). Promoted to 2-WORKING. | Implement red-first per the Phase 0 ordered list; verification + final Codex QA; ready PR against `development`. |
+| Implemented red-first (steps 1–9a); 24-case suite + 9 mutation witnesses green/red as designed; root/HiQS suites, ratchets, doctor and live dry-run smoke recorded in `TESTS-RESULTS/2026-11-11+GH-375/SUMMARY.md`. | Final Codex QA (`TESTS-RESULTS/2026-11-11+GH-375/qa/gh375-final-codex.md`); ready PR against `development`; operator flag-on smoke stays open on the issue. |
 
 ## Idea
 
@@ -380,3 +380,13 @@ ranking influence (`candidates=`); thread-ID storage.
 Flag off stops collection; device-scoped `DELETE` of `source='t3-code'` rows in both tables removes
 data; reverting the PR removes reader, tool and doctor check; the two tables are forward-only and stay
 empty/unread.
+
+### Implementation notes (2026-11-11)
+
+- Plan QA r2 Approved; one harness defect observed: `relay-drive` exited 4 (`attest-publish-failed`) because
+  `relay-system/` is gitignored here and its `git add` (no `-f`) errors on the tracked thread, although the
+  attestation commit itself landed (`a278102`). Final QA therefore uses a thread under `TESTS-RESULTS/`.
+- Mutation witness run added one assertion (dry-run must not write health on a missing or drifted store);
+  the witness for that guard was green before it.
+- The 14 root-suite failures are identical by test ID on base `70ccfc0` (disposable verify clone).
+- Live smoke ran as a dry run only, per the operator's scope; the flag-on smoke remains open.

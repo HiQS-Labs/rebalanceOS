@@ -1,6 +1,6 @@
 # red-first run on base 5122250 (tests only; no implementation)
     from rebalance.ingest import t3_code
-E   ImportError: cannot import name 't3_code' from 'rebalance.ingest' (/Users/noelsaw/Documents/GitHub/rebalanceOS-gh375-t3-code-session-store-2026-11-11/src/rebalance/ingest/__init__.py)
+E   ImportError: cannot import name 't3_code' from 'rebalance.ingest' (<task-clone>/src/rebalance/ingest/__init__.py)
 =========================== short test summary info ============================
 ERROR tests/test_t3_code.py
 !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!

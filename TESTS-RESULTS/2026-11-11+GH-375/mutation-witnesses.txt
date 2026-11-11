@@ -1,4 +1,5 @@
 # Mutation witnesses — GH-375 (SOP §3.6). Base commit 560c4e0. Each guard removed → named test must go red; file restored after each run.
+# Command: bash TESTS-RESULTS/2026-11-11+GH-375/scripts/witness.sh TESTS-RESULTS/2026-11-11+GH-375/scripts (from repo root)
 
 ## schema guard removed
 mutation: src/rebalance/ingest/t3_code.py :: replace «    row = conn.execute(_VERSION_SQL).fetchone()» → «    return 2\n    row = conn.execute(_VERSION_SQL).fetchone()»

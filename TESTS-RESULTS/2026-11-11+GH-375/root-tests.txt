@@ -1,0 +1,36 @@
+# root suite: .venv/bin/python -m pytest tests/ -q (task clone, code 118653f)
+SKIPPED [1] tests/test_web_surface.py:135: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:139: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:131: pulse_web.py --out failed or produced no output (DB may be absent)
+SKIPPED [1] tests/test_web_surface.py:146: pulse_web.py --out failed or produced no output (DB may be absent)
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+FAILED tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+FAILED tests/test_embedder.py::EmbedderTests::test_load_and_embed_batch_with_mock_model
+FAILED tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+FAILED tests/test_embedder_metal_unavailable.py::test_load_model_succeeds_even_when_metal_unavailable
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+14 failed, 2836 passed, 20 skipped, 1 warning, 171 subtests passed in 181.32s (0:03:01)
+
+# same 14 on base 70ccfc0 (disposable verify clone, identical FAILED set via diff):
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+FAILED tests/test_embedder.py::EmbedderTests::test_embed_vault_chunks_end_to_end
+FAILED tests/test_embedder.py::EmbedderTests::test_load_and_embed_batch_with_mock_model
+FAILED tests/test_embedder_metal_unavailable.py::test_real_model_loads_and_embeds_on_this_machine
+FAILED tests/test_embedder_metal_unavailable.py::test_load_model_succeeds_even_when_metal_unavailable
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
