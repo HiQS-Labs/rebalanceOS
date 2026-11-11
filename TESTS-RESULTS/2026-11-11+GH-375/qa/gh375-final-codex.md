@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 1 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -82,5 +82,31 @@ Every `[Blocker]`/`[Should]` asking for a behaviour change carries `Observed inp
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 · codex
+
+Ship within the recorded scope.
+
+swept file: yes
+
+VERDICT: PASS
+Basis: Read the complete new collector, migration and test module, the seeded schema evidence, the acceptance map, and the surrounding touched registry/read/config/time/MCP/doctor functions rather than only changed lines. No blocking or should-fix defect found, including in the pre-existing touched functions. This is source review plus assessment of retained receipts, not a new execution of the suites. Ratings remain 55/35/50/45; no evidence warrants changing them.
+
+- [Pass] Acceptance: resolved fixture refresh and exact aggregation are supported by `tests/test_t3_code.py:259`, `:292`, `:303` and collector `src/rebalance/ingest/t3_code.py:181`. Runs and messages group separately; the message join uses the seeded run primary key. Thread sets merge per repo/day/provider; human prompts require role=user and createdBy=user; provider fallback uses COALESCE. Seeded evidence explicitly reports “messages with NULL run_id: 751” and “messages whose run_id has no run row: 0”. Midnight attribution is requested_at for runs, created_at for messages. The inclusive cutoff is intentional: approved plan says “window `day >= today_utc - window_days`”; `src/rebalance/lib/time_ops.py:152` implements that rule, so it is not an accidental one-day discrepancy.
+- [Pass] Acceptance: schema drift, empty/missing store and disabled operation map to `tests/test_t3_code.py:345`, `:355`, `:361`, `:367`; implementation `src/rebalance/ingest/t3_code.py:139`, `:354`. Seeded metadata says “thread-projections|2”, matching the version-2 guard; required-column probes precede extraction. Missing/drift skip activity writes; empty extraction reaches ok health; disabled returns before opening T3.
+- [Pass] Acceptance: repeatability and one-row delta (`tests/test_t3_code.py:377`), insert rollback (`:394`) and fresh/0009/idempotent migration (`:418`) match `src/rebalance/ingest/t3_code.py:291` and migration `0010_agent_session_activity.sql` (“PRIMARY KEY (source, device_id, repo_full_name, day, provider)”). Delete, inserts and ok health share BEGIN IMMEDIATE/commit, with rollback on failure. Destination write sits outside the extraction exception handler, so failed writes do not replace health with error. Dry-run guards cover missing/drift/error and return before the successful write; `tests/test_t3_code.py:280` checks retained emptiness.
+- [Pass] Acceptance: frozen GitHub values are checked with nonempty activity plus a counter-change red control in `tests/test_t3_code.py:448`; the new writer names only the two agent-session tables (`src/rebalance/ingest/t3_code.py:260`, `:291`). Existing MCP GitHub functions remain separate in `src/rebalance/mcp/tools/projects.py:28`. No board-sync, job or device configuration wiring is introduced by these paths.
+- [Pass] Acceptance/privacy: `tests/test_t3_code.py:503` captures executed SQL and has a text-path red control. Collector SQL reads only metadata and the createdBy/branch/pullRequests paths; `src/rebalance/ingest/t3_code.py:171` retains each PR object's string url only. No message text or auth/secret table is selected. The whole PR array is read transiently, as the documented contract allows; its other fields are not persisted.
+- [Pass] Acceptance/read integration: `src/rebalance/ingest/db/queries.py:1453` sums explicitly named thread_days/thread_provider_days, canonicalizes repo aliases and bounds the result. `src/rebalance/mcp/tools/projects.py:55` clamps 1–90 and calls that reader; `tests/test_t3_code.py:316` pins actual FastMCP output including provider switching and URLs. Registry `src/rebalance/ingest/index_ops.py:2424` includes the flag-gated raw source in all/default refresh, covered by the updated collector tests. Its watched-repo union at `:965` is behind the separate watch flag, covered at `tests/test_t3_code.py:565`.
+- [Pass] Acceptance/doctor: `src/rebalance/doctor.py:1504` handles disabled with/without retained health, enabled-no-row, missing, drift, error, stale and ok. `src/rebalance/ingest/t3_code.py:338` filters source and current device; doctor reads the destination DB only. `tests/test_t3_code.py:549` covers the eight states while making a T3 open fail.
+- [Pass] Retained evidence: `mutation-witnesses.txt` records nine targeted red mutations and “24 passed” unmutated control. `root-tests.txt` lists the same 14 failed test IDs on candidate and base; that supports pre-existence of those failures, not a claim that the root suite is green or that their causes were diagnosed. `hiqs-tests.txt` records “163 passed, 1 skipped, 1 xfailed”. `doctor.txt` records exit 1 on both candidate and base with the same orphan-vector error, alongside the new disabled-source OK check. These are producer receipts assessed here, not reviewer reruns.
+- [Pass] Live acceptance is the explicit operator deferral: `SUMMARY.md` says “The live smoke is a **dry run**” and leaves persisted flag-on refresh open; `smoke.txt` says “scratch DB created by dry runs: False” and reports equal repo sets/run/prompt totals/provider run splits. It does not independently establish live distinct-thread or thread-day totals, nor persistent live refresh. Those limits are compatible with the recorded scope; fixture assertions provide the exact bucket contract.
+- [Pass] Documentation/version: `manifest.json:5` and `src/rebalance/__init__.py:31` both say 0.107.0; `CHANGELOG.md:13` carries the dated minor release. MCP documentation describes metadata exposure and counting units. No extra subsystem or replacement scheduler is needed.
+- [Nit] `src/rebalance/ingest/t3_code.py:360` says dry_run “reads and writes nothing”, although it deliberately reads T3 and computes aggregates. Optional wording correction: “reads the source and writes nothing.” The implementation and public campaign accurately describe dry-run behavior.
+- [Nit] `SUMMARY.md` describes the doctor base as 70ccfc0 through its “identical on base” table wording, while `doctor.txt` explicitly labels its comparison f081931. Optional correction: identify f081931 in that row. Root-suite comparison is separately and consistently labeled 70ccfc0.
+
+Review limitations: no git commands, executable fixtures, pytest, validate.sh or shell test suites were run. Checks requiring a fresh execution remain [Unverified — needs clone run] for this reviewer; the harness gate follows this turn. No new behavioral probe was needed, so there is no scratch probe output to retain.
+
+Relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
