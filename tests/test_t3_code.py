@@ -281,6 +281,12 @@ def test_dry_run_returns_aggregates_and_writes_nothing(tmp_path: Path, rdb: Path
     res = _sync(rdb, build_t3(tmp_path), dry_run=True)
     assert res["aggregates"] == EXPECTED
     assert _activity(rdb) == [] and _health(rdb) is None
+    # No health write on any dry-run outcome either: missing store, schema drift.
+    assert _sync(rdb, tmp_path / "absent.sqlite", dry_run=True)["skipped"] is True
+    drifted = tmp_path / "v3"
+    drifted.mkdir()
+    assert _sync(rdb, build_t3(drifted, version=3), dry_run=True)["skipped"] is True
+    assert _health(rdb) is None
 
 
 def test_aggregation_edge_cases_exact(tmp_path: Path, rdb: Path) -> None:
