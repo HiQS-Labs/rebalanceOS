@@ -44,7 +44,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Implemented red-first (steps 1–9a); 24-case suite + 9 mutation witnesses green/red as designed; root/HiQS suites, ratchets, doctor and live dry-run smoke recorded in `TESTS-RESULTS/2026-11-11+GH-375/SUMMARY.md`. | Final Codex QA (`TESTS-RESULTS/2026-11-11+GH-375/qa/gh375-final-codex.md`); ready PR against `development`; operator flag-on smoke stays open on the issue. |
+| Implemented red-first (steps 1–9a); 24-case suite + 9 mutation witnesses green/red as designed; root/HiQS suites, ratchets, doctor and live dry-run smoke recorded in `TESTS-RESULTS/2026-11-11+GH-375/SUMMARY.md`. | PR [#376](https://github.com/HiQS-Labs/rebalanceOS/pull/376) ready, awaiting merge (final Codex QA Approved r1). Operator flag-on smoke stays open on the issue. |
 
 ## Idea
 
