@@ -1,0 +1,49 @@
+# Mutation witnesses — GH-375 (SOP §3.6). Base commit 560c4e0. Each guard removed → named test must go red; file restored after each run.
+
+## schema guard removed
+mutation: src/rebalance/ingest/t3_code.py :: replace «    row = conn.execute(_VERSION_SQL).fetchone()» → «    return 2\n    row = conn.execute(_VERSION_SQL).fetchone()»
+witness: pytest tests/test_t3_code.py -k "unsupported_schema"
+1 failed, 1 passed, 22 deselected in 0.14s
+
+## column probes removed (version check kept)
+mutation: src/rebalance/ingest/t3_code.py :: replace «            conn.execute(f"SELECT {columns} FROM {table} LIMIT 0")» → «            pass»
+witness: pytest tests/test_t3_code.py -k "missing_column"
+1 failed, 23 deselected in 0.11s
+
+## write transaction removed (delete committed alone)
+mutation: src/rebalance/ingest/t3_code.py :: replace «        conn.execute("BEGIN IMMEDIATE")\n        try:\n            conn.execute(\n                "DELETE FROM agent_session_activity WHERE source = ? AND device_id = ? AND day >= ?",\n                (SOURCE, device_id, window_start),\n            )» → «        try:\n            conn.execute(\n                "DELETE FROM agent_session_activity WHERE source = ? AND device_id = ? AND day >= ?",\n                (SOURCE, device_id, window_start),\n            )\n            conn.commit()»
+witness: pytest tests/test_t3_code.py -k "insert_failure"
+1 failed, 23 deselected in 0.15s
+
+## row-joined runs stream (messages joined in)
+mutation: src/rebalance/ingest/t3_code.py :: replace «FROM orchestration_v2_projection_runs\nWHERE requested_at >= ?\nGROUP BY thread_id, provider, day» → «FROM orchestration_v2_projection_runs\nJOIN orchestration_v2_projection_messages USING (thread_id)\nWHERE requested_at >= ?\nGROUP BY thread_id, provider, day»
+witness: pytest tests/test_t3_code.py -k "edge_cases or predicted_rows"
+2 failed, 22 deselected in 0.21s
+
+## provider fallback removed (no thread default_provider)
+mutation: src/rebalance/ingest/t3_code.py :: replace «COALESCE(r.provider, t.default_provider) AS provider» → «r.provider AS provider»
+witness: pytest tests/test_t3_code.py -k "edge_cases or predicted_rows"
+2 failed, 22 deselected in 0.22s
+
+## message text read added
+mutation: src/rebalance/ingest/t3_code.py :: replace «SUM(m.role = 'user' AND json_extract(m.payload_json, '$.createdBy') = 'user') AS user_prompts,» → «SUM(m.role = 'user' AND json_extract(m.payload_json, '$.createdBy') = 'user') AS user_prompts, json_extract(m.payload_json, '$.text') AS leak,»
+witness: pytest tests/test_t3_code.py -k "metadata_only"
+1 failed, 23 deselected in 0.12s
+
+## watched-repo flag ignored (always union)
+mutation: src/rebalance/ingest/index_ops.py :: replace «            if get_t3_code_config()["watch_repos_from_agent_sessions"]:» → «            if True:»
+witness: pytest tests/test_t3_code.py -k "union_opt_in"
+1 failed, 23 deselected in 0.13s
+
+## dry-run writes health on missing store
+mutation: src/rebalance/ingest/t3_code.py :: replace «        if not dry_run:\n            _record_health(database_path, device_id, "missing"» → «        if True:\n            _record_health(database_path, device_id, "missing"»
+witness: pytest tests/test_t3_code.py -k "missing_file or dry_run"
+1 failed, 1 passed, 22 deselected in 0.15s
+
+## doctor ignores the flag
+mutation: src/rebalance/doctor.py :: replace «    if not enabled:\n        retained» → «    if False:\n        retained»
+witness: pytest tests/test_t3_code.py -k "doctor"
+2 failed, 6 passed, 16 deselected in 0.17s
+
+## control: unmutated tree
+24 passed in 0.97s

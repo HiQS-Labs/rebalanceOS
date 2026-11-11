@@ -81,6 +81,30 @@ this tool (GH-316): same implementation, identical response shape.
 
 ---
 
+### `agent_session_activity`
+
+Shows local agent-session activity per repo, from the opt-in `t3_code` collector (GH-375), which
+reads T3 Code's local session store read-only. Separate from `hiqs_work_activity`, which stays
+GitHub authorship only and unchanged.
+
+**Prerequisite:** set `t3_code_activity_enabled: true` in the config (optional: `t3_code_db_path`,
+default `~/.t3/userdata/statev2.sqlite`; `t3_code_window_days`, default 30, 1-90), then
+`refresh_index(scope=["t3_code"])` or let the daily sync run. Empty until then.
+
+**Privacy:** the collector reads only thread/run/message metadata and, from thread payloads, the
+creator, branch and PR URLs. It never reads message or prompt text or any auth table. This tool
+exposes repo, branch and PR metadata to any client of the local MCP server.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `since_days` | `int` | `14` | Rolling window in UTC days, clamped to 1-90 |
+
+**Returns:** `list[{repo, providers: {<provider>: {thread_days, runs, runs_completed, user_prompts}}, thread_provider_days, runs, runs_completed, user_prompts, branches, pr_urls, last_at}]`.
+`thread_days` sums a provider's daily distinct threads; `thread_provider_days` sums over (day,
+provider), so one thread on two providers in one day counts 2.
+
+---
+
 ### `ask`
 
 General-purpose natural language query across all data sources. Gathers context from vault embeddings, GitHub activity, project registry, calendar events, and recent vault modifications. Optionally synthesizes a first-pass answer via a local Qwen3 LLM.
@@ -428,7 +452,7 @@ A human-readable reference for all running MCP servers on this machine. Store at
 rebalance   python -m rebalance.mcp_server   REBALANCE_DB=/absolute/path/to/rebalance.db
 ```
 
-Live tools: `ask`, `list_projects`, `hiqs_work_activity` (alias: `github_balance`), `query_notes`, `query_github_context`, `github_release_readiness`, `github_close_candidates`, `search_vault`, `create_calendar_event`, `review_timesheet`, `classify_event`, `snap_calendar_edges`, `sleuth_sync_reminders`, `onboarding_status`, `setup_github_token`, `run_preflight`, `confirm_projects`
+Live tools: `ask`, `list_projects`, `hiqs_work_activity` (alias: `github_balance`), `agent_session_activity`, `query_notes`, `query_github_context`, `github_release_readiness`, `github_close_candidates`, `search_vault`, `create_calendar_event`, `review_timesheet`, `classify_event`, `snap_calendar_edges`, `sleuth_sync_reminders`, `onboarding_status`, `setup_github_token`, `run_preflight`, `confirm_projects`
 Planned: `weekly_rebalance`, `project_attention`, `review_unattributed_attention`, `classify_attention_item`, `todays_agenda`, `morning_brief`
 
 ---
