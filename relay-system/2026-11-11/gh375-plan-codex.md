@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -135,5 +135,31 @@ Dispositions (artifact revised in `PROJECT/1-INBOX/GH-375-T3-CODE-SESSION-STORE.
 - Kept as approved: aggregation contract; extraction-only `error` health (a write/insert failure never touches health, as the rollback acceptance requires); guard inside the read snapshot; D4 registration and the two pinned-set updates.
 
 Handing off to Reviewer (codex). Re-check S1 and the Nits against the revised Phase 0 section, then approve or return.
+
+### Reviewer · Round 2
+
+**What this proposes**
+Add an opt-in T3 metadata collector through the existing refresh registry, with separate per-device activity and health tables. Independent event streams feed daily provider buckets; the MCP rollup now names the repo total `thread_provider_days` and defines its provider-qualified unit.
+
+**How the existing system works, per this document**
+The registry drives the default refresh and scheduled collection, while the existing migration runner and database gateway own transactions and connections. GitHub authorship has a frozen, separate output contract; shared Git, device and read-layer helpers supply the proposed integration seams.
+
+**What it's not**
+Excluded: message text, T3 writes, ranking, scheduler changes and changes to GitHub activity. Deferred: Forge board integration, fleet export and the live flag-on smoke; the latter is explicitly replaced for this task by a live read-only dry-run comparison. Input boundary: the entire artifact document only, before opening evidence or source this turn.
+
+swept file: yes
+
+VERDICT: PASS
+Basis: S1 is resolved, the health clarifications are explicit, and the full artifact remains a proportionate implementation plan satisfying the Definition of Done. Approval is for the plan; implementation evidence is still outstanding.
+
+- [Pass] **S1 resolved.** `PROJECT/1-INBOX/GH-375-T3-CODE-SESSION-STORE.md:295` defines repo `thread_provider_days` as the sum over (day, provider), explicitly counting one thread on two providers in one day as 2; `:328-331` uses that field in the output contract. Per-provider `thread_days` remains honest. The Producer's pinned T2 example matches that definition; no new storage is required.
+- [Pass] **D1–D8 and aggregation remain sound.** D1–D3 and D6–D7 (`:291-297`) match the supplied evidence pack's named metadata DDL/version writer, object-valued PR elements, provenance cross-counts and nullable message run IDs. The evidence's `055_OrchestrationV2.ts:73-82` declares `run_id TEXT PRIMARY KEY`, so the D7 lookup cannot multiply messages. Independent event aggregation plus distinct contributing-thread sets retains the intended counting units. D8 (`:298`) correctly qualifies branch/PR metadata as “as of scan”; it does not claim historical branch attribution. These are source/design assessments, not independent live measurements.
+- [Pass] **Guard, write ordering and clarified health.** Artifact `:313-325` puts version/column checks within one read snapshot, builds rows before destination deletion, and places deletion, insertion and success health in one `BEGIN IMMEDIATE`. Extraction-only error health preserves the insertion-failure rollback contract; the second-insert trigger test at `:362` must preserve both prior rows and health. The explicit “Every health write ... is skipped on dry-run” at `:313` closes the clarification. Device-scoped doctor states at `:334-339` distinguish disabled-with-retained-health, enabled-with-no-scan and successful-empty scans. No ordering hole is evident in this plan.
+- [Pass] **Registry and opt-in coverage.** `index_ops.py:135-159` derives raw/default/semantic scope membership; the exact-set expectations in `tests/test_collector_contracts.py:28` and `tests/test_collector_registry.py:33-58` are the intended minimal updates. `next_actions.py:707-713` skips absent candidate providers, and `semantic_index.py:684-691` skips absent semantic providers. Index-status source payloads/health remain separately assembled (`index_ops.py:354-362,610-639`); dedicated doctor health is the planned surface, not an automatic index-status extension. The separate default-false watch flag (`artifact :309,332-333`) leaves default membership unchanged, reaches the diagnostic caller, and reuses `get_watched_repos` canonicalization/ignored-repo filtering (`index_ops.py:1034-1085`).
+- [Pass] **Shared primitives and ratchets.** Step 9a (`artifact :344-347`) puts the date primitive in the existing shared owner, alongside `time_ops.now_utc` and `parse_utc_iso`, and shares it across collection and reads. This is a suitable small extension, rather than a local window helper. `check_read_layer.py:57-72` limits R1 to GitHub activity tables and defines R3's window patterns; `check_banned_imports.py:24-39` names the existing SQLite gateways and prohibited ingest import families. The proposed gateway, shared time and Git calls fit those contracts without exemptions. Migration transaction ownership is already documented in `ingest/db/migrations/README.md` and implemented at `db/migrate.py:83-98`. No second writer, registry, daemon, script or plist is proposed.
+- [Pass] **Acceptance and full-document sweep.** The acceptance map (`artifact :353-369`) retains concrete controls for counts, drift, empty/missing, idempotence, rollback, migrations, frozen GitHub output, SQL privacy, actual MCP invocation and doctor states. The live flag-on smoke is explicitly an operator-sanctioned deferral (`:369`), with a dry-run comparison substituted rather than claimed equivalent to persisted collection. The original issue text remains historical where Phase 0 overrides it. The two prose corrections are present: “two CREATE TABLE IF NOT EXISTS statements plus one index” in Risk, and the Blast-radius row correctly attributes column probes rather than a version guard to #371. No additional material pre-existing defect found in the swept artifact; this is not a whole-codebase audit.
+- [Unverified — needs clone run] No tests, executable fixtures, live-store reads or ratchets were run this turn. Implementation, mutation witnesses, privacy tracing and the live dry-run comparison still require the disposable clone and retained TESTS-RESULTS campaign. Source/document reads are not behavioural verification.
+
+Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with implementation in the authorized task clone.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
