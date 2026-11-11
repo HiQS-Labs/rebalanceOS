@@ -148,7 +148,7 @@ Recon pinned to `f081931` (rebalanceOS origin/development, clean export). Integr
 | SQLite-gateway ratchet | `ROUTER.md:62`, `connection.py:90-104` | Uses the existing read-only gateway; no exemption |
 | Doctor | `doctor.py:1475-1502` | +1 DB-only check reading `agent_session_source_health` |
 | T3 internal schema | `t3code-fork/.../055_OrchestrationV2.ts:55,73,194`, `ProjectionStore.ts:736` | Read-only consumer. Upstream reshape → clean `skipped`, never a partial write |
-| PR #371 (CLIO T3 prompts) | `utils/clio-capture/clio-store.py` | Not modified. A second reader of the same schema, guarded by the same version check |
+| PR #371 (CLIO T3 prompts) | `utils/clio-capture/clio-store.py` | Not modified. A second reader of the same schema; it uses `?mode=ro` + `LIMIT 0` column probes, and this issue adds the projection schema_version guard on top |
 | XYZ-forge board_sync | `forge:utils/py/board_sync.py:133-163` | Not changed by this issue. A follow-on may union the new table |
 
 Write-set:
@@ -208,7 +208,7 @@ Route: builder Claude or Codex in a fresh task clone; reviewer Codex via relay p
 ## Risk and rollback
 
 - **Upstream T3 schema change:** the version guard plus column probes turn it into a clean `skipped` and a doctor drift line, never a partial write.
-- **A broken migration blocks every collector:** keep 0010 to one `CREATE TABLE IF NOT EXISTS` plus an index.
+- **A broken migration blocks every collector:** keep 0010 to two `CREATE TABLE IF NOT EXISTS` statements plus one index.
 - **Privacy:** metadata only, enforced by an acceptance check on the SQL, and opt-in by flag.
 - **Watched-repo generator effect:** behind its own default-off flag.
 - **Rollback:**
@@ -292,7 +292,7 @@ touched only `utils/clio-capture/`, CI and docs, so no seam below moved). Clone
 | D2 | `pr_urls_json` from `$.pullRequests` | `$.pullRequests` is an array of **objects** (keys incl. `url`, `number`, `repository`, `snapshot`); 140 threads carry the array, 71 elements | SQL reads only `$.pullRequests`; Python keeps each element's `url` string and drops everything else |
 | D3 | allowed paths include `$.worktreePath`, `$.creationSource` | not needed for any output column | not read at all — read set is `$.createdBy` (threads, messages), `$.branch`, `$.pullRequests` |
 | D4 | `included_in_all=True` | `tests/test_collector_contracts.py:28` and `tests/test_collector_registry.py:33-58` pin the exact raw/`all`/default sets | those two existing expectations gain `t3_code` (an intended contract change, not a new suite). `daily_sync.sh` runs the default recipe, so this is what makes collection automatic when the flag is on |
-| D5 | MCP returns per-repo `threads` | rows hold per-(day, provider) distinct thread counts; no thread IDs are stored, so a cross-day distinct count is not derivable | the per-repo rollup names it `thread_days` (sum of daily distinct threads); per-row `threads` stays exact. No thread-ID column is added |
+| D5 | MCP returns per-repo `threads` | rows hold per-(day, provider) distinct thread counts; no thread IDs are stored, so a cross-day distinct count is not derivable | per-provider rollup field `thread_days` = sum of that provider's daily distinct threads; repo-level total `thread_provider_days` = sum over (day, provider) buckets, so one thread on two providers in one day counts 2 (definition stated in the MCP docstring; pinned by the provider-switch fixture). Per-row `threads` stays exact. No thread-ID column is added (plan QA r1 S1) |
 | D6 | run statuses | live: completed 643, failed 11, interrupted 3, running 1 | `runs` counts all, `runs_completed` counts `completed` only (as specified) |
 | D7 | message provenance | 983 user-role messages: 363 `createdBy=user`, 620 `createdBy=agent`; 751 messages have null `run_id`; 0 orphan `run_id`; 0 threads without a project | `user_prompts` = role user AND createdBy user; provider = `COALESCE(run.provider, thread.default_provider)` via a primary-key lookup join (one row per message, cannot multiply) |
 | D8 | thread `branch`/`pullRequests` | these are the thread's *current* payload, not history | documented: branch/PR sets are "as of scan", attached to every bucket the thread contributed to |
@@ -310,7 +310,7 @@ touched only `utils/clio-capture/`, CI and docs, so no seam below moved). Clone
 4. **Reader/writer `ingest/t3_code.py`** (the single writer of both new tables):
    - `sync_t3_code_activity(database_path, *, dry_run=False, config=None) -> dict`.
    - disabled → `{"scope":"t3_code","skipped":True,"reason":"disabled (opt-in)"}`; T3 file not opened, no write.
-   - file absent → health `missing`, skipped.
+   - file absent → health `missing`, skipped. **Every health write (missing / drift / error / ok) is skipped on dry-run.**
    - open via `db_connection_readonly`, `PRAGMA query_only=ON`, one `BEGIN` read snapshot; guard =
      metadata version == 2 + `SELECT <cols> FROM <table> LIMIT 0` probes; mismatch → health `drift`
      (observed version + message), zero activity writes, skipped `unsupported T3 schema: …`.
@@ -326,18 +326,25 @@ touched only `utils/clio-capture/`, CI and docs, so no seam below moved). Clone
 5. **Collector**: `_refresh_t3_code` + `Collector("t3_code", …, kind="raw_source", included_in_all=True)`
    next to `clio`; update the two pinned set expectations (D4).
 6. **Read side**: `fetch_agent_activity(conn, since_days, source=None)` in `ingest/db/queries.py`
-   (per-repo rollup: `providers{…}`, `thread_days`, `runs`, `runs_completed`, `user_prompts`,
+   (per-repo rollup: `providers{p: {thread_days, runs, runs_completed, user_prompts}}`, `thread_provider_days`, `runs`, `runs_completed`, `user_prompts`,
    `branches`, `pr_urls`, `last_at`) + MCP `agent_session_activity(since_days=14)` (clamped 1–90) in
    `mcp/tools/projects.py`. Missing table → `[]`.
 7. **Opt-in watched-repo union**: `_activity_repos` appends `fetch_agent_activity` repos only when
    `watch_repos_from_agent_sessions` is true (also reaches `diagnose.py:149`, the only other caller).
 8. **Doctor** `_check_t3_code(db_path)`: DB-only read of `agent_session_source_health` + config flag;
-   OK not-enabled / WARN missing / WARN drift (observed version) / WARN error / WARN stale (>2 days) /
-   OK last success. Never opens the T3 file (test patches the T3 open to raise).
+   reads **this device's** row (`get_device_id()`). Flag off → OK "not enabled (opt-in)", plus
+   "; retained health: <status> <last_success_at>" when a row remains from an earlier enablement. Flag on and
+   no row → WARN "enabled, no scan recorded yet". Otherwise WARN missing / WARN drift (observed version) /
+   WARN error / WARN stale (`last_success_at` > 2 days) / OK last success. Never opens the T3 file (test
+   patches the T3 open to raise).
 9. **Docs + version**: ARCHITECTURE.md (Signal Sources row, fanout row, corrected one-writer example:
    `github_activity` is written by `github_scan.py` and the `__watch__` rollups in `github_watch.py`),
    MCP.md tool row with the metadata-only exposure note, CHANGELOG `0.107.0` (MINOR) + `pyproject.toml`
    + `manifest.json` version.
+9a. **Ratchet compliance**: `ingest/t3_code.py` imports neither `datetime` nor `subprocess` (GH-126
+    banned-import ratchet); window dates come from one new shared primitive `time_ops.utc_date_days_ago(days)`
+    in `src/rebalance/lib/time_ops.py`, used by both `t3_code.py` and `fetch_agent_activity`; git runs
+    through `git_ops.run_git`. No baseline or pragma change.
 10. **Gates**: `pytest tests/ HiQS/tests`, ruff check/format, mypy `src/`, the five `utils/pdda/check_*`
     ratchets, `rebalance doctor`, `utils/pdda/pdda.sh run`. Mutation witnesses (guard removed → named
     test red) and a live dry-run against the real T3 file are recorded under

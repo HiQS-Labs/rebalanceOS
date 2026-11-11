@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -123,5 +123,17 @@ Basis: sound integration approach, but D5 leaves the cross-provider rollup misle
 - [Unverified — needs clone run] No tests, fixtures, live-store reads, ratchets or Git commands were executed in this reviewer worktree. The full suite, mutation witnesses, tool invocation and live dry-run remain implementation evidence to retain in TESTS-RESULTS. Seeded live counts were reviewed as supplied, not independently remeasured. No probe-derived empirical finding is asserted.
 
 Handing off to Producer (claude-a) — address S1 and disposition the clarifications, then return for review.
+
+### Producer · Round 2 (claude-a)
+
+Dispositions (artifact revised in `PROJECT/1-INBOX/GH-375-T3-CODE-SESSION-STORE.md`, Phase 0 section):
+
+- **S1 — Implemented.** D5 row and step 6 now define two names: per-provider `thread_days` (sum of that provider's daily distinct threads) and the repo-level `thread_provider_days` (sum over (day, provider) buckets; one thread on two providers in one day counts 2). The MCP docstring will state the definition. The provider-switch fixture pins it: thread T2 runs on codex and claudeAgent on 2026-11-11 → those two buckets each have `threads=1`, and the repo's `thread_provider_days` includes 2 for T2 on that day. No storage change.
+- **Nit (dry-run / health states) — Implemented.** Step 4 now says every health write (missing / drift / error / ok) is skipped on dry-run. Step 8 now selects this device's row and distinguishes the states: flag off → OK "not enabled (opt-in)", plus the retained status when an earlier row remains; flag on with no row → WARN "enabled, no scan recorded yet"; then missing / drift / error / stale / ok. The planned doctor state test covers these; no new suite.
+- **Nit (pre-existing prose) — Implemented.** The Risk line now reads two `CREATE TABLE IF NOT EXISTS` plus one index. The Blast-radius row no longer claims #371 has a version check: it says #371 uses `?mode=ro` + `LIMIT 0` probes, and this issue adds the version guard.
+- **Ratchet note from the [Pass] on acceptance/ratchets — Implemented as new step 9a.** `ingest/t3_code.py` imports neither `datetime` nor `subprocess` (GH-126). One shared primitive, `time_ops.utc_date_days_ago(days)`, goes in `src/rebalance/lib/time_ops.py` and is used by both the collector and `fetch_agent_activity`. Its name avoids the R3 `day_(bounds|window)` pattern, and it is not the verbatim `strftime` cutoff. Git calls use `run_git`. No baseline or pragma change.
+- Kept as approved: aggregation contract; extraction-only `error` health (a write/insert failure never touches health, as the rollback acceptance requires); guard inside the read snapshot; D4 registration and the two pinned-set updates.
+
+Handing off to Reviewer (codex). Re-check S1 and the Nits against the revised Phase 0 section, then approve or return.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
