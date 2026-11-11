@@ -21,7 +21,7 @@ import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -1501,6 +1501,44 @@ def _check_apple_reminders(db_path: Path | None = None) -> Check:
     return Check(name, OK, f"synced · macOS {macos} · {health.get('last_sync_at', '')}")
 
 
+def _check_t3_code(db_path: Path | None = None) -> Check:
+    """T3 Code session activity — opt-in local source (GH-375). DB-only: reads this
+    device's row in agent_session_source_health and never opens the T3 store."""
+    name = "t3 code activity"
+    try:
+        from rebalance.ingest.config import get_t3_code_config
+        from rebalance.ingest.t3_code import t3_code_health
+
+        enabled = get_t3_code_config()["t3_code_activity_enabled"]
+        health = t3_code_health(db_path) if db_path is not None else None
+    except Exception as exc:  # noqa: BLE001 — doctor must never crash
+        return Check(name, WARN, f"health probe failed: {exc}")
+
+    if not enabled:
+        retained = f"; retained health: {health['status']} {health.get('last_success_at') or ''}" if health else ""
+        return Check(name, OK, f"not enabled (opt-in){retained}".rstrip())
+    remediation = "Run refresh_index(scope=['t3_code']) and check its result."
+    if health is None:
+        return Check(name, WARN, "enabled, no scan recorded yet", remediation)
+    status, message = health["status"], health.get("message") or ""
+    if status == "missing":
+        return Check(name, WARN, f"T3 store missing: {message}", "Check t3_code_db_path in the config.")
+    if status == "drift":
+        return Check(
+            name,
+            WARN,
+            f"T3 schema drift (observed thread-projections schema_version "
+            f"{health.get('observed_schema_version')}): {message}",
+            "A T3 update reshaped its store; review the reader in ingest/t3_code.py. No rows were written.",
+        )
+    if status != "ok":
+        return Check(name, WARN, f"last scan {status}: {message}", remediation)
+    last_success = parse_utc_iso(health.get("last_success_at"))
+    if last_success is None or now_utc() - last_success > timedelta(days=2):
+        return Check(name, WARN, f"stale: last success {health.get('last_success_at')}", remediation)
+    return Check(name, OK, f"last success {health['last_success_at']} · {message}")
+
+
 def _google_oauth_source(service: str, in_keyring: bool) -> str | None:
     """Where a Google OAuth token resolves from: keyring → secret-store JSON →
     legacy pickle. Returns None when nothing is present (unconfigured)."""
@@ -2651,6 +2689,7 @@ def run_doctor(database_path: Path | None = None) -> DoctorReport:
     report.checks.append(_check_sleuth(db_path))
     report.checks.append(_check_slack_users(db_path))
     report.checks.append(_check_apple_reminders(db_path))
+    report.checks.append(_check_t3_code(db_path))
     report.checks.append(_check_gmail(db_path))
     report.checks.append(_check_calendar())
     report.checks.append(_check_figma())

@@ -1383,6 +1383,36 @@ def get_claude_cloud_config() -> dict[str, Any]:
     }
 
 
+T3_CODE_DEFAULT_DB_PATH = "~/.t3/userdata/statev2.sqlite"
+
+
+def get_t3_code_config() -> dict[str, Any]:
+    """Return the T3 Code session-activity config block (GH-375).
+
+    Keys:
+      - t3_code_activity_enabled: opt-in flag for the ``t3_code`` collector, which
+        reads T3 Code's local session store read-only into agent_session_activity.
+        Default False — the collector skips without opening the store.
+      - t3_code_db_path: the T3 store, ``~`` expanded here because the SQLite
+        gateway does not expand it. Default ``~/.t3/userdata/statev2.sqlite``.
+      - t3_code_window_days: recompute window in days, clamped to 1-90. Default 30.
+      - watch_repos_from_agent_sessions: also add repos seen in agent_session_activity
+        to the GitHub watched-repo set. Default False (it widens GitHub sync).
+    """
+    config = _read_config()
+    try:
+        window = int(config.get("t3_code_window_days", 30))
+    except (TypeError, ValueError):
+        window = 30
+    raw_path = config.get("t3_code_db_path") or T3_CODE_DEFAULT_DB_PATH
+    return {
+        "t3_code_activity_enabled": bool(config.get("t3_code_activity_enabled", False)),
+        "t3_code_db_path": os.path.expanduser(str(raw_path)),
+        "t3_code_window_days": max(1, min(90, window)),
+        "watch_repos_from_agent_sessions": bool(config.get("watch_repos_from_agent_sessions", False)),
+    }
+
+
 def set_pulse_config(**values: Any) -> None:
     """Update one or more pulse config keys. Pass None to leave a key unchanged.
 

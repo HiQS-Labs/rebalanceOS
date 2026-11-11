@@ -77,8 +77,17 @@ def _thread(conn, tid, project, provider, created_by, branch=None, prs=None):
     payload = {"createdBy": created_by, "creationSource": "web", "branch": branch, "pullRequests": prs}
     conn.execute(
         "INSERT INTO orchestration_v2_projection_threads VALUES (?,?,?,?,?,?,NULL,?,?,NULL,NULL,?)",
-        (tid, project, "t", provider, "full", "default", "2026-09-01T00:00:00.000Z", "2026-11-11T00:00:00.000Z",
-         json.dumps(payload)),
+        (
+            tid,
+            project,
+            "t",
+            provider,
+            "full",
+            "default",
+            "2026-09-01T00:00:00.000Z",
+            "2026-11-11T00:00:00.000Z",
+            json.dumps(payload),
+        ),
     )
 
 
@@ -150,10 +159,46 @@ def _row(day, provider, threads, runs, completed, prompts, agent, branches, prs,
 
 
 EXPECTED = [
-    _row("2026-11-01", "codex", 1, 0, 0, 1, 0, ["feat/x"], [PR_URL], "2026-11-01T10:00:00.000Z", "2026-11-01T10:00:00.000Z"),
-    _row("2026-11-10", "codex", 1, 1, 1, 1, 0, ["feat/x"], [PR_URL], "2026-11-10T23:59:20.000Z", "2026-11-10T23:59:30.000Z"),
+    _row(
+        "2026-11-01",
+        "codex",
+        1,
+        0,
+        0,
+        1,
+        0,
+        ["feat/x"],
+        [PR_URL],
+        "2026-11-01T10:00:00.000Z",
+        "2026-11-01T10:00:00.000Z",
+    ),
+    _row(
+        "2026-11-10",
+        "codex",
+        1,
+        1,
+        1,
+        1,
+        0,
+        ["feat/x"],
+        [PR_URL],
+        "2026-11-10T23:59:20.000Z",
+        "2026-11-10T23:59:30.000Z",
+    ),
     _row("2026-11-11", "claudeAgent", 1, 1, 0, 0, 1, [], [], "2026-11-11T10:00:00.000Z", "2026-11-11T10:01:00.000Z"),
-    _row("2026-11-11", "codex", 2, 1, 1, 0, 1, ["feat/x"], [PR_URL], "2026-11-11T00:04:00.000Z", "2026-11-11T09:00:00.000Z"),
+    _row(
+        "2026-11-11",
+        "codex",
+        2,
+        1,
+        1,
+        0,
+        1,
+        ["feat/x"],
+        [PR_URL],
+        "2026-11-11T00:04:00.000Z",
+        "2026-11-11T09:00:00.000Z",
+    ),
 ]
 
 
@@ -465,7 +510,9 @@ def test_executed_sql_is_metadata_only(tmp_path: Path, rdb: Path) -> None:
     assert len(selects) >= 4  # probes + version + three streams actually ran
     assert {s: metadata_only_violations(s) for s in executed if metadata_only_violations(s)} == {}
     # Red control: a text read is caught.
-    assert metadata_only_violations("SELECT json_extract(payload_json,'$.text') FROM orchestration_v2_projection_messages")
+    assert metadata_only_violations(
+        "SELECT json_extract(payload_json,'$.text') FROM orchestration_v2_projection_messages"
+    )
 
 
 # --------------------------------------------------------------------------- doctor, watched set
