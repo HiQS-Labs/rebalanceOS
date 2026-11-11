@@ -52,10 +52,26 @@ ROUND: 1 / 3
    was merely waiting looked stalled. A turn that ends without this line is not finished.
 
 ## Setup
-- Artifact under review: _<fill in the repo-relative path(s) the turn reviews>_
+- Artifact under review: the committed implementation on this branch, diff `70ccfc0..HEAD` (`git diff 70ccfc0 -- src tests`), i.e. `src/rebalance/ingest/t3_code.py` (new), `src/rebalance/ingest/db/migrations/0010_agent_session_activity.sql` (new), `tests/test_t3_code.py` (new), and edits to `src/rebalance/ingest/index_ops.py`, `src/rebalance/ingest/db/queries.py` (`fetch_agent_activity`), `src/rebalance/ingest/config.py` (`get_t3_code_config`), `src/rebalance/lib/time_ops.py` (`utc_date_days_ago`), `src/rebalance/mcp/tools/projects.py`, `src/rebalance/doctor.py` (`_check_t3_code`), `tests/test_collector_contracts.py`, `tests/test_collector_registry.py`, docs (`ARCHITECTURE.md`, `MCP.md`, `AGENTS.md`, `CHANGELOG.md`, `manifest.json`, version 0.107.0).
+- Approved plan and acceptance map: `PROJECT/2-WORKING/GH-375-T3-CODE-SESSION-STORE.md` (section "Phase 0 — Recon deltas and implementation plan"); plan QA thread `relay-system/2026-11-11/gh375-plan-codex.md` (Approved r2).
+- Verification evidence: `TESTS-RESULTS/2026-11-11+GH-375/` — `SUMMARY.md`, `red-first.txt`, `mutation-witnesses.txt` (+ `scripts/`), `root-tests.txt`, `hiqs-tests.txt`, `doctor.txt`, `smoke.txt` (live dry-run vs direct count), `provenance.jsonl`. Seeded read-only T3 schema evidence: `.relay-artifacts/gh375-evidence.txt`.
+- Recorded operator decisions: new table + opt-in reads; `github_activity` and frozen `hiqs_work_activity` byte-identical; no XYZ-forge board_sync wiring; the live flag-on smoke on the operator's Mac is NOT part of this task (dry run instead); no device config/job changes; never select message text or auth/secret/token/pairing/webhook tables.
+- Operational envelope: local single-operator MCP server, a few Macs, local SQLite. rebalanceOS requires new red-first tests (SOP §3.6) — the new test file is expected, not a finding. Grade against commensurate complexity: no enterprise/multi-tenant threat model.
 - Reviewer: codex   ·   Producer: claude-a
 - Started: 2026-11-11
-- Definition of Done: _<fill in the acceptance criteria the Reviewer grades against>_
+- Definition of Done: every issue #375 Acceptance item is satisfied by code + evidence, or is the recorded operator deferral (flag-on smoke); the code matches the approved plan (no second writer, no parallel subsystem); checks substantiate the claims; ratings unchanged at 55/35/50/45 with no new evidence to move them.
+
+### Reviewer questions (final QA)
+1. For each Acceptance item in the plan's acceptance map, is it met? Cite the test and the code line that makes it true.
+2. Does `t3_code.py` match the aggregation contract exactly (three grouped streams, merge per (repo, day, provider), PK-lookup provider fallback, `user_prompts`, `agent_threads`, midnight rule, window filter)? Any count-multiplication or off-by-one in the window (`utc_date_days_ago`)?
+3. Write path: is delete+insert+ok-health one transaction with rollback; does a write failure leave health untouched; is `error` health only for extraction failures; is every health write skipped on dry run?
+4. Privacy: does any executed SQL read text, auth/secret tables, or payload paths beyond `$.createdBy`/`$.branch`/`$.pullRequests`? Is only each PR object's `url` retained?
+5. Registry/read side: is `t3_code` registered correctly; is the `_activity_repos` union strictly behind `watch_repos_from_agent_sessions`; does `fetch_agent_activity` honour the counting units (`thread_days` / `thread_provider_days`) documented in MCP.md and the docstring?
+6. Doctor: are the states (disabled ± retained, enabled-no-row, missing, drift, error, stale, ok) correct, device-scoped, and DB-only?
+7. Evidence: do the mutation witnesses, suites, doctor and smoke receipts substantiate the claims, and are the 14 root-suite failures credibly pre-existing (identical on base)? Is the dry-run smoke reported truthfully as a deferral substitute?
+8. Anything over-engineered, duplicated, or wrong in docs/changelog/version? Any pre-existing defect in the touched functions?
+
+Every `[Blocker]`/`[Should]` asking for a behaviour change carries `Observed input:`, `Affected scope:`, `Falsifier:`. Do not edit code. Set `STATUS: Approved` only if it passes.
 
 ## Ground rules
 1. This file is the single source of truth. The agents never share memory — read the whole file.
