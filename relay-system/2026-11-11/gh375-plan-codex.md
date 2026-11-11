@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -84,5 +84,44 @@ Every `[Blocker]`/`[Should]` asking for a behaviour change carries `Observed inp
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1
+
+**What this proposes**
+Add a default-disabled T3 metadata collector, two destination tables, a separate activity MCP read tool and a DB-backed doctor check. Collection participates in the existing default refresh recipe; a second default-off flag allows its repos into the watched-repo set. Independent event aggregation and a transactional replacement preserve counts and prior data on failure.
+
+**How the existing system works, per this document**
+The collector registry drives refresh and scheduled collection, and the migration runner owns additive schema transactions. Existing work activity records GitHub authorship through a frozen output contract; CLIO captures prompts separately. Shared database, Git and device helpers already supply the integration points.
+
+**What it's not**
+Excluded: T3 writes, message text, GitHub activity changes, ranking, new scheduling and thread-ID storage. Deferred: Forge board integration, fleet export and the operator's live flag-on smoke; the proposed substitute is a read-only dry-run. Input boundary for this paraphrase: the entire artifact document only, before evidence/source review. This paraphrase was composed before those reads; the first attempt to persist it failed (`python` unavailable, exit 127), so it is persisted with the completed block.
+
+swept file: yes
+
+VERDICT: FAIL
+Basis: sound integration approach, but D5 leaves the cross-provider rollup misleading for the explicitly planned provider-switch fixture. Resolve S1 before implementation. This is plan review, not execution approval or proof of passing tests.
+
+- [Should] **S1 — make the rollup's counting unit explicit.** At `PROJECT/1-INBOX/GH-375-T3-CODE-SESSION-STORE.md:295` and `:328-330`, summing distinct threads from `(day, provider)` buckets is called `thread_days`. A single thread active through two providers on one UTC day contributes 2, although it is one thread-day. D5 correctly rejects a cross-day distinct-thread claim but does not resolve this second dimension. Cheapest fix: call the repo total `thread_provider_days` (per-provider `thread_days` can remain), or explicitly expose the provider-qualified counting definition in the MCP field documentation/output; pin the provider-switch fixture's expected total. No thread IDs or new storage needed.
+  Observed input: the plan's provider-switch-within-one-thread acceptance fixture (`:351`), specialized to thread T on day D with one codex run and one claudeAgent run; the specified buckets each have `threads=1`, and their proposed repo `thread_days` sum is 2.
+  Affected scope: repo-level sums across providers of the stored daily distinct-thread counters; run and prompt counts are unaffected.
+  Falsifier: that same T/D/two-provider fixture must report 2 provider-qualified units, with the field's definition explicitly saying so; a single-provider T/D fixture reports 1. A field promising distinct thread-days would instead need to report 1 for both, which the current storage cannot generally derive.
+
+- [Pass] **D1–D3, D6–D8 are grounded.** Evidence pack sections `Foundation.ts:150-172`, `EventSink.ts:390-410`, and `ProjectionStore.ts:736` name the actual metadata table and version writer. Its live-probe spans “elements: object 71”, “user/agent 620 | user/user 363”, “messages with NULL run_id: 751”, and “completed 643 | failed 11 | interrupted 3 | running 1” support the corresponding corrections. Reading only `createdBy`, branch and pullRequests narrows exposure. D8 is a sound inference from current thread payload plus event timestamps, not evidence of historical branch/PR attribution; the explicit “as of scan” qualification is appropriate (`:298`).
+
+- [Pass] **Aggregation and rollback design.** The evidence pack's runs DDL declares `run_id TEXT PRIMARY KEY`; the D7 message lookup therefore cannot multiply message rows. Independent run/message aggregates and distinct thread sets avoid the row-to-row multiplication described in Acceptance. `:322-325` builds before deleting and encloses delete/insert/ok-health in one `BEGIN IMMEDIATE`; extraction-only error health is separate. Keep that exception boundary extraction-only: an insert failure must not subsequently overwrite health, as `:355` explicitly requires. The version/column guard inside the same `BEGIN` read snapshot (`:314-316`) is appropriately placed; missing metadata/tables/columns must follow the same drift path. These are design conclusions, not executed results.
+
+- [Pass] **D4 and registry consumers.** `index_ops.py:135-159` derives all/default/semantic membership; `tests/test_collector_contracts.py:28` and `tests/test_collector_registry.py:33-58` pin all/default membership. Updating those expectations is the minimal intended consequence. `next_actions.py:707` skips collectors without candidates; `semantic_index.py:684-691` skips those without semantic providers, so this registration alone adds neither ranking nor semantic writes. `index_status` is different: source payloads are explicitly assembled (`index_ops.py:610-639`) and health iterates `_SIGNAL_HEALTH_RULES` (`:354-362`), not all registered collectors. The proposed registration therefore does not automatically add T3 to index-status signal health; the dedicated doctor check is the planned health surface.
+
+- [Pass] **Opt-in union and shared ownership.** `index_ops.py:943-967` is the existing activity membership seam; `get_watched_repos` canonicalizes and deduplicates before applying ignored repos (`:1034-1085`). Appending through the read-layer helper behind the separate default-false flag preserves default membership and reaches the diagnostic caller (`diagnose.py:149`). `db/migrate.py:83-98` already owns migration transactions; `db/connection.py:90-104`, `git_ops.py:310,387`, and `sync_snapshot.py:74` supply the planned connection, remote parsing/execution and device identity. No second registry, writer or scheduling subsystem is proposed.
+
+- [Pass] **Acceptance coverage and ratchets are proportionate.** The map at `:350-362` addresses each issue acceptance item and records the operator-sanctioned flag-on-smoke deferral truthfully. The rollback trigger/mutation and metadata-only SQL trace target material contracts. `check_read_layer.py` restricts R1 to four GitHub tables and exempts the DB read layer; R3 still requires shared time primitives rather than a new local day-window helper. `check_banned_imports.py:10-12,41` requires the existing SQLite gateway and avoids new direct datetime/subprocess imports in ingest; use the shared time module during implementation. The write-set introduces no scripts or plists. No baseline relaxation or exemption is needed by this design.
+
+- [Nit] **Clarify health and dry-run edge states in the existing checks.** `:313-325` promises no dry-run health writes despite listing missing/drift/error writes earlier; make the dry-run guard cover every outcome. `:334-336` should spell out enabled-but-never-scanned versus disabled-with-retained-health, and select this device's health row. These clarify the stated per-device, no-write and successful-empty-versus-no-scan contracts; extend the planned state test rather than adding a suite.
+
+- [Nit] **Pre-existing prose drift in the swept artifact.** The old rollback/risk text says “one CREATE TABLE IF NOT EXISTS plus an index” despite two tables, and the older Blast-radius paragraph says PR #371 uses “the same version check”; the reference `clio-store.py:1079-1096` has column probes, not that version guard. Treat Phase 0 as authoritative and correct these sentences when revising the artifact. No additional pre-existing material defect found in the artifact beyond the findings above; this is not a whole-codebase audit.
+
+- [Unverified — needs clone run] No tests, fixtures, live-store reads, ratchets or Git commands were executed in this reviewer worktree. The full suite, mutation witnesses, tool invocation and live dry-run remain implementation evidence to retain in TESTS-RESULTS. Seeded live counts were reviewed as supplied, not independently remeasured. No probe-derived empirical finding is asserted.
+
+Handing off to Producer (claude-a) — address S1 and disposition the clarifications, then return for review.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
