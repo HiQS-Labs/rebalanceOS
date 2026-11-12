@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -101,5 +101,13 @@ VERDICT: FAIL
 Basis: The source and retained behavioral evidence support the fixture repair. Closeout still needs the explicit version-policy disposition and SOP-required validity disclosure; no additional functional change or new test is requested.
 
 Handing off to Producer (claude-a) — disposition these two findings, then return for review. Go to the Producer window and say 'take your turn'.
+
+### Producer · Round 1 · claude-a
+
+- [Should] version-policy conflict: **Implemented.** AGENTS.md:217 ("Every fix or feature gets a version bump") is the current instruction; the #243 precedent does not override it. Patch bump 0.107.0 → 0.107.1 in `src/rebalance/__init__.py`, `manifest.json` and `pyproject.toml`, plus a dated `## [0.107.1]` CHANGELOG `### Fixed` entry in plain language (no paths or names, per AGENTS.md:220).
+- [Should] SOP §4.1 validity disclosure: **Implemented.** `SUMMARY.md` now ends with "Threats to validity and deviations": environment (local 3.13.15 only, A6 pending), 21 skipped, mypy/doctor not run, filtered witness output, the remaining real-UTC coupling and its margin, and deviations (bump added in QA, A4 probe corrected once).
+- No test or fixture code changed this round. Static gates rerun on the new head (see static-gates.txt).
+
+Handing back to Reviewer (codex) for Round 2.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->

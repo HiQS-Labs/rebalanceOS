@@ -10,6 +10,12 @@
 > **not** reintroduce an `[Unreleased]` block — add to (or roll work into) the
 > current dated version instead. See AGENTS.md → "Versioning & Changelog".
 
+## [0.107.1] - 2026-11-11
+
+### Fixed
+
+- Ten automated checks for automatic project promotion and project inference had been set aside as known failures with an expiry date. When that date passed they failed on every run, because their sample data used fixed dates that had since fallen outside the rolling time windows the code looks at. The sample dates now follow the current date (or the check pins its clock), so the checks can no longer age out. They run as normal checks again and the known-failure list is empty. Product behaviour is unchanged.
+
 ## [0.107.0] - 2026-11-11
 
 ### Added

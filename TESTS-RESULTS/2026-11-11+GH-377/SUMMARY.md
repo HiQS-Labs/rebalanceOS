@@ -17,3 +17,11 @@ Disposable clone identity bracket: [identity.txt](identity.txt) (same HEAD and o
 Plan QA: [qa/gh377-plan-codex.md](qa/gh377-plan-codex.md) (Codex, Approved R2, attested).
 
 `rebalance doctor` was not run: the change touches only `tests/` and cannot affect the live runtime, DB or scheduler that doctor inspects.
+
+## Threats to validity and deviations
+
+- **Environment:** A1–A5 and smoke ran locally on macOS, Python 3.13.15, in one disposable clone with `PYTHONPATH=<clone>/src` over the primary checkout's virtualenv. Python 3.12 and Ubuntu are covered only by the hosted `root-noembed` lanes (A6, pending at the time of writing).
+- **Not measured:** 21 tests skipped in both base and fix runs (Metal-only and optional-dependency paths). This campaign makes no claim about them. `mypy src/` was not run (the only `src/` change is the version string). `rebalance doctor` was not run (above).
+- **Filtered output:** `witnesses.txt` keeps only the summary/PASSED/FAILED lines from each step plus one `--tb=line` assertion excerpt, not full pytest output. The script that produced it is retained, so a rerun reproduces the full output.
+- **Clock coupling that remains:** auto-promote fixtures are relative to the real UTC date, not frozen (SQLite `date('now')` cannot be frozen from Python). They use −1 to −3 days inside a 14-day window, so a run crossing UTC midnight stays in the window. A2 shows the tests still detect a fixture outside the window.
+- **Deviations from plan:** final QA R1 added the patch bump (0.107.1 + changelog) per AGENTS.md § Versioning. The plan had followed the #243 test-only precedent. The A4 probe was corrected once during the campaign: its first run imported the root `conftest.py`. The rerun asserts the import path. Both runs' A1–A3 results were identical.
