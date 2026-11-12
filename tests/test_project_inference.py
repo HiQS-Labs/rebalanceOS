@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 from rebalance.ingest import config as config_module
 from rebalance.ingest.calendar_config import CalendarConfig
@@ -138,12 +140,16 @@ class ProjectInferenceTests(unittest.TestCase):
             )
             conn.commit()
 
-        projects, summary = infer_project_registry(
-            db_path,
-            calendar_config=self._calendar_config(),
-            calendar_days_back=90,
-            calendar_days_forward=14,
-        )
+        # GH-377: the calendar window is now_utc() - 90 days; freeze it at the
+        # fixture's own instant so the April events never age out.
+        fixture_now = datetime(2026, 4, 28, 16, 0, tzinfo=timezone.utc)
+        with mock.patch("rebalance.ingest.project_inference.now_utc", return_value=fixture_now):
+            projects, summary = infer_project_registry(
+                db_path,
+                calendar_config=self._calendar_config(),
+                calendar_days_back=90,
+                calendar_days_forward=14,
+            )
 
         self.assertEqual(summary.github_backed_count, 1)
         names = [project["name"] for project in projects]

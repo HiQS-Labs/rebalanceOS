@@ -1,0 +1,25 @@
+# static gates (ci.yml lint + docs + PDDA), head 98665a5 (test code unchanged since ae11876)
+## ruff check . → exit 0
+All checks passed!
+## ruff format --check . → exit 0
+670 files already formatted
+## python utils/pdda/check_banned_imports.py --check → exit 0
+sqlite gateway ratchet: clean (0 baseline file(s) matched exactly)
+banned-import ratchet: clean (29 baseline file(s) matched exactly)
+## python utils/pdda/check_script_inventory.py --check → exit 0
+script-inventory ratchet: clean (matches baseline)
+## python utils/pdda/check_machine_paths.py --check → exit 0
+check_machine_paths: clean (0 machine-local path violations)
+## python utils/pdda/check_read_layer.py --check → exit 0
+read-layer ratchet: clean (52 baseline site(s) matched exactly)
+## python utils/pdda/check_near_duplicates.py --check → exit 0
+near-duplicate canary: clean (7 baseline pair(s) matched exactly)
+## python scripts/check_doc_links.py → exit 0
+checked 536 relative markdown links under <task-clone>
+no broken links, no machine-local paths
+## bash utils/pdda/pdda.sh run → exit 0
+PDDA run complete: 26 error(s) found, not blocking in observe mode — pdda-check-frontmatter pdda-check-status-table pdda-check-roadmap-coverage pdda-check-banned-imports
+Run with PDDA_MODE=full (or .pdda-mode) once these are fixed, so they block.
+## python -m pytest -q tests/test_version_sync.py tests/test_dashboard_cli.py → exit 0
+...                                                                      [100%]
+3 passed in 0.37s
