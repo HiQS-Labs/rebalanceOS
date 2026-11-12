@@ -46,7 +46,7 @@ goal: >
 | O7 | Falsification, scratch clone of `88a8972`, `test_auto_promote.py` dates sed-shifted | today−10d: `16 passed`. today−22d: `9 failed, 7 passed`. The production promotion logic is correct for in-window data, so the 9 are pure fixture aging |
 | O8 | Upstream issue Hypercart-Dev-Tools/rebalance-OS#178 (open) | The July report "auto-promote is not promoting" was the same visible symptom. Whatever the July product cause was (pre-`ed320289` `_activity_repos` filter), at HEAD the only remaining cause is the date window (O7) |
 
-**Production bug?** No. Both windows are intended rolling windows (`get_watched_repos` docstring, "active in the last 14 days"; calendar 90/14). `_activity_repos` uses SQLite `date('now')` while `_pushed_repos` uses `time_ops.now_utc()`. Both read the real wall clock, and the inconsistency only matters for clock-freezing tests. Not in scope; noted.
+**Production change needed?** None is needed to fix these ten failures (O7 plus the traced windows support that scope; this is not a claim that the auto-promote path is defect-free). Both windows are intended rolling windows (`get_watched_repos` docstring, "active in the last 14 days"; calendar 90/14). `_activity_repos` uses SQLite `date('now')` while `_pushed_repos` uses `time_ops.now_utc()`. Both read the real wall clock, and the inconsistency only matters for clock-freezing tests. Not in scope; noted.
 
 ## Plan (one phase, test-only)
 
@@ -62,7 +62,7 @@ goal: >
 ## Acceptance (falsifiable)
 
 - A1: On base `88a8972`, the 10 test IDs fail (red control, recorded). On the fix commit they pass **without** an xfail marker (`-rA` output shows PASSED, not XPASS).
-- A2 (decay falsifier, auto-promote): temporarily pass `scan_date=_days_ago(20)` (outside 14d) to the default, and the 9 fail. Restore, and they pass. This witnesses that the fixture is the only date coupling.
+- A2 (decay falsifier, auto-promote): in a disposable clone, temporarily age **both** date inputs outside the 14-day window: the helper defaults (`_days_ago(20)`) **and** the sum test's explicit dates (`_days_ago(22/21/20)`). All 9 fail. Restore, and they pass. This witnesses that fixture dates are the only date coupling. (Plan QA R1: aging only the default would leave the sum test passing, so 8, not 9.)
 - A3 (decay falsifier, project inference): remove the `now_utc` patch and the test fails with the `BetaReport` assertion. With the patch it passes. Also run it with the patch at a far-future `now` (2030-01-01, outside the window) and see it fail, which shows the patch is load-bearing.
 - A4: `KNOWN_FAILING_GH178 == set()`, and `tests/test_conftest_quarantine.py` passes.
 - A5: `pytest tests/` on the fix has no failure outside base's failure set minus these 10 (the local env may carry unrelated pre-existing failures; they are recorded by ID on both sides).

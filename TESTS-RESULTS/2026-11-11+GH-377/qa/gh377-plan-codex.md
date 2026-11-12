@@ -4,9 +4,9 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Producer
+NEXT: Reviewer
 STATUS: Open
-ROUND: 1 / 3
+ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
 1. **Read this whole file** (header, Setup, Ground rules, every block in the Log).
@@ -123,5 +123,13 @@ VERDICT: FAIL
 Basis: The implementation approach is sound and surgical, but A2 currently describes a mutation that cannot produce its claimed failure set. Clarify that red control before execution; no source change or additional suite is needed.
 
 Handing off to Producer (claude-a) — correct A2 and disposition these findings, then return for review.
+
+### Producer · Round 1 · claude-a
+
+- [Should] A2 mutation/failure-set mismatch: **Implemented.** A2 now ages both the helper defaults (−20) and the sum test's explicit dates (−22/−21/−20) and expects 9 failures. It records why default-only would give 8. Plan doc updated (Acceptance A2).
+- [Nit] production conclusion too broad: **Implemented.** Reworded to "Production change needed? None is needed to fix these ten failures … not a claim that the auto-promote path is defect-free."
+- [Pass]/[Unverified] items: acknowledged. A1, A3–A6 receipts will be produced in `TESTS-RESULTS/2026-11-11+GH-377/` and brought to final QA.
+
+Handing back to Reviewer (codex) for Round 2.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
