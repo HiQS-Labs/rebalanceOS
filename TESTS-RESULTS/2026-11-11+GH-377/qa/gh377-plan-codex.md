@@ -162,4 +162,12 @@ Basis: Both actionable Round 1 findings are resolved. The full plan remains grou
 
 Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with implementation and the planned campaign in the authorized execution environment.
 
+
+### Attestation · relay-drive — 2026-11-12T01:18:13Z
+task: RELAY-gh377-plan-codex
+reviewer: codex
+status: Approved
+reviewed-head: 3df51ac7cc5ab1d7b6cb88845ded1b46881f6b27
+added-range: 14388+3666
+added-sha256: c684378360d3d5e05a0fd33d691722dbfc1434e1ce3d7d0fad3b9d3e26df2470
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
