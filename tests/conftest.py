@@ -98,18 +98,11 @@ def gh178_quarantine_reason() -> str:
     )
 
 
-KNOWN_FAILING_GH178 = {
-    "tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold",
-    "tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert",
-    "tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only",
-}
+#: GH-377 (2026-11-11): emptied. The ten entries were fixed-date fixtures aged
+#: out of rolling windows (14-day SQLite candidate window, 90-day calendar
+#: window), exposed when this quarantine expired on 2026-11-01. The helper and
+#: its expiry policy stay for any future, deliberately re-quarantined entry.
+KNOWN_FAILING_GH178: set[str] = set()
 
 
 # GH-250 / GH-42: `metal_available()` (probes for a usable Metal device

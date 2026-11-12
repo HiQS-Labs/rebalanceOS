@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -25,9 +26,20 @@ from rebalance.ingest.project_inference import (
 from rebalance.ingest.registry import sync_db
 
 
-def _insert_commit(
-    db: Path, *, repo: str, sha: str, author_login: str, committed_at: str = "2026-07-01T00:00:00Z"
-) -> None:
+def _days_ago(n: int) -> str:
+    """UTC date ``n`` days before today, ISO ``YYYY-MM-DD``.
+
+    GH-377: candidates come from ``_activity_repos``, which filters
+    ``scan_date >= date('now', '-14 days')`` on SQLite's own clock — not
+    freezable from Python — so fixtures sit relative to today instead of at a
+    fixed date that ages out (same approach as #243). Callers use >= 1 day ago
+    to stay clear of a UTC-midnight race between Python and SQLite.
+    """
+    return (datetime.now(timezone.utc).date() - timedelta(days=n)).isoformat()
+
+
+def _insert_commit(db: Path, *, repo: str, sha: str, author_login: str, committed_at: str | None = None) -> None:
+    committed_at = committed_at or f"{_days_ago(1)}T00:00:00Z"
     conn = sqlite3.connect(db)
     conn.execute(
         """
@@ -43,12 +55,13 @@ def _insert_commit(
 
 
 def _insert_activity(
-    db: Path, *, repo: str, login: str = "tester", commits: int = 3, scan_date: str = "2026-07-01"
+    db: Path, *, repo: str, login: str = "tester", commits: int = 3, scan_date: str | None = None
 ) -> None:
     """Seed github_activity — the operator's own push-events feed. ``commits``
     drives _count_operator_commits' primary signal; a fixed nonzero ``pushes``
     keeps the row a valid "candidate" (_activity_repos requires the summed
     counters to be > 0) even when ``commits=0`` (the fork-with-zero test)."""
+    scan_date = scan_date or _days_ago(1)
     conn = sqlite3.connect(db)
     conn.execute(
         """
@@ -115,9 +128,9 @@ class AutoPromoteTests(unittest.TestCase):
         # Each scan_date row is preserved (window-refetch semantics), so the
         # cumulative count must sum across days, not just read the latest.
         repo = "Acme/widget"
-        _insert_activity(self.db_path, repo=repo, commits=1, scan_date="2026-06-30")
-        _insert_activity(self.db_path, repo=repo, commits=1, scan_date="2026-07-01")
-        _insert_activity(self.db_path, repo=repo, commits=1, scan_date="2026-07-02")
+        _insert_activity(self.db_path, repo=repo, commits=1, scan_date=_days_ago(3))
+        _insert_activity(self.db_path, repo=repo, commits=1, scan_date=_days_ago(2))
+        _insert_activity(self.db_path, repo=repo, commits=1, scan_date=_days_ago(1))
 
         summary = sync_commit_threshold_promotions(self.db_path)
 
