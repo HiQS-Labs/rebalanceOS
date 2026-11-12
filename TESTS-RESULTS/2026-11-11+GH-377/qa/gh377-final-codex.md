@@ -128,4 +128,12 @@ Basis: Both R1 Should findings are resolved. The reviewed source and retained re
 
 Relay closed (Approved), no further turn needed.
 
+
+### Attestation · relay-drive — 2026-11-12T01:38:56Z
+task: RELAY-gh377-final-codex
+reviewer: codex
+status: Approved
+reviewed-head: 32d47669a1eff996a2456e17b03a7d5f53006b0a
+added-range: 14035+2965
+added-sha256: dfd4d86130b95134bd251ca384651dff92073e78ab674fa725d962195c37cb45
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
