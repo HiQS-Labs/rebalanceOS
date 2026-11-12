@@ -11,12 +11,12 @@ Issue: https://github.com/HiQS-Labs/rebalanceOS/issues/377 · Plan: [GH-377](../
 | A5 full suite parity | base `10 failed, 2839 passed` (failures = the 10 GH-178 IDs exactly); fix `2849 passed, 0 failed` | [root-tests.txt](root-tests.txt) |
 | A6 hosted `root-noembed` 3.12/3.13 | pending on PR head | PR checks |
 | Smoke (main + adjacent) | main `23 passed`; adjacent: TZ=Pacific/Kiritimati and Pacific/Pago_Pago, and a second run, `19 passed` each | [smoke.txt](smoke.txt) |
-| Static gates | ruff check/format, five PDDA ratchets, doc links, `pdda.sh run`: all exit 0. `mypy src/` not run (no `src/` change) | [static-gates.txt](static-gates.txt) |
+| Static gates | ruff check/format, five PDDA ratchets, doc links, `pdda.sh run`: all exit 0. `mypy src/` not run (the only `src/` change is the version string) | [static-gates.txt](static-gates.txt) |
 
 Disposable clone identity bracket: [identity.txt](identity.txt) (same HEAD and origin before and after, clean tree).
 Plan QA: [qa/gh377-plan-codex.md](qa/gh377-plan-codex.md) (Codex, Approved R2, attested).
 
-`rebalance doctor` was not run: the change touches only `tests/` and cannot affect the live runtime, DB or scheduler that doctor inspects.
+`rebalance doctor` was not run: the change touches test fixtures plus the version string and cannot affect the live runtime, DB or scheduler that doctor inspects.
 
 ## Threats to validity and deviations
 

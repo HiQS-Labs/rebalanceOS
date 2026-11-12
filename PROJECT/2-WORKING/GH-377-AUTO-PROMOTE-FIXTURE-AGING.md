@@ -31,7 +31,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA Approved (Codex R2, attested). Implemented test-only fix `ae11876`. A1–A5 and smoke green in a disposable clone (fix: 2849 passed, 0 failed). Evidence: [campaign](../../TESTS-RESULTS/2026-11-11+GH-377/SUMMARY.md). | Final Codex QA, then ready PR. A6 (hosted `root-noembed`) is verified on the PR head. |
+| Plan QA and final QA Approved (Codex, both R2, attested). Test fix `ae11876` + 0.107.1 bump. A1–A5 and smoke green (fix: 2849 passed, 0 failed). Evidence: [campaign](../../TESTS-RESULTS/2026-11-11+GH-377/SUMMARY.md). | PR ready; awaiting merge. A6 = hosted `root-noembed` on the PR head. After merge: move to 3-COMPLETED. |
 
 ## Observed (base `88a8972`, 2026-11-11)
 
