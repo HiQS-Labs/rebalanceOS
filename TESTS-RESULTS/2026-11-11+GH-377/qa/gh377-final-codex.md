@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -55,7 +55,7 @@ ROUND: 1 / 3
 - Artifact under review: the implementation diff from base 88a8972 to HEAD on this branch, specifically `tests/test_auto_promote.py`, `tests/test_project_inference.py` and `tests/conftest.py`, plus the plan `PROJECT/2-WORKING/GH-377-AUTO-PROMOTE-FIXTURE-AGING.md` (Approved in `TESTS-RESULTS/2026-11-11+GH-377/qa/gh377-plan-codex.md`) and the campaign `TESTS-RESULTS/2026-11-11+GH-377/` (its SUMMARY, witnesses, root-tests, smoke, static-gates, identity and provenance receipts and the witness script).
 - Reviewer: codex   ·   Producer: claude-a
 - Started: 2026-11-11
-- Definition of Done: plan acceptance A1–A5 are substantiated by the retained receipts (A6, hosted CI, is verified after the PR opens). The code matches the approved plan with no production change, no new test/suite and no conftest machinery added. KNOWN_FAILING_GH178 is empty and its helper is intact. The rating 70/55/50/85 still matches the evidence.
+- Definition of Done: plan acceptance A1–A5 are substantiated by the retained receipts (A6, hosted CI, is verified after the PR opens). The code matches the approved plan with no production change, no new test/suite and no conftest machinery added. KNOWN_FAILING_GH178 is empty and its helper is intact. The rating 70/55/50/85 still matches the evidence.  [Unverified — no citation]
 
 **Operational envelope:** a test-only fix in a single-repo Python suite. Grade against stated acceptance and commensurate complexity. No freezegun/libfaketime, no production refactor, no new suites.
 
@@ -76,5 +76,30 @@ ROUND: 1 / 3
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 · codex
+
+swept file: yes
+
+Reviewed the whole three test files, approved plan, campaign summary, witness script and all listed receipts; traced the calendar clock/status consumers. No additional pre-existing functional defect requiring a test-file change was identified. This is source/receipt review, not an independent suite execution or an independently reconstructed base diff (git is prohibited in this seat).
+
+- [Pass] **Fixture implementation matches steps 1–3.** `tests/test_auto_promote.py:29–38,41–42,57–64,127–137` supplies UTC-relative defaults and all three explicit sum dates; no fixed `2026-` date remains in that file. All current callers supply either omitted values or nonempty explicit dates, so `or` does not change an existing explicit-value case. Yesterday remains inside the inclusive 14-day window across UTC midnight; it does not require Python and SQLite to sample the same date. Keep this bounded approach.
+- [Pass] **Freeze covers both consumers and is scoped.** `tests/test_project_inference.py:143–152` patches the module-bound import at `src/rebalance/ingest/project_inference.py:11`; calendar loading at line 240 and `_seed_status` at line 468 both execute inside that context. The April 17/24 inputs (test lines 118–131) remain in-window. Other fixed dates in the file support GitHub-only assertions without a calendar seed requirement. The context manager restores the binding afterward. `tests/conftest.py:105,138–139` leaves an empty quarantine and existing expiry machinery intact.
+- [Pass] **Retained receipts substantiate A1–A5 at the stated scope.** `witnesses.txt` reports “mutated sites: 5”, “9 failed, 7 passed”, then “16 passed”; its nine A2 failure IDs equal the auto-promote subset of A1. The witness script targets both defaults and three explicit sum sites. A3 mutations each report one site and one failure, followed by restoration passing; the appended assertion excerpt is “'BetaReport' not found in ['Acme']”. A4 reports “KNOWN_FAILING_GH178 = set()” and four helper passes. `root-tests.txt` lists exactly the same ten base failure IDs and “2849 passed”/“exit=0” for the fix. These are retained producer receipts, not reruns by this reviewer.
+- [Should] **Resolve the version-policy conflict before closeout.** Setup question 5 proposes skipping a bump because this is test-only, but `AGENTS.md:217–219` requires a bump for “Every fix or feature” and exempts documentation-only changes. Historical #243 precedent alone does not establish an exception to that current instruction. Cheapest fix: apply the normal patch bump/changelog at commit/merge, or cite an explicit applicable operator authorization/policy exception in the existing task doc. No production behavior change is requested.
+  Observed input: this fixture bugfix changes executable test code, while Setup question 5 explicitly asks whether skipping its bump is consistent.
+  Affected scope: GH-377 release metadata and its claimed policy compliance only.
+  Falsifier: an explicit applicable instruction exempting test-only fixes would make a bump unnecessary; cite it and retain the test-only scope.
+- [Should] **Finish the campaign's validity disclosure.** `SOP.md` §4.1 requires every SUMMARY to end with threats to validity and deviations. The current SUMMARY ends with the doctor omission and has no such disclosure. Append a short paragraph covering the local Python 3.13.15 run, 21 skipped tests, pending hosted 3.12/3.13 evidence, filtered rather than complete witness output, and any deviations; do not imply all environments or skipped paths were measured. This is a documentation correction, not a request for another suite.
+  Observed input: `SUMMARY.md` ends “the live runtime, DB or scheduler that doctor inspects”; `root-tests.txt` reports “21 skipped” and A6 remains pending.
+  Affected scope: interpretation of this campaign's A1–A5 evidence.
+  Falsifier: an existing final validity section explicitly covering those limits would satisfy the requirement; none appears in the supplied summary.
+- [Pass] **Scope remains proportionate.** The plan's “no production code change” and “no new tests, suites or conftest machinery” match the reviewed fixture approach. The summary's doctor omission is reasonable for that scope. The 70/55/50/85 rating remains a prioritization judgment supported by the plan's CI-impact and three-file effort rationale, not a measured product metric. Keep the small repair; no new subsystem is warranted.
+- [Unverified — needs clone run] No pytest, executable fixtures, validation scripts or git commands ran this turn. Independent behavior execution remains the harness gate; A6 remains the explicitly deferred hosted PR check. The identity receipt brackets `ae11876…` with `dirty=0`, but this seat did not independently reconstruct the commit diff or re-fetch #243.
+
+VERDICT: FAIL
+Basis: The source and retained behavioral evidence support the fixture repair. Closeout still needs the explicit version-policy disposition and SOP-required validity disclosure; no additional functional change or new test is requested.
+
+Handing off to Producer (claude-a) — disposition these two findings, then return for review. Go to the Producer window and say 'take your turn'.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
