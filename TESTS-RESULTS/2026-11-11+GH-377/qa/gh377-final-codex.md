@@ -52,7 +52,7 @@ ROUND: 1 / 3
    was merely waiting looked stalled. A turn that ends without this line is not finished.
 
 ## Setup
-- Artifact under review: the implementation diff from base 88a8972 to HEAD on this branch, specifically `tests/test_auto_promote.py`, `tests/test_project_inference.py` and `tests/conftest.py`, plus the plan `PROJECT/2-WORKING/GH-377-AUTO-PROMOTE-FIXTURE-AGING.md` (Approved in `qa/gh377-plan-codex.md`) and the campaign `TESTS-RESULTS/2026-11-11+GH-377/` (SUMMARY.md, witnesses.txt, root-tests.txt, smoke.txt, static-gates.txt, identity.txt, provenance.jsonl, scripts/witness.sh).
+- Artifact under review: the implementation diff from base 88a8972 to HEAD on this branch, specifically `tests/test_auto_promote.py`, `tests/test_project_inference.py` and `tests/conftest.py`, plus the plan `PROJECT/2-WORKING/GH-377-AUTO-PROMOTE-FIXTURE-AGING.md` (Approved in `TESTS-RESULTS/2026-11-11+GH-377/qa/gh377-plan-codex.md`) and the campaign `TESTS-RESULTS/2026-11-11+GH-377/` (its SUMMARY, witnesses, root-tests, smoke, static-gates, identity and provenance receipts and the witness script).
 - Reviewer: codex   ·   Producer: claude-a
 - Started: 2026-11-11
 - Definition of Done: plan acceptance A1–A5 are substantiated by the retained receipts (A6, hosted CI, is verified after the PR opens). The code matches the approved plan with no production change, no new test/suite and no conftest machinery added. KNOWN_FAILING_GH178 is empty and its helper is intact. The rating 70/55/50/85 still matches the evidence.
