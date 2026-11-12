@@ -1,0 +1,83 @@
+## date (UTC): 2026-11-12T01:19:34Z
+## A1 red control — base 88a8972
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+10 failed in 0.31s
+## A1 green — fix ae11876 (expect PASSED, not XPASS)
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+PASSED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+10 passed in 0.88s
+## A2 decay witness — age helper defaults to -20d AND sum-test dates to -22/-21/-20 (expect 9 failed)
+mutated sites: 5
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_below_threshold_does_not_promote
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_curated_row_never_touched
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_disabled_is_a_no_op
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_fork_with_zero_operator_commits_never_promotes
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_ignored_repo_never_promotes
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_no_github_login_configured_is_a_no_op
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_no_promotion_does_not_fire_auth_log_alert
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+9 failed, 7 passed in 0.42s
+## A2 restored
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_below_threshold_does_not_promote
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_curated_row_never_touched
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_disabled_is_a_no_op
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_fork_with_zero_operator_commits_never_promotes
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_ignored_repo_never_promotes
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_no_github_login_configured_is_a_no_op
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_no_promotion_does_not_fire_auth_log_alert
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+PASSED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+16 passed in 0.46s
+## A3a decay witness — remove the now_utc freeze (patch target -> unused name; expect BetaReport failure)
+mutated sites: 1
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+1 failed in 0.18s
+## A3b decay witness — freeze at 2030-01-01 (outside 90d; expect failure)
+mutated sites: 1
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+1 failed in 0.16s
+## A3 restored
+PASSED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+1 passed in 0.99s
+## A4 quarantine list + helper tests
+KNOWN_FAILING_GH178 = set()
+PASSED tests/test_conftest_quarantine.py::test_quarantine_active_before_expiry
+PASSED tests/test_conftest_quarantine.py::test_quarantine_boundary_exact_is_expired
+PASSED tests/test_conftest_quarantine.py::test_quarantine_expired_after_expiry
+PASSED tests/test_conftest_quarantine.py::test_quarantine_reason_carries_p13_elements
+4 passed in 0.07s
+E   AssertionError: 'BetaReport' not found in ['Acme']
+<local-path>:732: AssertionError: 'BetaReport' not found in ['Acme']
+1 failed in 0.16s

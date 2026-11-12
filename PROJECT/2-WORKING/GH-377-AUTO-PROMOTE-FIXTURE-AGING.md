@@ -31,7 +31,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Reproduced the 10 failures, traced them, falsified the hypothesis and wrote the plan (below). | Codex plan QA, then implementation. |
+| Plan QA Approved (Codex R2, attested). Implemented test-only fix `ae11876`. A1–A5 and smoke green in a disposable clone (fix: 2849 passed, 0 failed). Evidence: [campaign](../../TESTS-RESULTS/2026-11-11+GH-377/SUMMARY.md). | Final Codex QA, then ready PR. A6 (hosted `root-noembed`) is verified on the PR head. |
 
 ## Observed (base `88a8972`, 2026-11-11)
 

@@ -1,0 +1,18 @@
+# full pytest tests/ — base 88a8972 vs fix ae11876 (disposable clone, PYTHONPATH=<clone>/src, Python 3.13.15)
+## base
+10 failed, 2839 passed, 21 skipped, 2 warnings, 171 subtests passed in 221.65s (0:03:41)
+exit=1
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_activity_commits_sum_across_scan_dates
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_auto_promoted_row_survives_activity_inference_sync
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_cloud_agent_commits_count_toward_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_direct_push_commits_count_not_just_pr_commits
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_idempotent_rerun_does_not_duplicate
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_name_collision_disambiguates_instead_of_overwriting
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_operator_push_and_bot_commits_combine
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotes_repo_at_threshold
+FAILED tests/test_auto_promote.py::AutoPromoteTests::test_promotion_fires_auth_log_alert
+FAILED tests/test_project_inference.py::ProjectInferenceTests::test_infers_binoid_from_github_and_ltvera_from_calendar_only
+## fix
+2849 passed, 21 skipped, 2 warnings, 171 subtests passed in 228.21s (0:03:48)
+exit=0
+(no FAILED lines)

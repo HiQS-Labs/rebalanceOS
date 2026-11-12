@@ -1,0 +1,10 @@
+# GH-377 smoke — 2026-11-12T01:28:03Z, fix ae11876
+## main path: the 10 tests + quarantine helper
+23 passed in 0.95s
+## adjacent: rerun with TZ=Pacific/Kiritimati (local date differs from UTC; fixtures use UTC like SQLite date('now'))
+19 passed in 1.03s
+## adjacent: rerun with TZ=Pacific/Pago_Pago (local date differs from UTC; fixtures use UTC like SQLite date('now'))
+19 passed in 1.49s
+## adjacent: second consecutive invocation (idempotent, no shared state)
+19 passed in 1.17s
+dirty-after: 0
