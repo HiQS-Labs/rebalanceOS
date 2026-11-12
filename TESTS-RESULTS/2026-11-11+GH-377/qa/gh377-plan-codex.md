@@ -4,7 +4,7 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
+NEXT: Producer
 STATUS: Open
 ROUND: 1 / 3
 
@@ -88,5 +88,40 @@ Then read these and validate the plan (label this part source-backed):
 6. The relay ends on **Approved** (Reviewer only). End each turn by committing just this file; no push.
 
 ## Log
+
+### Reviewer · Round 1 · codex
+
+Input boundary: plan doc only (recorded before opening source files).
+
+**What this proposes**
+The plan replaces fixed July promotion dates with recent UTC dates and freezes calendar inference at the April fixture instant. It empties the expired quarantine while retaining expiry machinery, then requires base/fix and deliberate decay controls plus hosted CI evidence.
+
+**How the existing system works, per this document**
+Repository candidates use SQLite's rolling 14-day date filter, while calendar seeding uses the imported Python `now_utc` over 90 days. Calendar-only seeds need two events; quarantine expiry exposes nine promotion failures and one missing calendar seed. Inference: changing fixture time inputs should restore coverage without changing production windows.
+
+**What it's not**
+This is not a production change, renewed quarantine, new clock dependency, or production refactor.
+
+**Source-backed validation**
+
+swept file: yes
+
+Reviewed the entire plan and all four named test files, plus the relevant production candidate/counting, calendar seed/status, write partition and stale cleanup paths. No additional pre-existing defect was identified in the test files beyond the known fixed-date fixtures; this is a bounded plan review, not a claim that all production behavior is defect-free.
+
+- [Should] **Make A2's mutation match its expected nine failures.** The plan says “temporarily pass `scan_date=_days_ago(20)` ... to the default, and the 9 fail,” but the sum test bypasses that default with three explicit dates (`tests/test_auto_promote.py:118–120`; plan step 1 keeps explicit −3/−2/−1). Aging only the default leaves this test eligible. Cheapest fix: explicitly age all three sum-test dates as well (e.g. −22/−21/−20), or expect eight failures for the default-only mutation and separately witness the sum test's decay. This is an acceptance-protocol correction, not a request for production behavior changes.
+  Observed input: three explicit `scan_date` arguments in `test_activity_commits_sum_across_scan_dates`, preserved as recent relative dates by step 1.
+  Affected scope: A2's default-only mutation and its claimed nine-failure result.
+  Falsifier: in the disposable clone, change only the default to −20 while retaining explicit −3/−2/−1; the sum test should pass. If it fails specifically from candidate aging, this finding is wrong.
+- [Pass] **Clock ownership and minimal fix are supported.** `_activity_repos` uses `WHERE scan_date >= date('now', ?)` (`src/rebalance/ingest/index_ops.py:953`); `get_watched_repos` defaults to 14 days. `project_inference.py:11,240,468` imports and reads the same module-bound `now_utc` in calendar loading and status calculation. Patching that namespace for the entire inference call covers both; the April 17/24 events are within 90 days of April 28, and `project_inference.py:776` admits calendar-only seeds with at least two events. Keep the planned fixture-only approach.
+- [Pass] **No additional date dependency found in the nine promotion tests.** The fixed inputs are the helper defaults and the explicit sum dates (`tests/test_auto_promote.py:29,46,118–120`); counting itself has no timestamp predicate (`project_inference.py:831`, `_count_operator_commits`). Recent inputs can change inferred status but stale deletion explicitly owns only `activity_inference_v1` (`project_inference.py:676–692`), so it does not delete an auto-promotion marker. Keep the survival assertion unchanged.
+- [Pass] **Empty quarantine is compatible with existing helper coverage.** Collection tests membership before adding xfail (`tests/conftest.py:145`); the four tests in `tests/test_conftest_quarantine.py:18–36` exercise expiry/reason helpers rather than list contents. Use `set()`, not `{}`, and retain the helper tests as planned.
+- [Unverified — no citation] **Scope and precedent fit.** Issue #377's “Plan (test-only, surgical)” matches the artifact. Merged PR #243 states “Production cutoffs are unchanged” and its diff derives activity snapshots from current UTC dates. The plan's “three test files” and neutral appeal 50 support a small, bounded repair; 70/55/50/85 is a reasonable prioritization judgment, not a measured score.
+- [Nit] **Qualify the production conclusion.** “Production bug? No” is broader than the demonstrated fixture diagnosis. Prefer “No production change is needed to address these ten failures”; O7 and the traced windows support that scope, not universal correctness. No production refactor is requested.
+- [Unverified — needs clone run] A1, A3–A6 and O7's behavioral results were not independently executed here. A1/base comparison, A3's removed/future freeze, A4's helper run, A5's failure-ID comparison and A6's two hosted lanes are falsifiable and proportionate. Preserve their raw evidence in the campaign; approve implementation results only after those receipts exist. No pytest, fixtures, validate scripts, or git commands were run in this turn.
+
+VERDICT: FAIL
+Basis: The implementation approach is sound and surgical, but A2 currently describes a mutation that cannot produce its claimed failure set. Clarify that red control before execution; no source change or additional suite is needed.
+
+Handing off to Producer (claude-a) — correct A2 and disposition these findings, then return for review.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
