@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -109,5 +109,23 @@ Handing off to Producer (claude-a) — disposition these two findings, then retu
 - No test or fixture code changed this round. Static gates rerun on the new head (see static-gates.txt).
 
 Handing back to Reviewer (codex) for Round 2.
+
+### Reviewer · Round 2 · codex
+
+swept file: yes
+
+Re-read the complete three test files, plan, witness script and retained campaign receipts, plus the release metadata added in response to R1. No additional pre-existing functional defect requiring a change was identified in the reviewed test files. This is source and receipt review; no git, suite, executable fixture or validation script ran in this seat.
+
+- [Pass] **R1 version-policy finding resolved.** `src/rebalance/__init__.py:33`, `manifest.json:5` and `pyproject.toml:7` now carry `0.107.1`; CHANGELOG's quoted heading “## [0.107.1] - 2026-11-11” has a Fixed entry explaining the fixture aging and restored normal checks. This is the narrow release-metadata exception to the plan's no-production-change wording, with no runtime logic change requested.
+- [Pass] **R1 validity-disclosure finding resolved.** `SUMMARY.md:21–27` now explicitly covers local Python 3.13.15, 21 skipped tests, pending hosted evidence, filtered output, residual clock coupling and deviations. The quoted deviation “final QA R1 added the patch bump” explains the scope adjustment.
+- [Pass] **A1–A5 remain supported by retained producer receipts.** `witnesses.txt` retains “mutated sites: 5”, “9 failed, 7 passed”, “16 passed”, both single-site A3 failures and “KNOWN_FAILING_GH178 = set()”; `root-tests.txt` retains the same ten base failure IDs and “2849 passed, 21 skipped”. The witness script still targets both defaults and all three sum dates. The source conclusions and bounded rating rationale in R1 stand; no new machinery is warranted.
+- [Pass] **Release metadata received targeted clone validation.** `static-gates.txt:23–25` records version-sync/dashboard tests with exit 0 and “3 passed”. Its header identifies head `98665a5`; the behavioral suite receipts remain tied to `ae11876`. The PDDA receipt at lines 20–22 is an observe-mode exit 0 with 26 diagnostics, not an assertion that those diagnostics were fixed.
+- [Nit] **Some earlier summary wording predates the bump.** `SUMMARY.md:14,19` still says “no src/ change” and “touches only tests/”; lines 24 and 27 supply the accurate version-string exception. When preparing PR prose, describe the scope as test fixtures plus release metadata. This inconsistency does not invalidate the receipts or justify another relay cycle.
+- [Unverified — needs clone run] Independent behavioral reruns and commit-diff reconstruction were not performed in this restricted reviewer seat. The harness gate remains responsible for its own execution; A6 remains pending on the hosted PR head (`SUMMARY.md:12`).
+
+VERDICT: PASS
+Basis: Both R1 Should findings are resolved. The reviewed source and retained receipts support A1–A5, with the release-metadata deviation and evidence limits disclosed. Approval is final QA for this artifact, not a claim that deferred hosted A6 has run.
+
+Relay closed (Approved), no further turn needed.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
