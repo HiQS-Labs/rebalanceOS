@@ -2,7 +2,7 @@
 gh_issue: 377
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/377
 title: "ci: development red — GH-178 quarantine expired and auto-promote/project-inference fixtures aged out"
-status: in-progress
+status: "Completed — merged in PR #378 (33478bf)"
 created: 2026-11-11
 updated: 2026-11-11
 owner: Claude
@@ -31,7 +31,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Plan QA and final QA Approved (Codex, both R2, attested). Test fix `ae11876` + 0.107.1 bump. A1–A5 and smoke green (fix: 2849 passed, 0 failed). Evidence: [campaign](../../TESTS-RESULTS/2026-11-11+GH-377/SUMMARY.md). | PR ready; awaiting merge. A6 = hosted `root-noembed` on the PR head. After merge: move to 3-COMPLETED. |
+| Merged in PR #378 as `33478bf` (hosted CI 12/12 green incl. `root-noembed` 3.12/3.13 = A6; Codex plan + final QA approved R2). | Close upstream Hypercart-Dev-Tools/rebalance-OS#178 (quarantine now empty). |
 
 ## Observed (base `88a8972`, 2026-11-11)
 
