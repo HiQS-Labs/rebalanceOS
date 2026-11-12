@@ -4,8 +4,8 @@
   Scaffolded by relay-automation/new-relay.sh on 2026-11-11.
 -->
 
-NEXT: Reviewer
-STATUS: Open
+NEXT: Producer
+STATUS: Approved
 ROUND: 2 / 3
 
 ## ▶ TAKE YOUR TURN — read this first (works for ANY agent: Claude, Codex, agy)
@@ -131,5 +131,35 @@ Handing off to Producer (claude-a) — correct A2 and disposition these findings
 - [Pass]/[Unverified] items: acknowledged. A1, A3–A6 receipts will be produced in `TESTS-RESULTS/2026-11-11+GH-377/` and brought to final QA.
 
 Handing back to Reviewer (codex) for Round 2.
+
+### Reviewer · Round 2 · codex
+
+Input boundary: plan doc only for the following paraphrase, read before opening source files this turn.
+
+**What this proposes**
+Replace promotion fixture timestamps with recent UTC-relative values and freeze calendar inference at the April fixture instant. Empty the quarantine and retain existing expiry coverage. Revised A2 ages both helper defaults and the sum test's explicit dates.
+
+**How the existing system works, per this document**
+Promotion candidates pass a SQLite rolling 14-day filter; calendar seeds pass a Python-clock 90-day filter and require two events without a repo. Inference: repairing these fixture inputs should restore the intended assertions without changing production windows.
+
+**What it's not**
+No production change, renewed quarantine, new suite, or clock dependency is proposed.
+
+**Source-backed validation**
+
+swept file: yes
+
+Re-read the whole plan, all four named test files, and the candidate/counting, calendar/status, ownership and stale-cleanup paths named in Setup. No additional pre-existing defect requiring a change in these test files was identified beyond the fixed-date fixtures already covered by this plan.
+
+- [Pass] **Round 1 A2 finding resolved.** Plan acceptance A2 now explicitly ages “the helper defaults” and “the sum test's explicit dates,” with restoration afterward (plan:65). This matches the three explicit inputs in `tests/test_auto_promote.py:118–120`; the remaining nine-failure claim is an execution expectation, not a measured result here.
+- [Pass] **Round 1 scope nit resolved.** The plan now says “None is needed to fix these ten failures” and “not a claim that the auto-promote path is defect-free” (paragraph immediately above “Plan”). This is the appropriate conclusion for the traced fixture problem.
+- [Pass] **The bounded implementation remains supported.** SQLite candidate filtering is `scan_date >= date('now', ?)` (`src/rebalance/ingest/index_ops.py:953`); calendar loading and status read the module-bound clock (`src/rebalance/ingest/project_inference.py:240,468`). Calendar-only admission requires two events (`project_inference.py:776`), and the April 17/24 fixture events satisfy the proposed April 28 window. Empty membership prevents collection-time xfail marking (`tests/conftest.py:145`); the expiry helper tests do not require any quarantined IDs (`tests/test_conftest_quarantine.py:18–36`). Keep the existing surgical approach.
+- [Pass] **Acceptance remains falsifiable and proportionate.** A1 requires ordinary passes, A2/A3 deliberate decay failures and restoration, A4 retained helper coverage, A5 a base-relative failure-ID comparison, and A6 both hosted Python lanes (plan:64–69). The neutral appeal and three-file effort rationale are explicit (plan:85); the ratings are prioritization judgments.
+- [Unverified — needs clone run] No pytest, executable fixtures, validation scripts, or behavioral probes ran this turn. A1–A6 and O7 remain claims to establish from retained disposable-clone/hosted receipts during implementation QA. External issue/precedent content was not independently re-fetched this round; approval rests on the local plan and source review, not a new historical verification.
+
+VERDICT: PASS
+Basis: Both actionable Round 1 findings are resolved. The full plan remains grounded, test-only and surgical, with concrete red controls and acceptance. This approves the implementation plan, not unexecuted implementation results.
+
+Relay closed (Approved), no further turn needed. Producer (claude-a) may proceed with implementation and the planned campaign in the authorized execution environment.
 
 <!-- ↓↓↓ NEXT TURN goes here (append above nothing — this marker stays last) ↓↓↓ -->
