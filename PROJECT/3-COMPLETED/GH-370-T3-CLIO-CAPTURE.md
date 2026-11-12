@@ -1,6 +1,6 @@
 ---
 title: T3 Code prompt capture in CLIO
-status: in-progress
+status: "Completed — merged in PR #371 (70ccfc0)"
 created: 2026-10-30
 updated: 2026-10-30
 owner: Codex
@@ -16,7 +16,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| PR #371 published; hosted macOS 14 brownout traced to retired runner label. | Verify the README installation job on the supported macOS 15 runner. |
+| Merged in PR #371 as `70ccfc0` (11/11 checks green on `dbc92d9`). | Per-device CLIO publish and T3 setup, tracked in noelsaw1/noels-cross-project-tasks#87 step 10. |
 
 ## Quad Concepts
 - Missing T3 coverage → read durable human submissions across providers.

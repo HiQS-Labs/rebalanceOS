@@ -2,7 +2,7 @@
 gh_issue: 375
 source: https://github.com/HiQS-Labs/rebalanceOS/issues/375
 title: "T3 Code session store as an opt-in Rebalance work-activity source"
-status: in-progress
+status: "Completed — merged in PR #376 (88a8972)"
 created: 2026-11-11
 owner: Claude
 updated: 2026-11-11
@@ -44,7 +44,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Implemented red-first (steps 1–9a); 24-case suite + 9 mutation witnesses green/red as designed; root/HiQS suites, ratchets, doctor and live dry-run smoke recorded in `TESTS-RESULTS/2026-11-11+GH-375/SUMMARY.md`. | PR [#376](https://github.com/HiQS-Labs/rebalanceOS/pull/376) ready, awaiting merge (final Codex QA Approved r1). Operator flag-on smoke stays open on the issue. |
+| Merged in PR #376 as `88a8972`. Operator flag-on smoke done on this Mac 2026-11-11: refresh wrote 25 rows, doctor `_check_t3_code` OK ([receipt](https://github.com/HiQS-Labs/rebalanceOS/issues/375#issuecomment-6808165029)). | Scheduled-refresh check and other devices, tracked in noelsaw1/noels-cross-project-tasks#87 steps 4 and 11. |
 
 ## Idea
 
